@@ -80,6 +80,9 @@ final class ScheduleViewModel {
         await reloadFromCache()
         await ReminderScheduler.shared.reschedule()
         await LiveActivityManager.shared.refreshIfRunning()
+        // bootstrap() skips the keychain check in demo mode, and seeding replaced the cached Google window.
+        isSignedIn = await GoogleTokenProvider.shared.isSignedIn
+        if isSignedIn { await refresh() }
     }
 
     /// Demo replacement for the Google sync: seeds `DemoData` (once, unless `reseed`), then refreshes the

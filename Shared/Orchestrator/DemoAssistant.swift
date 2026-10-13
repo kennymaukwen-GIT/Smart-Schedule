@@ -33,7 +33,7 @@ actor DemoAssistant: ScheduleAssisting {
         let reply: Reply
         if let shifted = await shift(text, lower: lower, focusEventID: focusEventID, parser: parser) {
             reply = shifted
-        } else if Self.isGoal(lower) {
+        } else if Self.isGoal(lower), !Self.isDeleteRequest(lower) { // "delete the gym routine" is not a new plan
             reply = try await plan(text, lower: lower, now: now)
         } else if let deleteReply = await deletion(lower, now: now) {
             reply = deleteReply
@@ -308,9 +308,12 @@ actor DemoAssistant: ScheduleAssisting {
 
     // MARK: - Delete (always waits for a Confirm tap)
 
+    private static func isDeleteRequest(_ lower: String) -> Bool {
+        ["delete", "cancel", "remove", "刪除", "删除", "取消"].contains(where: { lower.contains($0) })
+    }
+
     private func deletion(_ lower: String, now: Date) async -> Reply? {
-        let words = ["delete", "cancel", "remove", "刪除", "删除", "取消"]
-        guard words.contains(where: { lower.contains($0) }) else { return nil }
+        guard Self.isDeleteRequest(lower) else { return nil }
         let snapshot = await store.snapshot()
         let events = snapshot.events.sorted { $0.start < $1.start }
         var reply = Reply()
@@ -486,14 +489,14 @@ private struct DemoParser {
 
     func extractTime(from text: inout String) -> TimeOfDay? {
         // "1pm", "2 pm", "10:30 a.m."
-        if let match = Self.match(#"(?<![\d:])(1[0-2]|0?[1-9])(?:[:：]([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])"#, in: text),
+        if let match = Self.match(#"(?<![\d:])(1[0-2]|0?[1-9])(?:[：:]([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])"#, in: text),
            let hour = Int(match.group(1) ?? "") {
             text.replaceSubrange(match.range, with: " ")
             let isPM = (match.group(3) ?? "").lowercased().hasPrefix("p")
             return TimeOfDay(hour: hour % 12 + (isPM ? 12 : 0), minute: Int(match.group(2) ?? "") ?? 0, hasMeridiem: true)
         }
         // "13:00", "9:05", "14：30"
-        if let match = Self.match(#"(?<!\d)([01]?\d|2[0-3])[:：]([0-5]\d)(?!\d)"#, in: text),
+        if let match = Self.match(#"(?<!\d)([01]?\d|2[0-3])[：:]([0-5]\d)(?!\d)"#, in: text),
            let raw = match.group(1), let hour = Int(raw), let minute = Int(match.group(2) ?? "") {
             text.replaceSubrange(match.range, with: " ")
             return TimeOfDay(hour: hour, minute: minute, hasMeridiem: hour >= 13 || raw.hasPrefix("0"))
@@ -584,14 +587,12 @@ private struct DemoParser {
         if let match = Self.match("(下下|下|這|这|本)?\\s*(?:週|周|星期|禮拜|礼拜)([一二三四五六日天])", in: text),
            let weekday = Self.chineseWeekday(match.group(2)) {
             text.replaceSubrange(match.range, with: " ")
-            let weeksAhead: Int?
             switch match.group(1) ?? "" {
-            case "下下": weeksAhead = 2
-            case "下": weeksAhead = 1
-            case "": weeksAhead = nil
-            default: weeksAhead = 0 // 這週 / 本週
+            case "下下": return mondayWeekMatch(weekday, weeksAhead: 2)
+            case "下": return mondayWeekMatch(weekday, weeksAhead: 1)
+            case "": return weekdayMatch(weekday, weeksAhead: nil)
+            default: return mondayWeekMatch(weekday, weeksAhead: 0) // 這週 / 本週
             }
-            return weekdayMatch(weekday, weeksAhead: weeksAhead)
         }
         return nil
     }
@@ -617,6 +618,12 @@ private struct DemoParser {
         }
         let weekStart = calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today
         return DayMatch(date: offset(7 * weeksAhead + weekday - 1, from: weekStart))
+    }
+
+    /// Chinese weeks run Monday–Sunday, so 這週日 / 下週日 is the Sunday that ends that week, not the one before it.
+    private func mondayWeekMatch(_ weekday: Int, weeksAhead: Int) -> DayMatch {
+        let monday = offset(-((calendar.component(.weekday, from: today) + 5) % 7), from: today)
+        return DayMatch(date: offset(7 * weeksAhead + (weekday + 5) % 7, from: monday))
     }
 
     private func upcoming(monthName: String?, day: String?) -> Date? {
