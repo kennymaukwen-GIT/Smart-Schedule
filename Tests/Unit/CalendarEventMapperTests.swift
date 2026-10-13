@@ -13,9 +13,9 @@ final class CalendarEventMapperTests: XCTestCase {
         let name = "create_events.single.json"
         let args = try Fixtures.args(CreateEventsArgs.self, from: name)
         let utterance = try Fixtures.utterance(name)
-        let draft = try XCTUnwrap(args.events.first)
+        let eventDraft = try XCTUnwrap(args.events.first)
 
-        let mapped = try mapper.event(from: draft, seed: "s", utterance: utterance)
+        let mapped = try mapper.event(from: eventDraft, seed: "s", utterance: utterance)
         let body = mapped.body
 
         XCTAssertEqual(body.id, "ss0gt731rkolpbr2h5lmvb3fudbg")

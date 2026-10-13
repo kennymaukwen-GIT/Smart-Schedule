@@ -1,0 +1,104 @@
+import XCTest
+
+final class LiveActivityStateBuilderTests: XCTestCase {
+    private let clock = TestClock.clock
+    /// Wednesday 2026-10-14 10:00 BST.
+    private let now = TestClock.local(2026, 10, 14, 10, 0)
+
+    private func build(_ events: [ScheduleEvent], lastLine: String? = nil, now: Date? = nil) -> ScheduleActivityAttributes.ContentState {
+        LiveActivityStateBuilder.build(events: events, lastLine: lastLine, now: now ?? self.now, clock: clock)
+    }
+
+    func testWeekHasSevenDaysStartingSunday() {
+        let state = build([])
+        XCTAssertEqual(state.days.count, 7)
+        XCTAssertEqual(state.days.map(\.dayNumber), [11, 12, 13, 14, 15, 16, 17])
+        XCTAssertEqual(state.weekStart, TestClock.local(2026, 10, 11))
+        XCTAssertEqual(state.todayIndex, 3)
+        XCTAssertNil(state.eventID)
+        XCTAssertNil(state.countdownTarget)
+        XCTAssertFalse(state.isInProgress)
+    }
+
+    func testWeekAcrossAutumnDSTChange() {
+        // Tuesday after the clocks go back; the week starts on Sunday 25th, which is 25 hours long.
+        let state = build([], now: TestClock.local(2026, 10, 27, 9, 0))
+        XCTAssertEqual(state.days.map(\.dayNumber), [25, 26, 27, 28, 29, 30, 31])
+        XCTAssertEqual(state.weekStart, TestClock.local(2026, 10, 25))
+        XCTAssertEqual(state.todayIndex, 2)
+    }
+
+    func testNextUpcomingEventDrivesCountdown() throws {
+        let past = TestEvents.make(id: "past", title: "Breakfast",
+                                   start: TestClock.local(2026, 10, 14, 7), end: TestClock.local(2026, 10, 14, 8))
+        let allDay = TestEvents.make(id: "allday", title: "Holiday",
+                                     start: TestClock.local(2026, 10, 14), end: TestClock.local(2026, 10, 15), allDay: true)
+        let next = TestEvents.make(id: "next", title: "Online meeting on the product quality",
+                                   start: TestClock.local(2026, 10, 14, 14), end: TestClock.local(2026, 10, 14, 15))
+        let tomorrow = TestEvents.make(id: "tomorrow", title: "Dentist",
+                                       start: TestClock.local(2026, 10, 15, 9), end: TestClock.local(2026, 10, 15, 10))
+
+        let state = build([tomorrow, past, allDay, next], lastLine: "Schedule set")
+        XCTAssertEqual(state.eventID, "next")
+        XCTAssertEqual(state.headline, next.title)
+        XCTAssertEqual(state.shortHeadline, String(next.title.prefix(16)))
+        XCTAssertFalse(state.isInProgress)
+        XCTAssertEqual(state.countdownFrom, now)
+        let target = try XCTUnwrap(state.countdownTarget)
+        XCTAssertEqual(target, next.start)
+        XCTAssertLessThanOrEqual(state.countdownFrom, target)
+        XCTAssertEqual(state.lastAssistantLine, "Schedule set")
+    }
+
+    func testInProgressEventCountsDownToItsEnd() throws {
+        let current = TestEvents.make(id: "now", title: "Standup",
+                                      start: TestClock.local(2026, 10, 14, 9, 30), end: TestClock.local(2026, 10, 14, 11))
+        let later = TestEvents.make(id: "later", start: TestClock.local(2026, 10, 14, 13), end: TestClock.local(2026, 10, 14, 14))
+
+        let state = build([later, current])
+        XCTAssertEqual(state.eventID, "now")
+        XCTAssertTrue(state.isInProgress)
+        let target = try XCTUnwrap(state.countdownTarget)
+        XCTAssertEqual(target, current.end)
+        XCTAssertLessThanOrEqual(state.countdownFrom, target)
+    }
+
+    func testCompletedEventIsSkipped() {
+        var done = TestEvents.make(id: "done", start: TestClock.local(2026, 10, 14, 11), end: TestClock.local(2026, 10, 14, 12))
+        done.isCompleted = true
+        let next = TestEvents.make(id: "next", start: TestClock.local(2026, 10, 14, 12), end: TestClock.local(2026, 10, 14, 13))
+        XCTAssertEqual(build([done, next]).eventID, "next")
+    }
+
+    func testChipsAreTruncatedAndOverflowCounted() {
+        let events = (0..<3).map { index in
+            TestEvents.make(id: "e\(index)", title: "Very long event title \(index)",
+                            start: TestClock.local(2026, 10, 15, 9 + index), end: TestClock.local(2026, 10, 15, 10 + index),
+                            kind: index == 0 ? .task : .event)
+        }
+        let thursday = build(events).days[4]
+        XCTAssertEqual(thursday.dayNumber, 15)
+        XCTAssertEqual(thursday.chips.count + thursday.overflow, 3)
+        XCTAssertTrue(thursday.chips.allSatisfy { $0.title.count <= 10 })
+        XCTAssertEqual(thursday.chips.first?.isTask, true)
+    }
+
+    func testPayloadStaysUnderBudgetForBusyWeek() throws {
+        let title = String(String(repeating: "健身訓練與會議", count: 9).prefix(60))
+        XCTAssertEqual(title.count, 60)
+        let weekStart = TestClock.local(2026, 10, 11)
+        let events = (0..<80).map { index -> ScheduleEvent in
+            let start = weekStart.addingTimeInterval(Double(index % 7) * 86_400 + Double(8 + index / 7) * 3600)
+            return TestEvents.make(id: "busy\(index)", title: title, start: start, end: start.addingTimeInterval(1800),
+                                   kind: index % 3 == 0 ? .task : .event, colorHex: "#0B8043")
+        }
+
+        let state = build(events, lastLine: String(repeating: "x", count: 500))
+        let encoded = try JSONEncoder().encode(state)
+        XCTAssertLessThanOrEqual(encoded.count, 3_200, "ActivityKit content must stay well under 4 KB")
+        XCTAssertEqual(state.days.count, 7)
+        XCTAssertEqual(state.days.reduce(0) { $0 + $1.chips.count + $1.overflow }, 80)
+        XCTAssertLessThanOrEqual(state.lastAssistantLine?.count ?? 0, 60)
+        XCTAssertLessThanOrEqual(state.shortHeadline.count, 16)
+    }
+}
