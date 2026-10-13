@@ -67,6 +67,9 @@ targets:
     dependencies:
       - target: SmartScheduleWidgets
       - target: SmartScheduleNotificationContent
+    scheme:
+      testTargets:
+        - SmartScheduleCoreTests
 
   # ───────────── Widget extension: Live Activity / Dynamic Island + Control Center ─────────────
   SmartScheduleWidgets:
@@ -138,3 +141,20 @@ targets:
       properties:
         com.apple.security.application-groups: [group.com.smartschedule.shared]
         keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]
+
+  # ───────────── Hostless unit tests: pure logic in Shared/, compiled straight into the bundle ─────────────
+  # No TEST_HOST, so tests run without launching the app. Shared/Intents (the app/widget App Intents) is left
+  # out; nothing else in Shared/ references it. Tests/fixtures ships as a "fixtures" folder inside the bundle.
+  SmartScheduleCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests/Unit
+      - path: Shared
+        excludes: ["Intents/**"]
+      - path: Tests/fixtures
+        type: folder
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.coretests
+        GENERATE_INFOPLIST_FILE: YES
