@@ -1,8 +1,7 @@
 import XCTest
 
 final class CalendarEventMapperTests: XCTestCase {
-    private let clock = TestClock.clock
-    private lazy var mapper = CalendarEventMapper(clock: clock, policy: ReminderPolicy())
+    private let mapper = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy())
 
     private func draft(_ json: String) throws -> EventDraft {
         try TestJSON.decode(EventDraft.self, json: json)
@@ -238,8 +237,8 @@ final class CalendarEventMapperTests: XCTestCase {
         XCTAssertTrue(firstDescription.contains("Phase 1: Foundation — Technique"))
         XCTAssertTrue(firstDescription.contains("Squat 3x10"))
 
-        let milestoneDays = ["2026-11-14", "2026-12-14", "2027-01-14", "2027-02-14", "2027-03-14", "2027-04-13"]
-        let milestoneEnds = ["2026-11-15", "2026-12-15", "2027-01-15", "2027-02-15", "2027-03-15", "2027-04-14"]
+        let milestoneDays: [String?] = ["2026-11-14", "2026-12-14", "2027-01-14", "2027-02-14", "2027-03-14", "2027-04-13"]
+        let milestoneEnds: [String?] = ["2026-11-15", "2026-12-15", "2027-01-15", "2027-02-15", "2027-03-15", "2027-04-14"]
         XCTAssertEqual(milestones.map { $0.body.start?.date }, milestoneDays)
         XCTAssertEqual(milestones.map { $0.body.end?.date }, milestoneEnds)
         XCTAssertEqual(milestones.first?.body.id, "ss5hkgrblhs8k8lht0gmho4ludn0")
