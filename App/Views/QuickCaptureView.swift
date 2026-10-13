@@ -5,8 +5,8 @@ private let modeStorageKey = "quickCaptureMode"
 /// Quick Capture (design 04): what the user sees after tapping the island's input pill. The OS can't host a
 /// keyboard in the island, so the app opens straight into this island-shaped card (keyboard already up) instead
 /// of the full month view, then gets out of the way. Top to bottom: focus date · DAY | WEEK | MONTH · month,
-/// the calendar in that scope, the conversation (the app's whole chat history, scrollable inside the panel) with
-/// the input bar, suggestions, and a grabber.
+/// the calendar in that scope (endless either way), the conversation (the app's whole chat history, scrollable
+/// inside the panel, with a handle to pull it up over the calendar) with the input bar, suggestions, and a grabber.
 struct QuickCaptureView: View {
     let startsWithVoice: Bool
     let onClose: () -> Void
@@ -14,11 +14,23 @@ struct QuickCaptureView: View {
     @Environment(ChatViewModel.self) private var chat
     @Environment(ScheduleViewModel.self) private var schedule
     @Environment(AppRouter.self) private var router
+    @Environment(\.locale) private var environmentLocale
     @AppStorage(modeStorageKey) private var storedMode: CalendarScope = .day
     @State private var mode: CalendarScope
     @FocusState private var inputFocused: Bool
+    /// Pulled up by its handle, by a plan card arriving, or by scrolling back through the history.
+    @State private var isConversationExpanded: Bool
+    /// The handle's drag so far (negative = up); eases back when the drag ends.
+    @GestureState(resetTransaction: Transaction(animation: .snappy)) private var handleDrag: CGFloat = 0
+    /// The whole card's height: the expanded conversation takes about 60% of it.
+    @State private var cardHeight: CGFloat = 0
 
     private static let panelFill = Color(white: 0.15)
+    /// The calendar and the conversation share this height (less while the keyboard is up); the conversation's
+    /// handle moves the line between them, so the composer stays where it is.
+    private static let splitMinHeight: CGFloat = 256
+    private static let splitMaxHeight: CGFloat = 460
+    private static let splitGap: CGFloat = 10
     /// Design 04's example inputs, in both languages on purpose.
     private static let defaultSuggestions = [
         "I want to be muscular in 6 month design me a daily routine",
@@ -27,12 +39,17 @@ struct QuickCaptureView: View {
     ]
 
     /// `initialMode` overrides the remembered scope (previews); nil opens in whatever the user picked last.
-    init(startsWithVoice: Bool, initialMode: CalendarScope? = nil, onClose: @escaping () -> Void) {
+    /// `conversationExpanded` opens with the conversation pulled up (previews).
+    init(startsWithVoice: Bool,
+         initialMode: CalendarScope? = nil,
+         conversationExpanded: Bool = false,
+         onClose: @escaping () -> Void) {
         self.startsWithVoice = startsWithVoice
         self.onClose = onClose
         // `mode` drives the animation; `storedMode` only persists it. Both read the same defaults key.
         let stored = UserDefaults.standard.string(forKey: modeStorageKey).flatMap(CalendarScope.init(rawValue:))
         _mode = State(initialValue: initialMode ?? stored ?? .day)
+        _isConversationExpanded = State(initialValue: conversationExpanded)
     }
 
     var body: some View {
@@ -47,17 +64,18 @@ struct QuickCaptureView: View {
                 .frame(height: 1)
                 .padding(.bottom, 10)
 
-            // Both flexible frames give way while the keyboard is up, so the input bar stays above it.
-            calendarArea(day: day, now: Date())
-                .frame(minHeight: 130, idealHeight: 250, maxHeight: 250)
-                .padding(.bottom, 10)
-
-            // Taller while a plan card waits for Add / Keep editing; the conversation scrolls inside either way.
-            conversationPanel
-                .frame(minHeight: 116,
-                       idealHeight: showsPlanCard ? 340 : 200,
-                       maxHeight: showsPlanCard ? 340 : 200)
-                .padding(.bottom, 10)
+            // Gives way while the keyboard is up, so the input bar stays above it.
+            GeometryReader { geo in
+                let heights = splitHeights(total: geo.size.height)
+                VStack(spacing: Self.splitGap) {
+                    calendarArea(day: day, now: Date())
+                        .frame(height: heights.calendar)
+                    conversationPanel
+                        .frame(height: heights.conversation)
+                }
+            }
+            .frame(minHeight: Self.splitMinHeight, idealHeight: Self.splitMaxHeight, maxHeight: Self.splitMaxHeight)
+            .padding(.bottom, 10)
 
             suggestionRow
                 .padding(.bottom, 6)
@@ -67,6 +85,11 @@ struct QuickCaptureView: View {
         .padding(.horizontal, 14)
         .padding(.top, 16)
         .padding(.bottom, 4)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+        } action: { height in
+            cardHeight = height
+        }
         .background(
             RoundedRectangle(cornerRadius: Theme.islandRadius, style: .continuous)
                 .fill(Color.black)
@@ -77,7 +100,10 @@ struct QuickCaptureView: View {
         )
         .padding(.horizontal, 10)
         .padding(.top, 6)
-        .onAppear { if !startsWithVoice { inputFocused = true } }
+        .onAppear {
+            if !startsWithVoice { inputFocused = true }
+            if showsPlanCard { isConversationExpanded = true }
+        }
         .onChange(of: mode) { _, newMode in
             storedMode = newMode
             inputFocused = false // picking a scope means "let me see the calendar"
@@ -92,7 +118,13 @@ struct QuickCaptureView: View {
         .onChange(of: chat.inputFocusRequest) {
             inputFocused = true // Keep editing: "What would you like to change?"
         }
-        .animation(.snappy, value: showsPlanCard)
+        // A plan card needs the room: it arrived, or a ghost occurrence asked to bring it into view.
+        .onChange(of: chat.openPlanMessageID) { _, id in
+            if id != nil { expandConversation() }
+        }
+        .onChange(of: chat.planRevealRequest) {
+            expandConversation()
+        }
         .gesture(DragGesture(minimumDistance: 20).onEnded { value in
             if value.translation.height < -40 { onClose() } // flick up = back into the island
         })
@@ -101,7 +133,13 @@ struct QuickCaptureView: View {
     // MARK: Header
 
     private func header(day: Date) -> some View {
-        ZStack(alignment: .bottom) {
+        let calendar = schedule.clock.calendar
+        let year = CalendarPaging.yearLabel(for: CalendarPaging.dayInterval(containing: day, calendar: calendar),
+                                            now: Date(),
+                                            calendar: calendar,
+                                            locale: ChatFormat.dateLocale(environmentLocale))
+
+        return ZStack(alignment: .bottom) {
             HStack(alignment: .bottom) {
                 VStack(spacing: 3) {
                     Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
@@ -114,11 +152,19 @@ struct QuickCaptureView: View {
                         .background(Circle().fill(Color.white))
                 }
                 Spacer(minLength: 0)
-                Text(day.formatted(.dateTime.month(.abbreviated)))
-                    .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .frame(height: 40)
+                VStack(alignment: .trailing, spacing: 0) {
+                    // Only outside the current year, level with the weekday over the date disc.
+                    if let year {
+                        Text(verbatim: year)
+                            .font(.system(size: 11, weight: .medium).monospacedDigit())
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    Text(day.formatted(.dateTime.month(.abbreviated)))
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .frame(height: 40)
+                }
             }
             // Centered on the card, level with the date disc.
             CaptureModePicker(selection: $mode)
@@ -133,23 +179,33 @@ struct QuickCaptureView: View {
         ZStack {
             switch mode {
             case .day:
-                DayTimelineView(day: day, events: schedule.events(on: day), hourHeight: 46, onSelect: openDetail)
+                CaptureDayPager(focusDay: day,
+                                now: now,
+                                isLoading: schedule.isLoadingRange,
+                                eventsOnDay: schedule.events(on:),
+                                onSelectEvent: openDetail,
+                                onSelectDay: selectDay,
+                                onRangeChange: loadEvents)
                     .transition(.opacity)
             case .week:
                 WeekAgendaCard(events: schedule.displayEvents,
                                focusDay: day,
                                now: now,
                                revealRequest: schedule.focusRequest,
+                               isLoading: schedule.isLoadingRange,
                                onSelectEvent: openDetail,
-                               onSelectDay: selectDay)
+                               onSelectDay: selectDay,
+                               onRangeChange: loadEvents)
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             case .month:
                 MonthScrollCard(events: schedule.displayEvents,
                                 focusDay: day,
                                 now: now,
                                 revealRequest: schedule.focusRequest,
+                                isLoading: schedule.isLoadingRange,
                                 onSelectEvent: openDetail,
-                                onSelectDay: selectDay)
+                                onSelectDay: selectDay,
+                                onRangeChange: loadEvents)
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             }
         }
@@ -169,6 +225,11 @@ struct QuickCaptureView: View {
         withAnimation(.snappy) { schedule.focusDay = day }
     }
 
+    /// Whatever range a calendar settles on gets its events, however far from today.
+    private func loadEvents(_ range: DateInterval) {
+        schedule.ensureEvents(covering: range)
+    }
+
     // MARK: Conversation
 
     /// A plan card waits for review somewhere in the conversation.
@@ -176,13 +237,42 @@ struct QuickCaptureView: View {
         chat.openPlanMessageID != nil
     }
 
+    private struct SplitHeights {
+        var calendar: CGFloat
+        var conversation: CGFloat
+    }
+
+    /// Collapsed, the conversation keeps the design's 200 pt (the calendar 250), sharing evenly once the keyboard
+    /// leaves less. Expanded, it takes about 60% of the whole card and the calendar shrinks to a strip. A drag on
+    /// the handle moves anywhere in between.
+    private func splitHeights(total: CGFloat) -> SplitHeights {
+        let usable = max(0, total - Self.splitGap)
+        let collapsed = min(usable, max(116, min(200, usable / 2)))
+        let expanded = max(collapsed, min(usable - 72, cardHeight * 0.6))
+        let base = isConversationExpanded ? expanded : collapsed
+        let conversation = min(max(base - handleDrag, collapsed), expanded)
+        return SplitHeights(calendar: usable - conversation, conversation: conversation)
+    }
+
+    private func expandConversation() {
+        guard !isConversationExpanded else { return }
+        withAnimation(.snappy) { isConversationExpanded = true }
+    }
+
+    private func toggleConversation() {
+        withAnimation(.snappy) { isConversationExpanded.toggle() }
+    }
+
     private var conversationPanel: some View {
         @Bindable var chat = chat
 
-        return VStack(spacing: 10) {
+        return VStack(spacing: 6) {
+            conversationHandle
+
             ConversationScrollView(tail: chat.conversationTail,
                                    revealRequest: chat.planRevealRequest,
-                                   revealID: chat.openPlanMessageID) {
+                                   revealID: chat.openPlanMessageID,
+                                   onScrollBack: expandConversation) {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(chat.messages) { message in
                         // Suggestions show under the panel instead.
@@ -213,9 +303,38 @@ struct QuickCaptureView: View {
                 startsRecording: startsWithVoice,
                 onSend: { chat.send() }
             )
+            .padding(.top, 4)
         }
-        .padding(10)
+        .padding(.horizontal, 10)
+        .padding(.top, 4)
+        .padding(.bottom, 10)
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Self.panelFill))
+    }
+
+    /// Grabber on top of the conversation: drag it up (or tap) for more history, down for more calendar.
+    private var conversationHandle: some View {
+        let label: LocalizedStringKey = isConversationExpanded ? "Collapse conversation" : "Expand conversation"
+
+        return Capsule()
+            .fill(Color.white.opacity(0.35))
+            .frame(width: 36, height: 4)
+            .frame(maxWidth: .infinity, minHeight: 12)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: toggleConversation)
+            // Global space: the handle itself moves while the panel grows under the finger.
+            .gesture(DragGesture(minimumDistance: 3, coordinateSpace: .global)
+                .updating($handleDrag) { value, state, _ in
+                    state = value.translation.height
+                }
+                .onEnded { value in
+                    let travel = value.predictedEndTranslation.height
+                    guard abs(travel) > 40 else { return }
+                    withAnimation(.snappy) { isConversationExpanded = travel < 0 }
+                })
+            .accessibilityElement()
+            .accessibilityLabel(Text(label))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { toggleConversation() }
     }
 
     // MARK: Suggestions + grabber

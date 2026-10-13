@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Artboard 5. Top half = view area (year, month chips, month grid). Bottom = AI conversation.
+/// Artboard 5. Top half = view area (year, month chips, month grid), both endless and kept in step through
+/// `displayedMonth`. Bottom = AI conversation.
 struct MainView: View {
     @Environment(ScheduleViewModel.self) private var schedule
     @Environment(ChatViewModel.self) private var chat
@@ -16,11 +17,12 @@ struct MainView: View {
                 .contentTransition(.numericText())
                 .padding(.top, 4)
 
-            MonthPickerBar(months: schedule.monthStrip, selection: $schedule.displayedMonth)
+            MonthPickerBar(selection: $schedule.displayedMonth)
 
             MonthGridView(
-                month: schedule.displayedMonth,
+                month: $schedule.displayedMonth,
                 today: Date(),
+                isLoading: schedule.isLoadingRange,
                 eventsOnDay: schedule.events(on:),
                 onSelect: { event in
                     // A ghost occurrence has no detail yet: bring its plan card (Add / Keep editing) into view.
@@ -39,6 +41,11 @@ struct MainView: View {
         .padding(.horizontal, 12)
         .background(Theme.canvas.ignoresSafeArea())
         .refreshable { await schedule.refresh() }
+        .onChange(of: schedule.displayedMonth, initial: true) { _, month in
+            // Every week the grid draws, however far from today.
+            schedule.ensureEvents(covering: CalendarPaging.monthGridInterval(containing: month,
+                                                                             calendar: schedule.clock.calendar))
+        }
         .overlay(alignment: .top) {
             if let error = schedule.lastError {
                 Text(error)
@@ -52,36 +59,71 @@ struct MainView: View {
     }
 }
 
+/// The month chips over the grid: a strip with no end either way. January shows its year ("JAN 2027" /
+/// "2027年1月"), so it is clear which year the strip has scrolled into; the selected chip stays centered.
 struct MonthPickerBar: View {
-    let months: [Date]
     @Binding var selection: Date
 
+    @Environment(\.locale) private var environmentLocale
+    private let calendar = WallClock().calendar
+    /// The month at offset 0; chips are month offsets from it.
+    @State private var anchor: Date
+
+    init(selection: Binding<Date>) {
+        _selection = selection
+        _anchor = State(initialValue: CalendarPaging.monthStart(containing: selection.wrappedValue,
+                                                                calendar: WallClock().calendar))
+    }
+
     var body: some View {
+        let selected = CalendarPaging.monthOffset(of: selection, from: anchor, calendar: calendar)
+        let locale = ChatFormat.dateLocale(environmentLocale)
+
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(months, id: \.self) { month in
-                        let isSelected = Calendar.current.isDate(month, equalTo: selection, toGranularity: .month)
-                        Button {
-                            withAnimation(.snappy) { selection = month }
-                        } label: {
-                            Text(month.formatted(.dateTime.month(.abbreviated)).uppercased())
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(isSelected ? Color.black : Color.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Capsule().fill(isSelected ? Color.white : Theme.surfaceRaised)
-                                )
-                                .overlay(Capsule().strokeBorder(Color.white.opacity(isSelected ? 0 : 0.6), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .id(month)
+                LazyHStack(spacing: 8) {
+                    ForEach(CalendarPaging.monthPages, id: \.self) { offset in
+                        let month = CalendarPaging.month(offset, from: anchor, calendar: calendar)
+                        chip(month, label: CalendarPaging.monthChipLabel(month, calendar: calendar, locale: locale),
+                             isSelected: offset == selected)
                     }
                 }
                 .padding(.horizontal, 4)
             }
-            .onAppear { proxy.scrollTo(selection, anchor: .center) }
+            .onAppear { proxy.scrollTo(selected, anchor: .center) }
+            .onChange(of: selection) { old, new in
+                var target = CalendarPaging.monthOffset(of: new, from: anchor, calendar: calendar)
+                if !CalendarPaging.isWithinReach(target, of: CalendarPaging.monthPages) {
+                    // Decades away: offset 0 becomes that month.
+                    anchor = CalendarPaging.monthStart(containing: new, calendar: calendar)
+                    target = 0
+                }
+                if abs(CalendarPaging.monthOffset(of: new, from: old, calendar: calendar)) <= 12 {
+                    withAnimation(.snappy) { proxy.scrollTo(target, anchor: .center) }
+                } else {
+                    proxy.scrollTo(target, anchor: .center)
+                }
+            }
         }
+        .frame(height: 32)
+    }
+
+    private func chip(_ month: Date, label: String, isSelected: Bool) -> some View {
+        Button {
+            withAnimation(.snappy) { selection = month }
+        } label: {
+            Text(verbatim: label.uppercased())
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.black : Color.white)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule().fill(isSelected ? Color.white : Theme.surfaceRaised)
+                )
+                .overlay(Capsule().strokeBorder(Color.white.opacity(isSelected ? 0 : 0.6), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 }

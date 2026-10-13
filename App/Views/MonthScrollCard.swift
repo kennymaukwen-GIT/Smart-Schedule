@@ -1,70 +1,93 @@
 import SwiftUI
 
-/// MONTH mode of Quick Capture: continuous weeks that scroll vertically (no month pages), snapping to whole
-/// rows. Titled with the first and last visible dates ("Oct 4 – Nov 7"); the badge counts the focus day's events.
-/// Opens one week before the focus week so the days just gone stay in view.
+/// MONTH mode of Quick Capture: continuous weeks that scroll vertically (no month pages) with no end either way,
+/// snapping to whole rows. Titled with the first and last visible dates ("Oct 4 – Nov 7", plus the year outside
+/// the current one); the badge counts the focus day's events. Opens one week before the focus week so the days
+/// just gone stay in view.
 struct MonthScrollCard: View {
     let events: [ScheduleEvent]
     let focusDay: Date
     let now: Date
     let revealRequest: ScheduleViewModel.FocusRequest?
+    let isLoading: Bool
     let onSelectEvent: (ScheduleEvent) -> Void
     let onSelectDay: (Date) -> Void
+    /// The rows on screen, on appear and whenever scrolling comes to rest, so their events can be loaded.
+    let onRangeChange: (DateInterval) -> Void
 
-    /// Rows that can be scrolled to, as week offsets from the current week (about six months back, a year ahead).
-    static let weeks = -26...52
-    private static let rowRange = 3...5
+    private static let rowRange = 1...5
     private static let minimumRowHeight = 34.0
 
     private let calendar: Calendar
-    private let thisWeek: Date
-    private let initialTopWeek: Int
+    /// The week at row 0; rows are week offsets from it.
+    @State private var anchor: Date
     @State private var topWeek: Int?
+    /// The top row where scrolling last came to rest. Restored when the rows change height (the conversation
+    /// grows, the keyboard comes up): the same scroll offset would otherwise land on another week.
+    @State private var restingTopWeek: Int
     @State private var visibleRows = 5 // rowRange.upperBound until the first layout
+
+    @Environment(\.locale) private var environmentLocale
 
     init(events: [ScheduleEvent],
          focusDay: Date,
          now: Date = Date(),
          revealRequest: ScheduleViewModel.FocusRequest? = nil,
+         isLoading: Bool = false,
          onSelectEvent: @escaping (ScheduleEvent) -> Void = { _ in },
-         onSelectDay: @escaping (Date) -> Void = { _ in }) {
+         onSelectDay: @escaping (Date) -> Void = { _ in },
+         onRangeChange: @escaping (DateInterval) -> Void = { _ in }) {
         let calendar = WallClock().calendar
-        let thisWeek = CalendarPaging.weekStart(containing: now, calendar: calendar)
         self.events = events
         self.focusDay = focusDay
         self.now = now
         self.revealRequest = revealRequest
+        self.isLoading = isLoading
         self.onSelectEvent = onSelectEvent
         self.onSelectDay = onSelectDay
+        self.onRangeChange = onRangeChange
         self.calendar = calendar
-        self.thisWeek = thisWeek
 
         // Opened by a month-sized request ("show me November"): start on that range, not a week before it.
         let showsRequestedMonth = revealRequest.map {
             CalendarScope.fitting($0.range, calendar: calendar) == .month
                 && calendar.isDate($0.range.start, inSameDayAs: focusDay)
         } ?? false
-        let top = Self.firstRow(showing: focusDay, leadWeeks: showsRequestedMonth ? 0 : 1,
-                               thisWeek: thisWeek, calendar: calendar)
-        initialTopWeek = top
+        let top = showsRequestedMonth ? 0 : -1
+        _anchor = State(initialValue: CalendarPaging.weekStart(containing: focusDay, calendar: calendar))
         _topWeek = State(initialValue: top)
+        _restingTopWeek = State(initialValue: top)
+    }
+
+    /// `visibleRows` weeks from row `top`.
+    private func rowsWindow(top: Int) -> DateInterval {
+        let first = CalendarPaging.week(top, from: anchor, calendar: calendar)
+        return DateInterval(start: first, end: max(first, CalendarPaging.week(visibleRows, from: first, calendar: calendar)))
     }
 
     var body: some View {
-        let top = topWeek ?? initialTopWeek
-        let first = CalendarPaging.week(top, from: thisWeek, calendar: calendar)
-        let window = DateInterval(start: first, end: max(first, CalendarPaging.week(visibleRows, from: first, calendar: calendar)))
+        let window = rowsWindow(top: topWeek ?? restingTopWeek)
         let referenceMonth = CalendarPaging.referenceMonth(of: window, calendar: calendar)
         let focusCount = CalendarPaging.events(on: focusDay, from: events, calendar: calendar).filter { !$0.isDraft }.count
+        let showsToday = !(window.start <= now && now < window.end)
 
         VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 6) {
                 Text(CalendarPaging.rangeTitle(window, calendar: calendar, locale: .autoupdatingCurrent))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                Spacer(minLength: 8)
+                if let year = CalendarPaging.yearLabel(for: window, now: now, calendar: calendar,
+                                                       locale: ChatFormat.dateLocale(environmentLocale)) {
+                    Text(verbatim: year)
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+                Spacer(minLength: 6)
+                CalendarStatusAccessory(showsToday: showsToday, isLoading: isLoading, onToday: showToday)
                 Text("\(focusCount)")
                     .font(.system(size: 10, weight: .bold).monospacedDigit())
                     .foregroundStyle(.black)
@@ -92,9 +115,9 @@ struct MonthScrollCard: View {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         LazyVStack(spacing: 0) {
-                            ForEach(Self.weeks, id: \.self) { offset in
+                            ForEach(CalendarPaging.weekPages, id: \.self) { offset in
                                 MonthWeekRow(
-                                    weekStart: CalendarPaging.week(offset, from: thisWeek, calendar: calendar),
+                                    weekStart: CalendarPaging.week(offset, from: anchor, calendar: calendar),
                                     events: events,
                                     referenceMonth: referenceMonth,
                                     now: now,
@@ -110,10 +133,16 @@ struct MonthScrollCard: View {
                     }
                     .scrollTargetBehavior(.viewAligned)
                     .scrollPosition(id: $topWeek)
+                    .onScrollPhaseChange { _, phase in
+                        if phase == .idle { settle() }
+                    }
                     .onAppear {
                         // Belt and braces for the initial `topWeek`: lazy stacks don't always honor it on first
-                        // layout (and may already have reported row `weeks.lowerBound` back through the binding).
-                        proxy.scrollTo(initialTopWeek, anchor: .top)
+                        // layout (and may already have reported the first row back through the binding).
+                        proxy.scrollTo(restingTopWeek, anchor: .top)
+                    }
+                    .onChange(of: rowHeight) {
+                        proxy.scrollTo(restingTopWeek, anchor: .top)
                     }
                 }
                 .onChange(of: rows, initial: true) { _, newValue in
@@ -129,14 +158,49 @@ struct MonthScrollCard: View {
         .onChange(of: revealRequest) { _, request in
             guard let request else { return }
             let lead = CalendarScope.fitting(request.range, calendar: calendar) == .month ? 0 : 1
-            let target = Self.firstRow(showing: request.range.start, leadWeeks: lead, thisWeek: thisWeek, calendar: calendar)
-            withAnimation(.snappy) { topWeek = target }
+            show(request.range.start, leadWeeks: lead)
+        }
+        .onChange(of: visibleRows, initial: true) {
+            onRangeChange(rowsWindow(top: restingTopWeek))
         }
     }
 
-    private static func firstRow(showing date: Date, leadWeeks: Int, thisWeek: Date, calendar: Calendar) -> Int {
-        let offset = CalendarPaging.weekOffset(of: date, from: thisWeek, calendar: calendar) - leadWeeks
-        return min(max(offset, weeks.lowerBound), weeks.upperBound - (rowRange.upperBound - 1))
+    private func showToday() {
+        show(now, leadWeeks: 1)
+        onSelectDay(now)
+    }
+
+    /// Scrolls so the week containing `date` is `leadWeeks` rows below the top.
+    private func show(_ date: Date, leadWeeks: Int) {
+        let target = CalendarPaging.weekOffset(of: date, from: anchor, calendar: calendar) - leadWeeks
+        guard target != topWeek else { return }
+        if CalendarPaging.isWithinReach(target, of: CalendarPaging.weekPages) {
+            restingTopWeek = target
+            PagerScroll.move($topWeek, to: target)
+        } else {
+            // Decades away: row 0 becomes that week. Nothing scrolls, so report the range here.
+            anchor = CalendarPaging.weekStart(containing: date, calendar: calendar)
+            topWeek = -leadWeeks
+            restingTopWeek = -leadWeeks
+            onRangeChange(CalendarPaging.monthWindow(around: date, leadWeeks: leadWeeks, weeks: visibleRows,
+                                                     calendar: calendar))
+        }
+    }
+
+    /// Scrolling came to rest (after a swipe or an animated move). Runs once the position binding has caught up.
+    private func settle() {
+        Task { @MainActor in
+            guard let top = topWeek else { return }
+            if CalendarPaging.isWithinReach(top, of: CalendarPaging.weekPages) {
+                restingTopWeek = top
+            } else {
+                // Half a century of scrolling: re-centre on the same week, which looks exactly the same.
+                anchor = CalendarPaging.week(top, from: anchor, calendar: calendar)
+                topWeek = 0
+                restingTopWeek = 0
+            }
+            onRangeChange(rowsWindow(top: restingTopWeek))
+        }
     }
 }
 

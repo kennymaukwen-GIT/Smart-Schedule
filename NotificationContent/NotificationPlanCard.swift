@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Review card for a draft plan inside the expanded notification: title and span, the short summary, the week as a
-/// table (a header per phase, one row per session), reminder and check-ins, assumptions folded away, then Add /
-/// Keep editing. The app's `PlanPreviewCard` (App/Views) is the same layout; this target does not compile App/,
-/// so it is repeated here in compact type.
+/// Review card for a draft plan inside the expanded notification: title and span, the short summary (folded to its
+/// first sentence when the model wrote more), the week as a table (a header per phase, one row per session),
+/// reminder and check-ins, assumptions folded away, then Add / Keep editing. The app's `PlanPreviewCard`
+/// (App/Views) is the same layout; this target does not compile App/, so it is repeated here in compact type.
 struct NotificationPlanCard: View {
     let draft: PlanDraft
     let status: NotificationChatModel.PlanStatus
@@ -22,12 +22,7 @@ struct NotificationPlanCard: View {
             // A replaced or discarded card keeps only its header and status.
             if !status.isRetired {
                 if !draft.summary.isEmpty {
-                    Text(draft.summary)
-                        .font(.system(size: 14))
-                        .lineSpacing(3)
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
+                    NotificationSummaryText(summary: draft.summary)
                 }
                 if !draft.sessions.isEmpty {
                     schedule
@@ -309,5 +304,92 @@ struct NotificationPlanCard: View {
         Label(title, systemImage: systemImage)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
+    }
+}
+
+/// The plan's summary. The prompt asks for one or two sentences; when the model writes more than fits in two lines,
+/// the card shows the first sentence (two lines at most) and folds the rest behind "Full description", like the
+/// app's `PlanPreviewCard`.
+private struct NotificationSummaryText: View {
+    let summary: String
+
+    @State private var isExpanded = false
+    /// Heights of the whole summary at the card's width: unlimited, and cut at two lines.
+    @State private var fullHeight: CGFloat?
+    @State private var twoLineHeight: CGFloat?
+
+    /// Nil until measured; the first sentence shows meanwhile, without the disclosure.
+    private var fitsInTwoLines: Bool? {
+        guard let fullHeight, let twoLineHeight else { return nil }
+        return fullHeight <= twoLineHeight + 1
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            styled(Text(isExpanded || fitsInTwoLines == true ? summary : Self.firstSentence(of: summary)))
+                .lineLimit(isExpanded ? nil : 2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(alignment: .topLeading) { measurements }
+
+            if fitsInTwoLines == false {
+                Button {
+                    withAnimation(.snappy) { isExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Full description")
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func styled(_ text: Text) -> some View {
+        text
+            .font(.system(size: 14))
+            .lineSpacing(3)
+            .foregroundStyle(.white.opacity(0.9))
+    }
+
+    /// Two hidden copies of the whole summary, laid out at the width of the visible one.
+    private var measurements: some View {
+        ZStack(alignment: .topLeading) {
+            styled(Text(summary))
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    fullHeight = height
+                }
+            styled(Text(summary))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    twoLineHeight = height
+                }
+        }
+        .hidden()
+        .accessibilityHidden(true)
+    }
+
+    /// Up to the end of the first sentence ("。" too); the whole text when it has only one.
+    static func firstSentence(of text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var first: String?
+        trimmed.enumerateSubstrings(in: trimmed.startIndex..<trimmed.endIndex, options: .bySentences) { sentence, _, _, stop in
+            first = sentence?.trimmingCharacters(in: .whitespacesAndNewlines)
+            stop = true
+        }
+        guard let first, !first.isEmpty else { return trimmed }
+        return first
     }
 }

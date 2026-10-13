@@ -6,6 +6,9 @@ import Foundation
 /// Stateless and always correct, ~1–4 requests. Triggers: app foreground, BGAppRefresh, after writes,
 /// and (with a backend) an `events.watch` webhook → silent push. Switch to `syncToken` incremental sync
 /// (handle 410 Gone → full resync) only when windows grow past a few thousand events.
+///
+/// Dates outside the window are listed on demand (`load`) when the calendars scroll there; see
+/// `ScheduleViewModel.ensureEvents(covering:)`.
 struct CalendarSync: Sendable {
     var client = GoogleCalendarClient()
     var store: SharedStore = .shared
@@ -21,5 +24,13 @@ struct CalendarSync: Sendable {
         let items = try await client.list(from: start, to: end)
         let mapper = CalendarEventMapper(clock: clock)
         await store.replaceWindow(DateInterval(start: start, end: end), with: items.compactMap(mapper.scheduleEvent(from:)))
+    }
+
+    /// One range the calendars scrolled to (any date, years away included), listed the same way and merged into
+    /// the cache. Leaves `windowStart` / `windowEnd` / `lastRefresh` alone: they describe the rolling window only.
+    func load(_ range: DateInterval) async throws {
+        let items = try await client.list(from: range.start, to: range.end)
+        let mapper = CalendarEventMapper(clock: clock)
+        await store.mergeRange(range, with: items.compactMap(mapper.scheduleEvent(from:)))
     }
 }

@@ -47,6 +47,138 @@ final class CalendarPagingTests: XCTestCase {
         XCTAssertEqual(CalendarPaging.weekOffset(of: TestClock.local(2026, 10, 3), from: tuesday, calendar: calendar), -2)
     }
 
+    func testWeekOffsetsFiftyYearsAway() {
+        // 18 263 days to 13 Oct 2076, also a Tuesday: exactly 2 609 weeks.
+        let later = TestClock.local(2076, 10, 13, 8)
+        XCTAssertEqual(CalendarPaging.dayOffset(of: later, from: tuesday, calendar: calendar), 18_263)
+        XCTAssertEqual(CalendarPaging.weekOffset(of: later, from: tuesday, calendar: calendar), 2_609)
+        XCTAssertEqual(CalendarPaging.week(2_609, from: TestClock.local(2026, 10, 11), calendar: calendar),
+                       TestClock.local(2076, 10, 11))
+
+        // 13 Oct 1976 was a Wednesday, in the week starting Sunday 10 Oct.
+        let earlier = TestClock.local(1976, 10, 13, 8)
+        XCTAssertEqual(CalendarPaging.weekOffset(of: earlier, from: tuesday, calendar: calendar), -2_609)
+        XCTAssertEqual(CalendarPaging.week(-2_609, from: TestClock.local(2026, 10, 11), calendar: calendar),
+                       TestClock.local(1976, 10, 10))
+    }
+
+    func testWeeksAndDaysAcrossBothClockChanges() {
+        // Spring: Sunday 28 Mar 2027 has 23 hours in London, so its week is an hour short of 7 × 86 400 s.
+        let spring = CalendarPaging.weekInterval(containing: TestClock.local(2027, 3, 31, 12), calendar: calendar)
+        XCTAssertEqual(spring.start, TestClock.local(2027, 3, 28))
+        XCTAssertEqual(spring.end, TestClock.local(2027, 4, 4))
+        XCTAssertEqual(spring.duration, 7 * 86_400 - 3_600)
+        XCTAssertEqual(CalendarPaging.weekOffset(of: TestClock.local(2027, 4, 4), from: TestClock.local(2027, 3, 27, 23),
+                                                 calendar: calendar), 2)
+        // Autumn: Sunday 25 Oct 2026 has 25.
+        let autumn = CalendarPaging.weekInterval(containing: TestClock.local(2026, 10, 27), calendar: calendar)
+        XCTAssertEqual(autumn.duration, 7 * 86_400 + 3_600)
+
+        // Day pages step from midnight to midnight on both sides of each change.
+        XCTAssertEqual(CalendarPaging.day(1, after: TestClock.local(2027, 3, 28), calendar: calendar),
+                       TestClock.local(2027, 3, 29))
+        XCTAssertEqual(CalendarPaging.dayOffset(of: TestClock.local(2027, 3, 29, 0, 30),
+                                                from: TestClock.local(2027, 3, 27, 23, 30), calendar: calendar), 2)
+        XCTAssertEqual(CalendarPaging.dayOffset(of: TestClock.local(2026, 10, 26),
+                                                from: TestClock.local(2026, 10, 25, 23, 30), calendar: calendar), 1)
+        XCTAssertEqual(CalendarPaging.dayOffset(of: TestClock.local(2026, 10, 24, 23), from: tuesday, calendar: calendar), 11)
+    }
+
+    // MARK: Months
+
+    func testMonthOffsetsAcrossYearBoundaries() {
+        XCTAssertEqual(CalendarPaging.month(15, from: tuesday, calendar: calendar), TestClock.local(2028, 1, 1))
+        XCTAssertEqual(CalendarPaging.month(3, from: tuesday, calendar: calendar), TestClock.local(2027, 1, 1))
+        XCTAssertEqual(CalendarPaging.month(-10, from: tuesday, calendar: calendar), TestClock.local(2025, 12, 1))
+        XCTAssertEqual(CalendarPaging.month(0, from: TestClock.local(2026, 10, 31, 23, 59), calendar: calendar),
+                       TestClock.local(2026, 10, 1))
+        XCTAssertEqual(CalendarPaging.monthOffset(of: TestClock.local(2028, 1, 31, 23), from: tuesday, calendar: calendar), 15)
+        XCTAssertEqual(CalendarPaging.monthOffset(of: TestClock.local(2025, 12, 1), from: tuesday, calendar: calendar), -10)
+        XCTAssertEqual(CalendarPaging.monthOffset(of: TestClock.local(2026, 10, 1), from: TestClock.local(2026, 10, 31, 23),
+                                                  calendar: calendar), 0)
+    }
+
+    func testMonthOffsetsCenturiesAway() {
+        // 1 300 months = 108 years and 4 months.
+        XCTAssertEqual(CalendarPaging.month(-1_300, from: tuesday, calendar: calendar), TestClock.local(1918, 6, 1))
+        XCTAssertEqual(CalendarPaging.monthOffset(of: TestClock.local(1918, 6, 30, 12), from: tuesday, calendar: calendar),
+                       -1_300)
+        XCTAssertEqual(CalendarPaging.month(1_300, from: tuesday, calendar: calendar), TestClock.local(2135, 2, 1))
+
+        // Every offset a pager can show maps to the first of a month and back.
+        for offset in stride(from: CalendarPaging.monthPages.lowerBound, through: CalendarPaging.monthPages.upperBound, by: 101) {
+            let month = CalendarPaging.month(offset, from: tuesday, calendar: calendar)
+            XCTAssertEqual(calendar.component(.day, from: month), 1, "\(offset)")
+            XCTAssertEqual(month, calendar.startOfDay(for: month), "\(offset)")
+            XCTAssertEqual(CalendarPaging.monthOffset(of: month, from: tuesday, calendar: calendar), offset)
+        }
+    }
+
+    func testMonthAndMonthGridIntervals() {
+        let march = CalendarPaging.monthInterval(containing: TestClock.local(2027, 3, 31, 23), calendar: calendar)
+        XCTAssertEqual(march.start, TestClock.local(2027, 3, 1))
+        XCTAssertEqual(march.end, TestClock.local(2027, 4, 1))
+
+        // October 2026 runs Thursday to Saturday: Sunday 27 Sep to Saturday 31 Oct.
+        let october = CalendarPaging.monthGridInterval(containing: tuesday, calendar: calendar)
+        XCTAssertEqual(october.start, TestClock.local(2026, 9, 27))
+        XCTAssertEqual(october.end, TestClock.local(2026, 11, 1))
+        // January 2027 starts on a Friday and ends on a Sunday, so the grid has six rows.
+        let january = CalendarPaging.monthGridInterval(containing: TestClock.local(2027, 1, 15), calendar: calendar)
+        XCTAssertEqual(january.start, TestClock.local(2026, 12, 27))
+        XCTAssertEqual(january.end, TestClock.local(2027, 2, 7))
+    }
+
+    func testMonthChipLabelsShowTheYearOnJanuary() {
+        let chinese = Locale(identifier: "zh_Hant_TW")
+        let october = TestClock.local(2026, 10, 1)
+        let january = TestClock.local(2027, 1, 1)
+
+        XCTAssertEqual(CalendarPaging.monthChipLabel(october, calendar: calendar, locale: english), "Oct")
+        XCTAssertEqual(CalendarPaging.monthChipLabel(january, calendar: calendar, locale: english), "Jan 2027")
+        XCTAssertEqual(CalendarPaging.monthChipLabel(TestClock.local(2027, 2, 1), calendar: calendar, locale: english), "Feb")
+        XCTAssertEqual(CalendarPaging.monthChipLabel(october, calendar: calendar, locale: chinese), "10月")
+        XCTAssertEqual(CalendarPaging.monthChipLabel(january, calendar: calendar, locale: chinese), "2027年1月")
+
+        // Two years of chips from October: only the Januaries carry a year.
+        let labels = (0..<24).map {
+            CalendarPaging.monthChipLabel(CalendarPaging.month($0, from: october, calendar: calendar),
+                                          calendar: calendar, locale: english)
+        }
+        XCTAssertEqual(labels.filter { $0.contains(" ") }, ["Jan 2027", "Jan 2028"])
+    }
+
+    func testYearLabelOnlyOutsideTheCurrentYear() {
+        let chinese = Locale(identifier: "zh_Hant_TW")
+        let thisWeek = CalendarPaging.weekInterval(containing: tuesday, calendar: calendar)
+        XCTAssertNil(CalendarPaging.yearLabel(for: thisWeek, now: tuesday, calendar: calendar, locale: english))
+
+        let far = CalendarPaging.weekInterval(containing: TestClock.local(2031, 3, 12), calendar: calendar)
+        XCTAssertEqual(CalendarPaging.yearLabel(for: far, now: tuesday, calendar: calendar, locale: english), "2031")
+        XCTAssertEqual(CalendarPaging.yearLabel(for: far, now: tuesday, calendar: calendar, locale: chinese), "2031年")
+
+        // Sunday 27 Dec 2026 – Saturday 2 Jan 2027 ends outside 2026.
+        let newYear = CalendarPaging.weekInterval(containing: TestClock.local(2026, 12, 31), calendar: calendar)
+        XCTAssertEqual(CalendarPaging.yearLabel(for: newYear, now: tuesday, calendar: calendar, locale: english), "2026 – 2027")
+    }
+
+    // MARK: Endless paging
+
+    func testPagersReachACenturyAndReanchorPastHalfOfIt() {
+        XCTAssertGreaterThanOrEqual(CalendarPaging.dayPages.upperBound, 36_525)
+        XCTAssertGreaterThanOrEqual(CalendarPaging.weekPages.upperBound * 7, 36_525)
+        XCTAssertGreaterThanOrEqual(CalendarPaging.monthPages.upperBound, 1_200)
+        for pages in [CalendarPaging.dayPages, CalendarPaging.weekPages, CalendarPaging.monthPages] {
+            XCTAssertEqual(pages.lowerBound, -pages.upperBound)
+        }
+
+        XCTAssertTrue(CalendarPaging.isWithinReach(2_609, of: CalendarPaging.weekPages))   // 50 years of weeks
+        XCTAssertFalse(CalendarPaging.isWithinReach(-5_655, of: CalendarPaging.weekPages)) // 1918: re-anchor there
+        XCTAssertTrue(CalendarPaging.isWithinReach(-600, of: CalendarPaging.monthPages))
+        XCTAssertFalse(CalendarPaging.isWithinReach(1_300, of: CalendarPaging.monthPages))
+        XCTAssertTrue(CalendarPaging.isWithinReach(18_263, of: CalendarPaging.dayPages))
+    }
+
     // MARK: Month window
 
     func testMonthWindowStartsOneWeekBeforeTheCurrentWeek() {

@@ -30,9 +30,10 @@ enum PlanCardStatus: Equatable {
 /// Calendar when the user taps Add. Keep editing asks what to change, the assistant answers with a complete new
 /// revision, and this card is then marked as replaced.
 ///
-/// Laid out to be scanned: title and span, the one- or two-sentence summary, then the week as a table (a header
-/// per phase, one row per session), the reminder and check-ins, and the assumptions folded away. Days and times
-/// appear only in the table; the summary never restates them.
+/// Laid out to be scanned: title and span, the one- or two-sentence summary (folded to its first sentence when the
+/// model wrote more), then the week as a table (a header per phase, one row per session), the reminder and
+/// check-ins, and the assumptions folded away. Days and times appear only in the table; the summary never
+/// restates them.
 ///
 /// `.full` is the chat panel's card; `.compact` is the same card with tighter type for Quick Capture's panel.
 struct PlanPreviewCard: View {
@@ -61,12 +62,7 @@ struct PlanPreviewCard: View {
             header
             if showsDetails {
                 if !draft.summary.isEmpty {
-                    Text(draft.summary)
-                        .font(.system(size: isCompact ? 14 : 15))
-                        .lineSpacing(4)
-                        .foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(4)
-                        .fixedSize(horizontal: false, vertical: true)
+                    PlanSummaryText(summary: draft.summary, fontSize: isCompact ? 14 : 15, lineSpacing: 4)
                 }
                 if !draft.sessions.isEmpty {
                     weeklySchedule
@@ -395,6 +391,96 @@ extension PlanPreviewCard {
         guard dates.count > 1, let first = dates.first, let last = dates.last else { return false }
         let averageDays = last.timeIntervalSince(first) / 86_400 / Double(dates.count - 1)
         return averageDays >= 21 && averageDays <= 38
+    }
+}
+
+/// The plan's summary. The prompt asks for one or two sentences; when the model writes more than fits in two lines,
+/// the card shows the first sentence (two lines at most) and folds the rest behind "Full description".
+private struct PlanSummaryText: View {
+    let summary: String
+    let fontSize: CGFloat
+    let lineSpacing: CGFloat
+
+    @State private var isExpanded = false
+    /// Heights of the whole summary at the card's width: unlimited, and cut at two lines.
+    @State private var fullHeight: CGFloat?
+    @State private var twoLineHeight: CGFloat?
+
+    /// Nil until measured; the first sentence shows meanwhile, without the disclosure.
+    private var fitsInTwoLines: Bool? {
+        guard let fullHeight, let twoLineHeight else { return nil }
+        return fullHeight <= twoLineHeight + 1
+    }
+
+    var body: some View {
+        let folds = fitsInTwoLines == false
+
+        VStack(alignment: .leading, spacing: 6) {
+            styled(Text(isExpanded || fitsInTwoLines == true ? summary : Self.firstSentence(of: summary)))
+                .lineLimit(isExpanded ? nil : 2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(alignment: .topLeading) { measurements }
+
+            if folds {
+                Button {
+                    withAnimation(.snappy) { isExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Full description")
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func styled(_ text: Text) -> some View {
+        text
+            .font(.system(size: fontSize))
+            .lineSpacing(lineSpacing)
+            .foregroundStyle(.white.opacity(0.9))
+    }
+
+    /// Two hidden copies of the whole summary, laid out at the width of the visible one.
+    private var measurements: some View {
+        ZStack(alignment: .topLeading) {
+            styled(Text(summary))
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    fullHeight = height
+                }
+            styled(Text(summary))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    twoLineHeight = height
+                }
+        }
+        .hidden()
+        .accessibilityHidden(true)
+    }
+
+    /// Up to the end of the first sentence ("。" too); the whole text when it has only one.
+    static func firstSentence(of text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var first: String?
+        trimmed.enumerateSubstrings(in: trimmed.startIndex..<trimmed.endIndex, options: .bySentences) { sentence, _, _, stop in
+            first = sentence?.trimmingCharacters(in: .whitespacesAndNewlines)
+            stop = true
+        }
+        guard let first, !first.isEmpty else { return trimmed }
+        return first
     }
 }
 

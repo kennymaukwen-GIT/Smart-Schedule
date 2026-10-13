@@ -4,7 +4,8 @@ import Foundation
 /// at render time (Live Activity, widgets) and a fast local context for prompts.
 ///
 /// Three processes write here, so every access re-reads the file under `NSFileCoordinator`.
-/// The file is small (a 90-day window ≈ 50–150 KB); move to SQLite/SwiftData only if profiling says so.
+/// The file is small (a 90-day window ≈ 50–150 KB; ranges loaded on demand are capped by
+/// `ScheduleViewModel.maxCachedEvents`); move to SQLite/SwiftData only if profiling says so.
 actor SharedStore {
     static let shared = SharedStore()
 
@@ -17,6 +18,15 @@ actor SharedStore {
         var lastAssistantLine: String?
         /// The long-term plan waiting for Add / Keep editing. Optional so caches written before drafts existed decode.
         var pendingPlan: PlanDraft?
+        /// Ranges outside the rolling window whose events were loaded on demand (sorted, merged). Written by the
+        /// app only (Shared/Calendar/SharedStore+LoadedRanges.swift); `replaceWindow` empties it.
+        var loadedRanges: [DateInterval] = []
+
+        /// The rolling sync window (`windowStart ..< windowEnd`), when a sync or the demo seed has set one.
+        var window: DateInterval? {
+            guard let windowStart, let windowEnd, windowEnd > windowStart else { return nil }
+            return DateInterval(start: windowStart, end: windowEnd)
+        }
     }
 
     private let fileURL: URL
@@ -65,14 +75,20 @@ actor SharedStore {
         }
     }
 
-    /// Replaces everything inside `interval` with a fresh server listing; keeps events outside it.
+    /// Replaces everything inside `interval` with a fresh server listing; keeps events outside it, except older
+    /// copies of listed ids (an event moved into the window from a range loaded on demand).
+    ///
+    /// Also forgets the on-demand ranges: their events stay cached and on screen, but each range is listed again
+    /// the next time it is shown, so edits made elsewhere reach far dates too.
     func replaceWindow(_ interval: DateInterval, with events: [ScheduleEvent]) {
         mutate { snapshot in
-            snapshot.events.removeAll { $0.intersects(interval) }
-            snapshot.events.append(contentsOf: events)
+            let incoming = Dictionary(events.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+            snapshot.events.removeAll { $0.intersects(interval) || incoming[$0.id] != nil }
+            snapshot.events.append(contentsOf: incoming.values)
             snapshot.windowStart = interval.start
             snapshot.windowEnd = interval.end
             snapshot.lastRefresh = Date()
+            snapshot.loadedRanges = []
         }
     }
 
@@ -111,12 +127,22 @@ actor SharedStore {
     }
 
     private func mutate(_ change: (inout Snapshot) -> Void) {
+        update { snapshot in
+            change(&snapshot)
+            return true
+        }
+    }
+
+    /// One coordinated read-modify-write. `change` returns false when it left the snapshot as it was, which skips
+    /// the write. Internal for the extensions in folders the widget target does not compile (Shared/Calendar);
+    /// everything else uses the named writes above.
+    func update(_ change: (inout Snapshot) -> Bool) {
         var coordinationError: NSError?
         NSFileCoordinator().coordinate(writingItemAt: fileURL, options: [], error: &coordinationError) { url in
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .secondsSince1970
             var snapshot = (try? Data(contentsOf: url)).flatMap { try? decoder.decode(Snapshot.self, from: $0) } ?? Snapshot()
-            change(&snapshot)
+            guard change(&snapshot) else { return }
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .secondsSince1970
             try? encoder.encode(snapshot).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
@@ -136,5 +162,7 @@ extension SharedStore.Snapshot {
         lastRefresh = try container.decodeIfPresent(Date.self, forKey: .lastRefresh)
         lastAssistantLine = try container.decodeIfPresent(String.self, forKey: .lastAssistantLine)
         pendingPlan = try? container.decodeIfPresent(PlanDraft.self, forKey: .pendingPlan)
+        // Missing in caches written before on-demand loading; unreadable means "load again", never a lost cache.
+        loadedRanges = (try? container.decodeIfPresent([DateInterval].self, forKey: .loadedRanges)) ?? []
     }
 }

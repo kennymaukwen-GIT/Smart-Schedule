@@ -526,6 +526,17 @@
         }
       }
     },
+    "Collapse conversation" : {
+      "comment" : "Accessibility: drag handle that gives the room back to the calendar",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收合對話"
+          }
+        }
+      }
+    },
     "Confirm" : {
       "localizations" : {
         "zh-Hant" : {
@@ -825,6 +836,28 @@
         }
       }
     },
+    "Expand conversation" : {
+      "comment" : "Accessibility: drag handle that pulls Quick Capture's conversation up",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展開對話"
+          }
+        }
+      }
+    },
+    "Full description" : {
+      "comment" : "Discloses the rest of a plan summary that is longer than two lines",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整說明"
+          }
+        }
+      }
+    },
     "Gemini blocked the request (%@)." : {
       "localizations" : {
         "zh-Hant" : {
@@ -981,6 +1014,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上週"
+          }
+        }
+      }
+    },
+    "Loading events" : {
+      "comment" : "Accessibility: spinner while events for a far-off date range load",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在載入行程"
           }
         }
       }

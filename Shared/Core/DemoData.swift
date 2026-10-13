@@ -28,16 +28,21 @@ enum DemoData {
         id.hasPrefix(idPrefix)
     }
 
-    /// Smallest interval containing every event: the window to hand `SharedStore.replaceWindow` when seeding.
-    static func interval(covering events: [ScheduleEvent]) -> DateInterval? {
-        guard let start = events.map(\.start).min(), let end = events.map(\.end).max(), end > start else { return nil }
-        return DateInterval(start: start, end: end)
+    /// The weeks `events(now:clock:)` fills, last week through five weeks ahead (Sunday to Sunday): the window
+    /// to hand `SharedStore.replaceWindow` when seeding. Every seeded event lies inside it.
+    static func seedWindow(now: Date = Date(), clock: WallClock = WallClock()) -> DateInterval {
+        let calendar = clock.calendar
+        let weekStart = sunday(onOrBefore: now, calendar: calendar)
+        let start = calendar.date(byAdding: .day, value: -7, to: weekStart) ?? weekStart
+        let end = calendar.date(byAdding: .day, value: 42, to: weekStart) ?? weekStart
+        return DateInterval(start: start, end: max(start, end))
     }
 
+    /// The seed: one-off items placed relative to `now`, plus the weekly series over `seedWindow`.
     static func events(now: Date = Date(), clock: WallClock = WallClock()) -> [ScheduleEvent] {
         let calendar = clock.calendar
         let today = calendar.startOfDay(for: now)
-        let weekStart = calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today // Sunday
+        let weekStart = sunday(onOrBefore: now, calendar: calendar)
 
         func day(_ offset: Int, from base: Date) -> Date {
             calendar.date(byAdding: .day, value: offset, to: base) ?? base
@@ -88,29 +93,75 @@ enum DemoData {
             make("trip-san-diego", "Trip to San Diego", tripStart, tripEnd, .event, allDay: true)
         ]
 
-        // Weekly series from last week through ~6 weeks ahead. Weekday offsets are from Sunday.
-        for week in -1..<6 {
-            let base = day(7 * week, from: weekStart)
-            for offset in [1, 3, 5] { // Mon, Wed, Fri
-                let start = at(day(offset, from: base), 18, 30)
-                guard !trip.contains(start) else { continue }
-                events.append(make("gym-\(clock.dateString(start))", "Gym", start, minutes(60, after: start), .routine,
-                                   seriesID: "gym"))
-            }
-            let sync = at(day(1, from: base), 10, 0)
-            events.append(make("team-sync-\(clock.dateString(sync))", "Weekly team sync", sync, minutes(30, after: sync),
-                               .event, seriesID: "team-sync"))
-            let yoga = at(day(6, from: base), 9, 0)
-            if !trip.contains(yoga) {
-                events.append(make("yoga-\(clock.dateString(yoga))", "Yoga", yoga, minutes(60, after: yoga), .routine,
-                                   seriesID: "yoga"))
-            }
-        }
+        events += recurringEvents(in: seedWindow(now: now, clock: clock), clock: clock, pausedDuring: trip)
 
         // Keep the meeting the next thing on the island: drop anything that would be running before it ends.
         return events
             .filter { $0.id == meetingID || $0.isAllDay || $0.end <= now || $0.start >= meetingEnd }
             .sorted { $0.start < $1.start }
+    }
+
+    // MARK: Weekly series
+
+    /// The weekly demo series in any range, so the calendars never run out of sample data however far they
+    /// scroll. Each occurrence's id is `demo-<series>-<yyyy-MM-dd>`: unique, and the same whichever range
+    /// produced it, so overlapping ranges merge instead of duplicating. One-off items are not included; they
+    /// exist only in the seed. Gym and Yoga skip occurrences starting inside `pausedDuring` (the seeded trip).
+    static func recurringEvents(in range: DateInterval,
+                                clock: WallClock = WallClock(),
+                                pausedDuring away: DateInterval? = nil) -> [ScheduleEvent] {
+        guard range.duration > 0 else { return [] }
+        let calendar = clock.calendar
+        var events: [ScheduleEvent] = []
+        var day = calendar.startOfDay(for: range.start)
+        while day < range.end {
+            let weekday = calendar.component(.weekday, from: day)
+            for series in weeklySeries where series.weekdays.contains(weekday) {
+                // Set on the day itself, not 86 400 s steps, so 18:30 stays 18:30 across DST changes.
+                guard let start = clock.combine(day: day, time: (hour: series.hour, minute: series.minute)) else { continue }
+                if series.pausesWhenAway, let away, away.contains(start) { continue }
+                let end = start.addingTimeInterval(TimeInterval(series.minutes) * 60)
+                guard start < range.end && end > range.start else { continue }
+                events.append(make("\(series.key)-\(clock.dateString(start))", series.title, start, end, series.kind,
+                                   seriesID: series.key))
+            }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day), next > day else { break }
+            day = next
+        }
+        return events
+    }
+
+    /// An occurrence `recurringEvents` can produce again, so the cache cap may drop it. Everything else with a
+    /// demo id (one-offs, events the demo assistant created) exists only in the cache.
+    static func isRecurringOccurrence(_ event: ScheduleEvent) -> Bool {
+        guard let seriesID = event.seriesID else { return false }
+        return weeklySeries.contains { idPrefix + $0.key == seriesID }
+    }
+
+    private struct WeeklySeries: Sendable {
+        let key: String           // id stem and seriesID, without the prefix
+        let title: String
+        let weekdays: Set<Int>    // `Calendar` weekday numbers: 1 = Sunday … 7 = Saturday
+        let hour: Int
+        let minute: Int
+        let minutes: Int
+        let kind: ScheduleEvent.Kind
+        let pausesWhenAway: Bool
+    }
+
+    private static let weeklySeries: [WeeklySeries] = [
+        WeeklySeries(key: "gym", title: "Gym", weekdays: [2, 4, 6], hour: 18, minute: 30, minutes: 60,
+                     kind: .routine, pausesWhenAway: true),
+        WeeklySeries(key: "team-sync", title: "Weekly team sync", weekdays: [2], hour: 10, minute: 0, minutes: 30,
+                     kind: .event, pausesWhenAway: false),
+        WeeklySeries(key: "yoga", title: "Yoga", weekdays: [7], hour: 9, minute: 0, minutes: 60,
+                     kind: .routine, pausesWhenAway: true)
+    ]
+
+    /// Sunday on or before `date` (`WallClock().calendar` weeks start on Sunday).
+    private static func sunday(onOrBefore date: Date, calendar: Calendar) -> Date {
+        let today = calendar.startOfDay(for: date)
+        return calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today
     }
 
     private static func make(_ id: String,

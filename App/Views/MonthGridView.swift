@@ -2,26 +2,53 @@ import SwiftUI
 
 /// "October 2026" card of Artboard 5: Sunday-first grid, adjacent-month days dimmed, today circled,
 /// colored chips, task rows with checkboxes, multi-day bars ("Trip to San Diego") drawn as connected
-/// segments across cells, "+N" overflow.
+/// segments across cells, "+N" overflow. Swipes sideways a month at a time with no end either way.
+///
+/// `month` (the view model's `displayedMonth`) is the source of truth both ways: a swipe that comes to rest
+/// sets it, and setting it (a month chip, the assistant, the Today pill) pages there.
 struct MonthGridView: View {
-    let month: Date
+    @Binding var month: Date
     let today: Date
+    let isLoading: Bool
     let eventsOnDay: (Date) -> [ScheduleEvent]
     let onSelect: (ScheduleEvent) -> Void
 
     private let calendar = WallClock().calendar
     private let maxChips = 3
+    /// The month at page 0; pages are month offsets from it.
+    @State private var anchor: Date
+    @State private var page: Int?
+
+    init(month: Binding<Date>,
+         today: Date,
+         isLoading: Bool = false,
+         eventsOnDay: @escaping (Date) -> [ScheduleEvent],
+         onSelect: @escaping (ScheduleEvent) -> Void) {
+        _month = month
+        self.today = today
+        self.isLoading = isLoading
+        self.eventsOnDay = eventsOnDay
+        self.onSelect = onSelect
+        _anchor = State(initialValue: CalendarPaging.monthStart(containing: month.wrappedValue,
+                                                                calendar: WallClock().calendar))
+        _page = State(initialValue: 0)
+    }
 
     var body: some View {
-        let weeks = Self.weeks(for: month, calendar: calendar)
-        let monthInterval = calendar.dateInterval(of: .month, for: month)
+        let monthInterval = CalendarPaging.monthInterval(containing: month, calendar: calendar)
 
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(spacing: 8) {
                 Text(month.formatted(.dateTime.month(.wide).year()))
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.white)
-                Spacer()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 6)
+                CalendarStatusAccessory(showsToday: CalendarPaging.monthOffset(of: month, from: today,
+                                                                               calendar: calendar) != 0,
+                                        isLoading: isLoading,
+                                        onToday: { month = CalendarPaging.monthStart(containing: today, calendar: calendar) })
                 // Badge: events left this month.
                 Text("\(remainingCount(in: monthInterval))")
                     .font(.system(size: 12, weight: .bold).monospacedDigit())
@@ -40,50 +67,121 @@ struct MonthGridView: View {
                 }
             }
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 6) {
-                    ForEach(weeks, id: \.self) { week in
-                        HStack(alignment: .top, spacing: 0) { // spacing 0 lets multi-day segments touch
-                            ForEach(week, id: \.self) { day in
-                                DayCell(
-                                    day: day,
-                                    isInMonth: monthInterval.map { day >= $0.start && day < $0.end } ?? true,
-                                    isToday: calendar.isDate(day, inSameDayAs: today),
-                                    events: eventsOnDay(day),
-                                    maxChips: maxChips,
-                                    calendar: calendar,
-                                    onSelect: onSelect
-                                )
-                            }
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(CalendarPaging.monthPages, id: \.self) { offset in
+                            MonthWeeksPage(month: CalendarPaging.month(offset, from: anchor, calendar: calendar),
+                                           today: today,
+                                           eventsOnDay: eventsOnDay,
+                                           maxChips: maxChips,
+                                           calendar: calendar,
+                                           onSelect: onSelect)
+                                .containerRelativeFrame(.horizontal)
                         }
                     }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $page)
+                .onScrollPhaseChange { _, phase in
+                    if phase == .idle { settle() }
+                }
+                .onAppear {
+                    // Lazy stacks don't always honor the initial position on first layout.
+                    proxy.scrollTo(page ?? 0)
                 }
             }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
+        .onChange(of: month) { _, newMonth in
+            show(newMonth)
+        }
     }
 
-    private func remainingCount(in interval: DateInterval?) -> Int {
-        guard let interval else { return 0 }
+    /// Pages to `newMonth` unless it is already on screen (as after a swipe).
+    private func show(_ newMonth: Date) {
+        let target = CalendarPaging.monthOffset(of: newMonth, from: anchor, calendar: calendar)
+        guard target != page else { return }
+        if CalendarPaging.isWithinReach(target, of: CalendarPaging.monthPages) {
+            PagerScroll.move($page, to: target)
+        } else {
+            // Decades away: page 0 becomes that month.
+            anchor = CalendarPaging.monthStart(containing: newMonth, calendar: calendar)
+            page = 0
+        }
+    }
+
+    /// Paging came to rest (after a swipe or an animated move). Runs once the position binding has caught up.
+    private func settle() {
+        Task { @MainActor in
+            guard let page else { return }
+            let shown = CalendarPaging.month(page, from: anchor, calendar: calendar)
+            if !CalendarPaging.isWithinReach(page, of: CalendarPaging.monthPages) {
+                // Half a century of swiping: re-centre on the same month, which looks exactly the same.
+                anchor = shown
+                self.page = 0
+            }
+            if CalendarPaging.monthOffset(of: shown, from: month, calendar: calendar) != 0 {
+                withAnimation(.snappy) { month = shown }
+            }
+        }
+    }
+
+    private func remainingCount(in interval: DateInterval) -> Int {
         var count = 0
         var day = max(calendar.startOfDay(for: today), interval.start)
         while day < interval.end {
             count += eventsOnDay(day).filter { !$0.isDraft && calendar.isDate($0.start, inSameDayAs: day) }.count
-            day = calendar.date(byAdding: .day, value: 1, to: day)!
+            day = CalendarPaging.day(1, after: day, calendar: calendar)
         }
         return count
     }
 
     static func weeks(for month: Date, calendar: Calendar) -> [[Date]] {
-        guard let monthInterval = calendar.dateInterval(of: .month, for: month),
-              var cursor = calendar.dateInterval(of: .weekOfYear, for: monthInterval.start)?.start else { return [] }
+        let grid = CalendarPaging.monthGridInterval(containing: month, calendar: calendar)
         var weeks: [[Date]] = []
-        while cursor < monthInterval.end {
-            weeks.append((0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: cursor) })
-            cursor = calendar.date(byAdding: .day, value: 7, to: cursor)!
+        var cursor = grid.start
+        while cursor < grid.end {
+            weeks.append(CalendarPaging.days(ofWeekStarting: cursor, calendar: calendar))
+            cursor = CalendarPaging.week(1, from: cursor, calendar: calendar)
         }
         return weeks
+    }
+}
+
+/// The weeks of one month in the pager, scrolling vertically when they don't fit.
+private struct MonthWeeksPage: View {
+    let month: Date
+    let today: Date
+    let eventsOnDay: (Date) -> [ScheduleEvent]
+    let maxChips: Int
+    let calendar: Calendar
+    let onSelect: (ScheduleEvent) -> Void
+
+    var body: some View {
+        let monthInterval = CalendarPaging.monthInterval(containing: month, calendar: calendar)
+
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 6) {
+                ForEach(MonthGridView.weeks(for: month, calendar: calendar), id: \.self) { week in
+                    HStack(alignment: .top, spacing: 0) { // spacing 0 lets multi-day segments touch
+                        ForEach(week, id: \.self) { day in
+                            DayCell(
+                                day: day,
+                                isInMonth: day >= monthInterval.start && day < monthInterval.end,
+                                isToday: calendar.isDate(day, inSameDayAs: today),
+                                events: eventsOnDay(day),
+                                maxChips: maxChips,
+                                calendar: calendar,
+                                onSelect: onSelect
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

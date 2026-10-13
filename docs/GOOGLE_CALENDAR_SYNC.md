@@ -114,7 +114,32 @@ Google 的限制：`overrides` **最多 5 個**，每個 `minutes` 介於 **0 �
 | 方向 | 方式 |
 |---|---|
 | App 寫到 Google | 上面的 insert、patch、delete，寫完後立刻 upsert 到本地 cache |
-| Google 回到 App（拉取） | `CalendarSync.refreshWindow()`：抓 −7 到 +120 天、`singleEvents=true`（重複事件展開成個別 instance）、`orderBy=startTime`、每頁 250 筆，然後**整段取代** cache。觸發時機：開到前景、寫入之後、BGAppRefresh。這種做法不需要保存狀態，結果永遠正確 |
+| Google 回到 App（拉取） | `CalendarSync.refreshWindow()`：抓 −7 到 +120 天、`singleEvents=true`（重複事件展開成個別 instance）、`orderBy=startTime`、每頁 250 筆，然後**整段取代** cache。觸發時機：開到前景、寫入之後、BGAppRefresh。這種做法不需要保存狀態，結果永遠正確。視窗以外的日期在畫面捲到時才載入，見第 8 節 |
 | Google 回到 App（即時） | 需要後端：`events.watch` 註冊 webhook，事件有變動時發 APNs silent push 或 Live Activity push，App 收到後再跑 `refreshWindow`。channel 會過期，要排程續約 |
 | 規模變大之後 | 改用 `syncToken` 增量同步；收到 410 Gone 就全量重抓 |
 | 其他人在 Google 那邊改了事件 | 下次 refresh 時，Google 的版本覆蓋本地。Google 是唯一的事實來源，App 只是 cache |
+
+## 8. 依需求載入任意日期（無限捲動的行事曆）
+
+Quick Capture 的 DAY / WEEK / MONTH，以及主畫面的月份列和月曆，都可以一直往前、往後捲，沒有盡頭。滾動視窗（−7 到 +120 天）以外的日期，等畫面捲到那裡才載入。程式碼：`ScheduleViewModel.ensureEvents(covering:)`、`Shared/Calendar/LoadedRanges.swift`、`Shared/Calendar/SharedStore+LoadedRanges.swift`、`CalendarSync.load(_:)`。
+
+| 項目 | 做法 |
+|---|---|
+| 入口 | 畫面每次捲動停下時，把看得到的範圍傳給 `ensureEvents(covering:)`。`focus(_:)`（助理要求顯示某段日期、按「今天」）也會呼叫，所以跳到好幾年後也會載入 |
+| 範圍 | 看得到的範圍碰到的整個月份，前後再各加一個月（`LoadedRanges.request`），下一兩次滑動已經在 cache 裡。範圍超過 12 個月時只取前 12 個月，一次呼叫不會抓幾十年 |
+| Request | 只抓缺少的部分（`LoadedRanges.missing`），每段一個 `events.list`：`timeMin`/`timeMax` 是缺少的那段，`singleEvents=true`、`orderBy=startTime`、每頁 250 筆，跟滾動視窗一樣 |
+| Debounce | 最後一次呼叫後 300 ms 才開始。快速滑過的中間位置不會發 request |
+| 去重 | 已經載入的範圍（App Group 裡的 `loadedRanges` 加上滾動視窗）和正在載入的範圍都會跳過。兩次載入同時開始時，在同一個 MainActor 步驟裡先查再登記，所以不會抓同一個月兩次 |
+| 不擋畫面 | 載入在獨立的 `Task` 裡跑，下一次呼叫只會取消 debounce，不會中斷已經送出的 request。載入期間 `isLoadingRange` 為 true，畫面可以顯示細小的進度提示 |
+| 寫入 cache | `SharedStore.mergeRange`：取代該範圍內的事件；同一個 id 在別的日期的舊副本（事件被移動了）一起移除。**不動 `windowStart`、`windowEnd`、`lastRefresh`**，提醒排程、Live Activity 和滾動同步都照舊 |
+| 錯誤 | 不影響畫面：cache 保留原本的資料，範圍不標記為已載入，下次再顯示時重試。只有 token refresh 失敗會把 `isSignedIn` 設回 false（跟 `refresh()` 一樣） |
+| 新鮮度 | 每次滾動同步（`replaceWindow`：開到前景、BGAppRefresh、助理寫入之後，不論哪個 process）都會清空 `loadedRanges`。cache 裡的事件照樣顯示，但每段範圍下次出現在畫面上時會重抓一次，所以在 Google 網頁版改的遠期事件也會同步回來。`reloadFromCache()` 會馬上重抓目前畫面上的範圍；本月月曆第一列落在視窗開始之前的那幾天也是這樣補上的 |
+| Demo 模式 | 不連 Google。`DemoData.recurringEvents(in:)` 產生該範圍的每週項目（Gym 一三五 18:30、週一 Weekly team sync、週六 Yoga），id 是 `demo-<series>-<yyyy-MM-dd>`，不同範圍產生的同一次項目 id 相同，合併時不會重複。一次性項目（會議、午餐、旅行等）只在 seed 裡，留在相對於 seed 當天的位置。合併時用 `replacingCached: false`，demo 助理建立、修改或刪除的事件不會被蓋掉 |
+
+### Cache 上限
+
+App Group 的 JSON 每次讀寫都是整個檔案，三個 process 都會讀，所以要設上限。每次載入成功後，如果 cache 超過 `ScheduleViewModel.maxCachedEvents`（2000 筆，約 1 MB），就丟掉離「今天」、「最後顯示的範圍」和「待確認計畫的日期」都超過 12 個月的事件（`LoadedRanges.evict`、`SharedStore.evictEvents`），並把那些範圍從 `loadedRanges` 移除，捲回去時再重抓。
+
+永遠不會丟的：滾動視窗、計畫預覽（`draft-` 開頭的 id）、待確認計畫的事件。Demo 模式只會丟可以重新產生的每週項目，其他 demo 事件只存在 cache 裡，丟了就沒了。
+
+提醒不受影響：`ReminderScheduler` 從最近的觸發時間開始排，最多 64 個。被丟掉的事件都在 12 個月以外，提醒最多提前 4 週（Google 的上限），在那之前它早就回到滾動視窗（+120 天）裡、重新排上了。

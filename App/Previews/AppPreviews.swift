@@ -6,14 +6,43 @@ import SwiftUI
 
 extension ScheduleViewModel {
     /// Preview-only: demo events in memory; `bootstrap()` is never called, so nothing touches Google.
-    /// `pendingPlan` draws that draft's occurrences as ghosts.
-    static func preview(focusDay: Date? = nil, isDemo: Bool = true, pendingPlan: PlanDraft? = nil) -> ScheduleViewModel {
+    /// `pendingPlan` draws that draft's occurrences as ghosts. Previews never load ranges on demand, so
+    /// `alsoLoading` adds the weekly demo series of a far-off range in memory, as the app would load it.
+    static func preview(focusDay: Date? = nil,
+                        displayedMonth: Date? = nil,
+                        alsoLoading range: DateInterval? = nil,
+                        isDemo: Bool = true,
+                        pendingPlan: PlanDraft? = nil) -> ScheduleViewModel {
         let model = ScheduleViewModel()
         model.events = DemoData.events(clock: model.clock)
+        if let range {
+            let seeded = Set(model.events.map(\.id))
+            model.events += DemoData.recurringEvents(in: range, clock: model.clock).filter { !seeded.contains($0.id) }
+            model.events.sort { $0.start < $1.start }
+        }
         model.isDemo = isDemo
         model.pendingPlan = pendingPlan
         if let focusDay { model.focusDay = focusDay }
+        if let displayedMonth { model.displayedMonth = displayedMonth }
         return model
+    }
+}
+
+/// Preview-only far-off dates: 12 March 2031 (a Wednesday) and January 2027, with six weeks of sample data
+/// either side.
+enum PreviewDates {
+    static var march2031: Date { day(2031, 3, 12) }
+    static var january2027: Date { day(2027, 1, 1) }
+
+    static func around(_ date: Date) -> DateInterval {
+        let calendar = WallClock().calendar
+        let week = CalendarPaging.weekStart(containing: date, calendar: calendar)
+        return DateInterval(start: CalendarPaging.week(-6, from: week, calendar: calendar),
+                            end: CalendarPaging.week(7, from: week, calendar: calendar))
+    }
+
+    private static func day(_ year: Int, _ month: Int, _ day: Int) -> Date {
+        WallClock().calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? Date()
     }
 }
 
@@ -126,7 +155,7 @@ struct PreviewChat {
 enum PreviewPlans {
     /// Revision 2 answers "Make sessions shorter" (45 instead of 60 minutes). `chinese` writes the model's text
     /// (titles, summary, assumptions) in Traditional Chinese, as Gemini would for a Chinese request.
-    static func strength(revision: Int = 1, chinese: Bool = false, now: Date = Date(),
+    static func strength(revision: Int = 1, chinese: Bool = false, summary: String? = nil, now: Date = Date(),
                          clock: WallClock = WallClock()) -> PlanDraft {
         let calendar = clock.calendar
         let start = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
@@ -194,11 +223,11 @@ enum PreviewPlans {
             title: text("12-week strength plan", "12 週肌力計畫"),
             startDate: start,
             endDate: day(83),
-            summary: revision > 1
+            summary: summary ?? (revision > 1
                 ? text("The same 12-week plan with shorter sessions: 3 to 4 workouts a week, 45 minutes each.",
                        "同一份 12 週計畫，每次縮短：每週練 3 到 4 次，每次 45 分鐘。")
                 : text("A 12-week strength plan: 3 to 4 workouts a week, about an hour each.",
-                       "12 週肌力計畫：每週練 3 到 4 次，每次約 1 小時。"),
+                       "12 週肌力計畫：每週練 3 到 4 次，每次約 1 小時。")),
             phases: phases,
             sessions: sessions,
             milestones: milestones,
@@ -208,6 +237,15 @@ enum PreviewPlans {
             writeCount: sessions.count + milestones.count,
             argsJSON: Data()
         )
+    }
+
+    /// What a model that ignores the 1-2 sentence rule writes.
+    static func longSummary(chinese: Bool) -> String {
+        chinese
+            ? "12 週肌力計畫，先打好基礎再逐步加重。前四週練全身動作，熟悉深蹲、伏地挺身和划船的正確姿勢。之後改成上下半身分開練，每週稍微增加重量。每個月檢查一次進度，必要時調整課表。"
+            : "A 12-week strength plan that builds a base before adding load. The first four weeks are full-body "
+                + "sessions to learn the squat, push-up and row. After that, upper and lower body alternate and the "
+                + "weight goes up a little every week. A monthly check-in looks at progress and adjusts the plan."
     }
 }
 
@@ -237,14 +275,40 @@ enum PreviewPlans {
         .environment(\.locale, Locale(identifier: "zh-Hant"))
 }
 
-/// Design 04 focuses the busy day (Lunch, Meeting With Andrew, Deadline for Plan 5008), two days from today.
-/// The conversation panel holds the whole history: scroll it up.
+/// Scrolling up through the history pulls the conversation up too; drag its handle back down for the calendar.
+#Preview("Quick Capture · conversation pulled up") {
+    quickCapturePreview(.week, conversationExpanded: true)
+}
+
+/// Years from today: the year shows next to the range, and the Today pill comes back.
+#Preview("Quick Capture · Week 2031") {
+    quickCapturePreview(.week, focusDay: PreviewDates.march2031)
+}
+
+#Preview("Quick Capture · Month 2031") {
+    quickCapturePreview(.month, focusDay: PreviewDates.march2031)
+}
+
+#Preview("Quick Capture · Day 2031 · zh-Hant") {
+    quickCapturePreview(.day, chinese: true, focusDay: PreviewDates.march2031)
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
+
+/// Design 04 focuses the busy day (Lunch, Meeting With Andrew, Deadline for Plan 5008), two days from today,
+/// unless `focusDay` picks another (with that range's sample data). The conversation panel holds the whole
+/// history: scroll it up.
 @MainActor
-private func quickCapturePreview(_ mode: CalendarScope, chinese: Bool = false) -> some View {
-    let schedule = ScheduleViewModel.preview(focusDay: WallClock().calendar.date(byAdding: .day, value: 2, to: Date()))
+private func quickCapturePreview(_ mode: CalendarScope,
+                                 chinese: Bool = false,
+                                 focusDay: Date? = nil,
+                                 conversationExpanded: Bool = false) -> some View {
+    let busyDay = WallClock().calendar.date(byAdding: .day, value: 2, to: Date())
+    let schedule = ScheduleViewModel.preview(focusDay: focusDay ?? busyDay,
+                                             alsoLoading: focusDay.map(PreviewDates.around))
     return ZStack(alignment: .top) {
         Color.black.ignoresSafeArea()
-        QuickCaptureView(startsWithVoice: false, initialMode: mode, onClose: {})
+        QuickCaptureView(startsWithVoice: false, initialMode: mode, conversationExpanded: conversationExpanded,
+                         onClose: {})
     }
     .environment(schedule)
     .environment(ChatViewModel.preview(schedule: schedule, chinese: chinese))
@@ -292,17 +356,48 @@ private func quickCapturePreview(_ mode: CalendarScope, chinese: Bool = false) -
 }
 
 #Preview("Month grid") {
-    let schedule = ScheduleViewModel.preview()
-    MonthGridView(
-        month: schedule.displayedMonth,
-        today: Date(),
-        eventsOnDay: schedule.events(on:),
-        onSelect: { _ in }
-    )
-    .frame(height: 440)
-    .padding(12)
-    .background(Theme.canvas)
-    .preferredColorScheme(.dark)
+    MonthGridPreview(schedule: ScheduleViewModel.preview())
+        .frame(height: 440)
+        .padding(12)
+        .background(Theme.canvas)
+        .preferredColorScheme(.dark)
+}
+
+/// January 2027: the chip shows the year ("JAN 2027"), and the Today pill leads back to this month.
+#Preview("Main · January 2027") {
+    let schedule = ScheduleViewModel.preview(displayedMonth: PreviewDates.january2027,
+                                             alsoLoading: PreviewDates.around(PreviewDates.january2027))
+    MainView()
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule))
+        .environment(AppRouter())
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Main · January 2027 · zh-Hant") {
+    let schedule = ScheduleViewModel.preview(displayedMonth: PreviewDates.january2027,
+                                             alsoLoading: PreviewDates.around(PreviewDates.january2027))
+    MainView()
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule, chinese: true))
+        .environment(AppRouter())
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+        .preferredColorScheme(.dark)
+}
+
+/// The month grid on its own; swipe it sideways.
+private struct MonthGridPreview: View {
+    let schedule: ScheduleViewModel
+    @State private var month: Date
+
+    init(schedule: ScheduleViewModel) {
+        self.schedule = schedule
+        _month = State(initialValue: schedule.displayedMonth)
+    }
+
+    var body: some View {
+        MonthGridView(month: $month, today: Date(), eventsOnDay: schedule.events(on:), onSelect: { _ in })
+    }
 }
 
 #Preview("Main · plan draft") {
@@ -362,6 +457,21 @@ private func quickCapturePreview(_ mode: CalendarScope, chinese: Bool = false) -
         .padding(12)
     }
     .background(Color(white: 0.15))
+    .preferredColorScheme(.dark)
+}
+
+/// A model that ignored the 1-2 sentence rule: the card shows the first sentence and folds the rest.
+#Preview("Plan card · long summary") {
+    ScrollView {
+        VStack(spacing: 16) {
+            PlanPreviewCard(draft: PreviewPlans.strength(summary: PreviewPlans.longSummary(chinese: false)),
+                            status: .pending)
+            PlanPreviewCard(draft: PreviewPlans.strength(chinese: true, summary: PreviewPlans.longSummary(chinese: true)),
+                            status: .pending, style: .compact)
+        }
+        .padding(12)
+    }
+    .background(Theme.surface)
     .preferredColorScheme(.dark)
 }
 

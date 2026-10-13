@@ -14,17 +14,39 @@ enum CalendarScope: String, CaseIterable, Sendable {
     }
 }
 
-/// Pure date math behind Quick Capture's week pages and continuously scrolling month grid.
+/// Pure date math behind the calendars: Quick Capture's day and week pages and continuously scrolling month
+/// grid, and the main view's month chips and month pages.
 ///
 /// Day and week boundaries always come from `Calendar`, never from 86 400-second steps: London's 25 Oct 2026
 /// has 25 hours, so `+ 7 × 86 400 s` from that Sunday lands on Saturday 23:00 instead of the next Sunday.
 /// Weeks start on `calendar.firstWeekday` (Sunday for `WallClock().calendar`).
 enum CalendarPaging {
 
+    // MARK: Endless paging
+
+    /// How far each pager reaches either side of its anchor date. Pages are lazy and all the same size, so only
+    /// the few on screen are ever built, however many there are; nobody swipes a century by hand.
+    static let reachYears = 101
+    static let dayPages = -(reachYears * 366)...(reachYears * 366)
+    static let weekPages = -(reachYears * 53)...(reachYears * 53)
+    static let monthPages = -(reachYears * 12)...(reachYears * 12)
+
+    /// Whether a pager can show `offset` from its current anchor. Past half its reach (only a jump decades
+    /// away gets there) the pager re-anchors on the target instead, so neither end is ever in sight.
+    static func isWithinReach(_ offset: Int, of pages: ClosedRange<Int>) -> Bool {
+        abs(offset) <= pages.upperBound / 2
+    }
+
     // MARK: Days and weeks
 
     static func day(_ offset: Int, after date: Date, calendar: Calendar) -> Date {
         calendar.date(byAdding: .day, value: offset, to: date) ?? date
+    }
+
+    /// Calendar days from the day containing `reference` to the day containing `date` (negative = earlier).
+    static func dayOffset(of date: Date, from reference: Date, calendar: Calendar) -> Int {
+        calendar.dateComponents([.day], from: calendar.startOfDay(for: reference),
+                                to: calendar.startOfDay(for: date)).day ?? 0
     }
 
     /// Local midnight to the next local midnight (23 or 25 hours on DST days).
@@ -68,6 +90,40 @@ enum CalendarPaging {
         return (calendar.dateComponents([.day], from: from, to: to).day ?? 0) / 7
     }
 
+    // MARK: Months
+
+    /// The first moment of the month containing `date`.
+    static func monthStart(containing date: Date, calendar: Calendar) -> Date {
+        calendar.dateInterval(of: .month, for: date)?.start ?? calendar.startOfDay(for: date)
+    }
+
+    /// The first moment of the month `offset` months from the one containing `date`.
+    static func month(_ offset: Int, from date: Date, calendar: Calendar) -> Date {
+        let start = monthStart(containing: date, calendar: calendar)
+        guard let shifted = calendar.date(byAdding: .month, value: offset, to: start) else { return start }
+        return monthStart(containing: shifted, calendar: calendar)
+    }
+
+    /// Whole months from the month containing `reference` to the month containing `date` (negative = earlier).
+    static func monthOffset(of date: Date, from reference: Date, calendar: Calendar) -> Int {
+        let from = calendar.dateComponents([.year, .month], from: reference)
+        let to = calendar.dateComponents([.year, .month], from: date)
+        return ((to.year ?? 0) - (from.year ?? 0)) * 12 + (to.month ?? 0) - (from.month ?? 0)
+    }
+
+    static func monthInterval(containing date: Date, calendar: Calendar) -> DateInterval {
+        let start = monthStart(containing: date, calendar: calendar)
+        return DateInterval(start: start, end: max(start, month(1, from: start, calendar: calendar)))
+    }
+
+    /// Whole weeks covering the month containing `date`, as the main month grid draws it.
+    static func monthGridInterval(containing date: Date, calendar: Calendar) -> DateInterval {
+        let interval = monthInterval(containing: date, calendar: calendar)
+        let first = weekStart(containing: interval.start, calendar: calendar)
+        let last = weekStart(containing: lastDay(of: interval, calendar: calendar), calendar: calendar)
+        return DateInterval(start: first, end: max(first, week(1, from: last, calendar: calendar)))
+    }
+
     // MARK: Month window
 
     /// `weeks` continuous weeks starting `leadWeeks` before the week containing `date`. `end` is exclusive.
@@ -107,6 +163,35 @@ enum CalendarPaging {
         formatter.timeZone = calendar.timeZone
         formatter.setLocalizedDateFormatFromTemplate("MMMd")
         return formatter.string(from: range.start) + " – " + formatter.string(from: lastDay(of: range, calendar: calendar))
+    }
+
+    /// A month chip: "Oct" / "10月", and on January the year as well, "Jan 2027" / "2027年1月", so scrolling
+    /// past a new year shows which one it is.
+    static func monthChipLabel(_ month: Date, calendar: Calendar, locale: Locale) -> String {
+        let isJanuary = calendar.component(.month, from: month) == 1
+        return formatted(month, template: isJanuary ? "yMMM" : "MMM", calendar: calendar, locale: locale)
+    }
+
+    /// "2031" / "2031年" when `range` lies outside the year of `now` ("2030 – 2031" across New Year), nil
+    /// inside it: titles like "Mar 9 – Mar 15" leave the year out.
+    static func yearLabel(for range: DateInterval, now: Date, calendar: Calendar, locale: Locale) -> String? {
+        let first = calendar.component(.year, from: range.start)
+        let lastDate = lastDay(of: range, calendar: calendar)
+        let last = calendar.component(.year, from: lastDate)
+        let current = calendar.component(.year, from: now)
+        guard first != current || last != current else { return nil }
+        let start = formatted(range.start, template: "y", calendar: calendar, locale: locale)
+        guard first != last else { return start }
+        return start + " – " + formatted(lastDate, template: "y", calendar: calendar, locale: locale)
+    }
+
+    private static func formatted(_ date: Date, template: String, calendar: Calendar, locale: Locale) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(template)
+        return formatter.string(from: date)
     }
 
     // MARK: Events per day

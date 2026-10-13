@@ -10,9 +10,14 @@ enum AppRefresh {
         try? BGTaskScheduler.shared.submit(request)
     }
 
+    /// Only the rolling window is re-listed here. Ranges loaded on demand are forgotten by it and listed again
+    /// when the app next shows them (`ScheduleViewModel.ensureEvents`), so a background run stays a few requests.
     static func run() async {
         schedule()
-        try? await CalendarSync().refreshWindow()
+        // Demo data lives only in the cache; a Google listing must not replace the seeded window (same as refresh()).
+        if !AppConstants.isDemoMode {
+            try? await CalendarSync().refreshWindow()
+        }
         await ReminderScheduler.shared.reschedule()
         await LiveActivityManager.shared.refreshIfRunning()
     }

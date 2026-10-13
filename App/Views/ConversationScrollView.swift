@@ -16,10 +16,14 @@ struct ConversationScrollView<Content: View>: View {
     /// Bumped to bring `revealID` into view by its bottom edge (a plan card's Add / Keep editing).
     var revealRequest = 0
     var revealID: UUID?
+    /// Called as the reader's finger scrolls back up through the history (Quick Capture makes room for it).
+    var onScrollBack: (() -> Void)? = nil
     @ViewBuilder var content: () -> Content
 
     @State private var isAtBottom = true
     @State private var hasUnseen = false
+    /// The reader's finger is moving the content (not a programmatic scroll or a bounce).
+    @State private var isDragging = false
 
     private static var bottomID: String { "conversation-bottom" }
     /// This close to the end still counts as reading the newest message.
@@ -39,13 +43,21 @@ struct ConversationScrollView<Content: View>: View {
                 ConversationViewport(isAtBottom: geometry.visibleRect.maxY >= geometry.contentSize.height - Self.slack,
                                      height: geometry.containerSize.height)
             } action: { old, new in
-                if new.height != old.height && old.isAtBottom {
+                if new.height != old.height && old.isAtBottom && !isDragging {
                     // The keyboard or the panel changed the view's height: stay on the newest message.
                     proxy.scrollTo(Self.bottomID, anchor: .bottom)
                     return
                 }
                 isAtBottom = new.isAtBottom
                 if new.isAtBottom { hasUnseen = false }
+            }
+            .onScrollPhaseChange { _, phase in
+                isDragging = phase == .interacting
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y
+            } action: { old, new in
+                if isDragging && new < old - 1 { onScrollBack?() }
             }
             .onChange(of: tail) { old, new in
                 if isAtBottom || new.isOwnMessage {
