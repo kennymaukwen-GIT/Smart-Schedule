@@ -14,7 +14,7 @@
 | Artboard 1 | 鎖定畫面提醒 → 長按展開 → 原地對話（MY TEXT／THE RESPOND／輸入列） | `NotificationContent/NotificationViewController.swift`、`NotificationChatView.swift`、`Shared/Notifications/*` |
 | Artboard 2 | 動態島 compact 狀態「⏰ Online meeting in 21 MIN」 | `Widgets/ScheduleLiveActivity.swift`（`compactLeading`／`compactTrailing`） |
 | Artboard 3 | 控制中心時鐘按鈕 → 動態島就緒；展開後顯示一週微型日曆和輸入列 | `Widgets/SmartScheduleControl.swift`、`Shared/Intents/SummonScheduleIntent.swift`、`Widgets/ScheduleLiveActivity.swift`（`ExpandedIslandView`） |
-| Artboard 4 | 點了動態島之後出現的 Quick Capture：當日時間軸加對話 | `App/Views/QuickCaptureView.swift`、`RootView.swift`（從島的位置放大出現的動畫） |
+| Artboard 4（04 Quick Capture） | 點了動態島之後出現的 Quick Capture：DAY／WEEK／MONTH 切換（記住上次的選擇）、24 小時制時間軸、可左右翻頁的週卡、可上下捲動的連續月曆、對話面板、建議膠囊 | `App/Views/QuickCaptureView.swift`、`CaptureModePicker.swift`、`WeekAgendaCard.swift`、`MonthScrollCard.swift`、`CaptureCalendarParts.swift`、`Shared/Core/CalendarPaging.swift`（日期運算）、`RootView.swift`（從島的位置放大出現的動畫） |
 | Artboard 5 | 主畫面：年份、月份選擇、月曆格（multi-day bar、task、+N）、AI 對話區、事件詳情 | `App/Views/MainView.swift`、`MonthGridView.swift`、`ChatPanel.swift`、`EventDetailSheet.swift` |
 | Artboard 5（6 個月健身計畫） | 長期目標拆成 phases 和 RRULE series | `Shared/AI/FunctionDeclarations.json`（`create_long_term_plan`）、`Shared/Calendar/CalendarEventMapper.swift` |
 

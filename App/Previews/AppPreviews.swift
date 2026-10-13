@@ -40,12 +40,25 @@ extension ChatViewModel {
         .preferredColorScheme(.dark)
 }
 
-#Preview("Quick Capture") {
-    // Artboard 4 shows the busy day: Lunch, Meeting With Andrew, Deadline for Plan 5008.
+#Preview("Quick Capture · Day") {
+    quickCapturePreview(.day)
+}
+
+#Preview("Quick Capture · Week") {
+    quickCapturePreview(.week)
+}
+
+#Preview("Quick Capture · Month") {
+    quickCapturePreview(.month)
+}
+
+/// Design 04 focuses the busy day (Lunch, Meeting With Andrew, Deadline for Plan 5008), two days from today.
+@MainActor
+private func quickCapturePreview(_ mode: CalendarScope) -> some View {
     let schedule = ScheduleViewModel.preview(focusDay: WallClock().calendar.date(byAdding: .day, value: 2, to: Date()))
-    ZStack(alignment: .top) {
+    return ZStack(alignment: .top) {
         Color.black.ignoresSafeArea()
-        QuickCaptureView(startsWithVoice: false, onClose: {})
+        QuickCaptureView(startsWithVoice: false, initialMode: mode, onClose: {})
     }
     .environment(schedule)
     .environment(ChatViewModel.preview(schedule: schedule))

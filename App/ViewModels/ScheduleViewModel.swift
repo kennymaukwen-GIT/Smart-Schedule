@@ -7,12 +7,20 @@ final class ScheduleViewModel {
     var events: [ScheduleEvent] = []
     var displayedMonth: Date
     var focusDay = Date()
+    /// The latest range the assistant asked to show (Quick Capture switches scope and scrolls to it).
+    private(set) var focusRequest: FocusRequest?
     var isSignedIn = false
     var isRefreshing = false
     var isDemo = false
     var lastError: String?
 
     let clock = WallClock()
+
+    /// A fresh `id` per request, so asking for the same range twice still reaches `onChange` observers.
+    struct FocusRequest: Equatable {
+        let id = UUID()
+        let range: DateInterval
+    }
 
     init() {
         displayedMonth = WallClock().calendar.dateInterval(of: .month, for: Date())?.start ?? Date()
@@ -115,8 +123,7 @@ final class ScheduleViewModel {
     }
 
     func events(on day: Date) -> [ScheduleEvent] {
-        let calendar = clock.calendar
-        let interval = DateInterval(start: calendar.startOfDay(for: day), duration: 86_400)
+        let interval = CalendarPaging.dayInterval(containing: day, calendar: clock.calendar) // 23/25 h on DST days
         return events
             .filter { $0.intersects(interval) }
             .sorted { lhs, rhs in
@@ -129,6 +136,7 @@ final class ScheduleViewModel {
     func focus(_ interval: DateInterval) {
         focusDay = interval.start
         displayedMonth = clock.calendar.dateInterval(of: .month, for: interval.start)?.start ?? displayedMonth
+        focusRequest = FocusRequest(range: interval)
     }
 
     func event(id: String) -> ScheduleEvent? {
