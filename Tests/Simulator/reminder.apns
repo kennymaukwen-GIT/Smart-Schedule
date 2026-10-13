@@ -1,0 +1,14 @@
+{
+  "Simulator Target Bundle": "com.smartschedule.app",
+  "aps": {
+    "alert": {
+      "title": "Online meeting with Joe",
+      "subtitle": "In 30 min",
+      "body": "15:30 · Google Meet"
+    },
+    "category": "SS_EVENT_REMINDER",
+    "interruption-level": "time-sensitive",
+    "sound": "default"
+  },
+  "ssEventId": "demo-meeting-joe"
+}

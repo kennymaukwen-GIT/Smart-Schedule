@@ -25,7 +25,8 @@ struct EventDetailSheet: View {
                         Label(location, systemImage: "mappin.and.ellipse")
                     }
                     if let minutes = event.reminderMinutes, !minutes.isEmpty {
-                        Label(minutes.map(Self.reminderText).joined(separator: ", "), systemImage: "bell")
+                        Label(minutes.map { Self.reminderText($0, allDay: event.isAllDay) }.joined(separator: ", "),
+                              systemImage: "bell")
                     }
                     if let notes = event.notes, !notes.isEmpty {
                         Label(notes, systemImage: "text.alignleft")
@@ -58,8 +59,19 @@ struct EventDetailSheet: View {
         return "\(day) · \(range)"
     }
 
-    static func reminderText(_ minutes: Int) -> String {
-        switch minutes {
+    static func reminderText(_ minutes: Int, allDay: Bool = false) -> String {
+        if allDay {
+            // All-day reminders count back from 00:00 of the event day: 900 = the day before at 09:00.
+            let daysBefore = (minutes + 1439) / 1440
+            let minuteOfDay = daysBefore * 1440 - minutes
+            let time = String(format: "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
+            switch daysBefore {
+            case 0: return "On the day at \(time)"
+            case 1: return "The day before at \(time)"
+            default: return "\(daysBefore) days before at \(time)"
+            }
+        }
+        return switch minutes {
         case 0: "At start"
         case 1..<60: "\(minutes) minutes before"
         case 60..<1440: "\(minutes / 60) hour\(minutes >= 120 ? "s" : "") before"
