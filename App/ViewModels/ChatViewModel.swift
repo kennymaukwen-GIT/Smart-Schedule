@@ -230,6 +230,8 @@ final class ChatViewModel {
         }
         if !reply.addedEvents.isEmpty {
             drawn += [ReplyFormatter.confirmation(for: reply.addedEvents, clock: clock), DemoAssistant.demoNote]
+            // Several create_events calls in one turn each append their own one-event confirmation.
+            drawn += reply.addedEvents.map { ReplyFormatter.confirmation(for: [$0], clock: clock) }
         }
         if let agenda = reply.agenda {
             drawn.append(ReplyFormatter.agenda(agenda, clock: clock))
@@ -241,10 +243,14 @@ final class ChatViewModel {
             let block = block.trimmingCharacters(in: .whitespacesAndNewlines)
             if !block.isEmpty { text = text.replacingOccurrences(of: block, with: "") }
         }
-        return text.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
+        // Drop the lines left empty, but keep one blank line where the model wrote a paragraph break.
+        var lines: [String] = []
+        for line in text.components(separatedBy: "\n").map({ $0.trimmingCharacters(in: .whitespaces) }) {
+            if line.isEmpty, lines.last?.isEmpty ?? true { continue }
+            lines.append(line)
+        }
+        if lines.last?.isEmpty == true { lines.removeLast() }
+        return lines.joined(separator: "\n")
     }
 
     private func setPlanStatus(_ status: PlanCardStatus, messageID: Message.ID) {
