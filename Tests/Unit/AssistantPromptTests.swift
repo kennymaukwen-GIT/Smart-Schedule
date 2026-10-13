@@ -106,6 +106,47 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertFalse(rows.contains { $0.hasPrefix("e00 |") })
     }
 
+    // MARK: Writing style
+
+    func testWritingStyleSection() throws {
+        let text = prompt()
+        XCTAssertTrue(text.contains("# Writing style"), text)
+        XCTAssertTrue(text.contains("Reply in the language the user wrote in. Use 24-hour times"), text)
+        XCTAssertTrue(text.contains("summary_for_user: 1–2 short, plain sentences"), text)
+        XCTAssertTrue(text.contains("Do NOT list days, times, phases, check-ins or reminders"), text)
+        XCTAssertTrue(text.contains(#""A 6-month muscle plan: 3 workouts a week, about an hour each.""#), text)
+        XCTAssertTrue(text.contains(#""6 個月增肌計畫：每週練 3 次，每次約 1 小時。""#), text)
+        XCTAssertTrue(text.contains("reply_to_user.message: at most 2 short sentences. Ask one question at a time."), text)
+        XCTAssertTrue(text.contains("never cram several facts into one sentence"), text)
+        XCTAssertTrue(text.contains(#"Never use slashes or abbreviations such as "Tue/Thu""#), text)
+        XCTAssertTrue(text.contains("write summary_for_user as described in # Writing style"), text)
+        XCTAssertFalse(text.contains("70 words"), "the old long-summary rule is gone")
+
+        // An instruction, so it sits above the data blocks.
+        let style = try XCTUnwrap(text.range(of: "# Writing style"))
+        let upcoming = try XCTUnwrap(text.range(of: "# UPCOMING"))
+        XCTAssertLessThan(style.lowerBound, upcoming.lowerBound)
+    }
+
+    func testDeclarationsCarryTheWritingStyle() throws {
+        let url = try XCTUnwrap(Bundle(for: GeminiClient.self).url(forResource: "FunctionDeclarations", withExtension: "json"))
+        let declarations = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        func property(_ function: String, _ name: String) throws -> String {
+            let declaration = try XCTUnwrap(declarations.first { $0["name"] as? String == function })
+            let parameters = try XCTUnwrap(declaration["parameters"] as? [String: Any])
+            let properties = try XCTUnwrap(parameters["properties"] as? [String: Any])
+            let field = try XCTUnwrap(properties[name] as? [String: Any])
+            return try XCTUnwrap(field["description"] as? String)
+        }
+        let summary = try property("create_long_term_plan", "summary_for_user")
+        XCTAssertTrue(summary.contains("1-2 short, plain sentences"), summary)
+        XCTAssertTrue(summary.contains("Do NOT list days, times, phases, check-ins or reminders"), summary)
+        XCTAssertFalse(summary.contains("70 words"), summary)
+        let message = try property("reply_to_user", "message")
+        XCTAssertTrue(message.contains("At most 2 short sentences"), message)
+        XCTAssertTrue(message.contains("one question at a time"), message)
+    }
+
     // MARK: Draft plan under review
 
     func testDraftPlanBlockOnlyWhenADraftIsGiven() throws {

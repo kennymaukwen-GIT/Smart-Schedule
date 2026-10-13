@@ -44,7 +44,7 @@ final class PlanDraftTests: XCTestCase {
         XCTAssertEqual(draft.utterance, "I want to be muscular in 6 month design me a daily routine")
         XCTAssertEqual(draft.title, "Muscle 6M")
         XCTAssertTrue(draft.goal.hasPrefix("Gain visible muscle mass"))
-        XCTAssertTrue(draft.summary.hasPrefix("Here is a plan I designed for you"))
+        XCTAssertEqual(draft.summary, "A 6-month muscle plan: 4 workouts a week, about an hour each.")
         XCTAssertEqual(draft.startDate, TestClock.local(2026, 10, 14))
         XCTAssertEqual(draft.endDate, TestClock.local(2027, 4, 13))
         XCTAssertEqual(draft.phases.map(\.name), ["Foundation", "Hypertrophy", "Strength"])

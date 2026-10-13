@@ -47,7 +47,7 @@ actor ReminderScheduler {
     /// Re-posts the same content later. Usable from the notification content extension.
     static func snooze(_ content: UNNotificationContent, minutes: Int) async {
         guard let copy = content.mutableCopy() as? UNMutableNotificationContent else { return }
-        copy.subtitle = "Snoozed \(minutes) min"
+        copy.subtitle = String(localized: "Snoozed \(minutes) min")
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(minutes * 60), repeats: false)
         let request = UNNotificationRequest(identifier: NotificationIDs.reminderPrefix + "snooze." + UUID().uuidString,
                                             content: copy, trigger: trigger)
@@ -60,7 +60,7 @@ actor ReminderScheduler {
         let content = UNMutableNotificationContent()
         content.title = event.title
         content.subtitle = Self.leadText(minutes)
-        let time = event.start.formatted(date: .omitted, time: .shortened)
+        let time = ReplyFormatter.clockTime(event.start, clock: WallClock())
         content.body = [time, event.location ?? (event.meetURL != nil ? "Google Meet" : nil)]
             .compactMap { $0 }.joined(separator: " · ")
         content.categoryIdentifier = NotificationIDs.Category.eventReminder
@@ -93,11 +93,11 @@ actor ReminderScheduler {
 
     static func leadText(_ minutes: Int) -> String {
         switch minutes {
-        case 0: "Starting now"
-        case 1..<60: "In \(minutes) min"
-        case 60..<1440: "In \(minutes / 60) h"
-        case 1440..<2880: "Tomorrow"
-        default: "In \(minutes / 1440) days"
+        case 0: String(localized: "Starting now")
+        case 1..<60: String(localized: "In \(minutes) min")
+        case 60..<1440: String(localized: "In \(minutes / 60) h")
+        case 1440..<2880: String(localized: "Tomorrow")
+        default: String(localized: "In \(minutes / 1440) days")
         }
     }
 }

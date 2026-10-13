@@ -29,8 +29,8 @@
 | `functionCallingConfig.mode = "ANY"` | 每一輪都**一定**是結構化呼叫，純聊天走 `reply_to_user`。解析結果可預測，不需要處理自由文字 |
 | 時間一律輸出**本地牆上時間** `YYYY-MM-DDTHH:mm`（不帶 offset、不帶 Z） | 模型最常犯的錯是算 offset，尤其跨夏令時間時。由 client 加上 IANA `timeZone`，交給 Google 展開，DST 就不會出錯（見 Calendar 文件第 3 節） |
 | `sessions` 攤平，用 `phase_index` 指回所屬階段，不巢狀在 `phases` 底下 | 減少 2 層巢狀，降低格式錯誤率 |
-| `summary_for_user` 放在函式參數裡 | 模型解析的同時也把要回給使用者的話寫好了，**一次 round trip** 就完成，不用執行完再呼叫第二次產生回覆，大約省 1 秒 |
-| `create_events` 的確認文字由 client 用 template 產生 | 同上，而且格式固定：「Schedule set to Google Calendar on …」（Artboard 5） |
+| `summary_for_user` 放在函式參數裡 | 模型解析的同時也把要回給使用者的話寫好了，**一次 round trip** 就完成，不用執行完再呼叫第二次產生回覆，大約省 1 秒。內容只寫 1–2 句（見第 6 節） |
+| `create_events` 的確認由 client 產生 | 同上。聊天裡顯示成確認列（`Reply.addedEvents`），文字版是「Added: 標題 · 日期 時間」，給 Siri、通知和 VoiceOver 用 |
 | `reminder_minutes` 「省略就用預設值」 | 模型不需要知道使用者的偏好；預設值由 `ReminderPolicy` 統一管理 |
 | `assumptions[]` | 把模型做的假設（「假設你是初學者」「假設平日晚上有空」）攤開給使用者看，讓他能修正 |
 | UPCOMING 區塊（`id \| title \| start \| end \| flags`） | 一次提供三種資訊：衝突偵測、`modify` 和 `delete` 要用的 id 來源、`plan=` 對照。標題裡的 `\|` 和換行會先移除，防止 prompt injection |
@@ -119,20 +119,48 @@ Demo 模式（`DemoAssistant`）走同一個流程：計畫先變成草稿；有
 
 Fixtures：[`create_long_term_plan.revision.json`](../Tests/fixtures/create_long_term_plan.revision.json)（肌肉計畫改到早上 7 點，`revises` 指向原始 fixture）、[`confirm_plan.add.json`](../Tests/fixtures/confirm_plan.add.json)。
 
-## 6. 多輪對話與 Gemini 3 的 thought signature
+## 6. 回覆怎麼寫、怎麼顯示（可讀性）
+
+使用者回報過一段難讀的回覆：「Phase 1 (Oct 14–Nov 30): full body Tue/Thu 18:30 and Sat 11:00, 60 min. Phase 2 …」。問題是同一句塞了太多事實、用斜線縮寫，而且卡片上的表格又把同樣的內容再說一次。現在分成兩邊處理：
+
+**模型怎麼寫**（`AssistantPrompt` 的 `# Writing style` 區塊，加上 `summary_for_user` 和 `reply_to_user.message` 的 schema 描述）：
+
+| 規則 | 例子 |
+|---|---|
+| `summary_for_user` 只寫 1–2 句：計畫要達成什麼、每週的量。**不列**星期、時間、階段、檢查點、提醒（App 會畫成表格） | 「6 個月增肌計畫：每週練 3 次，每次約 1 小時。」/ "A 6-month muscle plan: 3 workouts a week, about an hour each." |
+| `reply_to_user.message` 最多 2 句短句，一次只問一個問題 | 「要幾點開始？」 |
+| 一句只講一件事；不用斜線或「Tue/Thu」這類縮寫，把星期寫出來 | 「週二和週四」、"Tuesday and Thursday" |
+| 用使用者寫的語言回覆，時間一律 24 小時制 | 18:30 |
+
+`scripts/validate_schema.py` 會檢查 fixture 的 `summary_for_user` 最多 2 句、沒有時間、沒有斜線。
+
+**App 怎麼顯示**：能用結構化資料的地方就不用長句子。`ReplyFormatter` 的字串是給 Siri、通知和 VoiceOver 的簡短文字版。
+
+| 回覆 | 聊天裡顯示 | 文字版（`Reply.text`） |
+|---|---|---|
+| 計畫草稿 | 計畫卡片：標題、日期範圍、1–2 句摘要、每週課表（每個階段一組，每列「週二 · 週四　18:30　60 分鐘　課程名稱」）、每天提醒、每月檢查、收合的假設 | 摘要 + 一句「點加入或繼續修改」 |
+| 修訂 | 新的計畫卡片；舊卡片顯示「已由第 N 版取代」 | 一句說明改了什麼（示範模式：「已改成每週一、三、五 07:00。」）+ 摘要 |
+| 新增行程 | 確認列（`Reply.addedEvents`）：打勾、「已加入 Google 日曆」、標題、「10月14日（週三）14:00–15:00」 | 「Added: 標題 · 日期 時間」，多筆時每筆一行「• 」 |
+| 查詢行程 | 行程表（`Reply.agenda`，型別 `AgendaDigest`）：標題「今天 · 10月15日（週四）」，每列「12:30　午餐」 | 標題 + 每列「• 12:30  午餐」；沒有行程時是「沒有行程」 |
+
+日期依 UI 語言格式化（`ReplyFormatter.dayLabel` / `shortDate` / `when`），時間一律 `HH:mm`（`ReplyFormatter.clockTime`）。
+
+**語言**：UI 和 template 字串都在 `Shared/Localization/Localizable.xcstrings`（String Catalog，source language 是英文，加上 zh-Hant 翻譯）。App 和兩個 extension 都把它當 resource，各自從自己的 bundle 讀。模型的回覆則跟著使用者輸入的語言走；示範模式（`DemoAssistant`）也一樣：輸入中文就用中文回。validator 會確認每個 key 都有 zh-Hant 翻譯、格式參數（`%@`、`%lld`，順序不同時用 `%1$@`）一致，而且原始碼裡每個 `String(localized:)` 都在 catalog 裡。
+
+## 7. 多輪對話與 Gemini 3 的 thought signature
 
 - 模型那一輪的 content（包含 `thoughtSignature`）以 **raw JSON 原樣保存**，下一輪原封送回。這是 Gemini 3 function calling 的硬性規定，少了會回 400。
 - 歷史紀錄以「exchange」為單位修剪（使用者發話、模型回覆、function responses 三個一組），最多保留 6 組。這樣 `functionCall` 和它對應的 `functionResponse` 永遠不會被拆開。
 - 執行出錯時，也會回傳一個 `functionResponse`，內容是 `{"ok": false, "error": ...}`，讓模型下一輪可以自我修正。
 
-## 7. 模型設定
+## 8. 模型設定
 
 - `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.5-flash`。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。
 - `thinkingLevel: "low"`：只對 Gemini 3.x 有效。2.x 用的是 `thinkingBudget`，參數不相容。
 - **不設定 temperature**：Gemini 3 的官方建議是保持預設值 1.0，調低可能造成迴圈或品質下降。
 - 「send a link」（Artboard 5 的迴紋針）：Gemini API 的 changelog（2026-03）寫明，內建工具（如 `url_context`）可以和自訂 function 在同一次呼叫裡並用。建議把這件事放在 proxy 端做，讓模型直接讀活動頁面。舊模型則先跑一次 `url_context` 抽出文字，再呼叫 function。
 
-## 8. 本地驗證
+## 9. 本地驗證
 
 ```bash
 python3 -I scripts/validate_schema.py --print-payloads
@@ -142,3 +170,5 @@ python3 -I scripts/validate_schema.py --print-payloads
 - Python 參考版的 mapper 會重算 RRULE、UNTIL（UTC）和 DTSTART 對齊，並 assert 倫敦 GMT 和 BST 的邊界值。
 - 草稿預覽的參考展開（`--print-payloads` 會印出每個計畫 fixture 的預覽數量），並 assert 18:30 在兩次夏令時間切換前後都不變。
 - `confirm_plan` 的 fixture 必須帶 `draft_plan`；帶 `revises` 的 fixture 必須是 `create_long_term_plan`，而且保留原本的 `plan_title`。
+- 回覆寫法：fixture 的 `summary_for_user` 最多 2 句、不列時間、不用斜線（第 6 節）。
+- String Catalog：每個 key 都有 zh-Hant 翻譯、格式參數一致，原始碼裡的每個 `String(localized:)` 都在 catalog 裡。

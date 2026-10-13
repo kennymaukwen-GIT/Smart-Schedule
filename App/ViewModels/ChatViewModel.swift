@@ -8,6 +8,7 @@ final class ChatViewModel {
         enum Role { case user, assistant }
         let id = UUID()
         let role: Role
+        /// What the conversation shows. For replies this is `shownText(of:)`, not the whole `Reply.text`.
         var text: String
         var suggestions: [String] = []
         var assumptions: [String] = []
@@ -15,6 +16,10 @@ final class ChatViewModel {
         /// A long-term plan shown for review; nothing is in the calendar until the user taps Add.
         var planDraft: PlanDraft?
         var planStatus: PlanCardStatus = .pending
+        /// Events the reply put in the calendar, shown as rows instead of a confirmation sentence.
+        var addedEvents: [ScheduleEvent] = []
+        /// The answer to a schedule question, shown as an aligned list.
+        var agenda: AgendaDigest?
 
         var hasOpenPlan: Bool { planDraft != nil && planStatus == .pending }
     }
@@ -56,23 +61,36 @@ final class ChatViewModel {
         }
     }
 
+    /// Inputs the demo understands, offered as chips when it starts. They are sample input rather than UI text, so
+    /// they are picked by language here instead of translated: a translation could stop `DemoAssistant` parsing them.
+    static var demoSuggestions: [String] {
+        ReplyFormatter.isChinese(ReplyFormatter.displayLocale)
+            ? ["明天下午 1 點跟 Andrew 吃午餐", "團隊會議延後 30 分鐘", "我想在 6 個月內增肌"]
+            : ["Lunch with Andrew tomorrow 1pm", "Push the team sync 30 min", "I want to be muscular in 6 months"]
+    }
+
     /// Switches to the offline assistant ("Try demo" in the chat panel).
     func enableDemo() {
         assistant = DemoAssistant()
-        let hint = String(localized: "Demo mode: sample data, nothing leaves this device. Try “Lunch with Andrew tomorrow 1pm”, “push the team sync 30 min” or “I want to be muscular in 6 months”.")
-        messages.append(Message(role: .assistant, text: hint))
+        messages.append(Message(role: .assistant,
+                                text: String(localized: "Demo mode: sample data. Nothing leaves this device. Try one of these:"),
+                                suggestions: Self.demoSuggestions))
     }
 
     func disableDemo() {
         assistant = ScheduleAssistant.shared
     }
 
-    /// The latest user line + reply, for Quick Capture (Artboard 4 shows only the last exchange). Without a user
-    /// line the greeting is left out, but not a plan card (a draft made through Siri waits there for review).
-    var lastExchange: (user: Message?, reply: Message?) {
-        let reply = messages.last { $0.role == .assistant }
-        let user = messages.last { $0.role == .user }
-        return (user, user == nil && reply?.planDraft == nil ? nil : reply)
+    /// The newest message when it is a reply. Only its suggestions are on offer: once the user has written
+    /// again, older chips answer a question the conversation has moved past.
+    var latestReply: Message? {
+        guard let last = messages.last, last.role == .assistant else { return nil }
+        return last
+    }
+
+    /// What the conversation views follow: they scroll to a new message only while the reader is at the bottom.
+    var conversationTail: ConversationTail {
+        ConversationTail(lastID: messages.last?.id, isOwnMessage: messages.last?.role == .user, isTyping: isSending)
     }
 
     /// The card a tapped ghost occurrence should bring into view.
@@ -183,9 +201,10 @@ final class ChatViewModel {
         if let planID = reply.discardedPlanID { settlePlanCards(planID: planID, as: .discarded) }
         if let plan = reply.planDraft { retirePlanCards(before: plan) }
 
-        messages.append(Message(role: .assistant, text: reply.text, suggestions: reply.suggestions,
-                                assumptions: reply.assumptions, pendingDeletion: reply.pendingDeletion,
-                                planDraft: reply.planDraft))
+        messages.append(Message(role: .assistant, text: Self.shownText(of: reply, clock: schedule.clock),
+                                suggestions: reply.suggestions, assumptions: reply.assumptions,
+                                pendingDeletion: reply.pendingDeletion, planDraft: reply.planDraft,
+                                addedEvents: reply.addedEvents, agenda: reply.agenda))
 
         if let plan = reply.planDraft {
             // Quick Capture opens WEEK on the plan's first week, where its ghost sessions are.
@@ -199,6 +218,33 @@ final class ChatViewModel {
         } else if reply.planDraft != nil || reply.committedPlanID != nil || reply.discardedPlanID != nil {
             await schedule.reloadPendingPlan()
         }
+    }
+
+    /// `Reply.text` is the full text version that Siri, notifications and the Live Activity read. In the chat a
+    /// plan's summary and review prompt are on its card, and confirmations and agendas are drawn as rows, so
+    /// those lines are left out; anything else (a revision's "what changed", an overlap warning) stays.
+    static func shownText(of reply: ScheduleAssistant.Reply, clock: WallClock) -> String {
+        var drawn: [String] = []
+        if let plan = reply.planDraft {
+            drawn += [plan.summary, ReplyFormatter.planReviewPrompt]
+        }
+        if !reply.addedEvents.isEmpty {
+            drawn += [ReplyFormatter.confirmation(for: reply.addedEvents, clock: clock), DemoAssistant.demoNote]
+        }
+        if let agenda = reply.agenda {
+            drawn.append(ReplyFormatter.agenda(agenda, clock: clock))
+        }
+        guard !drawn.isEmpty else { return reply.text }
+
+        var text = reply.text
+        for block in drawn {
+            let block = block.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !block.isEmpty { text = text.replacingOccurrences(of: block, with: "") }
+        }
+        return text.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
     }
 
     private func setPlanStatus(_ status: PlanCardStatus, messageID: Message.ID) {

@@ -2,63 +2,108 @@
 import SwiftUI
 
 extension NotificationChatModel {
-    /// Preview-only: the expanded reminder from Artboard 1 with one exchange; replies go to `DemoAssistant`.
+    /// Preview-only: the expanded reminder from Artboard 1 with a few exchanges (scroll up for the first);
+    /// replies go to `DemoAssistant`.
     static func preview() -> NotificationChatModel {
         let model = NotificationChatModel(assistant: DemoAssistant())
         model.headerTitle = "Online meeting with Joe"
         model.headerBody = "In 30 min · 15:30 · Google Meet"
+        let samples = NotificationPreviewSamples()
         model.turns = [
             Turn(role: .user, text: "Push it 30 min and add a note to bring the Q3 numbers"),
-            Turn(role: .assistant, text: "Updated: Online meeting with Joe — 16:00. Reminder moved to 15:30.")
+            Turn(role: .assistant, text: "Updated: **Online meeting with Joe** · 16:00–17:00\nThe reminder moved to 15:30."),
+            Turn(role: .user, text: "What else do I have today?"),
+            Turn(role: .assistant, text: "", agenda: samples.agenda(chinese: false)),
+            Turn(role: .user, text: "Coffee with Mia tomorrow 9am at Blue Bottle"),
+            Turn(role: .assistant, text: "", addedEvents: [samples.coffee(chinese: false)])
         ]
         return model
     }
 
     /// Preview-only: a goal typed into a reminder came back as a draft plan waiting for Add / Keep editing.
-    static func planPreview() -> NotificationChatModel {
+    static func planPreview(chinese: Bool = false) -> NotificationChatModel {
         let model = NotificationChatModel(assistant: DemoAssistant())
         model.headerTitle = "Smart Schedule"
-        model.headerBody = "Good morning"
+        model.headerBody = chinese ? "早安" : "Good morning"
         model.turns = [
-            Turn(role: .user, text: "I want to get stronger in 3 months"),
-            Turn(role: .assistant, text: "Take a look: tap Add to put it in your calendar, or Keep editing to change something.")
+            Turn(role: .user, text: chinese ? "我想在 3 個月內變強壯" : "I want to get stronger in 3 months"),
+            Turn(role: .assistant, text: "", planDraft: previewPlanDraft(chinese: chinese))
         ]
-        model.planDraft = previewPlanDraft()
         return model
     }
 }
 
+/// Sample rows for the previews: events around today, nothing read from the App Group.
+private struct NotificationPreviewSamples {
+    let clock = WallClock()
+
+    func coffee(chinese: Bool) -> ScheduleEvent {
+        let calendar = clock.calendar
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())) ?? Date()
+        let start = clock.combine(day: tomorrow, time: (hour: 9, minute: 0)) ?? tomorrow
+        return ScheduleEvent(id: "preview-coffee", seriesID: nil, title: chinese ? "跟 Mia 喝咖啡" : "Coffee with Mia",
+                             start: start, end: start.addingTimeInterval(3600), isAllDay: false, kind: .event,
+                             colorHex: DemoData.eventHex, location: "Blue Bottle", meetURL: nil, notes: nil,
+                             reminderMinutes: nil, planID: nil, htmlLink: nil, isCompleted: false)
+    }
+
+    func agenda(chinese: Bool) -> AgendaDigest {
+        let calendar = clock.calendar
+        let today = calendar.startOfDay(for: Date())
+        let range = DateInterval(start: today, end: calendar.date(byAdding: .day, value: 1, to: today) ?? today)
+        func event(_ id: String, _ title: String, _ hour: Int, _ minute: Int, _ minutes: Int) -> ScheduleEvent {
+            let start = clock.combine(day: today, time: (hour: hour, minute: minute)) ?? today
+            return ScheduleEvent(id: "preview-\(id)", seriesID: nil, title: title, start: start,
+                                 end: start.addingTimeInterval(TimeInterval(minutes * 60)), isAllDay: false,
+                                 kind: .event, colorHex: DemoData.eventHex, location: nil, meetURL: nil, notes: nil,
+                                 reminderMinutes: nil, planID: nil, htmlLink: nil, isCompleted: false)
+        }
+        let locale = Locale(identifier: chinese ? "zh-Hant" : "en_US")
+        return AgendaDigest(range: range,
+                            title: ReplyFormatter.agendaTitle(for: range, now: Date(), clock: clock, locale: locale),
+                            events: [event("lunch", chinese ? "午餐" : "Lunch", 12, 30, 60),
+                                     event("joe", chinese ? "跟 Joe 開線上會議" : "Online meeting with Joe", 16, 0, 60),
+                                     event("gym", chinese ? "健身" : "Gym", 18, 30, 60)])
+    }
+}
+
 /// A 12-week, two-phase plan starting tomorrow. Preview events are left out: nothing here draws a calendar.
-private func previewPlanDraft() -> PlanDraft {
+private func previewPlanDraft(chinese: Bool = false) -> PlanDraft {
     let calendar = WallClock().calendar
     let start = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: Date())) ?? Date()
     func day(_ offset: Int) -> Date { calendar.date(byAdding: .day, value: offset, to: start) ?? start }
+    func text(_ english: String, _ chineseText: String) -> String { chinese ? chineseText : english }
     return PlanDraft(
         id: "plan-preview",
         revision: 1,
-        utterance: "I want to get stronger in 3 months",
-        goal: "Get stronger in 3 months",
-        title: "12-week strength plan",
+        utterance: text("I want to get stronger in 3 months", "我想在 3 個月內變強壯"),
+        goal: text("Get stronger in 3 months", "3 個月內變強壯"),
+        title: text("12-week strength plan", "12 週肌力計畫"),
         startDate: start,
         endDate: day(83),
-        summary: "Three sessions a week after work: full-body basics for four weeks, then an upper/lower split.",
+        summary: text("A 12-week strength plan: 2 to 4 workouts a week, about an hour each.",
+                      "12 週肌力計畫：每週練 2 到 4 次，每次約 1 小時。"),
         phases: [
-            PlanDraft.Phase(name: "Foundation", start: start, end: day(27), focus: "Technique and habit"),
-            PlanDraft.Phase(name: "Build", start: day(28), end: day(83), focus: "Add weight every week")
+            PlanDraft.Phase(name: text("Foundation", "基礎期"), start: start, end: day(27), focus: text("Technique and habit", "動作和習慣")),
+            PlanDraft.Phase(name: text("Build", "進步期"), start: day(28), end: day(83), focus: text("Add weight every week", "每週加重"))
         ],
         sessions: [
-            PlanDraft.Session(phaseIndex: 0, title: "Full body A", weekdays: ["MO", "TH"], startTime: "18:30",
-                              durationMinutes: 60, notes: nil),
-            PlanDraft.Session(phaseIndex: 1, title: "Upper body", weekdays: ["MO", "TH"], startTime: "18:30",
-                              durationMinutes: 60, notes: nil),
-            PlanDraft.Session(phaseIndex: 1, title: "Lower body", weekdays: ["TU", "FR"], startTime: "18:30",
-                              durationMinutes: 60, notes: nil)
+            PlanDraft.Session(phaseIndex: 0, title: text("Full body A", "全身訓練 A"), weekdays: ["MO", "TH"],
+                              startTime: "18:30", durationMinutes: 60, notes: nil),
+            PlanDraft.Session(phaseIndex: 1, title: text("Upper body", "上半身"), weekdays: ["MO", "TH"],
+                              startTime: "18:30", durationMinutes: 60, notes: nil),
+            PlanDraft.Session(phaseIndex: 1, title: text("Lower body", "下半身"), weekdays: ["TU", "FR"],
+                              startTime: "18:30", durationMinutes: 60, notes: nil)
         ],
-        milestones: [PlanDraft.Milestone(date: day(83), title: "Final check-in")],
-        nudge: PlanDraft.Nudge(hour: 7, minute: 30, message: "Training today at 18:30"),
-        assumptions: ["Workouts at 18:30 after work"],
+        milestones: [
+            PlanDraft.Milestone(date: day(27), title: text("Form check", "動作檢查")),
+            PlanDraft.Milestone(date: day(55), title: text("Strength test", "肌力測試")),
+            PlanDraft.Milestone(date: day(83), title: text("Final check-in", "最後檢查"))
+        ],
+        nudge: PlanDraft.Nudge(hour: 7, minute: 30, message: text("Training today at 18:30", "今天 18:30 訓練")),
+        assumptions: [text("Workouts at 18:30 after work", "下班後 18:30 訓練"), text("Starts tomorrow", "明天開始")],
         previewEvents: [],
-        writeCount: 4,
+        writeCount: 6,
         argsJSON: Data()
     )
 }
@@ -71,5 +116,11 @@ private func previewPlanDraft() -> PlanDraft {
 #Preview("Hold to reply · plan draft") {
     NotificationChatView(model: NotificationChatModel.planPreview())
         .frame(height: NotificationChatModel.planHeight)
+}
+
+#Preview("Hold to reply · zh-Hant") {
+    NotificationChatView(model: NotificationChatModel.planPreview(chinese: true))
+        .frame(height: NotificationChatModel.planHeight)
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
 }
 #endif

@@ -11,7 +11,7 @@
       "plan_title": "Muscle 6M",
       "start_date": "2026-10-14",
       "end_date": "2027-04-13",
-      "summary_for_user": "Updated: the same 4-day program, now at 07:00 before work — one hour each (70 min in the strength phase), three phases (foundation, hypertrophy, strength). Your morning reminder moves to 06:15. Tap Add when it looks right, or tell me what else to change.",
+      "summary_for_user": "Moved to the mornings, before work. Still 4 workouts a week, about an hour each.",
       "phases": [
         { "name": "Foundation", "start_date": "2026-10-14", "end_date": "2026-11-30", "focus": "Technique, full-body 3x10, add load weekly" },
         { "name": "Hypertrophy", "start_date": "2026-12-01", "end_date": "2027-02-28", "focus": "Upper/lower split, 4x8-12, progressive overload" },

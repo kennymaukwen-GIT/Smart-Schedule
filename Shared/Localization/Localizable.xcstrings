@@ -1,0 +1,1604 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ (%lld times)" : {
+      "comment" : "Event title and how many occurrences will be deleted",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@（%2$lld 次）"
+          }
+        }
+      }
+    },
+    "%@ · %lld min" : {
+      "comment" : "Session start time and length",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$lld 分鐘"
+          }
+        }
+      }
+    },
+    "%lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld days"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天"
+          }
+        }
+      }
+    },
+    "%lld days before" : {
+      "comment" : "Reminder time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天前"
+          }
+        }
+      }
+    },
+    "%lld days before at %@" : {
+      "comment" : "All-day event reminder time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 天前 %2$@"
+          }
+        }
+      }
+    },
+    "%lld events on the selected day" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld event on the selected day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld events on the selected day"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選取的日期有 %lld 個行程"
+          }
+        }
+      }
+    },
+    "%lld hours before" : {
+      "comment" : "Reminder time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 小時前"
+          }
+        }
+      }
+    },
+    "%lld items" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個項目"
+          }
+        }
+      }
+    },
+    "%lld milestones" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld milestone"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld milestones"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個檢查點"
+          }
+        }
+      }
+    },
+    "%lld min" : {
+      "comment" : "Session length",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分鐘"
+          }
+        }
+      }
+    },
+    "%lld minutes before" : {
+      "comment" : "Reminder time",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld minute before"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld minutes before"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分鐘前"
+          }
+        }
+      }
+    },
+    "%lld phases" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld phase"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld phases"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個階段"
+          }
+        }
+      }
+    },
+    "%lld weeks" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld weeks"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 週"
+          }
+        }
+      }
+    },
+    "+%lld" : {
+      "comment" : "More events than fit in a calendar cell",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "+%lld"
+          }
+        }
+      }
+    },
+    "+%lld more" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還有 %lld 個"
+          }
+        }
+      }
+    },
+    "1 day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 天"
+          }
+        }
+      }
+    },
+    "1 day before" : {
+      "comment" : "Reminder time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 天前"
+          }
+        }
+      }
+    },
+    "1 hour before" : {
+      "comment" : "Reminder time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 小時前"
+          }
+        }
+      }
+    },
+    "1 milestone" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 個檢查點"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "comment" : "Button that writes the draft plan to the calendar",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入"
+          }
+        }
+      }
+    },
+    "Add Plan" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增計畫"
+          }
+        }
+      }
+    },
+    "Add to Smart Schedule" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入 Smart Schedule"
+          }
+        }
+      }
+    },
+    "Added %lld events:" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入 %lld 個行程："
+          }
+        }
+      }
+    },
+    "Added (demo)" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入（示範）"
+          }
+        }
+      }
+    },
+    "Added to Google Calendar" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入 Google 日曆"
+          }
+        }
+      }
+    },
+    "Added “%@” on this device." : {
+      "comment" : "Plan title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在這台裝置加入「%@」。"
+          }
+        }
+      }
+    },
+    "Added “%@” to Google Calendar." : {
+      "comment" : "Plan title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已將「%@」加入 Google 日曆。"
+          }
+        }
+      }
+    },
+    "Added: %@ · %@" : {
+      "comment" : "One event was added: its title, then when it happens",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入：%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Adding…" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入中…"
+          }
+        }
+      }
+    },
+    "All day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全天"
+          }
+        }
+      }
+    },
+    "Assumptions" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "假設"
+          }
+        }
+      }
+    },
+    "Assumptions (%lld)" : {
+      "comment" : "Collapsed list of what the assistant assumed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "假設（%lld）"
+          }
+        }
+      }
+    },
+    "At start" : {
+      "comment" : "Reminder time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始時"
+          }
+        }
+      }
+    },
+    "Change the time" : {
+      "comment" : "Suggestion chip; the demo assistant reads it back",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "換時間"
+          }
+        }
+      }
+    },
+    "Change the training days" : {
+      "comment" : "Suggestion chip; the demo assistant reads it back",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "換訓練日"
+          }
+        }
+      }
+    },
+    "Check-in on %@" : {
+      "comment" : "The plan's only check-in date",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 檢查"
+          }
+        }
+      }
+    },
+    "Check-ins ×%lld" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檢查 %lld 次"
+          }
+        }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉"
+          }
+        }
+      }
+    },
+    "Confirm" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認"
+          }
+        }
+      }
+    },
+    "Confirm delete" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認刪除"
+          }
+        }
+      }
+    },
+    "Connect Google Calendar" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連接 Google 日曆"
+          }
+        }
+      }
+    },
+    "Connect Google Calendar in Smart Schedule first." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先在 Smart Schedule 連接 Google 日曆。"
+          }
+        }
+      }
+    },
+    "Could not understand the date “%@”." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看不懂日期「%@」。"
+          }
+        }
+      }
+    },
+    "Couldn't delete. Try again from the app." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除失敗，請到 App 再試一次。"
+          }
+        }
+      }
+    },
+    "DAY" : {
+      "comment" : "Quick Capture mode picker",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日"
+          }
+        }
+      }
+    },
+    "DEMO" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範"
+          }
+        }
+      }
+    },
+    "DRAFT PLAN" : {
+      "comment" : "Eyebrow above the plan card title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計畫草稿"
+          }
+        }
+      }
+    },
+    "DRAFT PLAN · REVISION %lld" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計畫草稿 · 第 %lld 版"
+          }
+        }
+      }
+    },
+    "Daily reminder %@" : {
+      "comment" : "Time of the plan's morning reminder",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天 %@ 提醒"
+          }
+        }
+      }
+    },
+    "Daily reminder at %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天 %@ 提醒"
+          }
+        }
+      }
+    },
+    "Delete %@? Tap Confirm." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要刪除 %@ 嗎？請點「確認」。"
+          }
+        }
+      }
+    },
+    "Deleted %lld items from Google Calendar." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld item from Google Calendar."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld items from Google Calendar."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已從 Google 日曆刪除 %lld 個項目。"
+          }
+        }
+      }
+    },
+    "Deleted %lld items on this device." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld item on this device."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Deleted %lld items on this device."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在這台裝置刪除 %lld 個項目。"
+          }
+        }
+      }
+    },
+    "Demo mode: nothing was written to Google Calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式：沒有寫入 Google 日曆。"
+          }
+        }
+      }
+    },
+    "Demo mode: sample data, nothing leaves this device. Try “Lunch with Andrew tomorrow 1pm”, “push the team sync 30 min” or “I want to be muscular in 6 months”." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式：使用範例資料，不會離開這台裝置。試試「明天下午 1 點 Andrew 午餐」、「下一個行程延後 30 分鐘」或「我想在 6 個月內增肌」。"
+          }
+        }
+      }
+    },
+    "Demo mode: sample data. Nothing leaves this device. Try one of these:" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式：使用範例資料，不會離開這台裝置。試試看："
+          }
+        }
+      }
+    },
+    "Describe an event or a goal; Smart Schedule writes it to Google Calendar. Long-term plans wait in the app until you review them and tap Add." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描述一個行程或目標，Smart Schedule 會寫入 Google 日曆。長期計畫會先留在 App 裡，等你確認並點「加入」。"
+          }
+        }
+      }
+    },
+    "Dictate" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聽寫"
+          }
+        }
+      }
+    },
+    "Discarded" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已捨棄"
+          }
+        }
+      }
+    },
+    "Done." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成。"
+          }
+        }
+      }
+    },
+    "Draft dropped. Nothing was added to your calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已捨棄草稿，行事曆沒有任何變動。"
+          }
+        }
+      }
+    },
+    "Draft, not in your calendar yet" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "草稿，尚未加入行事曆"
+          }
+        }
+      }
+    },
+    "Every day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天"
+          }
+        }
+      }
+    },
+    "Exit demo" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離開示範"
+          }
+        }
+      }
+    },
+    "Gemini blocked the request (%@)." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini 拒絕了這個要求（%@）。"
+          }
+        }
+      }
+    },
+    "Google sign-in expired (%@). Open Smart Schedule to reconnect." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 登入已過期（%@）。請打開 Smart Schedule 重新連接。"
+          }
+        }
+      }
+    },
+    "Hide Smart Schedule" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隱藏 Smart Schedule"
+          }
+        }
+      }
+    },
+    "Hold-to-reply: tell me what to add or change." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長按回覆：告訴我要新增或修改什麼。"
+          }
+        }
+      }
+    },
+    "I couldn't find that event. Try naming it and the day." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到這個行程。請說出名稱和日期。"
+          }
+        }
+      }
+    },
+    "I couldn't work out which dates you meant." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看不懂你指的是哪幾天。"
+          }
+        }
+      }
+    },
+    "I want to be muscular in 6 month design me a daily routine" : {
+      "comment" : "Example prompt; the demo assistant must understand the translation",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我想在 6 個月內增肌，幫我排每天的訓練"
+          }
+        }
+      }
+    },
+    "I want to be muscular in 6 months" : {
+      "comment" : "Example prompt; the demo assistant must understand the translation",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我想在 6 個月內增肌"
+          }
+        }
+      }
+    },
+    "In %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "In %lld days"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天後"
+          }
+        }
+      }
+    },
+    "In %lld h" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 小時後"
+          }
+        }
+      }
+    },
+    "In %lld min" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分鐘後"
+          }
+        }
+      }
+    },
+    "Join Google Meet" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入 Google Meet 會議"
+          }
+        }
+      }
+    },
+    "Keep editing" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續修改"
+          }
+        }
+      }
+    },
+    "Last week" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上週"
+          }
+        }
+      }
+    },
+    "Lunch with Andrew tomorrow 1pm" : {
+      "comment" : "Example prompt; the demo assistant must understand the translation",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明天下午 1 點 Andrew 午餐"
+          }
+        }
+      }
+    },
+    "MONTH" : {
+      "comment" : "Quick Capture mode picker",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月"
+          }
+        }
+      }
+    },
+    "Make sessions shorter" : {
+      "comment" : "Suggestion chip; the demo assistant reads it back",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縮短時長"
+          }
+        }
+      }
+    },
+    "Monthly check-ins ×%lld" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每月檢查 %lld 次"
+          }
+        }
+      }
+    },
+    "NOW" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在"
+          }
+        }
+      }
+    },
+    "New message ↓" : {
+      "comment" : "Pill that jumps to the newest chat message",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新訊息 ↓"
+          }
+        }
+      }
+    },
+    "Next week" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下週"
+          }
+        }
+      }
+    },
+    "Nothing is added until you tap Add." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按「加入」前不會寫入行事曆。"
+          }
+        }
+      }
+    },
+    "Nothing next — type a plan" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接下來沒有行程，輸入一個計畫吧"
+          }
+        }
+      }
+    },
+    "Nothing scheduled" : {
+      "comment" : "Empty agenda",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有行程"
+          }
+        }
+      }
+    },
+    "On the day at %@" : {
+      "comment" : "All-day event reminder time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當天 %@"
+          }
+        }
+      }
+    },
+    "Open Smart Schedule to review it and tap Add." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開 Smart Schedule 確認後點「加入」。"
+          }
+        }
+      }
+    },
+    "Open in Google Calendar" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Google 日曆中開啟"
+          }
+        }
+      }
+    },
+    "Overlaps: %@" : {
+      "comment" : "List of “new ↔ existing” event title pairs",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間重疊：%@"
+          }
+        }
+      }
+    },
+    "Part of a long-term plan" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屬於長期計畫"
+          }
+        }
+      }
+    },
+    "Paste a link" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貼上連結"
+          }
+        }
+      }
+    },
+    "Plan" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計畫"
+          }
+        }
+      }
+    },
+    "Press and hold to review it, then tap Add." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長按查看計畫，再點「加入」。"
+          }
+        }
+      }
+    },
+    "Push the team sync 30 min" : {
+      "comment" : "Example prompt; the demo assistant must understand the translation",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一個行程延後 30 分鐘"
+          }
+        }
+      }
+    },
+    "Replaced by a newer plan" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已由較新的計畫取代"
+          }
+        }
+      }
+    },
+    "Replaced by revision %lld" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已由第 %lld 版取代"
+          }
+        }
+      }
+    },
+    "SCROLL" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "滑動"
+          }
+        }
+      }
+    },
+    "Sample data · nothing is sent to Google" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "範例資料 · 不會傳送到 Google"
+          }
+        }
+      }
+    },
+    "Send" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "傳送"
+          }
+        }
+      }
+    },
+    "Show me my schedule for today" : {
+      "comment" : "Example prompt; the demo assistant must understand the translation",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示今天的行程"
+          }
+        }
+      }
+    },
+    "Shows your next event and this week in the Dynamic Island." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在動態島顯示下一個行程和本週行程。"
+          }
+        }
+      }
+    },
+    "Smart Schedule" : {
+      "comment" : "App name",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule"
+          }
+        }
+      }
+    },
+    "Snooze 10 min" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延後 10 分鐘"
+          }
+        }
+      }
+    },
+    "Snoozed %lld min" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已延後 %lld 分鐘"
+          }
+        }
+      }
+    },
+    "Start on a different date" : {
+      "comment" : "Suggestion chip; the demo assistant reads it back",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "換開始日期"
+          }
+        }
+      }
+    },
+    "Starting now" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在開始"
+          }
+        }
+      }
+    },
+    "Stop dictation" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止聽寫"
+          }
+        }
+      }
+    },
+    "Summon" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "叫出"
+          }
+        }
+      }
+    },
+    "Summon Smart Schedule" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "叫出 Smart Schedule"
+          }
+        }
+      }
+    },
+    "Tap Add to put it in your calendar, or Keep editing to change it." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點「加入」放進行事曆，或點「繼續修改」調整內容。"
+          }
+        }
+      }
+    },
+    "The day before at %@" : {
+      "comment" : "All-day event reminder time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前一天 %@"
+          }
+        }
+      }
+    },
+    "The generated plan had no schedulable sessions." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "產生的計畫裡沒有可以排進行事曆的課程。"
+          }
+        }
+      }
+    },
+    "There is no draft plan waiting for review." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前沒有等待確認的計畫草稿。"
+          }
+        }
+      }
+    },
+    "This plan is waiting for your review." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個計畫正在等你確認。"
+          }
+        }
+      }
+    },
+    "This week" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本週"
+          }
+        }
+      }
+    },
+    "Today" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天"
+          }
+        }
+      }
+    },
+    "Tomorrow" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明天"
+          }
+        }
+      }
+    },
+    "Try demo (no account)" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "試用示範（不需帳號）"
+          }
+        }
+      }
+    },
+    "Type in any plan to add or change" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "輸入要新增或修改的計畫"
+          }
+        }
+      }
+    },
+    "Type your schedule, aim, or plan with a date and time." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "輸入行程、目標或計畫，並附上日期和時間。"
+          }
+        }
+      }
+    },
+    "Type your schedule, event, aim, or plan, or send a link with a date and time" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "輸入行程、目標或計畫，或貼上附日期時間的連結"
+          }
+        }
+      }
+    },
+    "Unexpected Gemini response: %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemini 的回應格式不符：%@"
+          }
+        }
+      }
+    },
+    "Upcoming event" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即將開始的行程"
+          }
+        }
+      }
+    },
+    "Updated." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已更新。"
+          }
+        }
+      }
+    },
+    "Updated: %@ · %@" : {
+      "comment" : "Event title, then when it now happens",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已更新：%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "WEEK" : {
+      "comment" : "Quick Capture mode picker",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "週"
+          }
+        }
+      }
+    },
+    "Weekly schedule" : {
+      "comment" : "Header of the plan card's session table",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每週課表"
+          }
+        }
+      }
+    },
+    "What should I schedule?" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要安排什麼？"
+          }
+        }
+      }
+    },
+    "What would you like to change?" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要修改哪裡？"
+          }
+        }
+      }
+    },
+    "Yesterday" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天"
+          }
+        }
+      }
+    },
+    "e.g. push this to 16:00 · add gym tomorrow 07:00" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如：延後到 16:00 · 明天 07:00 健身"
+          }
+        }
+      }
+    },
+    "now" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在"
+          }
+        }
+      }
+    },
+    "the plan (%lld items)" : {
+      "comment" : "Fills “Delete %@? Tap Confirm.”",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "the plan (%lld item)"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "the plan (%lld items)"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個計畫（%lld 個項目）"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

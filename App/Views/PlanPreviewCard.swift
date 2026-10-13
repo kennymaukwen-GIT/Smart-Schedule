@@ -16,14 +16,25 @@ enum PlanCardStatus: Equatable {
         case .added, .replaced, .discarded: false
         }
     }
+
+    /// Replaced or discarded: the card folds down to its header and status.
+    var isRetired: Bool {
+        switch self {
+        case .replaced, .discarded: true
+        case .pending, .adding, .added: false
+        }
+    }
 }
 
 /// A long-term plan shown for review. `create_long_term_plan` only produces a draft; the series reach Google
 /// Calendar when the user taps Add. Keep editing asks what to change, the assistant answers with a complete new
 /// revision, and this card is then marked as replaced.
 ///
-/// `.full` is the chat panel's card. `.compact` fits Quick Capture's conversation panel: no phase breakdown,
-/// at most two session lines.
+/// Laid out to be scanned: title and span, the one- or two-sentence summary, then the week as a table (a header
+/// per phase, one row per session), the reminder and check-ins, and the assumptions folded away. Days and times
+/// appear only in the table; the summary never restates them.
+///
+/// `.full` is the chat panel's card; `.compact` is the same card with tighter type for Quick Capture's panel.
 struct PlanPreviewCard: View {
     enum Style { case full, compact }
 
@@ -33,23 +44,33 @@ struct PlanPreviewCard: View {
     var onAdd: () -> Void = {}
     var onKeepEditing: () -> Void = {}
 
+    @Environment(\.locale) private var environmentLocale
+    @State private var showsAssumptions = false
+    /// A retired card unfolds on tap, to compare with the revision that replaced it.
+    @State private var showsRetiredDetails = false
+
     private static let radius: CGFloat = 18
+    private let clock = WallClock()
 
     private var isCompact: Bool { style == .compact }
+    private var locale: Locale { ChatFormat.dateLocale(environmentLocale) }
+    private var showsDetails: Bool { !status.isRetired || showsRetiredDetails }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: isCompact ? 7 : 12) {
+        VStack(alignment: .leading, spacing: isCompact ? 12 : 14) {
             header
-            if !draft.summary.isEmpty {
-                Text(draft.summary)
-                    .font(.system(size: isCompact ? 12 : 14))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(isCompact ? 2 : nil)
-            }
-            if isCompact {
-                compactSessions
-            } else {
-                phaseList
+            if showsDetails {
+                if !draft.summary.isEmpty {
+                    Text(draft.summary)
+                        .font(.system(size: isCompact ? 14 : 15))
+                        .lineSpacing(4)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !draft.sessions.isEmpty {
+                    weeklySchedule
+                }
                 details
             }
             footer
@@ -58,150 +79,206 @@ struct PlanPreviewCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: Self.radius, style: .continuous).fill(Theme.canvas))
         .overlay(border)
-        .opacity(status.isOpen || isAdded ? 1 : 0.5)
+        .opacity(status.isRetired ? 0.7 : 1)
         .animation(.snappy, value: status)
-    }
-
-    private var isAdded: Bool {
-        if case .added = status { return true }
-        return false
     }
 
     // MARK: Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 Image(systemName: "sparkles")
-                Text(revisionLabel)
+                if draft.revision > 1 {
+                    Text("DRAFT PLAN · REVISION \(draft.revision)")
+                } else {
+                    Text("DRAFT PLAN")
+                }
             }
-            .font(.system(size: 10, weight: .bold))
+            .font(.system(size: 11, weight: .bold))
             .tracking(0.8)
             .foregroundStyle(Theme.textSecondary)
 
             Text(draft.title)
-                .font(.system(size: isCompact ? 15 : 17, weight: .semibold))
+                .font(.system(size: isCompact ? 16 : 18, weight: .semibold))
                 .foregroundStyle(.white)
-                .lineLimit(isCompact ? 1 : 2)
+                .lineLimit(2)
 
-            Text(dateLine)
-                .font(.system(size: isCompact ? 11 : 12))
+            metaLine
+        }
+    }
+
+    /// "Oct 14 – Apr 13 · 26 weeks · 3 phases" / "10月14日 – 4月13日 · 26 週 · 3 個階段".
+    private var metaLine: some View {
+        HStack(spacing: 0) {
+            Text(verbatim: dayRange(draft.startDate, draft.endDate))
+            Text(verbatim: " · ")
+            lengthText
+            if draft.phases.count > 1 {
+                Text(verbatim: " · ")
+                Text("\(draft.phases.count) phases")
+            }
+        }
+        .font(.system(size: 13).monospacedDigit())
+        .foregroundStyle(Theme.textSecondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Weeks, rounded so an inclusive or exclusive end date reads the same; days for plans under two weeks.
+    @ViewBuilder
+    private var lengthText: some View {
+        let days = Self.dayCount(from: draft.startDate, to: draft.endDate)
+        if days == 1 {
+            Text("1 day")
+        } else if days < 14 {
+            Text("\(days) days")
+        } else {
+            Text("\(Int((Double(days) / 7).rounded())) weeks")
+        }
+    }
+
+    // MARK: Weekly schedule
+
+    private var weeklySchedule: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Weekly schedule")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(phaseBlocks.enumerated()), id: \.offset) { index, block in
+                    if index > 0 {
+                        Rectangle().fill(Theme.hairline).frame(height: 1)
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let phase = block.phase {
+                            phaseHeader(phase)
+                        }
+                        ForEach(Array(block.sessions.enumerated()), id: \.offset) { _, session in
+                            PlanSessionRow(session: session, locale: locale, compact: isCompact)
+                        }
+                    }
+                    .padding(.vertical, 10)
+                }
+            }
+            .padding(.horizontal, 12)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.07)))
+        }
+    }
+
+    private func phaseHeader(_ phase: PlanDraft.Phase) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(phase.name)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Text(verbatim: dayRange(phase.start, phase.end))
+                .font(.system(size: 12).monospacedDigit())
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                .fixedSize()
         }
+        .accessibilityElement(children: .combine)
     }
 
-    private var revisionLabel: String {
-        draft.revision > 1
-            ? String(localized: "DRAFT PLAN · REVISION \(draft.revision)")
-            : String(localized: "DRAFT PLAN")
+    private struct PhaseBlock {
+        /// Nil for a single-phase plan (no headers) and for sessions whose phase_index points nowhere.
+        var phase: PlanDraft.Phase?
+        var sessions: [PlanDraft.Session]
     }
 
-    /// "Oct 14 – Apr 13, 2027 · 26 weeks", plus the phase count on the compact card (it has no phase list).
-    private var dateLine: String {
-        var parts = [Self.dayRange(draft.startDate, draft.endDate, includeYear: true),
-                     Self.lengthText(from: draft.startDate, to: draft.endDate)]
-        if isCompact, draft.phases.count > 1 {
-            parts.append(String(localized: "\(draft.phases.count) phases"))
+    private var phaseBlocks: [PhaseBlock] {
+        guard draft.phases.count > 1 else { return [PhaseBlock(phase: nil, sessions: draft.sessions)] }
+        var blocks = draft.phases.indices.compactMap { index -> PhaseBlock? in
+            let sessions = draft.sessions.filter { $0.phaseIndex == index }
+            return sessions.isEmpty ? nil : PhaseBlock(phase: draft.phases[index], sessions: sessions)
         }
-        return parts.joined(separator: " · ")
+        let unassigned = draft.sessions.filter { !draft.phases.indices.contains($0.phaseIndex) }
+        if !unassigned.isEmpty { blocks.append(PhaseBlock(phase: nil, sessions: unassigned)) }
+        return blocks
     }
 
-    // MARK: Phases and sessions
-
-    private var phaseList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(draft.phases.enumerated()), id: \.offset) { index, phase in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(phase.name)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                        Spacer(minLength: 4)
-                        Text(Self.dayRange(phase.start, phase.end))
-                            .font(.system(size: 11).monospacedDigit())
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                    if let focus = phase.focus, !focus.isEmpty {
-                        Text(focus)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                    ForEach(Array(sessions(inPhase: index).enumerated()), id: \.offset) { _, session in
-                        PlanSessionLine(session: session)
-                    }
-                }
-                .padding(.leading, 10)
-                .overlay(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.3)).frame(width: 2)
-                }
-            }
-            // Sessions whose phase_index points nowhere still belong on the card.
-            ForEach(Array(unassignedSessions.enumerated()), id: \.offset) { _, session in
-                PlanSessionLine(session: session)
-            }
-        }
-    }
-
-    private func sessions(inPhase index: Int) -> [PlanDraft.Session] {
-        draft.sessions.filter { $0.phaseIndex == index }
-    }
-
-    private var unassignedSessions: [PlanDraft.Session] {
-        draft.sessions.filter { !draft.phases.indices.contains($0.phaseIndex) }
-    }
-
-    /// Phases usually repeat the same sessions, so the compact card lists distinct ones.
-    private var compactSessions: some View {
-        let distinct = Self.distinctSessions(draft.sessions)
-        return VStack(alignment: .leading, spacing: 3) {
-            ForEach(Array(distinct.prefix(2).enumerated()), id: \.offset) { _, session in
-                PlanSessionLine(session: session, compact: true)
-            }
-            if distinct.count > 2 {
-                Text("+\(distinct.count - 2) more")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Theme.textSecondary)
-            }
-        }
-    }
-
-    // MARK: Reminder, milestones, assumptions
+    // MARK: Reminder, check-ins, assumptions
 
     @ViewBuilder
     private var details: some View {
         if draft.nudge != nil || !draft.milestones.isEmpty || !draft.assumptions.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 if let nudge = draft.nudge {
-                    detailRow(String(localized: "Daily reminder at \(Self.clockTime(hour: nudge.hour, minute: nudge.minute))"),
-                              systemImage: "bell")
+                    iconRow("bell") {
+                        Text("Daily reminder \(ChatFormat.clockTime(hour: nudge.hour, minute: nudge.minute))")
+                    }
                 }
                 if !draft.milestones.isEmpty {
-                    detailRow(draft.milestones.count == 1
-                                  ? String(localized: "1 milestone")
-                                  : String(localized: "\(draft.milestones.count) milestones"),
-                              systemImage: "flag")
+                    iconRow("flag") { checkInText }
                 }
-                ForEach(Array(draft.assumptions.enumerated()), id: \.offset) { _, assumption in
-                    detailRow(assumption, systemImage: "info.circle", secondary: true)
+                if !draft.assumptions.isEmpty {
+                    assumptionsDisclosure
                 }
             }
         }
     }
 
-    private func detailRow(_ text: String, systemImage: String, secondary: Bool = false) -> some View {
-        Label {
-            Text(text)
-        } icon: {
-            Image(systemName: systemImage)
-                .frame(width: 16)
+    @ViewBuilder
+    private var checkInText: some View {
+        let count = draft.milestones.count
+        if count == 1, let only = draft.milestones.first {
+            Text("Check-in on \(ReplyFormatter.shortDate(only.date, clock: clock, locale: locale))")
+        } else if Self.isMonthly(draft.milestones) {
+            Text("Monthly check-ins ×\(count)")
+        } else {
+            Text("Check-ins ×\(count)")
         }
-        .font(.system(size: secondary ? 12 : 13))
-        .foregroundStyle(secondary ? Theme.textSecondary : Color.white.opacity(0.85))
+    }
+
+    private func iconRow<Content: View>(_ systemImage: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: systemImage)
+                .frame(width: 18)
+            content()
+        }
+        .font(.system(size: 14))
+        .foregroundStyle(.white.opacity(0.85))
+    }
+
+    private var assumptionsDisclosure: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.snappy) { showsAssumptions.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .frame(width: 18)
+                    Text("Assumptions (\(draft.assumptions.count))")
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .rotationEffect(.degrees(showsAssumptions ? 180 : 0))
+                }
+                .font(.system(size: 14))
+                .foregroundStyle(Theme.textSecondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showsAssumptions {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(draft.assumptions.enumerated()), id: \.offset) { _, assumption in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(verbatim: "•")
+                            Text(assumption)
+                        }
+                    }
+                }
+                .font(.system(size: 13))
+                .lineSpacing(3)
+                .foregroundStyle(Theme.textSecondary)
+                .padding(.leading, 26)
+                .transition(.opacity)
+            }
+        }
     }
 
     // MARK: Footer
@@ -210,16 +287,16 @@ struct PlanPreviewCard: View {
     private var footer: some View {
         switch status {
         case .pending:
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Nothing is added until you tap Add.")
-                    .font(.system(size: isCompact ? 10 : 11))
+                    .font(.system(size: 12))
                     .foregroundStyle(Theme.textSecondary)
                 HStack(spacing: 10) {
                     Button(action: onAdd) {
                         Text("Add")
-                            .font(.system(size: isCompact ? 14 : 15, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity, minHeight: isCompact ? 34 : 40)
+                            .frame(maxWidth: .infinity, minHeight: isCompact ? 36 : 40)
                             .background(Capsule().fill(Color.white))
                             .contentShape(Capsule())
                     }
@@ -227,10 +304,10 @@ struct PlanPreviewCard: View {
 
                     Button(action: onKeepEditing) {
                         Text("Keep editing")
-                            .font(.system(size: isCompact ? 14 : 15, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                            .frame(maxWidth: .infinity, minHeight: isCompact ? 34 : 40)
+                            .frame(maxWidth: .infinity, minHeight: isCompact ? 36 : 40)
                             .overlay(Capsule().strokeBorder(Color.white, lineWidth: 1))
                             .contentShape(Capsule())
                     }
@@ -244,21 +321,41 @@ struct PlanPreviewCard: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white)
             }
-            .frame(minHeight: isCompact ? 34 : 40)
+            .frame(minHeight: isCompact ? 36 : 40)
         case let .added(demo):
-            statusLine(demo ? String(localized: "Added (demo)") : String(localized: "Added to Google Calendar"),
-                       systemImage: "checkmark.circle.fill")
-        case let .replaced(revision):
-            statusLine(revision.map { String(localized: "Replaced by revision \($0)") }
-                           ?? String(localized: "Replaced by a newer plan"),
-                       systemImage: "arrow.triangle.2.circlepath")
-        case .discarded:
-            statusLine(String(localized: "Discarded"), systemImage: "xmark.circle")
+            statusLine(demo ? "Added (demo)" : "Added to Google Calendar", systemImage: "checkmark.circle.fill")
+        case .replaced, .discarded:
+            Button {
+                withAnimation(.snappy) { showsRetiredDetails.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    retiredStatus
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                        .rotationEffect(.degrees(showsRetiredDetails ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 
-    private func statusLine(_ text: String, systemImage: String) -> some View {
-        Label(text, systemImage: systemImage)
+    @ViewBuilder
+    private var retiredStatus: some View {
+        switch status {
+        case .replaced(revision: let revision?):
+            statusLine("Replaced by revision \(revision)", systemImage: "arrow.triangle.2.circlepath")
+        case .replaced:
+            statusLine("Replaced by a newer plan", systemImage: "arrow.triangle.2.circlepath")
+        default:
+            statusLine("Discarded", systemImage: "xmark.circle")
+        }
+    }
+
+    private func statusLine(_ title: LocalizedStringKey, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
     }
@@ -273,96 +370,72 @@ struct PlanPreviewCard: View {
             shape.strokeBorder(Theme.hairline, lineWidth: 1)
         }
     }
+
+    /// "Oct 14 – Dec 8" / "10月14日 – 12月8日" (both ends inclusive days).
+    private func dayRange(_ start: Date, _ end: Date) -> String {
+        ReplyFormatter.shortDate(start, clock: clock, locale: locale) + " – "
+            + ReplyFormatter.shortDate(end, clock: clock, locale: locale)
+    }
 }
 
 // MARK: - Formatting
 
 extension PlanPreviewCard {
-    /// RFC 5545 BYDAY codes in `Calendar.shortWeekdaySymbols` order (Sunday first).
-    private static let weekdayCodes = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"]
-
-    /// `["TH", "MO"]` → "Mon · Thu" (Monday first, like a training week); all seven → "Every day".
-    static func weekdayList(_ codes: [String]) -> String {
-        let symbols = Calendar.autoupdatingCurrent.shortWeekdaySymbols
-        let indices = Set(codes.compactMap { weekdayCodes.firstIndex(of: $0.uppercased()) })
-            .sorted { ($0 + 6) % 7 < ($1 + 6) % 7 }
-        if indices.count == 7 { return String(localized: "Every day") }
-        return indices.filter { $0 < symbols.count }.map { symbols[$0] }.joined(separator: " · ")
-    }
-
-    /// "18:30 · 60 min"
-    static func timing(of session: PlanDraft.Session) -> String {
-        String(localized: "\(session.startTime) · \(session.durationMinutes) min")
-    }
-
-    /// "07:30", matching the 24-hour session times.
-    static func clockTime(hour: Int, minute: Int) -> String {
-        String(format: "%02d:%02d", hour, minute)
-    }
-
-    /// "Oct 14 – Dec 8" (both ends inclusive days).
-    static func dayRange(_ start: Date, _ end: Date, includeYear: Bool = false) -> String {
-        let first = start.formatted(.dateTime.month(.abbreviated).day())
-        let last = includeYear
-            ? end.formatted(.dateTime.month(.abbreviated).day().year())
-            : end.formatted(.dateTime.month(.abbreviated).day())
-        return "\(first) – \(last)"
-    }
-
-    /// "26 weeks" (rounded, so an inclusive or exclusive end date reads the same), or days for short plans.
-    static func lengthText(from start: Date, to end: Date) -> String {
+    /// Calendar days from `start` to `end`, both included.
+    static func dayCount(from start: Date, to end: Date) -> Int {
         let calendar = WallClock().calendar
-        let span = calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: end)).day ?? 0
-        let days = max(1, span + 1)
-        if days < 14 {
-            return days == 1 ? String(localized: "1 day") : String(localized: "\(days) days")
-        }
-        let weeks = Int((Double(days) / 7).rounded())
-        return String(localized: "\(weeks) weeks")
+        let span = calendar.dateComponents([.day], from: calendar.startOfDay(for: start),
+                                           to: calendar.startOfDay(for: end)).day ?? 0
+        return max(1, span + 1)
     }
 
-    static func distinctSessions(_ sessions: [PlanDraft.Session]) -> [PlanDraft.Session] {
-        var seen = Set<String>()
-        return sessions.filter { session in
-            let key = [session.weekdays.joined(separator: ","), session.startTime,
-                       String(session.durationMinutes), session.title].joined(separator: "|")
-            return seen.insert(key).inserted
-        }
-    }
-
-    /// The reply text without the plan's summary, which the card already shows (nil when nothing is left).
-    static func leadText(_ text: String, summary: String) -> String? {
-        var rest = text
-        let summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !summary.isEmpty, let range = rest.range(of: summary) {
-            rest.removeSubrange(range)
-        }
-        rest = rest.trimmingCharacters(in: .whitespacesAndNewlines)
-        return rest.isEmpty ? nil : rest
+    /// Plans add one check-in a month (prompt rule 4); spacing of three to five weeks reads as monthly.
+    static func isMonthly(_ milestones: [PlanDraft.Milestone]) -> Bool {
+        let dates = milestones.map(\.date).sorted()
+        guard dates.count > 1, let first = dates.first, let last = dates.last else { return false }
+        let averageDays = last.timeIntervalSince(first) / 86_400 / Double(dates.count - 1)
+        return averageDays >= 21 && averageDays <= 38
     }
 }
 
-/// "Mon · Thu  18:30 · 60 min  Full body A". The title gives way first when the line is tight.
-private struct PlanSessionLine: View {
+/// One session in the weekly table: days over the title on the left, start time over the length on the right.
+private struct PlanSessionRow: View {
     let session: PlanDraft.Session
+    let locale: Locale
     var compact = false
 
     var body: some View {
-        let size: CGFloat = compact ? 11 : 12
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(PlanPreviewCard.weekdayList(session.weekdays))
-                .font(.system(size: size, weight: .semibold))
-                .foregroundStyle(.white)
-            Text(PlanPreviewCard.timing(of: session))
-                .font(.system(size: size).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.6))
-            Text(session.title)
-                .font(.system(size: size))
-                .foregroundStyle(.white.opacity(0.9))
-                .layoutPriority(-1)
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                days
+                    .font(.system(size: compact ? 14 : 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(session.title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.65))
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(verbatim: session.startTime)
+                    .font(.system(size: compact ? 14 : 15, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.white)
+                Text(verbatim: ChatFormat.duration(minutes: session.durationMinutes, locale: locale))
+                    .font(.system(size: 13).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.65))
+            }
+            .fixedSize()
         }
-        .lineLimit(1)
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var days: some View {
+        if let names = ChatFormat.weekdays(session.weekdays, locale: locale) {
+            Text(verbatim: names)
+        } else {
+            Text("Every day")
+        }
     }
 }
 

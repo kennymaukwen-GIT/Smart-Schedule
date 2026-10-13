@@ -39,7 +39,7 @@ struct CaptureModePicker: View {
 }
 
 extension CalendarScope {
-    /// Segment label; the design keeps these uppercase English in every locale.
+    /// Segment label: DAY / WEEK / MONTH, 日 / 週 / 月 in Chinese (String Catalog).
     var title: LocalizedStringKey {
         switch self {
         case .day: "DAY"

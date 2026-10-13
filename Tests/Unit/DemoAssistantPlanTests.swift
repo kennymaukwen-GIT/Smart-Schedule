@@ -66,6 +66,9 @@ final class DemoAssistantPlanTests: XCTestCase {
         XCTAssertNil(first.committedPlanID)
         XCTAssertTrue(first.text.contains(draft.summary))
         XCTAssertTrue(first.text.contains(ReplyFormatter.planReviewPrompt))
+        // Readable summary: what and how much, no days or times (the card's table shows those).
+        XCTAssertEqual(draft.summary, "A 6-month muscle plan: 4 workouts a week, about an hour each.")
+        XCTAssertEqual(draft.title, "Muscle Plan")
         XCTAssertEqual(first.showRange?.start, draft.startDate)
 
         var snapshot = await store.snapshot()
@@ -82,8 +85,8 @@ final class DemoAssistantPlanTests: XCTestCase {
         XCTAssertEqual(Set(revised.sessions.map(\.startTime)), ["07:00"])
         XCTAssertEqual(wallTimes(revised.previewEvents), ["07:00"])
         XCTAssertEqual(revised.nudge?.hour, 6) // an hour before an early session
-        XCTAssertTrue(revised.summary.contains("at 07:00"))
-        XCTAssertTrue(second.text.contains("revision 2"))
+        XCTAssertFalse(revised.summary.contains("07:00"), revised.summary)
+        XCTAssertTrue(second.text.hasPrefix("Sessions now start at 07:00."), second.text)
         XCTAssertFalse(second.changed)
 
         snapshot = await store.snapshot()
@@ -95,8 +98,9 @@ final class DemoAssistantPlanTests: XCTestCase {
         XCTAssertEqual(added.committedPlanID, draft.id)
         XCTAssertNil(added.planDraft)
         XCTAssertTrue(added.changed)
-        XCTAssertTrue(added.text.hasPrefix("Added (demo)"), added.text)
+        XCTAssertTrue(added.text.hasPrefix("Added “Muscle Plan”"), added.text)
         XCTAssertTrue(added.text.contains(DemoAssistant.demoNote))
+        XCTAssertTrue(added.addedEvents.isEmpty, "the plan card shows the added state; no event rows")
 
         snapshot = await store.snapshot()
         XCTAssertNil(snapshot.pendingPlan)
@@ -181,9 +185,9 @@ final class DemoAssistantPlanTests: XCTestCase {
         let question = try await ask(assistant, "Change the time")
         XCTAssertNil(question.planDraft)
         XCTAssertTrue(question.needsClarification)
-        XCTAssertTrue(question.suggestions.contains("7am"))
+        XCTAssertTrue(question.suggestions.contains("07:00"))
 
-        let answer = try await ask(assistant, "7am")
+        let answer = try await ask(assistant, "07:00")
         let revised = try XCTUnwrap(answer.planDraft)
         XCTAssertEqual(revised.id, draft.id)
         XCTAssertEqual(revised.revision, 2)
@@ -197,7 +201,12 @@ final class DemoAssistantPlanTests: XCTestCase {
 
         let days = try await ask(assistant, "Change the training days")
         XCTAssertNil(days.planDraft)
-        XCTAssertFalse(days.suggestions.isEmpty)
+        XCTAssertEqual(days.suggestions, ["Mon · Wed · Fri", "Weekdays", "Tue · Thu · Sat"])
+
+        let mwf = try await ask(assistant, days.suggestions[0])
+        let fourth = try XCTUnwrap(mwf.planDraft)
+        XCTAssertEqual(Set(fourth.sessions.flatMap(\.weekdays)), ["MO", "WE", "FR"])
+        XCTAssertTrue(mwf.text.hasPrefix("Now every Monday, Wednesday and Friday."), mwf.text)
 
         let start = try await ask(assistant, "Start on a different date")
         XCTAssertNil(start.planDraft)
@@ -234,10 +243,85 @@ final class DemoAssistantPlanTests: XCTestCase {
         let (assistant, store) = makeAssistant()
         _ = try await startPlan(assistant, store)
 
-        let revised = try await revise(assistant, "改成週二四早上7點")
+        let reply = try await ask(assistant, "改成週二四早上7點")
+        let revised = try XCTUnwrap(reply.planDraft)
         XCTAssertEqual(Set(revised.sessions.flatMap(\.weekdays)), ["TU", "TH"])
         XCTAssertEqual(Set(revised.sessions.map(\.startTime)), ["07:00"])
         XCTAssertEqual(revised.revision, 2)
+        // Replies follow the language the user wrote in.
+        XCTAssertTrue(reply.text.hasPrefix("已改成每週二、四 07:00。"), reply.text)
+        XCTAssertEqual(revised.summary, "6 個月增肌計畫：每週練 2 次，每次約 1 小時。")
+    }
+
+    // MARK: Readable replies
+
+    func testChineseGoalGetsAChinesePlan() async throws {
+        let (assistant, _) = makeAssistant()
+        let reply = try await ask(assistant, "我想在半年內增肌")
+        let draft = try XCTUnwrap(reply.planDraft)
+        XCTAssertEqual(draft.title, "增肌計畫")
+        XCTAssertEqual(draft.summary, "6 個月增肌計畫：每週練 4 次，每次約 1 小時。")
+        XCTAssertEqual(draft.phases.map(\.name), ["基礎期", "增肌期", "力量期"])
+        XCTAssertEqual(draft.assumptions, ["下班後 18:30 訓練", "明天開始", "可以使用健身房"])
+        XCTAssertTrue(reply.text.hasPrefix(draft.summary), reply.text)
+    }
+
+    /// The device-language chips (zh-Hant: 換訓練日 · 換時間 · 縮短時長 · 換開始日期) and the follow-up chips the
+    /// demo offers must all lead somewhere.
+    func testChineseSuggestionChipsLeadToRevisions() async throws {
+        let (assistant, _) = makeAssistant()
+        _ = try await ask(assistant, "我想在半年內增肌")
+
+        let time = try await ask(assistant, "換時間")
+        XCTAssertNil(time.planDraft)
+        XCTAssertEqual(time.text, "幾點開始？")
+        XCTAssertEqual(time.suggestions, ["07:00", "12:30", "18:30"])
+        // A bare "07:00" keeps the plan's language.
+        let seven = try await ask(assistant, "07:00")
+        let atSeven = try XCTUnwrap(seven.planDraft)
+        XCTAssertEqual(Set(atSeven.sessions.map(\.startTime)), ["07:00"])
+        XCTAssertTrue(seven.text.hasPrefix("已改成 07:00 開始。"), seven.text)
+
+        let shorter = try await ask(assistant, "縮短時長")
+        let shorterDraft = try XCTUnwrap(shorter.planDraft)
+        XCTAssertEqual(Set(shorterDraft.sessions.map(\.durationMinutes)), [45])
+        XCTAssertTrue(shorter.text.hasPrefix("每次改成 45 分鐘。"), shorter.text)
+
+        let days = try await ask(assistant, "換訓練日")
+        XCTAssertNil(days.planDraft)
+        XCTAssertEqual(days.suggestions, ["週一、三、五", "平日", "週二、四、六"])
+        let mwf = try await ask(assistant, days.suggestions[0])
+        let mwfDraft = try XCTUnwrap(mwf.planDraft)
+        XCTAssertEqual(Set(mwfDraft.sessions.flatMap(\.weekdays)), ["MO", "WE", "FR"])
+        XCTAssertTrue(mwf.text.hasPrefix("已改成每週一、三、五。"), mwf.text)
+
+        let start = try await ask(assistant, "換開始日期")
+        XCTAssertNil(start.planDraft)
+        XCTAssertEqual(start.suggestions, ["明天", "下週一", "11月1日"])
+        let monday = try await ask(assistant, "下週一")
+        let mondayDraft = try XCTUnwrap(monday.planDraft)
+        XCTAssertEqual(mondayDraft.startDate, TestClock.local(2026, 10, 19))
+        XCTAssertTrue(monday.text.hasPrefix("改成10月19日（週一）開始。"), monday.text)
+    }
+
+    func testRepliesAreShortAndUseNoSlashes() async throws {
+        let (assistant, _) = makeAssistant()
+        var replies: [Reply] = []
+        for text in [goal, "MWF", "45 min sessions please", "weekends", "start next Monday", "Change the time", "hmm"] {
+            let reply = try await ask(assistant, text)
+            replies.append(reply)
+        }
+        for reply in replies {
+            XCTAssertFalse(reply.text.contains("/"), reply.text)
+            if let draft = reply.planDraft {
+                XCTAssertNil(draft.summary.range(of: #"\d:\d"#, options: .regularExpression), "summary lists a time: \(draft.summary)")
+            }
+        }
+        XCTAssertTrue(replies[1].text.hasPrefix("Now every Monday, Wednesday and Friday."), replies[1].text)
+        XCTAssertTrue(replies[2].text.hasPrefix("Each session is now 45 minutes."), replies[2].text)
+        XCTAssertTrue(replies[3].text.hasPrefix("Now on weekends."), replies[3].text)
+        XCTAssertTrue(replies[4].text.hasPrefix("The plan now starts on Mon, Oct 19.")
+                      || replies[4].text.hasPrefix("The plan now starts on Mon 19 Oct."), replies[4].text)
     }
 
     func testStartDateChanges() async throws {

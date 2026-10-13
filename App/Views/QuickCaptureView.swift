@@ -5,7 +5,8 @@ private let modeStorageKey = "quickCaptureMode"
 /// Quick Capture (design 04): what the user sees after tapping the island's input pill. The OS can't host a
 /// keyboard in the island, so the app opens straight into this island-shaped card (keyboard already up) instead
 /// of the full month view, then gets out of the way. Top to bottom: focus date · DAY | WEEK | MONTH · month,
-/// the calendar in that scope, the latest exchange with the input bar, suggestions, and a grabber.
+/// the calendar in that scope, the conversation (the app's whole chat history, scrollable inside the panel) with
+/// the input bar, suggestions, and a grabber.
 struct QuickCaptureView: View {
     let startsWithVoice: Bool
     let onClose: () -> Void
@@ -18,6 +19,7 @@ struct QuickCaptureView: View {
     @FocusState private var inputFocused: Bool
 
     private static let panelFill = Color(white: 0.15)
+    /// Design 04's example inputs, in both languages on purpose.
     private static let defaultSuggestions = [
         "I want to be muscular in 6 month design me a daily routine",
         "明天下午兩點跟 Joe 開線上會議",
@@ -50,7 +52,7 @@ struct QuickCaptureView: View {
                 .frame(minHeight: 130, idealHeight: 250, maxHeight: 250)
                 .padding(.bottom, 10)
 
-            // Taller while a plan card waits for Add / Keep editing, so its buttons fit without scrolling.
+            // Taller while a plan card waits for Add / Keep editing; the conversation scrolls inside either way.
             conversationPanel
                 .frame(minHeight: 116,
                        idealHeight: showsPlanCard ? 340 : 200,
@@ -155,8 +157,11 @@ struct QuickCaptureView: View {
     }
 
     private func openDetail(_ event: ScheduleEvent) {
-        // A ghost occurrence has no detail yet; its plan card is the latest reply here.
-        guard !event.isDraft else { return }
+        // A ghost occurrence has no detail yet: bring its plan card (Add / Keep editing) into view instead.
+        guard !event.isDraft else {
+            chat.revealOpenPlan()
+            return
+        }
         router.selectedEventID = event.id // RootView's sheet shows the detail
     }
 
@@ -166,44 +171,38 @@ struct QuickCaptureView: View {
 
     // MARK: Conversation
 
-    /// The latest reply is a plan card (open or not), shown compact in the panel.
+    /// A plan card waits for review somewhere in the conversation.
     private var showsPlanCard: Bool {
-        !chat.isSending && chat.lastExchange.reply?.planDraft != nil
+        chat.openPlanMessageID != nil
     }
 
     private var conversationPanel: some View {
         @Bindable var chat = chat
-        let exchange = chat.lastExchange
 
         return VStack(spacing: 10) {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 10) {
-                    if let user = exchange.user {
-                        Text(user.text)
-                            .lineLimit(showsPlanCard ? 1 : nil)
-                            .font(.system(size: 15))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.bubble))
-                            .padding(.leading, 36)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+            ConversationScrollView(tail: chat.conversationTail,
+                                   revealRequest: chat.planRevealRequest,
+                                   revealID: chat.openPlanMessageID) {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(chat.messages) { message in
+                        // Suggestions show under the panel instead.
+                        ChatMessageRow(message: message,
+                                       style: .capture,
+                                       isDemo: schedule.isDemo,
+                                       isBusy: chat.isBusy,
+                                       onConfirmDelete: { chat.confirmDeletion(in: message) },
+                                       onAddPlan: { chat.addPlan(message) },
+                                       onKeepEditing: { chat.keepEditing(message) })
+                            .id(message.id)
                     }
                     if chat.isSending {
                         ProgressView().tint(.white)
-                    } else if let reply = exchange.reply {
-                        // Its suggestions are shown under the panel instead.
-                        ChatMessageRow(message: withoutSuggestions(reply),
-                                       compactPlan: true,
-                                       onConfirmDelete: { chat.confirmDeletion(in: reply) },
-                                       onAddPlan: { chat.addPlan(reply) },
-                                       onKeepEditing: { chat.keepEditing(reply) })
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 2)
+                .padding(.bottom, 4)
             }
-            .id(exchange.user?.id) // a new exchange starts at the top
             .scrollDismissesKeyboard(.interactively)
 
             ComposerBar(
@@ -219,16 +218,11 @@ struct QuickCaptureView: View {
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Self.panelFill))
     }
 
-    private func withoutSuggestions(_ message: ChatViewModel.Message) -> ChatViewModel.Message {
-        var copy = message
-        copy.suggestions = []
-        return copy
-    }
-
     // MARK: Suggestions + grabber
 
+    /// The newest reply's suggestions, else examples to start from.
     private var suggestions: [String] {
-        let fromReply = chat.lastExchange.reply?.suggestions ?? []
+        let fromReply = chat.latestReply?.suggestions ?? []
         return fromReply.isEmpty ? Self.defaultSuggestions : fromReply
     }
 

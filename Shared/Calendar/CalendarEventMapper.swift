@@ -11,8 +11,8 @@ enum MappingError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .invalidDate(value): "Could not understand the date “\(value)”."
-        case .emptyPlan: "The generated plan had no schedulable sessions."
+        case let .invalidDate(value): String(localized: "Could not understand the date “\(value)”.")
+        case .emptyPlan: String(localized: "The generated plan had no schedulable sessions.")
         }
     }
 }

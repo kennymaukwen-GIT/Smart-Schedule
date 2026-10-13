@@ -6,8 +6,8 @@ enum AuthError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .signedOut: "Connect Google Calendar in Smart Schedule first."
-        case let .refreshFailed(reason): "Google sign-in expired (\(reason)). Open Smart Schedule to reconnect."
+        case .signedOut: String(localized: "Connect Google Calendar in Smart Schedule first.")
+        case let .refreshFailed(reason): String(localized: "Google sign-in expired (\(reason)). Open Smart Schedule to reconnect.")
         }
     }
 }

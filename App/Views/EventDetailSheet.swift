@@ -52,11 +52,12 @@ struct EventDetailSheet: View {
 
     private var timeLine: String {
         if event.isAllDay {
-            return event.start.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()) + " · All day"
+            return event.start.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()) + " · "
+                + String(localized: "All day")
         }
         let day = event.start.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
-        let range = event.start.formatted(date: .omitted, time: .shortened) + "–" + event.end.formatted(date: .omitted, time: .shortened)
-        return "\(day) · \(range)"
+        // 24-hour, like the timeline and the chat.
+        return "\(day) · \(ReplyFormatter.timeRange(event, clock: WallClock()))"
     }
 
     static func reminderText(_ minutes: Int, allDay: Bool = false) -> String {
@@ -66,16 +67,18 @@ struct EventDetailSheet: View {
             let minuteOfDay = daysBefore * 1440 - minutes
             let time = String(format: "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
             switch daysBefore {
-            case 0: return "On the day at \(time)"
-            case 1: return "The day before at \(time)"
-            default: return "\(daysBefore) days before at \(time)"
+            case 0: return String(localized: "On the day at \(time)")
+            case 1: return String(localized: "The day before at \(time)")
+            default: return String(localized: "\(daysBefore) days before at \(time)")
             }
         }
         return switch minutes {
-        case 0: "At start"
-        case 1..<60: "\(minutes) minutes before"
-        case 60..<1440: "\(minutes / 60) hour\(minutes >= 120 ? "s" : "") before"
-        default: "\(minutes / 1440) day\(minutes >= 2880 ? "s" : "") before"
+        case 0: String(localized: "At start")
+        case 1..<60: String(localized: "\(minutes) minutes before")
+        case 60..<120: String(localized: "1 hour before")
+        case 120..<1440: String(localized: "\(minutes / 60) hours before")
+        case 1440..<2880: String(localized: "1 day before")
+        default: String(localized: "\(minutes / 1440) days before")
         }
     }
 }

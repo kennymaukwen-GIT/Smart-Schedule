@@ -7,10 +7,14 @@ import Foundation
 /// Plans follow the same review loop as the real assistant: a goal produces a `PlanDraft` (nothing written);
 /// while it is pending, approval words add it, abandonment words drop it and anything else is read as a
 /// change request ("make it 7am", "MWF", "45 min", "start next Monday") that produces the next revision.
+///
+/// Like Gemini, the demo writes its own sentences (plan summary, what a revision changed, follow-up questions)
+/// in the language the user typed: Chinese for Chinese input, English otherwise. Shared templates
+/// (`ReplyFormatter`, the demo note) follow the device language through the String Catalog.
 actor DemoAssistant: ScheduleAssisting {
     typealias Reply = ScheduleAssistant.Reply
 
-    static let demoNote = "(Demo mode: nothing was written to Google Calendar.)"
+    static var demoNote: String { String(localized: "Demo mode: nothing was written to Google Calendar.") }
 
     private let store: SharedStore
     private let clock: WallClock
@@ -40,6 +44,7 @@ actor DemoAssistant: ScheduleAssisting {
         let text = utterance.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = text.lowercased()
         let parser = DemoParser(clock: clock, now: now)
+        let language = DemoLanguage.of(text, fallback: .device)
         let pending = pendingDraft
         pendingDraft = nil
 
@@ -48,18 +53,18 @@ actor DemoAssistant: ScheduleAssisting {
         // event), so "push the gym routine 30 min" is not mistaken for a new plan.
         let reply: Reply
         if let reviewed = try await review(text, lower: lower, focusEventID: focusEventID,
-                                           answersTimeQuestion: pending != nil, parser: parser) {
+                                           answersTimeQuestion: pending != nil, language: language, parser: parser) {
             reply = reviewed
-        } else if let shifted = await shift(text, lower: lower, focusEventID: focusEventID, parser: parser) {
+        } else if let shifted = await shift(text, lower: lower, focusEventID: focusEventID, language: language, parser: parser) {
             reply = shifted
         } else if Self.isGoal(lower), !Self.isDeleteRequest(lower) { // "delete the gym routine" is not a new plan
-            reply = try await plan(text, lower: lower, parser: parser)
-        } else if let deleteReply = await deletion(lower, now: now) {
+            reply = try await plan(text, lower: lower, language: language, parser: parser)
+        } else if let deleteReply = await deletion(lower, now: now, language: language) {
             reply = deleteReply
         } else if Self.isAgendaQuery(lower), !parser.containsTime(text) {
             reply = await agenda(text, lower: lower, parser: parser)
         } else {
-            reply = await capture(text, pending: pending, parser: parser)
+            reply = await capture(text, pending: pending, language: language, parser: parser)
         }
 
         if reply.changed { await rescheduleReminders(store) }
@@ -72,7 +77,7 @@ actor DemoAssistant: ScheduleAssisting {
         if let planID = pending.planID { await store.removeNudges(planID: planID) }
         await rescheduleReminders(store)
         var reply = Reply(changed: true)
-        reply.append("Deleted \(pending.eventIDs.count) item(s) on this device.")
+        reply.append(String(localized: "Deleted \(pending.eventIDs.count) items on this device."))
         reply.append(Self.demoNote)
         return reply
     }
@@ -117,11 +122,12 @@ actor DemoAssistant: ScheduleAssisting {
 
     /// Builds the same `LongTermPlanArgs` Gemini would send and turns them into a draft for review.
     /// A new goal while a draft is pending replaces it as the next revision.
-    private func plan(_ text: String, lower: String, parser: DemoParser) async throws -> Reply {
+    private func plan(_ text: String, lower: String, language: DemoLanguage, parser: DemoParser) async throws -> Reply {
         let calendar = clock.calendar
         let startDay = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: parser.now))!
         let args = DemoPlan.make(goal: text, months: Self.planMonths(lower), startDay: startDay,
-                                 startLabel: parser.label(for: startDay), clock: clock)
+                                 startLabel: parser.label(for: startDay, language: language),
+                                 language: language, clock: clock)
         let pending = await store.pendingPlan()
         let draft = try planBuilder.draft(from: args,
                                           argsJSON: PlanDraftBuilder.encode(args),
@@ -156,10 +162,13 @@ actor DemoAssistant: ScheduleAssisting {
                         lower: String,
                         focusEventID: String?,
                         answersTimeQuestion: Bool,
+                        language inputLanguage: DemoLanguage,
                         parser: DemoParser) async throws -> Reply? {
         // A reminder's "push it 30 min" is about that event, and "14:00" answers the last "What time…?" question.
         guard focusEventID == nil, let draft = await store.pendingPlan() else { return nil }
         if answersTimeQuestion, parser.containsTime(text) { return nil }
+        // A tapped "07:00" chip has no words: keep talking in the plan's language.
+        let language = DemoLanguage.of(text, fallback: DemoLanguage.of(draft.utterance, fallback: inputLanguage))
 
         var leftover = text
         let edit = parser.extractPlanEdit(from: &leftover)
@@ -168,27 +177,28 @@ actor DemoAssistant: ScheduleAssisting {
                 || Self.isMoveRequest(lower) || parser.containsTime(text)
             return elsewhere ? nil : Self.askWhatToChange()
         }
-        if !edit.isEmpty { return try await revise(draft, with: edit, parser: parser) }
+        if !edit.isEmpty { return try await revise(draft, with: edit, language: language, parser: parser) }
         if Self.isAbandonment(lower) { return await discard(draft) }
         if Self.isApproval(lower) { return try await writePlan(draft) }
-        if let topic = edit.topic { return Self.followUp(topic, parser: parser) }
+        if let topic = edit.topic { return Self.followUp(topic, language: language, parser: parser) }
         return Self.askWhatToChange()
     }
 
     /// Applies the change to the stored args and re-drafts them as the next revision (same id).
-    private func revise(_ draft: PlanDraft, with edit: PlanEdit, parser: DemoParser) async throws -> Reply {
+    private func revise(_ draft: PlanDraft, with edit: PlanEdit, language: DemoLanguage,
+                        parser: DemoParser) async throws -> Reply {
         let calendar = clock.calendar
         var args = try PlanDraftBuilder.decodeArgs(draft.argsJSON)
-        var changes: [String] = []
+        var change = PlanChange()
 
         if let day = edit.startDay, let oldStart = clock.date(args.startDate),
            let delta = calendar.dateComponents([.day], from: oldStart, to: calendar.startOfDay(for: day)).day, delta != 0 {
             DemoPlan.shift(&args, byDays: delta, clock: clock)
-            changes.append("starts \(parser.label(for: day))")
+            change.start = parser.dayPhrase(for: day, language: language)
         }
         if let weekdays = edit.weekdays {
             DemoPlan.assign(weekdays, to: &args)
-            changes.append(DemoPlan.dayList(weekdays))
+            change.weekdays = RecurrenceRule.normalizedWeekdays(weekdays)
         }
         var newTime = edit.time.map { (hour: $0.hour, minute: $0.minute) }
         if newTime == nil, let shift = edit.timeShiftMinutes,
@@ -199,30 +209,31 @@ actor DemoAssistant: ScheduleAssisting {
         if let newTime {
             let value = String(format: "%02d:%02d", newTime.hour, newTime.minute)
             for index in args.sessions.indices { args.sessions[index].startTime = value }
-            changes.append("at \(value)")
+            change.time = value
         }
         if let minutes = edit.durationMinutes {
             let value = min(max(minutes, 10), 240)
             for index in args.sessions.indices { args.sessions[index].durationMinutes = value }
-            changes.append("\(value) min")
-        } else if let change = edit.durationChange {
+            change.minutes = value
+        } else if let step = edit.durationChange {
             for index in args.sessions.indices {
-                args.sessions[index].durationMinutes = min(max(args.sessions[index].durationMinutes + change, 15), 180)
+                args.sessions[index].durationMinutes = min(max(args.sessions[index].durationMinutes + step, 15), 180)
             }
-            changes.append("\(args.sessions.first?.durationMinutes ?? 0) min")
+            change.minutes = args.sessions.first?.durationMinutes
         }
-        guard !changes.isEmpty else { return Self.askWhatToChange(lead: "The draft already looks like that.") }
+        guard !change.isEmpty else {
+            return Self.askWhatToChange(lead: language == .chinese ? "草稿已經是這樣了。" : "The draft already looks like that.")
+        }
 
         let start = clock.date(args.startDate) ?? draft.startDate
-        DemoPlan.refreshText(&args, startLabel: parser.label(for: start), clock: clock)
+        DemoPlan.refreshText(&args, startLabel: parser.label(for: start, language: language), language: language, clock: clock)
         let revised = try planBuilder.draft(from: args,
                                             argsJSON: PlanDraftBuilder.encode(args),
                                             id: draft.id,
                                             revision: draft.revision + 1,
                                             utterance: draft.utterance)
         await store.setPendingPlan(revised)
-        let lead = "Updated the draft (revision \(revised.revision)): \(changes.joined(separator: ", "))."
-        return reviewReply(for: revised, lead: lead)
+        return reviewReply(for: revised, lead: change.sentences(language))
     }
 
     /// "Add": the reviewed args, expanded locally the way Google would, with real (non-draft) ids.
@@ -235,12 +246,11 @@ actor DemoAssistant: ScheduleAssisting {
         if let nudge = mapper.nudge(from: args, planID: draft.id) { await store.addNudge(nudge) }
         if await store.pendingPlan()?.id == draft.id { await store.setPendingPlan(nil) }
 
-        let sessions = events.filter { !$0.isAllDay }.count
         var reply = Reply(changed: true)
         reply.created = events
         reply.committedPlanID = draft.id
         reply.showRange = firstWeek(of: draft)
-        reply.append("Added (demo): \(sessions) sessions and \(events.count - sessions) check-ins on this device.")
+        reply.append(String(localized: "Added “\(draft.title)” on this device."))
         reply.append(Self.demoNote)
         return reply
     }
@@ -263,19 +273,22 @@ actor DemoAssistant: ScheduleAssisting {
     }
 
     /// The suggestion chips name a topic without a value ("Change the time"), so ask for the value.
-    private static func followUp(_ topic: PlanEdit.Topic, parser: DemoParser) -> Reply {
+    /// Every suggestion is something `extractPlanEdit` reads back.
+    private static func followUp(_ topic: PlanEdit.Topic, language: DemoLanguage, parser: DemoParser) -> Reply {
         var reply = Reply()
         reply.needsClarification = true
+        let chinese = language == .chinese
         switch topic {
         case .days:
-            reply.append("Which days should you train?")
-            reply.suggestions = ["Mon, Wed, Fri", "Weekdays", "Tue, Thu, Sat"]
+            reply.append(chinese ? "要練哪幾天？" : "Which days do you want to train?")
+            reply.suggestions = chinese ? ["週一、三、五", "平日", "週二、四、六"] : ["Mon · Wed · Fri", "Weekdays", "Tue · Thu · Sat"]
         case .time:
-            reply.append("What time should the sessions start?")
-            reply.suggestions = ["7am", "12:30", "18:30"]
+            reply.append(chinese ? "幾點開始？" : "What time should the sessions start?")
+            reply.suggestions = ["07:00", "12:30", "18:30"]
         case .start:
-            reply.append("When should the plan start?")
-            reply.suggestions = ["Tomorrow", "Next Monday", parser.firstOfNextMonthLabel()]
+            reply.append(chinese ? "要從哪一天開始？" : "When should the plan start?")
+            reply.suggestions = (chinese ? ["明天", "下週一"] : ["Tomorrow", "Next Monday"])
+                + [parser.firstOfNextMonthLabel(language: language)]
         }
         return reply
     }
@@ -330,10 +343,11 @@ actor DemoAssistant: ScheduleAssisting {
         "delete", "remove", "interested", "calendar"
     ]
 
-    /// Stripped longest first, so 不要了 goes before 不要.
+    /// Stripped longest first, so 不要了 goes before 不要 and 訓練日 (the 換訓練日 chip) before 訓練.
     private static let chinesePlanPhrases: [String] = [
-        "沒問題", "没问题", "就這樣", "就这样", "不要了", "不用了", "可以了", "改成", "改到", "換成", "换成", "調整", "调整",
-        "訓練", "训练", "運動", "运动", "健身", "計畫", "計劃", "计划", "時間", "时间", "日期", "開始", "开始", "每次",
+        "訓練日", "训练日", "沒問題", "没问题", "就這樣", "就这样", "不要了", "不用了", "可以了", "改成", "改到", "換成",
+        "换成", "調整", "调整", "時長", "时长", "訓練", "训练", "運動", "运动", "健身", "計畫", "計劃", "计划", "時間",
+        "时间", "日期", "開始", "开始", "每次",
         "請", "请", "幫我", "帮我", "我想", "我要", "可以", "好的", "好啊", "加入", "加進", "加进", "確定", "确定", "不要",
         "算了", "取消", "放棄", "放弃", "刪掉", "删掉", "刪除", "删除", "一點", "一点", "還是", "还是", "然後", "然后",
         "這個", "这个", "好", "加", "行", "對", "对", "嗯", "吧", "了", "的", "改", "換", "换", "從", "从", "再", "都",
@@ -348,7 +362,8 @@ actor DemoAssistant: ScheduleAssisting {
 
     // MARK: - (c) "push it 30 min"
 
-    private func shift(_ text: String, lower: String, focusEventID: String?, parser: DemoParser) async -> Reply? {
+    private func shift(_ text: String, lower: String, focusEventID: String?, language: DemoLanguage,
+                       parser: DemoParser) async -> Reply? {
         guard Self.isMoveRequest(lower) else { return nil }
         let delta = Self.relativeMinutes(lower)
         var leftover = text
@@ -360,7 +375,8 @@ actor DemoAssistant: ScheduleAssisting {
         guard let event = await target(lower: lower, focusEventID: focusEventID, now: parser.now) else {
             var reply = Reply()
             reply.needsClarification = true
-            reply.append("Which event should I move? Try “push the team sync 30 min”.")
+            reply.append(language == .chinese ? "要移動哪個行程？例如「團隊會議延後 30 分鐘」。"
+                                              : "Which event should I move? Try “push the team sync 30 min”.")
             return reply
         }
         var updated = event
@@ -425,7 +441,7 @@ actor DemoAssistant: ScheduleAssisting {
         ["delete", "cancel", "remove", "刪除", "删除", "取消"].contains(where: { lower.contains($0) })
     }
 
-    private func deletion(_ lower: String, now: Date) async -> Reply? {
+    private func deletion(_ lower: String, now: Date, language: DemoLanguage) async -> Reply? {
         guard Self.isDeleteRequest(lower) else { return nil }
         let snapshot = await store.snapshot()
         let events = snapshot.events.sorted { $0.start < $1.start }
@@ -435,23 +451,23 @@ actor DemoAssistant: ScheduleAssisting {
         if wantsPlan, let planID = snapshot.nudges.last?.planID ?? events.last(where: { $0.planID != nil })?.planID {
             let ids = events.filter { $0.planID == planID }.map(\.id)
             reply.pendingDeletion = ScheduleAssistant.PendingDeletion(eventIDs: ids, planID: planID,
-                                                                      summary: "the plan (\(ids.count) items)")
+                                                                      summary: String(localized: "the plan (\(ids.count) items)"))
         } else {
             let named = events.filter { $0.end > now && Self.mentions(lower, $0.title) }
             guard let first = named.first else {
-                reply.append("I couldn't find that event. Try naming it, e.g. “cancel the dentist”.")
+                reply.append(language == .chinese ? "找不到這個行程。請說出名稱，例如「取消看牙醫」。"
+                                                  : "I couldn't find that event. Try naming it, like “cancel the dentist”.")
                 return reply
             }
             let everyOccurrence = DemoParser.match(#"\b(?:all|every)\b"#, in: lower) != nil
                 || lower.contains("所有") || lower.contains("全部")
             let chosen = everyOccurrence && first.seriesID != nil ? named.filter { $0.seriesID == first.seriesID } : [first]
             let summary = chosen.count == 1
-                ? "\(first.title) — \(ReplyFormatter.stamp(first, clock: clock))"
-                : "\(first.title) (\(chosen.count) times)"
+                ? "\(first.title) · \(ReplyFormatter.when(first, clock: clock))"
+                : String(localized: "\(first.title) (\(chosen.count) times)")
             reply.pendingDeletion = ScheduleAssistant.PendingDeletion(eventIDs: chosen.map(\.id), planID: nil, summary: summary)
         }
-        let summary = reply.pendingDeletion?.summary ?? "it"
-        reply.append("Delete \(summary)? Tap Confirm.")
+        if let summary = reply.pendingDeletion?.summary { reply.append(ReplyFormatter.deletePrompt(summary)) }
         return reply
     }
 
@@ -468,28 +484,29 @@ actor DemoAssistant: ScheduleAssisting {
     private func agenda(_ text: String, lower: String, parser: DemoParser) async -> Reply {
         let calendar = clock.calendar
         let interval: DateInterval
-        let label: String
         if ["week", "這週", "这周", "本週", "本周"].contains(where: { lower.contains($0) }),
            let week = calendar.dateInterval(of: .weekOfYear, for: parser.now) {
             interval = week
-            label = "this week"
         } else {
             var leftover = text
             let day = parser.extractDay(from: &leftover)?.date ?? calendar.startOfDay(for: parser.now)
             interval = DateInterval(start: day, end: calendar.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86_400))
-            label = parser.label(for: day)
         }
         let events = await store.events(in: interval)
+        let digest = AgendaDigest(range: interval,
+                                  title: ReplyFormatter.agendaTitle(for: interval, now: parser.now, clock: clock),
+                                  events: events)
         var reply = Reply()
         reply.showRange = interval
-        reply.append("Your schedule for \(label):")
-        reply.append(ReplyFormatter.agenda(events, clock: clock))
+        reply.agenda = digest
+        reply.append(ReplyFormatter.agenda(digest, clock: clock))
         return reply
     }
 
     // MARK: - (d) "Lunch with Andrew tomorrow 1pm" · (e) no time → ask
 
-    private func capture(_ text: String, pending: (title: String, day: Date?)?, parser: DemoParser) async -> Reply {
+    private func capture(_ text: String, pending: (title: String, day: Date?)?, language: DemoLanguage,
+                         parser: DemoParser) async -> Reply {
         let calendar = clock.calendar
         let now = parser.now
         var leftover = text
@@ -501,22 +518,27 @@ actor DemoAssistant: ScheduleAssisting {
             title = pending.title
             day = day ?? pending.day
         }
-        if title.isEmpty { title = "New event" }
+        if title.isEmpty { title = language == .chinese ? "新行程" : "New event" }
 
         var reply = Reply()
         guard let time else {
             pendingDraft = (title: title, day: day)
-            let dayNote = day.map { " (\(parser.label(for: $0)))" } ?? ""
+            let when = day.map { parser.dayPhrase(for: $0, language: language) }
             reply.needsClarification = true
             reply.suggestions = ["09:00", "14:00", "19:00"]
-            reply.append("What time should I schedule “\(title)”\(dayNote)?")
+            switch language {
+            case .chinese:
+                reply.append("\(when.map { $0 + "的" } ?? "")「\(title)」要排在幾點？")
+            case .english:
+                reply.append("What time should I schedule “\(title)”\(when.map { " " + $0 } ?? "")?")
+            }
             return reply
         }
 
         var hour = time.hour
         if dayMatch?.evening == true, !time.hasMeridiem, hour < 12 { hour += 12 }
         guard var start = clock.combine(day: day ?? calendar.startOfDay(for: now), time: (hour: hour, minute: time.minute)) else {
-            reply.append("I couldn't work out that time.")
+            reply.append(language == .chinese ? "看不懂這個時間。" : "I couldn't work out that time.")
             return reply
         }
         if start < now, day == nil {
@@ -549,6 +571,7 @@ actor DemoAssistant: ScheduleAssisting {
 
         reply.changed = true
         reply.created = [event]
+        reply.addedEvents = [event]
         reply.showRange = dayInterval
         reply.append(ReplyFormatter.confirmation(for: [event], clock: clock))
         reply.append(ReplyFormatter.conflicts([event], against: sameDay))
@@ -722,13 +745,18 @@ private struct DemoParser {
         }
     }
 
-    /// "today", "tomorrow" or "Wed, Oct 15".
-    func label(for day: Date) -> String {
-        if calendar.isDate(day, inSameDayAs: today) { return "today" }
-        if calendar.isDate(day, inSameDayAs: offset(1, from: today)) { return "tomorrow" }
-        var style = Date.FormatStyle.dateTime.weekday(.abbreviated).month(.abbreviated).day()
-        style.timeZone = clock.timeZone
-        return day.formatted(style)
+    /// "today", "tomorrow" or "Wed, Oct 15"; 今天, 明天 or 10月15日（週四）.
+    func label(for day: Date, language: DemoLanguage) -> String {
+        if calendar.isDate(day, inSameDayAs: today) { return language == .chinese ? "今天" : "today" }
+        if calendar.isDate(day, inSameDayAs: offset(1, from: today)) { return language == .chinese ? "明天" : "tomorrow" }
+        return ReplyFormatter.dayLabel(day, clock: clock, locale: language.locale)
+    }
+
+    /// `label` as it reads after a verb: "tomorrow" but "on Wed, Oct 15" (Chinese needs no preposition).
+    func dayPhrase(for day: Date, language: DemoLanguage) -> String {
+        let text = label(for: day, language: language)
+        let relative = calendar.isDate(day, inSameDayAs: today) || calendar.isDate(day, inSameDayAs: offset(1, from: today))
+        return language == .english && !relative ? "on " + text : text
     }
 
     private func offset(_ days: Int, from base: Date) -> Date {
@@ -836,19 +864,23 @@ private struct DemoParser {
 }
 
 /// The demo's muscle-plan template and its wording. The summary, nudge and assumptions are rebuilt after every
-/// revision so they always describe the sessions.
+/// revision so they always describe the sessions; titles keep the language of the original goal.
 private enum DemoPlan {
-    static func make(goal: String, months: Int, startDay: Date, startLabel: String, clock: WallClock) -> LongTermPlanArgs {
+    static func make(goal: String, months: Int, startDay: Date, startLabel: String, language: DemoLanguage,
+                     clock: WallClock) -> LongTermPlanArgs {
         let calendar = clock.calendar
+        let chinese = language == .chinese
         let endExclusive = calendar.date(byAdding: .month, value: months, to: startDay)!
         let endDay = calendar.date(byAdding: .day, value: -1, to: endExclusive)!
         let totalDays = max(calendar.dateComponents([.day], from: startDay, to: endExclusive).day ?? months * 30, 3)
 
-        let phaseInfo = [
-            ("Foundation", "Technique, full range of motion, build the habit"),
-            ("Hypertrophy", "8–12 reps, add weight or reps every week"),
-            ("Strength", "Heavier compound lifts, 4–6 reps")
-        ]
+        let phaseInfo = chinese
+            ? [("基礎期", "練好技巧和完整動作幅度，養成習慣"),
+               ("增肌期", "每組 8–12 下，每週增加重量或次數"),
+               ("力量期", "較重的複合動作，每組 4–6 下")]
+            : [("Foundation", "Technique, full range of motion, build the habit"),
+               ("Hypertrophy", "8–12 reps, add weight or reps every week"),
+               ("Strength", "Heavier compound lifts, 4–6 reps")]
         var phases: [PhaseDraft] = []
         for (index, info) in phaseInfo.enumerated() {
             let first = calendar.date(byAdding: .day, value: totalDays * index / 3, to: startDay)!
@@ -860,25 +892,31 @@ private enum DemoPlan {
 
         var sessions: [SessionDraft] = []
         for index in phases.indices {
-            sessions.append(SessionDraft(phaseIndex: index, title: "Upper body", weekdays: ["MO", "TH"],
-                                         startTime: "18:30", durationMinutes: 60, notes: "Push + pull, then core"))
-            sessions.append(SessionDraft(phaseIndex: index, title: "Lower body", weekdays: ["TU", "FR"],
-                                         startTime: "18:30", durationMinutes: 60, notes: "Squat or deadlift, then mobility"))
+            sessions.append(SessionDraft(phaseIndex: index, title: chinese ? "上半身" : "Upper body", weekdays: ["MO", "TH"],
+                                         startTime: "18:30", durationMinutes: 60,
+                                         notes: chinese ? "推和拉，最後練核心" : "Push + pull, then core"))
+            sessions.append(SessionDraft(phaseIndex: index, title: chinese ? "下半身" : "Lower body", weekdays: ["TU", "FR"],
+                                         startTime: "18:30", durationMinutes: 60,
+                                         notes: chinese ? "深蹲或硬舉，最後做伸展" : "Squat or deadlift, then mobility"))
         }
 
         var milestones: [MilestoneDraft] = []
         for month in 1...months {
             let monthEnd = calendar.date(byAdding: .month, value: month, to: startDay)!
             let day = calendar.date(byAdding: .day, value: -1, to: monthEnd)!
-            let title = month == months
-                ? "Final check-in: photos, measurements, strength test"
-                : "Month \(month) check-in: weigh-in and photos"
+            let title: String
+            switch (chinese, month == months) {
+            case (true, true): title = "最終檢查：照片、圍度、力量測試"
+            case (true, false): title = "第 \(month) 個月檢查：體重和照片"
+            case (false, true): title = "Final check-in: photos, measurements, strength test"
+            case (false, false): title = "Month \(month) check-in: weigh-in and photos"
+            }
             milestones.append(MilestoneDraft(date: clock.dateString(day), title: title))
         }
 
         var args = LongTermPlanArgs(
             goal: goal,
-            planTitle: "Muscle Plan",
+            planTitle: chinese ? "增肌計畫" : "Muscle Plan",
             startDate: clock.dateString(startDay),
             endDate: clock.dateString(endDay),
             summaryForUser: "",
@@ -888,7 +926,7 @@ private enum DemoPlan {
             milestones: milestones,
             assumptions: nil
         )
-        refreshText(&args, startLabel: startLabel, clock: clock)
+        refreshText(&args, startLabel: startLabel, language: language, clock: clock)
         return args
     }
 
@@ -927,40 +965,45 @@ private enum DemoPlan {
         args.sessions = sessions
     }
 
-    static func refreshText(_ args: inout LongTermPlanArgs, startLabel: String, clock: WallClock) {
+    /// The summary follows the readability rules the model gets: what the plan is and the weekly load, nothing
+    /// the card's schedule table already shows (days, times, phases, check-ins, reminders).
+    static func refreshText(_ args: inout LongTermPlanArgs, startLabel: String, language: DemoLanguage, clock: WallClock) {
         let calendar = clock.calendar
         let firstPhase = args.sessions.map(\.phaseIndex).min() ?? 0
         let first = args.sessions.filter { $0.phaseIndex == firstPhase }
         let dayCount = Set(first.flatMap { RecurrenceRule.normalizedWeekdays($0.weekdays) }).count
         let time = first.first?.startTime ?? "18:30"
-        let durations = Set(first.map(\.durationMinutes))
+        let shortest = first.map(\.durationMinutes).min() ?? 60
+        let longest = first.map(\.durationMinutes).max() ?? 60
 
         var months = 1
         if let start = clock.date(args.startDate), let end = clock.date(args.endDate),
            let afterEnd = calendar.date(byAdding: .day, value: 1, to: end) {
             months = max(calendar.dateComponents([.month], from: start, to: afterEnd).month ?? 1, 1)
         }
-        let span = months == 1 ? "1 month" : "\(months) months"
-        let frequency = dayCount == 1 ? "once a week" : "\(dayCount) days a week"
-        let parts = first.map { "\(dayList($0.weekdays)) \($0.title.lowercased())" }.joined(separator: ", ")
-        let timing = (Set(first.map(\.startTime)).count == 1 ? " at \(time)" : "")
-            + (durations.count == 1 ? ", \(durations.first ?? 60) min each" : "")
         let nudge = nudgeTime(forSessionAt: time, clock: clock)
-
-        args.dailyNudge = NudgeDraft(time: nudge, message: "Morning! Protein with breakfast; today's session is at \(time).")
-        args.summaryForUser = "Here is a plan I designed for you: exercise \(frequency) for \(span) — \(parts)\(timing) — "
-            + "in \(args.phases.count) phases (\(args.phases.map(\.name).joined(separator: " → "))), "
-            + "with a \(nudge) morning nudge and a monthly check-in."
         let afterWork = (clock.timeOfDay(time)?.hour ?? 18) >= 17
-        args.assumptions = [afterWork ? "Workouts at \(time) after work" : "Workouts at \(time)",
-                            "Starts \(startLabel)",
-                            "You have gym access"]
-    }
 
-    /// "MO","TH" → "Mon/Thu".
-    static func dayList(_ codes: [String]) -> String {
-        let names = ["MO": "Mon", "TU": "Tue", "WE": "Wed", "TH": "Thu", "FR": "Fri", "SA": "Sat", "SU": "Sun"]
-        return RecurrenceRule.normalizedWeekdays(codes).compactMap { names[$0] }.joined(separator: "/")
+        switch language {
+        case .english:
+            let article = [8, 11, 18].contains(months) ? "An" : "A"
+            let workouts = dayCount == 1 ? "1 workout a week" : "\(dayCount) workouts a week"
+            let length = shortest != longest ? "\(shortest) to \(longest) minutes each"
+                : (shortest == 60 ? "about an hour each" : "\(shortest) minutes each")
+            args.summaryForUser = "\(article) \(months)-month muscle plan: \(workouts), \(length)."
+            args.dailyNudge = NudgeDraft(time: nudge, message: "Good morning! Have some protein with breakfast.")
+            args.assumptions = [afterWork ? "You train at \(time), after work" : "You train at \(time)",
+                                "Starts \(startLabel)",
+                                "You have gym access"]
+        case .chinese:
+            let length = shortest != longest ? "每次 \(shortest) 到 \(longest) 分鐘"
+                : (shortest == 60 ? "每次約 1 小時" : "每次 \(shortest) 分鐘")
+            args.summaryForUser = "\(months) 個月增肌計畫：每週練 \(dayCount) 次，\(length)。"
+            args.dailyNudge = NudgeDraft(time: nudge, message: "早安！早餐記得補充蛋白質。")
+            args.assumptions = [afterWork ? "下班後 \(time) 訓練" : "\(time) 訓練",
+                                "\(startLabel)開始",
+                                "可以使用健身房"]
+        }
     }
 
     /// 07:30, or an hour before an early session (never before 05:00).
@@ -970,6 +1013,95 @@ private enum DemoPlan {
         guard minutes < 8 * 60 + 30 else { return "07:30" }
         let nudge = max(minutes - 60, 5 * 60)
         return String(format: "%02d:%02d", nudge / 60, nudge % 60)
+    }
+}
+
+/// The language demo sentences are written in: Chinese when the user typed Chinese, English otherwise.
+enum DemoLanguage {
+    case english
+    case chinese
+
+    /// Chinese when `text` has Han characters, English when it has other letters, else `fallback`
+    /// (a bare "07:00" or "45").
+    static func of(_ text: String, fallback: DemoLanguage = .english) -> DemoLanguage {
+        let scalars = text.unicodeScalars
+        if scalars.contains(where: { (0x4E00...0x9FFF).contains($0.value) || (0x3400...0x4DBF).contains($0.value) }) {
+            return .chinese
+        }
+        return scalars.contains(where: { CharacterSet.letters.contains($0) }) ? .english : fallback
+    }
+
+    /// The language the UI strings resolved to.
+    static var device: DemoLanguage {
+        Bundle.main.preferredLocalizations.first?.hasPrefix("zh") == true ? .chinese : .english
+    }
+
+    /// For dates inside demo sentences. English keeps the device's region when the device is in English.
+    var locale: Locale {
+        switch self {
+        case .chinese: Locale(identifier: "zh_Hant_TW")
+        case .english: Locale.current.language.languageCode?.identifier == "en" ? Locale.current : Locale(identifier: "en_US")
+        }
+    }
+}
+
+/// What a revision changed, said in short sentences: "Now every Monday and Thursday at 07:00." /
+/// "已改成每週一、四 07:00。" Days are written out, never "Mon/Thu".
+private struct PlanChange {
+    var weekdays: [String]?        // normalized MO…SU
+    var time: String?              // "HH:mm"
+    var minutes: Int?
+    var start: String?             // "tomorrow", "on Mon, Oct 19", 明天, 10月19日（週一）
+
+    var isEmpty: Bool { weekdays == nil && time == nil && minutes == nil && start == nil }
+
+    func sentences(_ language: DemoLanguage) -> String {
+        var parts: [String] = []
+        switch language {
+        case .english:
+            if let weekdays {
+                parts.append("Now \(Self.englishDays(weekdays))\(time.map { " at \($0)" } ?? "").")
+            } else if let time {
+                parts.append("Sessions now start at \(time).")
+            }
+            if let minutes { parts.append("Each session is now \(minutes) minutes.") }
+            if let start { parts.append("The plan now starts \(start).") }
+            return parts.joined(separator: " ")
+        case .chinese:
+            if let weekdays {
+                parts.append("已改成\(Self.chineseDays(weekdays))\(time.map { " \($0)" } ?? "")。")
+            } else if let time {
+                parts.append("已改成 \(time) 開始。")
+            }
+            if let minutes { parts.append("每次改成 \(minutes) 分鐘。") }
+            if let start { parts.append("改成\(start)開始。") }
+            return parts.joined()
+        }
+    }
+
+    private static let weekdaysOnly = ["MO", "TU", "WE", "TH", "FR"]
+    private static let weekend = ["SA", "SU"]
+    private static let everyDay = weekdaysOnly + weekend
+
+    /// "every Monday and Thursday", "on weekdays", "every day".
+    private static func englishDays(_ codes: [String]) -> String {
+        if codes == everyDay { return "every day" }
+        if codes == weekdaysOnly { return "on weekdays" }
+        if codes == weekend { return "on weekends" }
+        let names = ["MO": "Monday", "TU": "Tuesday", "WE": "Wednesday", "TH": "Thursday",
+                     "FR": "Friday", "SA": "Saturday", "SU": "Sunday"]
+        let words = codes.compactMap { names[$0] }
+        guard let last = words.last else { return "" }
+        return "every " + (words.count == 1 ? last : words.dropLast().joined(separator: ", ") + " and " + last)
+    }
+
+    /// 每週一、三、五 · 平日 · 週末 · 每天.
+    private static func chineseDays(_ codes: [String]) -> String {
+        if codes == everyDay { return "每天" }
+        if codes == weekdaysOnly { return "平日" }
+        if codes == weekend { return "週末" }
+        let names = ["MO": "一", "TU": "二", "WE": "三", "TH": "四", "FR": "五", "SA": "六", "SU": "日"]
+        return "每週" + codes.compactMap { names[$0] }.joined(separator: "、")
     }
 }
 
@@ -1154,7 +1286,8 @@ extension DemoParser {
         if Self.match(#"\b(?:start|begin|date)\b"#, in: lower) != nil || ["開始", "开始", "日期"].contains(where: { lower.contains($0) }) {
             return .start
         }
-        if Self.match(#"\bdays?\b"#, in: lower) != nil || ["哪幾天", "哪几天", "星期", "天"].contains(where: { lower.contains($0) }) {
+        if Self.match(#"\bdays?\b"#, in: lower) != nil
+            || ["訓練日", "训练日", "哪幾天", "哪几天", "星期", "天"].contains(where: { lower.contains($0) }) {
             return .days
         }
         if Self.match(#"\b(?:time|times|when|hour)\b"#, in: lower) != nil || ["時間", "时间", "幾點", "几点"].contains(where: { lower.contains($0) }) {
@@ -1163,10 +1296,12 @@ extension DemoParser {
         return nil
     }
 
-    /// "Nov 1" (the first of next month), a start-day suggestion this parser reads back.
-    func firstOfNextMonthLabel() -> String {
+    /// "Nov 1" / 11月1日 (the first of next month), a start-day suggestion this parser reads back.
+    func firstOfNextMonthLabel(language: DemoLanguage) -> String {
+        let month = calendar.component(.month, from: today) % 12 + 1
+        if language == .chinese { return "\(month)月1日" }
         let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        return "\(names[calendar.component(.month, from: today) % 12]) 1"
+        return "\(names[month - 1]) 1"
     }
 
     /// Every case-insensitive match of `pattern` with its groups; all of them are replaced by a space in `text`.

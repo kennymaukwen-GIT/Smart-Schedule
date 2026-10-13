@@ -7,6 +7,8 @@ options:
   deploymentTarget:
     iOS: "18.0"
   createIntermediateGroups: true
+  # UI strings are English source keys; Shared/Localization/Localizable.xcstrings adds zh-Hant. XcodeGen has no
+  # knownRegions option: it collects regions from the .lproj folders it finds (Shared/Localization/zh-Hant.lproj).
   developmentLanguage: en
 
 configFiles:
@@ -20,6 +22,9 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # String(localized:) / Text("…") keys are extracted at build time and kept in sync with the String Catalog.
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
 
 targets:
   # ───────────────────────────── Host app ─────────────────────────────
@@ -83,6 +88,7 @@ targets:
       - Shared/LiveActivity
       - Shared/Intents
       - Shared/DesignSystem
+      - Shared/Localization   # each extension resolves strings from its own bundle
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.app.widgets
@@ -115,6 +121,7 @@ targets:
       - Shared/Orchestrator
       - Shared/Notifications
       - Shared/DesignSystem
+      - Shared/Localization
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.app.notification-content
@@ -145,6 +152,8 @@ targets:
   # ───────────── Hostless unit tests: pure logic in Shared/, compiled straight into the bundle ─────────────
   # No TEST_HOST, so tests run without launching the app. Shared/Intents (the app/widget App Intents) is left
   # out; nothing else in Shared/ references it. Tests/fixtures ships as a "fixtures" folder inside the bundle.
+  # Shared/Localization comes along, so the compiled catalog's zh-Hant.lproj sits in the test bundle; Bundle.main
+  # is the test runner, so String(localized:) in tests still returns the English keys.
   SmartScheduleCoreTests:
     type: bundle.unit-test
     platform: iOS

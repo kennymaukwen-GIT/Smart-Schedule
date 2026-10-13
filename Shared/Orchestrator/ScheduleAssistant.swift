@@ -7,9 +7,10 @@ enum AssistantError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .unknownEvent(id): "I couldn't find that event (\(id)). Try naming it and the day."
-        case .badRange: "I couldn't work out which dates you meant."
-        case .noPendingPlan: "There is no draft plan waiting for review."
+        // The id is left out: it means nothing to the user, and Gemini knows which id it sent.
+        case .unknownEvent: String(localized: "I couldn't find that event. Try naming it and the day.")
+        case .badRange: String(localized: "I couldn't work out which dates you meant.")
+        case .noPendingPlan: String(localized: "There is no draft plan waiting for review.")
         }
     }
 }
@@ -24,6 +25,8 @@ actor ScheduleAssistant {
     }
 
     struct Reply: Sendable {
+        /// Short text version of the reply: what Siri, notifications and VoiceOver read. Chat renders the
+        /// structured fields below where they are set.
         var text = ""
         var created: [ScheduleEvent] = []
         var changed = false
@@ -38,6 +41,11 @@ actor ScheduleAssistant {
         var committedPlanID: String?
         /// Set when a draft was discarded.
         var discardedPlanID: String?
+        /// Events this reply just created, one confirmation row each ("Added to Google Calendar").
+        /// Plans are not listed here; their card shows the added state instead.
+        var addedEvents: [ScheduleEvent] = []
+        /// The answer to a schedule question, for the agenda card.
+        var agenda: AgendaDigest?
 
         mutating func append(_ line: String?) {
             guard let line, !line.isEmpty else { return }
@@ -121,7 +129,7 @@ actor ScheduleAssistant {
         if let planID = pending.planID { await store.removeNudges(planID: planID) }
         await ReminderScheduler.shared.reschedule(store: store)
         var reply = Reply(changed: true)
-        reply.append(String(localized: "Deleted \(pending.eventIDs.count) item(s) from Google Calendar."))
+        reply.append(String(localized: "Deleted \(pending.eventIDs.count) items from Google Calendar."))
         return reply
     }
 
@@ -151,7 +159,7 @@ actor ScheduleAssistant {
     private func writePlan(_ draft: PlanDraft, now: Date) async throws -> Reply {
         let args = try PlanDraftBuilder.decodeArgs(draft.argsJSON)
         let mapped = try mapper.events(fromPlan: args, planID: draft.id, utterance: draft.utterance)
-        let saved = try await calendar.insertAll(mapped)
+        _ = try await calendar.insertAll(mapped)
         if let nudge = mapper.nudge(from: args, planID: draft.id) { await store.addNudge(nudge) }
         try? await CalendarSync(client: calendar, store: store, clock: clock).refreshWindow(now: now)
         await clearPendingPlan(id: draft.id)
@@ -159,7 +167,7 @@ actor ScheduleAssistant {
         var reply = Reply(changed: true)
         reply.committedPlanID = draft.id
         reply.showRange = firstWeek(of: draft)
-        reply.append(String(localized: "Added \(saved.count) recurring items to Google Calendar."))
+        reply.append(ReplyFormatter.planAdded(draft.title))
         return reply
     }
 
@@ -200,6 +208,7 @@ actor ScheduleAssistant {
                 await store.upsert(events)
             }
             reply.created += events
+            reply.addedEvents += events
             reply.changed = true
             reply.append(ReplyFormatter.confirmation(for: events, clock: clock))
             reply.append(ReplyFormatter.conflicts(events, against: upcoming))
@@ -288,7 +297,8 @@ actor ScheduleAssistant {
 
             let titles = ids.compactMap { known[$0]?.title }
             let pending = PendingDeletion(eventIDs: ids, planID: args.planId,
-                                          summary: titles.isEmpty ? "\(ids.count) item(s)" : titles.prefix(3).joined(separator: ", "))
+                                          summary: titles.isEmpty ? ReplyFormatter.itemCount(ids.count)
+                                                                  : titles.prefix(3).joined(separator: ", "))
             if ids.count == 1, args.planId == nil, args.scope != "all_occurrences" {
                 let done = try await confirm(pending) // single, explicit, reversible in Google's Trash
                 reply.append(done.text)
@@ -296,7 +306,7 @@ actor ScheduleAssistant {
                 return ["ok": true, "deleted": ids]
             }
             reply.pendingDeletion = pending // bulk deletes always need a tap
-            reply.append(String(localized: "Delete \(pending.summary)? Tap Confirm."))
+            reply.append(ReplyFormatter.deletePrompt(pending.summary))
             return ["ok": true, "status": "awaiting_user_confirmation", "count": ids.count]
 
         case .querySchedule:
@@ -305,8 +315,12 @@ actor ScheduleAssistant {
             let last = max(args.rangeEnd.flatMap(clock.date) ?? first, first)
             let interval = DateInterval(start: first, end: clock.calendar.date(byAdding: .day, value: 1, to: last)!)
             let events = await store.events(in: interval)
+            let digest = AgendaDigest(range: interval,
+                                      title: ReplyFormatter.agendaTitle(for: interval, now: now, clock: clock),
+                                      events: events)
             reply.showRange = interval
-            reply.append(ReplyFormatter.agenda(events, clock: clock))
+            reply.agenda = digest
+            reply.append(ReplyFormatter.agenda(digest, clock: clock))
             return ["ok": true, "count": events.count]
 
         case .replyToUser:

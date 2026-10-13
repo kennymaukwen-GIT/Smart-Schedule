@@ -45,33 +45,28 @@ struct ChatPanel: View {
                 }
             }
 
-            ScrollViewReader { proxy in
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        ForEach(chat.messages) { message in
-                            ChatMessageRow(message: message,
-                                           onSuggestion: { chat.send($0) },
-                                           onConfirmDelete: { chat.confirmDeletion(in: message) },
-                                           onAddPlan: { chat.addPlan(message) },
-                                           onKeepEditing: { chat.keepEditing(message) })
-                                .id(message.id)
-                        }
-                        if chat.isSending {
-                            ProgressView().tint(.white).padding(.leading, 4)
-                        }
+            ConversationScrollView(tail: chat.conversationTail,
+                                   revealRequest: chat.planRevealRequest,
+                                   revealID: chat.openPlanMessageID) {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(chat.messages) { message in
+                        ChatMessageRow(message: message,
+                                       showsSuggestions: message.id == chat.latestReply?.id,
+                                       isDemo: schedule.isDemo,
+                                       isBusy: chat.isBusy,
+                                       onSuggestion: { chat.send($0) },
+                                       onConfirmDelete: { chat.confirmDeletion(in: message) },
+                                       onAddPlan: { chat.addPlan(message) },
+                                       onKeepEditing: { chat.keepEditing(message) })
+                            .id(message.id)
                     }
-                    .padding(.top, 8)
-                }
-                .onChange(of: chat.messages.count) {
-                    if let last = chat.messages.last {
-                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                    if chat.isSending {
+                        ProgressView().tint(.white).padding(.leading, 4)
                     }
                 }
-                .onChange(of: chat.planRevealRequest) {
-                    if let id = chat.openPlanMessageID {
-                        withAnimation { proxy.scrollTo(id, anchor: .bottom) } // the card's buttons
-                    }
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
             }
 
             ComposerBar(
@@ -120,10 +115,20 @@ private struct DemoBadge: View {
     }
 }
 
+/// One message in the chat panel or Quick Capture: the user's line as a bubble, a reply as `AssistantMessageView`.
 struct ChatMessageRow: View {
+    enum Style {
+        /// Chat panel (Artboard 5): wide graphite bubbles.
+        case panel
+        /// Quick Capture: the user's lines as trailing bubbles, the compact plan card.
+        case capture
+    }
+
     let message: ChatViewModel.Message
-    /// Quick Capture: the plan card alone, compact (it carries the summary; the review line is its footer).
-    var compactPlan = false
+    var style: Style = .panel
+    var showsSuggestions = false
+    var isDemo = false
+    var isBusy = false
     var onSuggestion: (String) -> Void = { _ in }
     var onConfirmDelete: () -> Void = {}
     var onAddPlan: () -> Void = {}
@@ -132,72 +137,47 @@ struct ChatMessageRow: View {
     var body: some View {
         switch message.role {
         case .user:
-            // Artboard 5: wide graphite bubble, left-aligned text.
-            Text(message.text)
-                .font(.system(size: 15))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.bubble))
-        case .assistant:
-            VStack(alignment: .leading, spacing: 8) {
-                if let plan = message.planDraft {
-                    // The card shows the summary and assumptions; only the rest of the reply goes above it.
-                    if !compactPlan, let lead = PlanPreviewCard.leadText(message.text, summary: plan.summary) {
-                        replyText(lead)
-                    }
-                    PlanPreviewCard(draft: plan,
-                                    status: message.planStatus,
-                                    style: compactPlan ? .compact : .full,
-                                    onAdd: onAddPlan,
-                                    onKeepEditing: onKeepEditing)
-                } else {
-                    replyText(message.text)
-                    ForEach(message.assumptions, id: \.self) { assumption in
-                        Label(assumption, systemImage: "info.circle")
-                            .font(.caption)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                }
-                if message.pendingDeletion != nil {
-                    Button("Confirm", role: .destructive, action: onConfirmDelete)
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
-                }
-                if !message.suggestions.isEmpty {
-                    // Scrolls sideways: Keep editing offers four chips, more than one row holds.
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack {
-                            ForEach(message.suggestions, id: \.self) { suggestion in
-                                Button(suggestion) { onSuggestion(suggestion) }
-                                    .font(.system(size: 13, weight: .medium))
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(Capsule().strokeBorder(Theme.hairline))
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                    }
-                }
+            switch style {
+            case .panel:
+                // Artboard 5: wide graphite bubble, left-aligned text.
+                Text(message.text)
+                    .font(.system(size: 15))
+                    .lineSpacing(3)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.bubble))
+            case .capture:
+                Text(message.text)
+                    .font(.system(size: 15))
+                    .lineSpacing(3)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Theme.bubble))
+                    .padding(.leading, 36)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .padding(.horizontal, 4)
+        case .assistant:
+            AssistantMessageView(message: message,
+                                 showsSuggestions: showsSuggestions,
+                                 compact: style == .capture,
+                                 isDemo: isDemo,
+                                 isBusy: isBusy,
+                                 onSuggestion: onSuggestion,
+                                 onConfirmDelete: onConfirmDelete,
+                                 onAddPlan: onAddPlan,
+                                 onKeepEditing: onKeepEditing)
+                .padding(.horizontal, 4)
         }
-    }
-
-    private func replyText(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 15))
-            .foregroundStyle(.white.opacity(0.92))
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 /// Shared input bar (Artboards 2–5): optional paperclip, field, mic, send.
 struct ComposerBar: View {
     @Binding var text: String
-    var placeholder: String
+    var placeholder: LocalizedStringKey
     var showsAttachment = false
     var isBusy = false
     var focus: FocusState<Bool>.Binding

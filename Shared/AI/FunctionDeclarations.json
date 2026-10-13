@@ -127,7 +127,7 @@
         },
         "summary_for_user": {
           "type": "string",
-          "description": "Shown verbatim in chat. Max 70 words, user's language. Say sessions per week, duration, phases and that a morning reminder is set, then invite edits. Example: 'Here is a plan I designed for you: exercise 4 days a week, one hour each time... Feel free to tell me to alter or edit anything.'"
+          "description": "Shown verbatim in chat above the plan's schedule table. 1-2 short, plain sentences in the user's language: what the plan achieves and the weekly load. Do NOT list days, times, phases, check-ins or reminders; the app shows them in the table. No slashes or abbreviations such as 'Tue/Thu'. Example: 'A 6-month muscle plan: 3 workouts a week, about an hour each.' or '6 個月增肌計畫：每週練 3 次，每次約 1 小時。'"
         },
         "phases": {
           "type": "array",
@@ -302,7 +302,7 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "message": { "type": "string", "description": "Max 50 words, user's language." },
+        "message": { "type": "string", "description": "At most 2 short sentences in the user's language. Ask one question at a time. 24-hour times; no slashes or abbreviations such as 'Tue/Thu'." },
         "needs_clarification": { "type": "boolean" },
         "suggested_replies": {
           "type": "array",

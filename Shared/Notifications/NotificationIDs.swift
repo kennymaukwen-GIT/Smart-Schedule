@@ -1,3 +1,4 @@
+import Foundation
 import UserNotifications
 
 /// Categories handled by the Notification Content Extension (listed in its Info.plist
@@ -28,15 +29,15 @@ enum NotificationIDs {
         // it works on the Lock Screen and the result is delivered to the content extension in place.
         let reply = UNTextInputNotificationAction(
             identifier: Action.reply,
-            title: "Type in any plan to add or change",
+            title: String(localized: "Type in any plan to add or change"),
             options: [],
             icon: UNNotificationActionIcon(systemImageName: "text.bubble"),
-            textInputButtonTitle: "Send",
-            textInputPlaceholder: "e.g. push this to 4pm · add gym tomorrow 7am"
+            textInputButtonTitle: String(localized: "Send"),
+            textInputPlaceholder: String(localized: "e.g. push this to 16:00 · add gym tomorrow 07:00")
         )
         let snooze = UNNotificationAction(
             identifier: Action.snooze10,
-            title: "Snooze 10 min",
+            title: String(localized: "Snooze 10 min"),
             options: [],
             icon: UNNotificationActionIcon(systemImageName: "zzz")
         )
@@ -44,7 +45,7 @@ enum NotificationIDs {
             identifier: Category.eventReminder,
             actions: [reply, snooze],
             intentIdentifiers: [],
-            hiddenPreviewsBodyPlaceholder: "Upcoming event",
+            hiddenPreviewsBodyPlaceholder: String(localized: "Upcoming event"),
             options: [.customDismissAction]
         )
         let compose = UNNotificationCategory(

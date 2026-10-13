@@ -27,8 +27,8 @@ enum GeminiError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .http(status, message): "Gemini HTTP \(status): \(message)"
-        case let .blocked(reason): "Gemini blocked the request (\(reason))."
-        case let .malformed(detail): "Unexpected Gemini response: \(detail)"
+        case let .blocked(reason): String(localized: "Gemini blocked the request (\(reason)).")
+        case let .malformed(detail): String(localized: "Unexpected Gemini response: \(detail)")
         }
     }
 }
