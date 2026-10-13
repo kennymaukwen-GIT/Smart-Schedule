@@ -1,0 +1,10 @@
+{
+  "utterance": "push this 30 minutes later",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "focus_event": "ss0k3p | Online meeting with Joe | 2026-10-13T15:30 | 2026-10-13T16:30 | event",
+  "expected_call": {
+    "name": "modify_event",
+    "args": { "event_id": "ss0k3p", "changes": { "start": "2026-10-13T16:00" } }
+  }
+}

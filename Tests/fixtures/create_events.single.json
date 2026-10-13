@@ -1,0 +1,19 @@
+{
+  "utterance": "明天下午兩點跟 Joe 開線上會議",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "create_events",
+    "args": {
+      "events": [
+        {
+          "title": "與Joe開會",
+          "start": "2026-10-14T14:00",
+          "duration_minutes": 60,
+          "kind": "event",
+          "add_video_conference": true
+        }
+      ]
+    }
+  }
+}

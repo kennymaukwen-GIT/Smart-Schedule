@@ -1,0 +1,13 @@
+// Shared build settings for every target. Secrets live in Secrets.xcconfig (git-ignored).
+// NOTE: "//" starts a comment in xcconfig, so URLs use the https:/$()/ escape.
+
+GEMINI_BASE_URL = https:/$()/generativelanguage.googleapis.com/v1beta
+// Model IDs churn fast (2.5 family is past its announced shutdown window).
+// Check https://ai.google.dev/gemini-api/docs/deprecations before shipping.
+GEMINI_MODEL_ID = gemini-3.5-flash
+GEMINI_API_KEY =
+GOOGLE_IOS_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.placeholder
+DEVELOPMENT_TEAM =
+
+#include? "Secrets.xcconfig"

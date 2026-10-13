@@ -1,0 +1,14 @@
+{
+  "utterance": "I have a meeting on oct 15 at 13:00, and remind me to pay bills friday",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "create_events",
+    "args": {
+      "events": [
+        { "title": "Meeting", "start": "2026-10-15T13:00", "kind": "event" },
+        { "title": "Pay bills", "start": "2026-10-16T09:00", "duration_minutes": 30, "kind": "task" }
+      ]
+    }
+  }
+}

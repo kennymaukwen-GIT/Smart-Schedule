@@ -1,0 +1,140 @@
+# XcodeGen spec — run `xcodegen generate` on macOS (brew install xcodegen) to produce SmartSchedule.xcodeproj.
+# Three processes share one App Group + one Keychain access group:
+#   SmartSchedule (app) · SmartScheduleWidgets (Live Activity + Control Center) · SmartScheduleNotificationContent
+name: SmartSchedule
+options:
+  bundleIdPrefix: com.smartschedule
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+targets:
+  # ───────────────────────────── Host app ─────────────────────────────
+  SmartSchedule:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Smart Schedule
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Dark
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        NSMicrophoneUsageDescription: Smart Schedule listens when you hold the mic so you can speak a plan instead of typing it.
+        NSSpeechRecognitionUsageDescription: Your spoken plan is transcribed to text before it is scheduled.
+        BGTaskSchedulerPermittedIdentifiers: [com.smartschedule.refresh]
+        UIBackgroundModes: [fetch, remote-notification]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.smartschedule.deeplink
+            CFBundleURLSchemes: [smartschedule]
+          - CFBundleURLName: com.smartschedule.google-oauth
+            CFBundleURLSchemes: [$(GOOGLE_REVERSED_CLIENT_ID)]
+        SSKeychainAccessGroup: $(AppIdentifierPrefix)com.smartschedule.shared
+        SSGoogleClientID: $(GOOGLE_IOS_CLIENT_ID)
+        SSGoogleReversedClientID: $(GOOGLE_REVERSED_CLIENT_ID)
+        SSGeminiBaseURL: $(GEMINI_BASE_URL)
+        SSGeminiModelID: $(GEMINI_MODEL_ID)
+        SSGeminiAPIKey: $(GEMINI_API_KEY)
+    entitlements:
+      path: App/SmartSchedule.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.smartschedule.shared]
+        keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]
+        com.apple.developer.usernotifications.time-sensitive: true
+        aps-environment: development
+    dependencies:
+      - target: SmartScheduleWidgets
+      - target: SmartScheduleNotificationContent
+
+  # ───────────── Widget extension: Live Activity / Dynamic Island + Control Center ─────────────
+  SmartScheduleWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets
+      - Shared/Core
+      - Shared/Models
+      - Shared/Storage
+      - Shared/LiveActivity
+      - Shared/Intents
+      - Shared/DesignSystem
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.app.widgets
+        SKIP_INSTALL: YES
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Smart Schedule
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        SSKeychainAccessGroup: $(AppIdentifierPrefix)com.smartschedule.shared
+    entitlements:
+      path: Widgets/SmartScheduleWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.smartschedule.shared]
+        keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]
+
+  # ───────────── Notification Content Extension: "HOLD MESSAGE TO SPAWN" ─────────────
+  SmartScheduleNotificationContent:
+    type: app-extension
+    platform: iOS
+    sources:
+      - NotificationContent
+      - Shared/Core
+      - Shared/Models
+      - Shared/Storage
+      - Shared/AI
+      - Shared/Calendar
+      - Shared/Auth
+      - Shared/Orchestrator
+      - Shared/Notifications
+      - Shared/DesignSystem
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.app.notification-content
+        SKIP_INSTALL: YES
+    info:
+      path: NotificationContent/Info.plist
+      properties:
+        CFBundleDisplayName: Smart Schedule
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.content-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationViewController
+          NSExtensionAttributes:
+            UNNotificationExtensionCategory: [SS_EVENT_REMINDER, SS_COMPOSE]
+            UNNotificationExtensionInitialContentSizeRatio: 0.75
+            UNNotificationExtensionUserInteractionEnabled: true
+            UNNotificationExtensionDefaultContentHidden: true
+        SSKeychainAccessGroup: $(AppIdentifierPrefix)com.smartschedule.shared
+        SSGoogleClientID: $(GOOGLE_IOS_CLIENT_ID)
+        SSGeminiBaseURL: $(GEMINI_BASE_URL)
+        SSGeminiModelID: $(GEMINI_MODEL_ID)
+        SSGeminiAPIKey: $(GEMINI_API_KEY)
+    entitlements:
+      path: NotificationContent/SmartScheduleNotificationContent.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.smartschedule.shared]
+        keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]

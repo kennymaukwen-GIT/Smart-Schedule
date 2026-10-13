@@ -1,0 +1,187 @@
+import SwiftUI
+import UIKit
+
+/// Bottom half of Artboard 5: conversation with the scheduling agent.
+struct ChatPanel: View {
+    @Environment(ChatViewModel.self) private var chat
+    @Environment(ScheduleViewModel.self) private var schedule
+    @FocusState private var inputFocused: Bool
+
+    var body: some View {
+        @Bindable var chat = chat
+
+        VStack(spacing: 10) {
+            if !schedule.isSignedIn {
+                Button {
+                    Task { await schedule.signIn() }
+                } label: {
+                    Label("Connect Google Calendar", systemImage: "calendar.badge.plus")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                        .foregroundStyle(.black)
+                }
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(chat.messages) { message in
+                            ChatMessageRow(message: message,
+                                           onSuggestion: { chat.send($0) },
+                                           onConfirmDelete: { chat.confirmDeletion(in: message) })
+                                .id(message.id)
+                        }
+                        if chat.isSending {
+                            ProgressView().tint(.white).padding(.leading, 4)
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+                .onChange(of: chat.messages.count) {
+                    if let last = chat.messages.last {
+                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                    }
+                }
+            }
+
+            ComposerBar(
+                text: $chat.draft,
+                placeholder: "Type your schedule, event, aim, or plan, or send a link with a date and time",
+                showsAttachment: true,
+                isBusy: chat.isSending,
+                focus: $inputFocused,
+                onSend: { chat.send() }
+            )
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.surface))
+    }
+}
+
+struct ChatMessageRow: View {
+    let message: ChatViewModel.Message
+    var onSuggestion: (String) -> Void = { _ in }
+    var onConfirmDelete: () -> Void = {}
+
+    var body: some View {
+        switch message.role {
+        case .user:
+            // Artboard 5: wide graphite bubble, left-aligned text.
+            Text(message.text)
+                .font(.system(size: 15))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.bubble))
+        case .assistant:
+            VStack(alignment: .leading, spacing: 8) {
+                Text(message.text)
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                ForEach(message.assumptions, id: \.self) { assumption in
+                    Label(assumption, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                if message.pendingDeletion != nil {
+                    Button("Confirm", role: .destructive, action: onConfirmDelete)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                }
+                if !message.suggestions.isEmpty {
+                    HStack {
+                        ForEach(message.suggestions, id: \.self) { suggestion in
+                            Button(suggestion) { onSuggestion(suggestion) }
+                                .font(.system(size: 13, weight: .medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Capsule().strokeBorder(Theme.hairline))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+}
+
+/// Shared input bar (Artboards 2–5): optional paperclip, field, mic, send.
+struct ComposerBar: View {
+    @Binding var text: String
+    var placeholder: String
+    var showsAttachment = false
+    var isBusy = false
+    var focus: FocusState<Bool>.Binding
+    var startsRecording = false
+    var onSend: () -> Void
+
+    @State private var transcriber = SpeechTranscriber()
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if showsAttachment {
+                Button(action: pasteLink) {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .accessibilityLabel("Paste a link")
+            }
+
+            TextField(placeholder, text: $text)
+                .font(.system(size: 15))
+                .foregroundStyle(.white)
+                .focused(focus)
+                .submitLabel(.send)
+                .onSubmit(onSend)
+
+            Button {
+                Task { await transcriber.toggle() }
+            } label: {
+                Image(systemName: transcriber.isRecording ? "waveform" : "mic.fill")
+                    .symbolEffect(.variableColor.iterative, isActive: transcriber.isRecording)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Color.white.opacity(transcriber.isRecording ? 0.35 : 0.12)))
+            }
+            .accessibilityLabel(transcriber.isRecording ? "Stop dictation" : "Dictate")
+
+            Button {
+                if transcriber.isRecording { transcriber.stop() }
+                onSend()
+            } label: {
+                Image(systemName: isBusy ? "hourglass" : "paperplane.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Color.white.opacity(0.25)))
+            }
+            .disabled(isBusy || text.trimmingCharacters(in: .whitespaces).isEmpty)
+            .accessibilityLabel("Send")
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 6)
+        .frame(minHeight: 50)
+        .background(Capsule().fill(Theme.surfaceRaised))
+        .overlay(Capsule().strokeBorder(Theme.hairline))
+        .onChange(of: transcriber.transcript) { _, transcript in
+            if !transcript.isEmpty { text = transcript }
+        }
+        .task {
+            if startsRecording { await transcriber.start() }
+        }
+    }
+
+    /// "send a link" — e.g. an event page. Gemini reads the URL text; for full page context add the
+    /// url_context tool on the server side.
+    private func pasteLink() {
+        guard let pasted = UIPasteboard.general.string, !pasted.isEmpty else { return }
+        text = text.isEmpty ? pasted : text + " " + pasted
+    }
+}

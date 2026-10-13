@@ -1,0 +1,302 @@
+[
+  {
+    "name": "create_events",
+    "description": "Create one or more concrete calendar entries the user stated or clearly implied (meetings, appointments, tasks, deadlines, short repeating events). Use for anything that can be written as a small fixed list of events. Do NOT use for open-ended goals that need a multi-week program (use create_long_term_plan).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "description": "Every event to create, in chronological order. One utterance may contain several events.",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Concise title in the user's language, max 40 characters, no dates or times. Example: '與Joe開會' or 'Online meeting with Joe'."
+              },
+              "start": {
+                "type": "string",
+                "description": "Local wall-clock start in the user's time zone. Timed: 'YYYY-MM-DDTHH:mm' (24h, no offset, no Z). All-day: 'YYYY-MM-DD'."
+              },
+              "end": {
+                "type": "string",
+                "description": "Local wall-clock end, same format as start. Omit when unknown; duration_minutes or defaults apply. For all-day events this is the last day INCLUDED."
+              },
+              "duration_minutes": {
+                "type": "integer",
+                "description": "Used only when end is omitted. Defaults: meeting 60, call 30, lunch 60, task 30.",
+                "minimum": 5,
+                "maximum": 1440
+              },
+              "all_day": {
+                "type": "boolean",
+                "description": "True when the user gave a date but no time and the item is a whole-day thing (trip, birthday, deadline day)."
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["event", "task", "deadline", "routine"],
+                "description": "event = has attendees or a place; task = something to do; deadline = due date; routine = repeating personal habit."
+              },
+              "location": {
+                "type": "string",
+                "description": "Physical address or venue name. Leave empty for online meetings."
+              },
+              "add_video_conference": {
+                "type": "boolean",
+                "description": "True when the user says online, call, video, remote, Meet or Zoom-like. Creates a Google Meet link."
+              },
+              "attendees": {
+                "type": "array",
+                "description": "Email addresses ONLY if the user typed them. Never guess emails from names.",
+                "items": { "type": "string" }
+              },
+              "recurrence": {
+                "type": "object",
+                "description": "Only when the user explicitly asks for a repeating event.",
+                "properties": {
+                  "frequency": {
+                    "type": "string",
+                    "enum": ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]
+                  },
+                  "interval": {
+                    "type": "integer",
+                    "description": "Every N periods. Default 1.",
+                    "minimum": 1,
+                    "maximum": 52
+                  },
+                  "by_weekday": {
+                    "type": "array",
+                    "description": "For WEEKLY: the weekdays it repeats on.",
+                    "items": { "type": "string", "enum": ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] }
+                  },
+                  "until": {
+                    "type": "string",
+                    "description": "Last local date included, 'YYYY-MM-DD'. Prefer this over count."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "Total occurrences. Only when the user said a number of times.",
+                    "minimum": 1,
+                    "maximum": 730
+                  }
+                },
+                "required": ["frequency"]
+              },
+              "reminder_minutes": {
+                "type": "array",
+                "description": "Minutes before start for push reminders. OMIT to use the user's defaults [1440, 60, 30]. Max 5 values, each 0-40320.",
+                "maxItems": 5,
+                "items": { "type": "integer", "minimum": 0, "maximum": 40320 }
+              },
+              "notes": {
+                "type": "string",
+                "description": "Agenda, checklist or context worth saving in the event description."
+              }
+            },
+            "required": ["title", "start", "kind"]
+          }
+        }
+      },
+      "required": ["events"]
+    }
+  },
+  {
+    "name": "create_long_term_plan",
+    "description": "Turn an open-ended goal spanning more than two weeks (e.g. 'I want to be muscular in 6 months, design me a daily routine', 'pass IELTS 7.5 by March', 'run a half marathon') into a phased program of recurring calendar sessions, milestones and a daily nudge. Design the program like a domain expert, then schedule it around the user's BUSY list.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "goal": {
+          "type": "string",
+          "description": "The user's goal restated precisely and measurably, in the user's language."
+        },
+        "plan_title": {
+          "type": "string",
+          "description": "Short name used as a prefix on every event, max 24 characters. Example: '增肌計畫' or 'Muscle 6M'."
+        },
+        "start_date": {
+          "type": "string",
+          "description": "First day of the plan, 'YYYY-MM-DD'. Default: the next day after today."
+        },
+        "end_date": {
+          "type": "string",
+          "description": "Last day of the plan, 'YYYY-MM-DD'."
+        },
+        "summary_for_user": {
+          "type": "string",
+          "description": "Shown verbatim in chat. Max 70 words, user's language. Say sessions per week, duration, phases and that a morning reminder is set, then invite edits. Example: 'Here is a plan I designed for you: exercise 4 days a week, one hour each time... Feel free to tell me to alter or edit anything.'"
+        },
+        "phases": {
+          "type": "array",
+          "description": "2-4 consecutive, non-overlapping phases that progress toward the goal (e.g. foundation, hypertrophy, strength).",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Phase name, max 20 characters." },
+              "start_date": { "type": "string", "description": "'YYYY-MM-DD'" },
+              "end_date": { "type": "string", "description": "'YYYY-MM-DD', inclusive." },
+              "focus": { "type": "string", "description": "One sentence on what changes in this phase." }
+            },
+            "required": ["name", "start_date", "end_date"]
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "description": "Weekly session templates. Each becomes ONE recurring calendar series inside its phase. Flat list; link to a phase with phase_index.",
+          "minItems": 1,
+          "maxItems": 24,
+          "items": {
+            "type": "object",
+            "properties": {
+              "phase_index": {
+                "type": "integer",
+                "description": "0-based index into phases.",
+                "minimum": 0
+              },
+              "title": {
+                "type": "string",
+                "description": "Session name, max 30 characters, e.g. 'Upper body push'."
+              },
+              "weekdays": {
+                "type": "array",
+                "description": "Days this session repeats each week.",
+                "minItems": 1,
+                "items": { "type": "string", "enum": ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] }
+              },
+              "start_time": {
+                "type": "string",
+                "description": "Local 'HH:mm' (24h). Choose a time that avoids the BUSY list and respects preferences."
+              },
+              "duration_minutes": {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 240
+              },
+              "notes": {
+                "type": "string",
+                "description": "The actual workout or study content: exercises, sets x reps, progression rule. Saved in the event description."
+              }
+            },
+            "required": ["phase_index", "title", "weekdays", "start_time", "duration_minutes"]
+          }
+        },
+        "daily_nudge": {
+          "type": "object",
+          "description": "A short motivational notification every morning while the plan runs.",
+          "properties": {
+            "time": { "type": "string", "description": "Local 'HH:mm', default '07:30'." },
+            "message": { "type": "string", "description": "Max 80 characters, user's language." }
+          },
+          "required": ["time", "message"]
+        },
+        "milestones": {
+          "type": "array",
+          "description": "Check-ins, about one per month: measure progress or adjust load.",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": { "type": "string", "description": "'YYYY-MM-DD'" },
+              "title": { "type": "string", "description": "Max 40 characters, e.g. 'Month 1 check-in: weight & photos'." }
+            },
+            "required": ["date", "title"]
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "description": "Anything you assumed (fitness level, equipment, free time). Shown so the user can correct it.",
+          "maxItems": 5,
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["goal", "plan_title", "start_date", "end_date", "summary_for_user", "phases", "sessions"]
+    }
+  },
+  {
+    "name": "modify_event",
+    "description": "Change an existing event: reschedule, rename, move, change reminders. event_id MUST come from the UPCOMING list or the FOCUS event. Never invent ids.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "event_id": { "type": "string", "description": "Exact id from UPCOMING or FOCUS." },
+        "scope": {
+          "type": "string",
+          "enum": ["this_occurrence", "all_occurrences"],
+          "description": "For recurring events only. Default this_occurrence."
+        },
+        "changes": {
+          "type": "object",
+          "description": "Only the fields that change.",
+          "properties": {
+            "title": { "type": "string" },
+            "start": { "type": "string", "description": "New local start 'YYYY-MM-DDTHH:mm'. For 'push 30 min later' compute it from the current start." },
+            "end": { "type": "string", "description": "New local end 'YYYY-MM-DDTHH:mm'. Omit to keep the original duration." },
+            "duration_minutes": { "type": "integer", "minimum": 5, "maximum": 1440 },
+            "location": { "type": "string" },
+            "reminder_minutes": {
+              "type": "array",
+              "maxItems": 5,
+              "items": { "type": "integer", "minimum": 0, "maximum": 40320 }
+            },
+            "notes": { "type": "string" }
+          }
+        }
+      },
+      "required": ["event_id", "changes"]
+    }
+  },
+  {
+    "name": "delete_events",
+    "description": "Cancel events or a whole plan. Use ids from UPCOMING/FOCUS, or plan_id to remove every session of a plan. The app asks the user to confirm bulk deletions.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "event_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "plan_id": { "type": "string", "description": "Plan id shown in UPCOMING as plan=<id>." },
+        "scope": {
+          "type": "string",
+          "enum": ["this_occurrence", "all_occurrences"]
+        }
+      }
+    }
+  },
+  {
+    "name": "query_schedule",
+    "description": "The user wants to SEE their schedule ('show me my schedule for today', 'what do I have on Thursday', 'am I free tomorrow afternoon').",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "range_start": { "type": "string", "description": "'YYYY-MM-DD'" },
+        "range_end": { "type": "string", "description": "'YYYY-MM-DD', inclusive. Omit for a single day." },
+        "view": { "type": "string", "enum": ["day", "week", "month"] }
+      },
+      "required": ["range_start"]
+    }
+  },
+  {
+    "name": "reply_to_user",
+    "description": "Talk to the user without changing the calendar: ask for missing information (e.g. no time given and none can be inferred), answer a question, or decline. Use only when no other function fits.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string", "description": "Max 50 words, user's language." },
+        "needs_clarification": { "type": "boolean" },
+        "suggested_replies": {
+          "type": "array",
+          "description": "Up to 3 one-tap answers, e.g. ['14:00', '15:00', '16:00'].",
+          "maxItems": 3,
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["message"]
+    }
+  }
+]

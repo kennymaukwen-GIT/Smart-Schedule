@@ -1,0 +1,6 @@
+{
+  "utterance": "Show me my schedule for today",
+  "now_local": "2026-10-15T08:00",
+  "time_zone": "Europe/London",
+  "expected_call": { "name": "query_schedule", "args": { "range_start": "2026-10-15", "view": "day" } }
+}
