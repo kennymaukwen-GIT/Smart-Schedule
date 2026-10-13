@@ -128,7 +128,7 @@ Quick Capture 的 DAY / WEEK / MONTH，以及主畫面的月份列和月曆，�
 | 入口 | 畫面每次捲動停下時，把看得到的範圍傳給 `ensureEvents(covering:)`。`focus(_:)`（助理要求顯示某段日期、按「今天」）也會呼叫，所以跳到好幾年後也會載入 |
 | 範圍 | 看得到的範圍碰到的整個月份，前後再各加一個月（`LoadedRanges.request`），下一兩次滑動已經在 cache 裡。範圍超過 12 個月時只取前 12 個月，一次呼叫不會抓幾十年 |
 | Request | 只抓缺少的部分（`LoadedRanges.missing`），每段一個 `events.list`：`timeMin`/`timeMax` 是缺少的那段，`singleEvents=true`、`orderBy=startTime`、每頁 250 筆，跟滾動視窗一樣 |
-| Debounce | 最後一次呼叫後 300 ms 才開始。快速滑過的中間位置不會發 request |
+| Debounce | 最後一次呼叫後 300 ms 才開始。快速滑過的中間位置不會發 request。300 ms 內來自不同行事曆的範圍（例如主畫面月曆和 Quick Capture）最多保留最近 3 個，都會載入 |
 | 去重 | 已經載入的範圍（App Group 裡的 `loadedRanges` 加上滾動視窗）和正在載入的範圍都會跳過。兩次載入同時開始時，在同一個 MainActor 步驟裡先查再登記，所以不會抓同一個月兩次 |
 | 不擋畫面 | 載入在獨立的 `Task` 裡跑，下一次呼叫只會取消 debounce，不會中斷已經送出的 request。載入期間 `isLoadingRange` 為 true，畫面可以顯示細小的進度提示 |
 | 寫入 cache | `SharedStore.mergeRange`：取代該範圍內的事件；同一個 id 在別的日期的舊副本（事件被移動了）一起移除。**不動 `windowStart`、`windowEnd`、`lastRefresh`**，提醒排程、Live Activity 和滾動同步都照舊 |

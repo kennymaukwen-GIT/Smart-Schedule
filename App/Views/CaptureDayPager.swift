@@ -56,8 +56,11 @@ struct CaptureDayPager: View {
                 if phase == .idle { settle() }
             }
             .onAppear {
-                // Lazy stacks don't always honor the initial position on first layout.
-                proxy.scrollTo(page ?? 0)
+                // Lazy stacks don't always honor the initial position on first layout, and may already have
+                // reported the first page (a century back) through the binding: go by `focusDay` instead.
+                let target = CalendarPaging.dayOffset(of: focusDay, from: anchor, calendar: calendar)
+                page = target
+                proxy.scrollTo(target)
             }
         }
         .overlay(alignment: .bottomTrailing) {

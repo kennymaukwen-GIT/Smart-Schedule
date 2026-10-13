@@ -88,8 +88,11 @@ struct MonthGridView: View {
                     if phase == .idle { settle() }
                 }
                 .onAppear {
-                    // Lazy stacks don't always honor the initial position on first layout.
-                    proxy.scrollTo(page ?? 0)
+                    // Lazy stacks don't always honor the initial position on first layout, and may already have
+                    // reported the first page (a century back) through the binding: go by `month` instead.
+                    let target = CalendarPaging.monthOffset(of: month, from: anchor, calendar: calendar)
+                    page = target
+                    proxy.scrollTo(target)
                 }
             }
         }

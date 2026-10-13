@@ -30,6 +30,7 @@ final class ScheduleViewModel {
     private static let loadsRangesOnDemand = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1"
 
     @ObservationIgnored private var rangeDebounceTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingRanges: [DateInterval] = []
     @ObservationIgnored private var rangesInFlight = LoadedRanges()
     /// What the calendars last asked for (or `focus` jumped to): re-listed after a rolling refresh, kept by the cap.
     @ObservationIgnored private var lastRequestedRange: DateInterval?
@@ -186,12 +187,20 @@ final class ScheduleViewModel {
     /// waits. A failure keeps what is cached; the range is tried again the next time it is asked for.
     func ensureEvents(covering range: DateInterval) {
         lastRequestedRange = range
+        // Two calendars can ask within one debounce (the main grid and Quick Capture): keep the latest few.
+        pendingRanges.removeAll { $0 == range }
+        pendingRanges.append(range)
+        if pendingRanges.count > 3 { pendingRanges.removeFirst(pendingRanges.count - 3) }
         rangeDebounceTask?.cancel()
         rangeDebounceTask = Task { [weak self] in
             try? await Task.sleep(for: Self.rangeDebounce)
             guard !Task.isCancelled, let self else { return }
+            let ranges = self.pendingRanges
+            self.pendingRanges = []
             // A task of its own: the next call cancels the debounce, never a fetch already under way.
-            Task { await self.loadMissing(around: range) }
+            Task {
+                for range in ranges.reversed() { await self.loadMissing(around: range) }
+            }
         }
     }
 

@@ -75,8 +75,12 @@ struct WeekAgendaCard: View {
                 if phase == .idle { settle() }
             }
             .onAppear {
-                // Lazy stacks don't always honor the initial position on first layout.
-                proxy.scrollTo(currentPage ?? 0)
+                // Lazy stacks don't always honor the initial position on first layout, and may already have
+                // reported the first page (a century back) through the binding, which is never within reach.
+                var target = currentPage ?? 0
+                if !CalendarPaging.isWithinReach(target, of: CalendarPaging.weekPages) { target = 0 }
+                currentPage = target
+                proxy.scrollTo(target)
                 onRangeChange(shownWeek)
             }
         }
