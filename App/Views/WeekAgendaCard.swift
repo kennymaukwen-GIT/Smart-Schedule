@@ -226,5 +226,6 @@ private struct WeekEventChip: View {
         .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+        .draftGhost(event.isDraft, shape: RoundedRectangle(cornerRadius: 3, style: .continuous), tint: tint)
     }
 }

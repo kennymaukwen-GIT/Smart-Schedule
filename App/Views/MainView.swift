@@ -3,6 +3,7 @@ import SwiftUI
 /// Artboard 5. Top half = view area (year, month chips, month grid). Bottom = AI conversation.
 struct MainView: View {
     @Environment(ScheduleViewModel.self) private var schedule
+    @Environment(ChatViewModel.self) private var chat
     @Environment(AppRouter.self) private var router
 
     var body: some View {
@@ -21,11 +22,18 @@ struct MainView: View {
                 month: schedule.displayedMonth,
                 today: Date(),
                 eventsOnDay: schedule.events(on:),
-                onSelect: { router.selectedEventID = $0.id }
+                onSelect: { event in
+                    // A ghost occurrence has no detail yet: bring its plan card (Add / Keep editing) into view.
+                    if event.isDraft {
+                        chat.revealOpenPlan()
+                    } else {
+                        router.selectedEventID = event.id
+                    }
+                }
             )
             .frame(maxHeight: .infinity)
 
-            ChatPanel()
+            ChatPanel(takesFocusRequests: router.quickCapture == nil)
                 .containerRelativeFrame(.vertical) { height, _ in height * 0.40 }
         }
         .padding(.horizontal, 12)

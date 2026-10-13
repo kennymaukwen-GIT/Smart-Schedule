@@ -105,7 +105,7 @@
   },
   {
     "name": "create_long_term_plan",
-    "description": "Turn an open-ended goal spanning more than two weeks (e.g. 'I want to be muscular in 6 months, design me a daily routine', 'pass IELTS 7.5 by March', 'run a half marathon') into a phased program of recurring calendar sessions, milestones and a daily nudge. Design the program like a domain expert, then schedule it around the user's BUSY list.",
+    "description": "Turn an open-ended goal spanning more than two weeks (e.g. 'I want to be muscular in 6 months, design me a daily routine', 'pass IELTS 7.5 by March', 'run a half marathon') into a phased program of recurring calendar sessions, milestones and a daily nudge. Design the program like a domain expert, then schedule it around the user's BUSY list. The result is a DRAFT shown to the user for review; nothing is written until they approve it. To revise a draft, call this again with the COMPLETE revised plan.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -279,6 +279,21 @@
         "view": { "type": "string", "enum": ["day", "week", "month"] }
       },
       "required": ["range_start"]
+    }
+  },
+  {
+    "name": "confirm_plan",
+    "description": "The user responded to the DRAFT PLAN shown for review. Use decision 'add' when they approve it ('looks good', 'add it', 'OK', '好', '加入') and 'discard' when they abandon it ('cancel the plan', '不要了'). Only call when a DRAFT PLAN block is present. For change requests do NOT call this: call create_long_term_plan again with the COMPLETE revised plan.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": ["add", "discard"],
+          "description": "add = write the draft plan to the calendar; discard = drop it without writing anything."
+        }
+      },
+      "required": ["decision"]
     }
   },
   {

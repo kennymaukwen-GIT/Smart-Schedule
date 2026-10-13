@@ -5,6 +5,8 @@ import Observation
 @Observable
 final class ScheduleViewModel {
     var events: [ScheduleEvent] = []
+    /// A long-term plan shown for review but not in Google Calendar yet. Its `previewEvents` are drawn as ghosts.
+    var pendingPlan: PlanDraft?
     var displayedMonth: Date
     var focusDay = Date()
     /// The latest range the assistant asked to show (Quick Capture switches scope and scrolls to it).
@@ -20,6 +22,8 @@ final class ScheduleViewModel {
     struct FocusRequest: Equatable {
         let id = UUID()
         let range: DateInterval
+        /// Overrides the scope Quick Capture would pick for `range` (a plan draft always opens on WEEK).
+        var scope: CalendarScope?
     }
 
     init() {
@@ -45,8 +49,21 @@ final class ScheduleViewModel {
         await refresh()
     }
 
+    /// Calendar events plus the pending plan's preview occurrences, for the WEEK and MONTH cards.
+    var displayEvents: [ScheduleEvent] {
+        guard let preview = pendingPlan?.previewEvents, !preview.isEmpty else { return events }
+        return events + preview
+    }
+
     func reloadFromCache() async {
         events = await SharedStore.shared.snapshot().events.sorted { $0.start < $1.start }
+        await reloadPendingPlan() // after `events`: ChatViewModel.syncPendingPlan looks for the plan's events
+    }
+
+    /// The draft lives in the App Group, so Siri and the notification extension can create, add or discard it too.
+    func reloadPendingPlan() async {
+        let plan = await SharedStore.shared.pendingPlan()
+        if plan != pendingPlan { pendingPlan = plan }
     }
 
     func refresh() async {
@@ -72,6 +89,7 @@ final class ScheduleViewModel {
     /// "Try demo (no account)": sample data, offline assistant, Live Activity, no Google or Gemini.
     func startDemo() async {
         AppConstants.setDemoMode(true)
+        await SharedStore.shared.setPendingPlan(nil) // a draft belongs to the assistant that made it
         await refreshDemo(reseed: true)
         try? await LiveActivityManager.shared.summon()
     }
@@ -85,6 +103,7 @@ final class ScheduleViewModel {
         for planID in Set(snapshot.nudges.map(\.planID).filter(DemoData.isDemoID)) {
             await store.removeNudges(planID: planID)
         }
+        await store.setPendingPlan(nil) // a demo draft must not reach Google through the real assistant
         await reloadFromCache()
         await ReminderScheduler.shared.reschedule()
         await LiveActivityManager.shared.refreshIfRunning()
@@ -122,10 +141,11 @@ final class ScheduleViewModel {
         }
     }
 
+    /// Includes the pending plan's ghost occurrences.
     func events(on day: Date) -> [ScheduleEvent] {
         let interval = CalendarPaging.dayInterval(containing: day, calendar: clock.calendar) // 23/25 h on DST days
-        return events
-            .filter { $0.intersects(interval) }
+        let preview = pendingPlan?.previewEvents.filter { $0.intersects(interval) } ?? []
+        return (events.filter { $0.intersects(interval) } + preview)
             .sorted { lhs, rhs in
                 // Multi-day bars first so they line up across cells, then by time.
                 let lhsSpan = lhs.duration >= 86_400, rhsSpan = rhs.duration >= 86_400
@@ -133,10 +153,10 @@ final class ScheduleViewModel {
             }
     }
 
-    func focus(_ interval: DateInterval) {
+    func focus(_ interval: DateInterval, scope: CalendarScope? = nil) {
         focusDay = interval.start
         displayedMonth = clock.calendar.dateInterval(of: .month, for: interval.start)?.start ?? displayedMonth
-        focusRequest = FocusRequest(range: interval)
+        focusRequest = FocusRequest(range: interval, scope: scope)
     }
 
     func event(id: String) -> ScheduleEvent? {

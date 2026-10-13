@@ -3,17 +3,18 @@
 唯一的 schema 來源是 [`Shared/AI/FunctionDeclarations.json`](../Shared/AI/FunctionDeclarations.json)，App 和 notification extension 都直接讀這個檔，作為 bundle resource 載入。
 驗證方式：`python3 -I scripts/validate_schema.py --print-payloads`（lint、fixtures、DST 參考測試）。
 
-## 1. 為什麼拆成 6 個函式，而不是一個大函式
+## 1. 為什麼拆成 7 個函式，而不是一個大函式
 
 需求是「一個 schema 同時處理單一事件和長期計畫」。實作上用的是**一組 toolset**，由模型自己選要呼叫哪一個：
 
 | 函式 | 負責的情境 | 設計重點 |
 |---|---|---|
 | `create_events` | 一句話裡有 1 到 20 個具體事件，也可以帶簡單的重複規則 | `events[]` 陣列，一句話寫入多筆 |
-| `create_long_term_plan` | 跨度超過 2 週的目標：「半年變壯」「三月前考到 IELTS 7.5」 | 分階段 `phases` 和 `sessions` 樣板，加上 `daily_nudge`、`milestones` |
+| `create_long_term_plan` | 跨度超過 2 週的目標：「半年變壯」「三月前考到 IELTS 7.5」 | 分階段 `phases` 和 `sessions` 樣板，加上 `daily_nudge`、`milestones`。只產生**草稿**給使用者審閱；修改時再呼叫一次，帶上**完整**的修訂版（見第 5 節） |
 | `modify_event` | 「延後 30 分鐘」「改到四點」 | `event_id` 只能取自 UPCOMING 或 FOCUS |
 | `delete_events` | 取消事件或整個計畫 | 支援 `plan_id`；批次刪除由 App 要求使用者確認 |
 | `query_schedule` | 「Show me my schedule for today」（Artboard 4） | 只讀，回傳區間讓 UI 跳轉 |
+| `confirm_plan` | 使用者對畫面上的草稿計畫說「好」「looks good」或「不要了」 | `decision`：`add` 或 `discard`。只有 prompt 裡有 DRAFT PLAN 區塊時才能呼叫 |
 | `reply_to_user` | 缺資訊時追問，或婉拒 | `suggested_replies` 讓使用者一鍵回答 |
 
 不做成一個大函式加 `oneOf` 的理由：
@@ -77,7 +78,7 @@ daily_nudge  07:30 "Protein 1.6 g/kg + 8h sleep today…"
 milestones   每月 14 日 check-in（全天、提醒時間是前一天 09:00）
 ```
 
-Client 端由 `CalendarEventMapper.events(fromPlan:)` 展開成 **6 個 RRULE series 加 6 個 milestone**，一共 12 次 API 寫入。如果逐日建立事件，6 個月每週 4 次大約是 104 次寫入。逐日建立還有一個問題：使用者說「把健身全部改到晚上」時，要 patch 104 筆；用 series 只要 patch 6 個 master。
+使用者按下 Add 之後，client 端才由 `CalendarEventMapper.events(fromPlan:)` 展開成 **6 個 RRULE series 加 6 個 milestone**，一共 12 次 API 寫入。如果逐日建立事件，6 個月每週 4 次大約是 104 次寫入。逐日建立還有一個問題：使用者說「把健身全部改到晚上」時，要 patch 104 筆；用 series 只要 patch 6 個 master。
 
 validator 會印出實際的 Google payload，例如：
 ```
@@ -89,20 +90,49 @@ validator 會印出實際的 Google payload，例如：
 ### 4.3 在通知裡回「延後 30 分鐘」
 Fixture：[`Tests/fixtures/modify_event.push.json`](../Tests/fixtures/modify_event.push.json)。FOCUS 區塊已經告訴模型「it」指的是哪個事件，所以使用者不用說出事件名稱。
 
-## 5. 多輪對話與 Gemini 3 的 thought signature
+## 5. 長期計畫先審閱再寫入：草稿 → Add / Keep editing
+
+計畫一次就是幾十到上百個行程，所以 `create_long_term_plan` **不會直接寫進 Google Calendar**，而是先讓使用者看過：
+
+```
+使用者：「半年內練出肌肉」
+  → create_long_term_plan（revision 1）
+  → App 存成 PlanDraft（SharedStore.pendingPlan），顯示計畫卡片 + 日曆上的預覽（預覽行程的 id 以 draft- 開頭，從不寫入任何地方）
+     ┌ [Add]          → commitPlan → 寫入 Google（RRULE series + milestones + 晨間提醒）
+     └ [Keep editing] → 「What would you like to change?」+ 4 個建議
+          使用者：「改成早上 7 點」
+          → create_long_term_plan（revision 2，完整的修訂版、同一個 plan id）
+          → 舊卡片標成「Replaced by revision 2」，新卡片再次顯示 Add / Keep editing
+打字也可以：「好」「looks good」「加入」→ confirm_plan add；「不要了」「cancel the plan」→ confirm_plan discard
+```
+
+| 環節 | 做法 |
+|---|---|
+| 草稿 | `PlanDraftBuilder` 先用真正的 mapper 驗證參數（寫不進去的計畫在審閱前就失敗），算出 `writeCount`，再用 `RecurrenceExpander` 把每個 weekly series 展開成預覽：整個計畫或 26 週，取較短者。預覽以牆上時間展開，跨夏令時間也維持 18:30 |
+| 回給 Gemini 的結果 | `{"ok": true, "status": "draft_shown_for_review", "plan_id": …, "revision": n}`。這時 Google Calendar 裡什麼都沒有 |
+| 修訂 | 有待審草稿時，system prompt 多一個 `# DRAFT PLAN (… revision N)` 區塊（標題、日期、階段、每個 session 的星期/時間/長度、milestones、nudge），並規定：修改就再呼叫一次 `create_long_term_plan`，帶上**完整**計畫、保留 `plan_title`；同意就 `confirm_plan add`；放棄就 `confirm_plan discard`。修訂沿用同一個 plan id，`revision` 加 1 |
+| Add | 按鈕直接呼叫 `commitPlan(draft)`，不經過 Gemini：重新解碼草稿裡原樣保存的 args（`argsJSON`），以 `planID = draft.id` 寫入。event id 由 plan id 決定，重按 Add 只會得到 409，不會重複。之後在對話歷史補一句「[app] The user tapped Add…」，讓下一輪知道計畫已經在日曆上 |
+| 跨 process | 草稿存在 App Group，App、Siri 和通知 extension 看到的是同一份 |
+| 單一事件 | `create_events` 不變，照樣立刻寫入 |
+
+Demo 模式（`DemoAssistant`）走同一個流程：計畫先變成草稿；有草稿時，「好 / looks good」會加入、「不要了 / cancel the plan」會丟棄，其他訊息當成修改要求（`7am`、`mornings`、`MWF`、`weekdays`、`3 days a week`、`週一三五`、`45 min`、`shorter`、`next Monday`、`Nov 1`），看不懂就問「What would you like to change?」並附上 4 個建議。
+
+Fixtures：[`create_long_term_plan.revision.json`](../Tests/fixtures/create_long_term_plan.revision.json)（肌肉計畫改到早上 7 點，`revises` 指向原始 fixture）、[`confirm_plan.add.json`](../Tests/fixtures/confirm_plan.add.json)。
+
+## 6. 多輪對話與 Gemini 3 的 thought signature
 
 - 模型那一輪的 content（包含 `thoughtSignature`）以 **raw JSON 原樣保存**，下一輪原封送回。這是 Gemini 3 function calling 的硬性規定，少了會回 400。
 - 歷史紀錄以「exchange」為單位修剪（使用者發話、模型回覆、function responses 三個一組），最多保留 6 組。這樣 `functionCall` 和它對應的 `functionResponse` 永遠不會被拆開。
 - 執行出錯時，也會回傳一個 `functionResponse`，內容是 `{"ok": false, "error": ...}`，讓模型下一輪可以自我修正。
 
-## 6. 模型設定
+## 7. 模型設定
 
 - `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.5-flash`。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。
 - `thinkingLevel: "low"`：只對 Gemini 3.x 有效。2.x 用的是 `thinkingBudget`，參數不相容。
 - **不設定 temperature**：Gemini 3 的官方建議是保持預設值 1.0，調低可能造成迴圈或品質下降。
 - 「send a link」（Artboard 5 的迴紋針）：Gemini API 的 changelog（2026-03）寫明，內建工具（如 `url_context`）可以和自訂 function 在同一次呼叫裡並用。建議把這件事放在 proxy 端做，讓模型直接讀活動頁面。舊模型則先跑一次 `url_context` 抽出文字，再呼叫 function。
 
-## 7. 本地驗證
+## 8. 本地驗證
 
 ```bash
 python3 -I scripts/validate_schema.py --print-payloads
@@ -110,3 +140,5 @@ python3 -I scripts/validate_schema.py --print-payloads
 - Lint 只允許 Gemini OpenAPI subset 支援的 key；檢查 `required` 是否都存在、`enum` 是否只用在 string 上、陣列是否都有 `items`。
 - 用 JSON Schema 驗證 `Tests/fixtures/*.json` 裡的 `expected_call`。
 - Python 參考版的 mapper 會重算 RRULE、UNTIL（UTC）和 DTSTART 對齊，並 assert 倫敦 GMT 和 BST 的邊界值。
+- 草稿預覽的參考展開（`--print-payloads` 會印出每個計畫 fixture 的預覽數量），並 assert 18:30 在兩次夏令時間切換前後都不變。
+- `confirm_plan` 的 fixture 必須帶 `draft_plan`；帶 `revises` 的 fixture 必須是 `create_long_term_plan`，而且保留原本的 `plan_title`。

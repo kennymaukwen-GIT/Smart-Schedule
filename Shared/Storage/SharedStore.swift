@@ -15,6 +15,8 @@ actor SharedStore {
         var windowEnd: Date?
         var lastRefresh: Date?
         var lastAssistantLine: String?
+        /// The long-term plan waiting for Add / Keep editing. Optional so caches written before drafts existed decode.
+        var pendingPlan: PlanDraft?
     }
 
     private let fileURL: URL
@@ -23,6 +25,12 @@ actor SharedStore {
         let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConstants.appGroupID)
             ?? FileManager.default.temporaryDirectory
         fileURL = container.appendingPathComponent(fileName)
+    }
+
+    /// A cache at an explicit location. Unit tests use a temporary file, since a hostless test bundle has no
+    /// App Group entitlement.
+    init(fileURL: URL) {
+        self.fileURL = fileURL
     }
 
     // MARK: Reads
@@ -35,6 +43,10 @@ actor SharedStore {
 
     func event(id: String) -> ScheduleEvent? {
         read().events.first { $0.id == id }
+    }
+
+    func pendingPlan() -> PlanDraft? {
+        read().pendingPlan
     }
 
     // MARK: Writes
@@ -79,6 +91,11 @@ actor SharedStore {
         mutate { $0.lastAssistantLine = line }
     }
 
+    /// nil clears it (after Add or discard).
+    func setPendingPlan(_ draft: PlanDraft?) {
+        mutate { $0.pendingPlan = draft }
+    }
+
     // MARK: File I/O
 
     private func read() -> Snapshot {
@@ -104,5 +121,20 @@ actor SharedStore {
             encoder.dateEncodingStrategy = .secondsSince1970
             try? encoder.encode(snapshot).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         }
+    }
+}
+
+extension SharedStore.Snapshot {
+    /// A draft the current build cannot decode (written by an older or newer version) is dropped on its own
+    /// instead of failing the whole snapshot, which would also lose the local-only nudges.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        events = try container.decode([ScheduleEvent].self, forKey: .events)
+        nudges = try container.decode([PlanNudge].self, forKey: .nudges)
+        windowStart = try container.decodeIfPresent(Date.self, forKey: .windowStart)
+        windowEnd = try container.decodeIfPresent(Date.self, forKey: .windowEnd)
+        lastRefresh = try container.decodeIfPresent(Date.self, forKey: .lastRefresh)
+        lastAssistantLine = try container.decodeIfPresent(String.self, forKey: .lastAssistantLine)
+        pendingPlan = try? container.decodeIfPresent(PlanDraft.self, forKey: .pendingPlan)
     }
 }

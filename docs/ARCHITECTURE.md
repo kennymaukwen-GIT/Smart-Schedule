@@ -131,7 +131,7 @@ sequenceDiagram
   participant S as SharedStore
   U->>A: utterance
   A->>S: 取 14 天 UPCOMING（做衝突偵測和 id 參照）
-  A->>G: systemInstruction(now/tz/UPCOMING) + tools(6) + mode ANY
+  A->>G: systemInstruction(now/tz/UPCOMING) + tools(7) + mode ANY
   G-->>A: functionCall create_events{title, start "2026-10-14T14:00", add_video_conference}
   A->>C: events.insert (client id, wall-clock + timeZone, reminders, Meet)
   C-->>A: Event (htmlLink, hangoutLink)
@@ -140,6 +140,8 @@ sequenceDiagram
   A-->>U: "Schedule set to Google Calendar on 14 Oct 2026, 14:00"
   Note over A,G: 回覆用 deterministic template 產生，不再呼叫 Gemini 第二次，省一次 round trip
 ```
+
+**長期計畫多一步審閱：** `create_long_term_plan` 只產生草稿（`PlanDraft`，存在 `SharedStore.pendingPlan`），App 顯示計畫卡片和日曆預覽，什麼都還沒寫進 Google。使用者按 **Add** 才由 `commitPlan` 寫入；按 **Keep editing** 就說要改什麼，Gemini 回一份完整的修訂版（同一個 plan id、revision 加 1），再給同樣的兩個按鈕，直到 Add 為止。打字「好」「looks good」等同 Add（`confirm_plan add`），「不要了」會丟棄草稿（`confirm_plan discard`）。單一事件照舊立刻寫入。細節見 [`GEMINI_FUNCTION_CALLING.md`](GEMINI_FUNCTION_CALLING.md) 第 5 節。
 
 **延遲預算（目標值，要在實機上量）：** Gemini Flash（`thinkingLevel: low`）約 1 到 2.5 秒，Calendar insert 約 0.3 到 0.7 秒，本地處理不到 50 毫秒，總計目標不超過 3 秒。長期計畫是 4 路並行 insert，每多一批 4 個 series 大約多 0.5 秒。
 
@@ -150,7 +152,7 @@ sequenceDiagram
 | 風險 | 對策 |
 |---|---|
 | API key 外洩 | 正式版改走 proxy。proxy 驗證 App Check／DeviceCheck，並依使用者做 rate limit |
-| Prompt injection（別人寄來的邀請，標題裡寫指令） | 行事曆資料放在 system prompt 的 DATA 區塊，並移除分隔字元；模型只能呼叫 6 個白名單函式；`modify_event`／`delete_events` 的 id 一定要在本地 cache 裡找得到才放行；批次刪除要使用者按確認 |
+| Prompt injection（別人寄來的邀請，標題裡寫指令） | 行事曆資料放在 system prompt 的 DATA 區塊，並移除分隔字元；模型只能呼叫 7 個白名單函式；`modify_event`／`delete_events` 的 id 一定要在本地 cache 裡找得到才放行；批次刪除要使用者按確認 |
 | 網路重試造成重複事件 | Event ID 由確定的 seed 算出（base32hex）；伺服器回 409 就當作已經寫過 |
 | Token 過期 | OAuth consent screen 在 Testing 狀態時，refresh token **7 天就失效**。`calendar.events` 屬於 sensitive scope，正式上線要過 Google 的 App 驗證 |
 | 跨 process 同時寫檔 | 用 `NSFileCoordinator` 加 atomic write |

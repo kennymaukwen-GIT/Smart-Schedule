@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppRouter.self) private var router
     @Environment(ScheduleViewModel.self) private var schedule
+    @Environment(ChatViewModel.self) private var chat
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -26,6 +27,10 @@ struct RootView: View {
             set: { router.selectedEventID = $0?.id }
         )) { event in
             EventDetailSheet(event: event)
+        }
+        // A draft made through Siri or a notification shows up here as a card with Add / Keep editing.
+        .onChange(of: schedule.pendingPlan) { _, plan in
+            chat.syncPendingPlan(plan)
         }
     }
 

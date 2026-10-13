@@ -1,0 +1,40 @@
+{
+  "utterance": "can we do mornings at 7 instead?",
+  "now_local": "2026-10-13T10:18",
+  "time_zone": "Europe/London",
+  "revises": "create_long_term_plan.muscle.json",
+  "draft_plan": "Muscle 6M (revision 1): MO,TH + TU,FR 18:30, 60-70 min, 2026-10-14 → 2027-04-13",
+  "expected_call": {
+    "name": "create_long_term_plan",
+    "args": {
+      "goal": "Gain visible muscle mass (~3–5 kg lean) in 6 months",
+      "plan_title": "Muscle 6M",
+      "start_date": "2026-10-14",
+      "end_date": "2027-04-13",
+      "summary_for_user": "Updated: the same 4-day program, now at 07:00 before work — one hour each (70 min in the strength phase), three phases (foundation, hypertrophy, strength). Your morning reminder moves to 06:15. Tap Add when it looks right, or tell me what else to change.",
+      "phases": [
+        { "name": "Foundation", "start_date": "2026-10-14", "end_date": "2026-11-30", "focus": "Technique, full-body 3x10, add load weekly" },
+        { "name": "Hypertrophy", "start_date": "2026-12-01", "end_date": "2027-02-28", "focus": "Upper/lower split, 4x8-12, progressive overload" },
+        { "name": "Strength", "start_date": "2027-03-01", "end_date": "2027-04-13", "focus": "Heavier compounds 5x5 plus accessories" }
+      ],
+      "sessions": [
+        { "phase_index": 0, "title": "Full body A", "weekdays": ["MO", "TH"], "start_time": "07:00", "duration_minutes": 60, "notes": "Squat 3x10, bench 3x10, row 3x10, plank 3x45s" },
+        { "phase_index": 0, "title": "Full body B", "weekdays": ["TU", "FR"], "start_time": "07:00", "duration_minutes": 60, "notes": "Deadlift 3x8, OHP 3x10, pulldown 3x10, lunges 3x10" },
+        { "phase_index": 1, "title": "Upper", "weekdays": ["MO", "TH"], "start_time": "07:00", "duration_minutes": 60, "notes": "Bench 4x8-12, row 4x8-12, OHP 3x10, curls/triceps 3x12" },
+        { "phase_index": 1, "title": "Lower", "weekdays": ["TU", "FR"], "start_time": "07:00", "duration_minutes": 60, "notes": "Squat 4x8-12, RDL 4x10, leg press 3x12, calves 4x15" },
+        { "phase_index": 2, "title": "Strength upper", "weekdays": ["MO", "TH"], "start_time": "07:00", "duration_minutes": 70, "notes": "Bench 5x5, weighted pull-up 5x5, dips 3x8" },
+        { "phase_index": 2, "title": "Strength lower", "weekdays": ["TU", "FR"], "start_time": "07:00", "duration_minutes": 70, "notes": "Squat 5x5, deadlift 3x5, hip thrust 3x8" }
+      ],
+      "daily_nudge": { "time": "06:15", "message": "Gym at 07:00 on training days. Protein 1.6 g/kg + 8h sleep." },
+      "milestones": [
+        { "date": "2026-11-14", "title": "Month 1 check-in: weight & photos" },
+        { "date": "2026-12-14", "title": "Month 2 check-in" },
+        { "date": "2027-01-14", "title": "Month 3 check-in" },
+        { "date": "2027-02-14", "title": "Month 4 check-in" },
+        { "date": "2027-03-14", "title": "Month 5 check-in" },
+        { "date": "2027-04-13", "title": "Final: compare to day 1" }
+      ],
+      "assumptions": ["Beginner with gym access", "Weekday mornings before 08:15 are free"]
+    }
+  }
+}

@@ -7,6 +7,9 @@ import SwiftUI
 ///    including on the Lock Screen; dictation comes from the keyboard's mic.
 /// 2. The inline field here. Needs `UNNotificationExtensionUserInteractionEnabled = YES`; keyboard focus
 ///    inside content extensions has varied across iOS releases, so verify on device before relying on it.
+///
+/// A long-term plan arrives as a draft: its card sits under the conversation with Add / Keep editing, and nothing
+/// is written until Add.
 struct NotificationChatView: View {
     @Bindable var model: NotificationChatModel
     @FocusState private var inputFocused: Bool
@@ -14,23 +17,35 @@ struct NotificationChatView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
-            if model.turns.isEmpty {
+            if model.turns.isEmpty && model.planDraft == nil {
                 Text("Hold-to-reply: tell me what to add or change.")
                     .font(.footnote)
                     .foregroundStyle(Theme.textSecondary)
-            } else {
+            } else if !model.turns.isEmpty {
                 conversation
+            }
+            if let plan = model.planDraft {
+                NotificationPlanCard(draft: plan,
+                                     status: model.planStatus,
+                                     onAdd: { model.addPlan() },
+                                     onKeepEditing: { model.keepEditing() })
             }
             if model.pendingDeletion != nil {
                 Button("Confirm delete", role: .destructive) { model.confirmDeletion() }
                     .buttonStyle(.borderedProminent)
                     .tint(.red)
             }
+            if !model.suggestions.isEmpty {
+                suggestionRow
+            }
             inputBar
         }
         .padding(14)
         .background(Theme.canvas.opacity(0.92))
         .preferredColorScheme(.dark)
+        .onChange(of: model.inputFocusRequest) {
+            inputFocused = true // Keep editing: "What would you like to change?"
+        }
     }
 
     private var header: some View {
@@ -59,9 +74,31 @@ struct NotificationChatView: View {
                     }
                 }
             }
-            .frame(maxHeight: 150)
+            .frame(maxHeight: model.planDraft == nil ? 150 : 90) // the plan card needs the room
             .onChange(of: model.turns) { _, turns in
                 if let last = turns.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+            }
+        }
+    }
+
+    private var suggestionRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(model.suggestions, id: \.self) { suggestion in
+                    Button {
+                        model.send(suggestion)
+                    } label: {
+                        Text(suggestion)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .overlay(Capsule().strokeBorder(Theme.hairline))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(model.isWorking)
+                }
             }
         }
     }

@@ -23,6 +23,8 @@ final class FixtureDecodingTests: XCTestCase {
                 XCTAssertNoThrow(try TestJSON.decode(QueryScheduleArgs.self, data: call.args), name)
             case .replyToUser:
                 XCTAssertNoThrow(try TestJSON.decode(ReplyToUserArgs.self, data: call.args), name)
+            case .confirmPlan:
+                XCTAssertNoThrow(try TestJSON.decode(ConfirmPlanArgs.self, data: call.args), name)
             }
         }
     }
@@ -69,6 +71,32 @@ final class FixtureDecodingTests: XCTestCase {
         XCTAssertEqual(plan.dailyNudge?.time, "07:30")
         XCTAssertEqual(plan.milestones?.count, 6)
         XCTAssertEqual(plan.assumptions?.count, 2)
+    }
+
+    func testLongTermPlanRevisionIsCompleteAndKeepsItsTitle() throws {
+        let name = "create_long_term_plan.revision.json"
+        XCTAssertEqual(try Fixtures.root(name)["revises"] as? String, "create_long_term_plan.muscle.json")
+        let original = try Fixtures.args(LongTermPlanArgs.self, from: "create_long_term_plan.muscle.json")
+        let revised = try Fixtures.args(LongTermPlanArgs.self, from: name)
+
+        // A revision restates the whole plan; only what the user asked for changes.
+        XCTAssertEqual(revised.planTitle, original.planTitle)
+        XCTAssertEqual(revised.startDate, original.startDate)
+        XCTAssertEqual(revised.endDate, original.endDate)
+        XCTAssertEqual(revised.phases.map(\.name), original.phases.map(\.name))
+        XCTAssertEqual(revised.sessions.map(\.title), original.sessions.map(\.title))
+        XCTAssertEqual(revised.sessions.map(\.weekdays), original.sessions.map(\.weekdays))
+        XCTAssertEqual(revised.sessions.map(\.durationMinutes), original.sessions.map(\.durationMinutes))
+        XCTAssertEqual(revised.milestones?.map(\.date), original.milestones?.map(\.date))
+        XCTAssertEqual(Set(revised.sessions.map(\.startTime)), ["07:00"])
+        XCTAssertEqual(revised.dailyNudge?.time, "06:15")
+    }
+
+    func testConfirmPlanAdd() throws {
+        let name = "confirm_plan.add.json"
+        XCTAssertEqual(try Fixtures.args(ConfirmPlanArgs.self, from: name).decision, "add")
+        // confirm_plan only exists while a draft is on screen.
+        XCTAssertNotNil(try Fixtures.root(name)["draft_plan"] as? String)
     }
 
     func testModifyEvent() throws {

@@ -3,6 +3,9 @@ import UIKit
 
 /// Bottom half of Artboard 5: conversation with the scheduling agent.
 struct ChatPanel: View {
+    /// False while Quick Capture is on top: its own field answers Keep editing, not this one behind it.
+    var takesFocusRequests = true
+
     @Environment(ChatViewModel.self) private var chat
     @Environment(ScheduleViewModel.self) private var schedule
     @FocusState private var inputFocused: Bool
@@ -48,7 +51,9 @@ struct ChatPanel: View {
                         ForEach(chat.messages) { message in
                             ChatMessageRow(message: message,
                                            onSuggestion: { chat.send($0) },
-                                           onConfirmDelete: { chat.confirmDeletion(in: message) })
+                                           onConfirmDelete: { chat.confirmDeletion(in: message) },
+                                           onAddPlan: { chat.addPlan(message) },
+                                           onKeepEditing: { chat.keepEditing(message) })
                                 .id(message.id)
                         }
                         if chat.isSending {
@@ -62,19 +67,27 @@ struct ChatPanel: View {
                         withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                     }
                 }
+                .onChange(of: chat.planRevealRequest) {
+                    if let id = chat.openPlanMessageID {
+                        withAnimation { proxy.scrollTo(id, anchor: .bottom) } // the card's buttons
+                    }
+                }
             }
 
             ComposerBar(
                 text: $chat.draft,
                 placeholder: "Type your schedule, event, aim, or plan, or send a link with a date and time",
                 showsAttachment: true,
-                isBusy: chat.isSending,
+                isBusy: chat.isBusy,
                 focus: $inputFocused,
                 onSend: { chat.send() }
             )
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.surface))
+        .onChange(of: chat.inputFocusRequest) {
+            if takesFocusRequests { inputFocused = true } // Keep editing: "What would you like to change?"
+        }
     }
 }
 
@@ -109,8 +122,12 @@ private struct DemoBadge: View {
 
 struct ChatMessageRow: View {
     let message: ChatViewModel.Message
+    /// Quick Capture: the plan card alone, compact (it carries the summary; the review line is its footer).
+    var compactPlan = false
     var onSuggestion: (String) -> Void = { _ in }
     var onConfirmDelete: () -> Void = {}
+    var onAddPlan: () -> Void = {}
+    var onKeepEditing: () -> Void = {}
 
     var body: some View {
         switch message.role {
@@ -125,14 +142,23 @@ struct ChatMessageRow: View {
                 .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.bubble))
         case .assistant:
             VStack(alignment: .leading, spacing: 8) {
-                Text(message.text)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                ForEach(message.assumptions, id: \.self) { assumption in
-                    Label(assumption, systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
+                if let plan = message.planDraft {
+                    // The card shows the summary and assumptions; only the rest of the reply goes above it.
+                    if !compactPlan, let lead = PlanPreviewCard.leadText(message.text, summary: plan.summary) {
+                        replyText(lead)
+                    }
+                    PlanPreviewCard(draft: plan,
+                                    status: message.planStatus,
+                                    style: compactPlan ? .compact : .full,
+                                    onAdd: onAddPlan,
+                                    onKeepEditing: onKeepEditing)
+                } else {
+                    replyText(message.text)
+                    ForEach(message.assumptions, id: \.self) { assumption in
+                        Label(assumption, systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
                 }
                 if message.pendingDeletion != nil {
                     Button("Confirm", role: .destructive, action: onConfirmDelete)
@@ -140,20 +166,31 @@ struct ChatMessageRow: View {
                         .tint(.red)
                 }
                 if !message.suggestions.isEmpty {
-                    HStack {
-                        ForEach(message.suggestions, id: \.self) { suggestion in
-                            Button(suggestion) { onSuggestion(suggestion) }
-                                .font(.system(size: 13, weight: .medium))
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Capsule().strokeBorder(Theme.hairline))
-                                .foregroundStyle(.white)
+                    // Scrolls sideways: Keep editing offers four chips, more than one row holds.
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(message.suggestions, id: \.self) { suggestion in
+                                Button(suggestion) { onSuggestion(suggestion) }
+                                    .font(.system(size: 13, weight: .medium))
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Capsule().strokeBorder(Theme.hairline))
+                                    .foregroundStyle(.white)
+                            }
                         }
                     }
                 }
             }
             .padding(.horizontal, 4)
         }
+    }
+
+    private func replyText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15))
+            .foregroundStyle(.white.opacity(0.92))
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

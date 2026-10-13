@@ -18,6 +18,10 @@
 | Artboard 5 | 主畫面：年份、月份選擇、月曆格（multi-day bar、task、+N）、AI 對話區、事件詳情 | `App/Views/MainView.swift`、`MonthGridView.swift`、`ChatPanel.swift`、`EventDetailSheet.swift` |
 | Artboard 5（6 個月健身計畫） | 長期目標拆成 phases 和 RRULE series | `Shared/AI/FunctionDeclarations.json`（`create_long_term_plan`）、`Shared/Calendar/CalendarEventMapper.swift` |
 
+### 長期計畫：先審閱，按 Add 才加入
+
+AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先存成草稿（`PlanDraft`，放在 App Group，App、通知擴充和 Siri 共用），在對話裡顯示計畫卡片（`App/Views/PlanPreviewCard.swift`），月曆上用虛線、半透明的「幽靈」行程預覽每一堂課。卡片有兩個按鈕：**Add** 才會真的寫入；**Keep editing** 會問「What would you like to change?」，使用者說要改什麼之後，AI 產生一份完整的新版本（revision 2、3…）再給使用者看一次，舊卡片標示為已被取代，直到按下 Add 為止。直接打字「好」「加入」「looks good」等同按 Add，打「不要了」「cancel the plan」則捨棄草稿。單一行程（`create_events`）仍然立即加入。用 Siri 建立的計畫會停在草稿，打開 App 就能看到卡片。
+
 ## 文件
 
 | 文件 | 內容 |

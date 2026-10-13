@@ -5,6 +5,8 @@
 2. Validates each fixture's expected args against its declaration (JSON Schema).
 3. Re-implements the Swift mapper's date/RRULE rules as a reference and prints the Google Calendar
    payload a fixture produces, including DST-correct UNTIL values.
+4. Re-implements the draft-plan preview (Shared/Calendar/RecurrenceExpander.swift + PlanDraftBuilder.swift):
+   weekly occurrences at a fixed wall-clock time, capped at the plan or 26 weeks, whichever is shorter.
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -113,6 +115,34 @@ def plan_payloads(args: dict, tz_name: str, plan_id: str = "demoplan") -> list[d
     return out
 
 
+PREVIEW_WEEKS = 26
+
+
+def weekly_occurrences(first: datetime, weekdays: list[str], last_day: date, horizon: date) -> list[datetime]:
+    """Wall-clock starts on BYDAY days from `first` through `last_day` (UNTIL, inclusive), before `horizon`."""
+    wanted = {WEEKDAYS.index(d) for d in weekdays}
+    out, day = [], first.date()
+    while day <= last_day and day < horizon:
+        if day.weekday() in wanted:
+            out.append(datetime.combine(day, first.time()))
+        day += timedelta(days=1)
+    return out
+
+
+def preview_occurrences(args: dict) -> list[datetime]:
+    """Local wall-clock starts of every session occurrence the draft preview shows."""
+    start, end = parse_day(args["start_date"]), parse_day(args["end_date"])
+    horizon = min(end + timedelta(days=1), start + timedelta(weeks=PREVIEW_WEEKS))
+    out = []
+    for session in args["sessions"]:
+        phase = args["phases"][session["phase_index"]]
+        phase_start, phase_end = parse_day(phase["start_date"]), parse_day(phase["end_date"])
+        first_day = first_matching_day(phase_start, session["weekdays"])
+        hh, mm = map(int, session["start_time"].split(":"))
+        out += weekly_occurrences(datetime.combine(first_day, time(hh, mm)), session["weekdays"], phase_end, horizon)
+    return sorted(out)
+
+
 def semantic_checks(name: str, args: dict, fixture: str) -> None:
     if name == "create_events":
         for ev in args["events"]:
@@ -132,6 +162,19 @@ def semantic_checks(name: str, args: dict, fixture: str) -> None:
                 errors.append(f"{fixture}: phase_index {s['phase_index']} out of range")
             if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", s["start_time"]):
                 errors.append(f"{fixture}: bad start_time {s['start_time']}")
+
+
+def context_checks(root: dict, fixture: str) -> None:
+    """Draft-review fixtures: confirm_plan needs a draft on screen; a revision is a complete plan that keeps its title."""
+    call = root["expected_call"]
+    if call["name"] == "confirm_plan" and not root.get("draft_plan"):
+        errors.append(f"{fixture}: confirm_plan is only valid while a DRAFT PLAN is shown (add 'draft_plan')")
+    if "revises" in root:
+        original = json.loads((FIXTURES / root["revises"]).read_text())["expected_call"]
+        if original["name"] != call["name"] or call["name"] != "create_long_term_plan":
+            errors.append(f"{fixture}: a revision must be create_long_term_plan, like {root['revises']}")
+        elif original["args"]["plan_title"] != call["args"]["plan_title"]:
+            errors.append(f"{fixture}: a revision keeps plan_title unless the user renames it")
 
 
 def main() -> int:
@@ -158,18 +201,27 @@ def main() -> int:
         for err in jsonschema.Draft202012Validator(schema["parameters"]).iter_errors(call["args"]):
             errors.append(f"{path.name}: {'/'.join(map(str, err.path))}: {err.message}")
         semantic_checks(call["name"], call["args"], path.name)
+        context_checks(fixture, path.name)
         print(f"✓ fixture {path.name}")
 
         if "--print-payloads" in sys.argv and call["name"] == "create_long_term_plan":
             for payload in plan_payloads(call["args"], fixture["time_zone"]):
                 print(json.dumps(payload, ensure_ascii=False))
+            preview = preview_occurrences(call["args"])
+            print(f"  draft preview: {len(preview)} sessions, {preview[0]:%Y-%m-%d %H:%M} → {preview[-1]:%Y-%m-%d %H:%M}")
 
     # DST regression: Europe/London UNTIL must shift by an hour between GMT and BST days.
     london = ZoneInfo("Europe/London")
     assert until_utc(date(2026, 11, 30), london) == "20261130T235959Z", "GMT day"
     assert until_utc(date(2027, 4, 13), london) == "20270413T225959Z", "BST day"
     assert first_matching_day(date(2026, 10, 13), ["MO", "WE", "FR"]) == date(2026, 10, 14)
-    print("✓ DST / RRULE reference checks")
+    # Preview occurrences keep 18:30 wall time, so their UTC instant moves by an hour across both changes.
+    weekly = weekly_occurrences(datetime(2026, 10, 15, 18, 30), ["MO", "TH"], date(2027, 4, 13), date(2027, 4, 14))
+    utc = [w.replace(tzinfo=london).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%MZ") for w in weekly]
+    assert "2026-10-22T17:30Z" in utc and "2026-10-26T18:30Z" in utc, "autumn change"
+    assert "2027-03-25T18:30Z" in utc and "2027-03-29T17:30Z" in utc, "spring change"
+    assert weekly[0] == datetime(2026, 10, 15, 18, 30) and weekly[-1] == datetime(2027, 4, 12, 18, 30)
+    print("✓ DST / RRULE / preview reference checks")
 
     if errors:
         print("\n".join(f"✗ {e}" for e in errors), file=sys.stderr)

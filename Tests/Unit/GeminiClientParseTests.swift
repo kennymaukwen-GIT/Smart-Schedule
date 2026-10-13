@@ -146,10 +146,27 @@ final class GeminiClientParseTests: XCTestCase {
                                 "Shared/AI/FunctionDeclarations.json must be a resource of the test bundle")
         let declarations = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
         let names = declarations.compactMap { $0["name"] as? String }
-        XCTAssertEqual(names.count, 6)
+        XCTAssertEqual(names.count, 7)
         XCTAssertEqual(Set(names), Set(AssistantFunction.allCases.map(\.rawValue)))
         for declaration in declarations {
             XCTAssertNotNil(declaration["parameters"] as? [String: Any], "\(declaration["name"] ?? "?")")
         }
+
+        let confirm = try XCTUnwrap(declarations.first { $0["name"] as? String == "confirm_plan" })
+        let parameters = try XCTUnwrap(confirm["parameters"] as? [String: Any])
+        XCTAssertEqual(parameters["required"] as? [String], ["decision"])
+        let decision = try XCTUnwrap((parameters["properties"] as? [String: Any])?["decision"] as? [String: Any])
+        XCTAssertEqual(decision["enum"] as? [String], ["add", "discard"])
+    }
+
+    func testConfirmPlanCallDecodes() throws {
+        let response = try parse("""
+        {"candidates": [{"content": {"parts": [
+          {"functionCall": {"name": "confirm_plan", "args": {"decision": "discard"}}}
+        ]}, "finishReason": "STOP"}]}
+        """)
+        let call = try XCTUnwrap(response.functionCalls.first)
+        XCTAssertEqual(AssistantFunction(rawValue: call.name), .confirmPlan)
+        XCTAssertEqual(try call.decode(ConfirmPlanArgs.self).decision, "discard")
     }
 }

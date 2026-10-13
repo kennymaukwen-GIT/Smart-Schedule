@@ -50,8 +50,11 @@ struct QuickCaptureView: View {
                 .frame(minHeight: 130, idealHeight: 250, maxHeight: 250)
                 .padding(.bottom, 10)
 
+            // Taller while a plan card waits for Add / Keep editing, so its buttons fit without scrolling.
             conversationPanel
-                .frame(minHeight: 116, idealHeight: 200, maxHeight: 200)
+                .frame(minHeight: 116,
+                       idealHeight: showsPlanCard ? 340 : 200,
+                       maxHeight: showsPlanCard ? 340 : 200)
                 .padding(.bottom, 10)
 
             suggestionRow
@@ -79,11 +82,15 @@ struct QuickCaptureView: View {
         }
         .onChange(of: schedule.focusRequest) { _, request in
             guard let request else { return }
-            let scope = CalendarScope.fitting(request.range, calendar: schedule.clock.calendar)
+            let scope = request.scope ?? CalendarScope.fitting(request.range, calendar: schedule.clock.calendar)
             if scope != mode {
                 withAnimation(.snappy) { mode = scope }
             }
         }
+        .onChange(of: chat.inputFocusRequest) {
+            inputFocused = true // Keep editing: "What would you like to change?"
+        }
+        .animation(.snappy, value: showsPlanCard)
         .gesture(DragGesture(minimumDistance: 20).onEnded { value in
             if value.translation.height < -40 { onClose() } // flick up = back into the island
         })
@@ -127,7 +134,7 @@ struct QuickCaptureView: View {
                 DayTimelineView(day: day, events: schedule.events(on: day), hourHeight: 46, onSelect: openDetail)
                     .transition(.opacity)
             case .week:
-                WeekAgendaCard(events: schedule.events,
+                WeekAgendaCard(events: schedule.displayEvents,
                                focusDay: day,
                                now: now,
                                revealRequest: schedule.focusRequest,
@@ -135,7 +142,7 @@ struct QuickCaptureView: View {
                                onSelectDay: selectDay)
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             case .month:
-                MonthScrollCard(events: schedule.events,
+                MonthScrollCard(events: schedule.displayEvents,
                                 focusDay: day,
                                 now: now,
                                 revealRequest: schedule.focusRequest,
@@ -148,6 +155,8 @@ struct QuickCaptureView: View {
     }
 
     private func openDetail(_ event: ScheduleEvent) {
+        // A ghost occurrence has no detail yet; its plan card is the latest reply here.
+        guard !event.isDraft else { return }
         router.selectedEventID = event.id // RootView's sheet shows the detail
     }
 
@@ -156,6 +165,11 @@ struct QuickCaptureView: View {
     }
 
     // MARK: Conversation
+
+    /// The latest reply is a plan card (open or not), shown compact in the panel.
+    private var showsPlanCard: Bool {
+        !chat.isSending && chat.lastExchange.reply?.planDraft != nil
+    }
 
     private var conversationPanel: some View {
         @Bindable var chat = chat
@@ -166,6 +180,7 @@ struct QuickCaptureView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if let user = exchange.user {
                         Text(user.text)
+                            .lineLimit(showsPlanCard ? 1 : nil)
                             .font(.system(size: 15))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 14)
@@ -179,7 +194,10 @@ struct QuickCaptureView: View {
                     } else if let reply = exchange.reply {
                         // Its suggestions are shown under the panel instead.
                         ChatMessageRow(message: withoutSuggestions(reply),
-                                       onConfirmDelete: { chat.confirmDeletion(in: reply) })
+                                       compactPlan: true,
+                                       onConfirmDelete: { chat.confirmDeletion(in: reply) },
+                                       onAddPlan: { chat.addPlan(reply) },
+                                       onKeepEditing: { chat.keepEditing(reply) })
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -191,7 +209,7 @@ struct QuickCaptureView: View {
             ComposerBar(
                 text: $chat.draft,
                 placeholder: "Type in any plan to add or change",
-                isBusy: chat.isSending,
+                isBusy: chat.isBusy,
                 focus: $inputFocused,
                 startsRecording: startsWithVoice,
                 onSend: { chat.send() }
@@ -236,7 +254,7 @@ struct QuickCaptureView: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        .disabled(chat.isSending)
+                        .disabled(chat.isBusy)
                     }
                 }
             }
@@ -335,13 +353,16 @@ private struct TimelinePill: View {
     let event: ScheduleEvent
 
     var body: some View {
+        // A draft is outlined rather than filled: a dashed edge would vanish against the white pill.
+        let fill = event.kind == .deadline ? Theme.deadline : Color.white
         Text(event.title)
             .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.black)
+            .foregroundStyle(event.isDraft ? Color.white : Color.black)
             .lineLimit(1)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(Capsule().fill(event.kind == .deadline ? Theme.deadline : Color.white))
+            .background(Capsule().fill(event.isDraft ? fill.opacity(0.18) : fill))
+            .draftGhost(event.isDraft, shape: Capsule(), tint: fill)
             .contentShape(Capsule())
     }
 }

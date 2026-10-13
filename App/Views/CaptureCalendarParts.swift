@@ -71,6 +71,8 @@ struct CaptureSpanBar: View {
                 ))
                 .fill(Color(hex: span.event.colorHex).opacity(0.9))
             )
+            .draftGhost(span.event.isDraft, shape: RoundedRectangle(cornerRadius: radius),
+                        tint: Color(hex: span.event.colorHex))
     }
 }
 

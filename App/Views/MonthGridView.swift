@@ -69,7 +69,7 @@ struct MonthGridView: View {
         var count = 0
         var day = max(calendar.startOfDay(for: today), interval.start)
         while day < interval.end {
-            count += eventsOnDay(day).filter { calendar.isDate($0.start, inSameDayAs: day) }.count
+            count += eventsOnDay(day).filter { !$0.isDraft && calendar.isDate($0.start, inSameDayAs: day) }.count
             day = calendar.date(byAdding: .day, value: 1, to: day)!
         }
         return count
@@ -153,6 +153,7 @@ private struct EventChip: View {
             ))
             .fill(event.kind == .task ? Color.clear : tint.opacity(segment.isMultiDay ? 0.85 : 0.28))
         )
+        .draftGhost(event.isDraft, shape: RoundedRectangle(cornerRadius: 3), tint: tint)
         .padding(.leading, segment.isStart ? 2 : 0)
         .padding(.trailing, segment.isEnd ? 2 : 0)
     }

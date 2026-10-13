@@ -3,6 +3,7 @@ import Foundation
 // Typed mirrors of the Gemini function declarations in Shared/AI/FunctionDeclarations.json.
 // Decoded with `.convertFromSnakeCase`. Enum-like fields stay `String` and are validated by the mapper,
 // so one unexpected value from the model degrades gracefully instead of failing the whole decode.
+// The plan types are also Encodable (`.convertToSnakeCase`) so the offline demo can produce the same args JSON.
 
 enum AssistantFunction: String, CaseIterable, Sendable {
     case createEvents = "create_events"
@@ -11,6 +12,7 @@ enum AssistantFunction: String, CaseIterable, Sendable {
     case deleteEvents = "delete_events"
     case querySchedule = "query_schedule"
     case replyToUser = "reply_to_user"
+    case confirmPlan = "confirm_plan"
 }
 
 // MARK: create_events
@@ -44,7 +46,7 @@ struct RecurrenceDraft: Decodable, Sendable {
 
 // MARK: create_long_term_plan
 
-struct LongTermPlanArgs: Decodable, Sendable {
+struct LongTermPlanArgs: Codable, Sendable {
     var goal: String
     var planTitle: String
     var startDate: String
@@ -57,7 +59,7 @@ struct LongTermPlanArgs: Decodable, Sendable {
     var assumptions: [String]?
 }
 
-struct PhaseDraft: Decodable, Sendable {
+struct PhaseDraft: Codable, Sendable {
     var name: String
     var startDate: String
     var endDate: String
@@ -66,7 +68,7 @@ struct PhaseDraft: Decodable, Sendable {
 
 /// Flattened (phase_index instead of nesting) to keep the schema shallow — deep nesting measurably
 /// raises malformed-call rates and can hit schema-complexity limits.
-struct SessionDraft: Decodable, Sendable {
+struct SessionDraft: Codable, Sendable {
     var phaseIndex: Int
     var title: String
     var weekdays: [String]
@@ -75,12 +77,12 @@ struct SessionDraft: Decodable, Sendable {
     var notes: String?
 }
 
-struct NudgeDraft: Decodable, Sendable {
+struct NudgeDraft: Codable, Sendable {
     var time: String                  // "HH:mm"
     var message: String
 }
 
-struct MilestoneDraft: Decodable, Sendable {
+struct MilestoneDraft: Codable, Sendable {
     var date: String
     var title: String
 }
@@ -119,4 +121,10 @@ struct ReplyToUserArgs: Decodable, Sendable {
     var message: String
     var needsClarification: Bool?
     var suggestedReplies: [String]?
+}
+
+// MARK: confirm_plan
+
+struct ConfirmPlanArgs: Decodable, Sendable {
+    var decision: String              // add | discard
 }

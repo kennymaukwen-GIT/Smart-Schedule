@@ -1,0 +1,10 @@
+{
+  "utterance": "looks good, add it",
+  "now_local": "2026-10-13T10:20",
+  "time_zone": "Europe/London",
+  "draft_plan": "Muscle 6M (revision 2): MO,TH + TU,FR 07:00, 60-70 min, 2026-10-14 → 2027-04-13",
+  "expected_call": {
+    "name": "confirm_plan",
+    "args": { "decision": "add" }
+  }
+}

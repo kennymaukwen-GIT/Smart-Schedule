@@ -8,6 +8,10 @@ import Foundation
 protocol ScheduleAssisting: Sendable {
     func handle(_ utterance: String, focusEventID: String?, now: Date) async throws -> ScheduleAssistant.Reply
     func confirm(_ pending: ScheduleAssistant.PendingDeletion) async throws -> ScheduleAssistant.Reply
+    /// "Add" on a draft plan card: writes the reviewed draft (`Reply.planDraft`) and clears the pending plan.
+    func commitPlan(_ draft: PlanDraft) async throws -> ScheduleAssistant.Reply
+    /// Drops a draft plan without writing anything.
+    func discardPlan(_ draft: PlanDraft) async -> ScheduleAssistant.Reply
 }
 
 extension ScheduleAssistant: ScheduleAssisting {}

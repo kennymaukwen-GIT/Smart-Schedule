@@ -55,7 +55,7 @@ struct MonthScrollCard: View {
         let first = CalendarPaging.week(top, from: thisWeek, calendar: calendar)
         let window = DateInterval(start: first, end: max(first, CalendarPaging.week(visibleRows, from: first, calendar: calendar)))
         let referenceMonth = CalendarPaging.referenceMonth(of: window, calendar: calendar)
-        let focusCount = CalendarPaging.events(on: focusDay, from: events, calendar: calendar).count
+        let focusCount = CalendarPaging.events(on: focusDay, from: events, calendar: calendar).filter { !$0.isDraft }.count
 
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .center) {
@@ -250,5 +250,6 @@ private struct MonthEventChip: View {
         }
         .background(tint.opacity(isTask ? 0 : 0.3))
         .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+        .draftGhost(event.isDraft, shape: RoundedRectangle(cornerRadius: 2, style: .continuous), tint: tint)
     }
 }

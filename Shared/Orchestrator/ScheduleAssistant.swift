@@ -3,11 +3,13 @@ import Foundation
 enum AssistantError: LocalizedError {
     case unknownEvent(String)
     case badRange
+    case noPendingPlan
 
     var errorDescription: String? {
         switch self {
         case let .unknownEvent(id): "I couldn't find that event (\(id)). Try naming it and the day."
         case .badRange: "I couldn't work out which dates you meant."
+        case .noPendingPlan: "There is no draft plan waiting for review."
         }
     }
 }
@@ -30,6 +32,12 @@ actor ScheduleAssistant {
         var suggestions: [String] = []
         var assumptions: [String] = []
         var pendingDeletion: PendingDeletion?
+        /// A plan (or a revision of one) ready for review. Nothing has been written yet.
+        var planDraft: PlanDraft?
+        /// Set when a draft was added to the calendar.
+        var committedPlanID: String?
+        /// Set when a draft was discarded.
+        var discardedPlanID: String?
 
         mutating func append(_ line: String?) {
             guard let line, !line.isEmpty else { return }
@@ -43,6 +51,7 @@ actor ScheduleAssistant {
     private let calendar: GoogleCalendarClient
     private let store: SharedStore
     private let mapper: CalendarEventMapper
+    private let planBuilder: PlanDraftBuilder
     private let clock: WallClock
     /// Each exchange = [user text, model turn, function responses]. Trimmed by whole exchanges so a
     /// functionCall is never separated from its functionResponse (Gemini rejects that).
@@ -58,7 +67,9 @@ actor ScheduleAssistant {
         self.calendar = calendar
         self.store = store
         self.clock = clock
-        self.mapper = CalendarEventMapper(clock: clock, policy: policy)
+        let mapper = CalendarEventMapper(clock: clock, policy: policy)
+        self.mapper = mapper
+        self.planBuilder = PlanDraftBuilder(mapper: mapper)
     }
 
     func resetConversation() {
@@ -72,9 +83,10 @@ actor ScheduleAssistant {
         let upcoming = await store.events(in: window)
         var focus: ScheduleEvent?
         if let focusEventID { focus = await store.event(id: focusEventID) }
+        let draft = await store.pendingPlan()
 
         let system = AssistantPrompt.system(now: now, clock: clock, locale: .current,
-                                            upcoming: upcoming, focus: focus, policy: mapper.policy)
+                                            upcoming: upcoming, focus: focus, policy: mapper.policy, draft: draft)
         var exchange = [GeminiTurn.user(utterance)]
         let response = try await gemini.generate(system: system, history: exchanges.flatMap { $0 } + exchange)
         exchange.append(response.modelTurn)
@@ -95,8 +107,7 @@ actor ScheduleAssistant {
             results.append(.init(name: call.name, id: call.id, responseJSON: json))
         }
         if !results.isEmpty { exchange.append(.functionResponses(results)) }
-        exchanges.append(exchange)
-        if exchanges.count > maxExchanges { exchanges.removeFirst(exchanges.count - maxExchanges) }
+        remember(exchange)
 
         if reply.text.isEmpty { reply.text = response.text ?? String(localized: "Done.") }
         if reply.changed { await ReminderScheduler.shared.reschedule(store: store) }
@@ -112,6 +123,59 @@ actor ScheduleAssistant {
         var reply = Reply(changed: true)
         reply.append(String(localized: "Deleted \(pending.eventIDs.count) item(s) from Google Calendar."))
         return reply
+    }
+
+    // MARK: - Draft plans
+
+    func commitPlan(_ draft: PlanDraft) async throws -> Reply {
+        let reply = try await writePlan(draft, now: Date())
+        // Tell Gemini, so "move the gym to 7am" next turn edits the real plan instead of re-drafting it.
+        remember([.user("[app] The user tapped Add; the draft plan is now in the calendar.")])
+        await ReminderScheduler.shared.reschedule(store: store)
+        await store.setLastAssistantLine(reply.text)
+        return reply
+    }
+
+    func discardPlan(_ draft: PlanDraft) async -> Reply {
+        await clearPendingPlan(id: draft.id)
+        remember([.user("[app] The user discarded the draft plan; nothing was added to the calendar.")])
+        var reply = Reply()
+        reply.discardedPlanID = draft.id
+        reply.append(ReplyFormatter.planDiscarded)
+        await store.setLastAssistantLine(reply.text)
+        return reply
+    }
+
+    /// The only place a plan reaches Google: the reviewed args, under the draft's id, so every revision the
+    /// user saw maps to the same series ids (a double tap on Add is an idempotent 409, not a duplicate).
+    private func writePlan(_ draft: PlanDraft, now: Date) async throws -> Reply {
+        let args = try PlanDraftBuilder.decodeArgs(draft.argsJSON)
+        let mapped = try mapper.events(fromPlan: args, planID: draft.id, utterance: draft.utterance)
+        let saved = try await calendar.insertAll(mapped)
+        if let nudge = mapper.nudge(from: args, planID: draft.id) { await store.addNudge(nudge) }
+        try? await CalendarSync(client: calendar, store: store, clock: clock).refreshWindow(now: now)
+        await clearPendingPlan(id: draft.id)
+
+        var reply = Reply(changed: true)
+        reply.committedPlanID = draft.id
+        reply.showRange = firstWeek(of: draft)
+        reply.append(String(localized: "Added \(saved.count) recurring items to Google Calendar."))
+        return reply
+    }
+
+    private func clearPendingPlan(id: String) async {
+        if await store.pendingPlan()?.id == id { await store.setPendingPlan(nil) }
+    }
+
+    private func firstWeek(of draft: PlanDraft) -> DateInterval {
+        let end = clock.calendar.date(byAdding: .day, value: 7, to: draft.startDate) ?? draft.startDate.addingTimeInterval(7 * 86_400)
+        return DateInterval(start: draft.startDate, end: end)
+    }
+
+    /// Appends one exchange and trims by whole exchanges.
+    private func remember(_ exchange: [GeminiTurn]) {
+        exchanges.append(exchange)
+        if exchanges.count > maxExchanges { exchanges.removeFirst(exchanges.count - maxExchanges) }
     }
 
     // MARK: - Function execution
@@ -143,18 +207,41 @@ actor ScheduleAssistant {
                                                          "start": clock.promptDateTimeString($0.start)] }]
 
         case .createLongTermPlan:
+            // Review first: build and store a draft; nothing reaches Google until commitPlan / confirm_plan "add".
             let args = try call.decode(LongTermPlanArgs.self)
-            let planID = GoogleEventID.newPlanID()
-            let mapped = try mapper.events(fromPlan: args, planID: planID, utterance: utterance)
-            let saved = try await calendar.insertAll(mapped)
-            if let nudge = mapper.nudge(from: args, planID: planID) { await store.addNudge(nudge) }
-            try? await CalendarSync(client: calendar, store: store, clock: clock).refreshWindow(now: now)
-            reply.changed = true
+            let pending = await store.pendingPlan()
+            let draft = try planBuilder.draft(from: args,
+                                              argsJSON: call.argsJSON,
+                                              id: pending?.id ?? GoogleEventID.newPlanID(),
+                                              revision: (pending?.revision ?? 0) + 1,
+                                              utterance: pending?.utterance ?? utterance)
+            await store.setPendingPlan(draft)
+            reply.planDraft = draft
             reply.append(args.summaryForUser)
-            reply.append(String(localized: "\(saved.count) recurring items added to Google Calendar (\(args.phases.count) phases)."))
+            reply.append(ReplyFormatter.planReviewPrompt)
             reply.assumptions = args.assumptions ?? []
-            reply.showRange = clock.date(args.startDate).map { DateInterval(start: $0, duration: 7 * 86_400) }
-            return ["ok": true, "plan_id": planID, "series_created": saved.count]
+            reply.showRange = firstWeek(of: draft)
+            return ["ok": true, "status": "draft_shown_for_review", "plan_id": draft.id, "revision": draft.revision]
+
+        case .confirmPlan:
+            let args = try call.decode(ConfirmPlanArgs.self)
+            guard let draft = await store.pendingPlan() else { throw AssistantError.noPendingPlan }
+            switch args.decision.lowercased() {
+            case "add":
+                let done = try await writePlan(draft, now: now)
+                reply.changed = true
+                reply.committedPlanID = draft.id
+                reply.showRange = done.showRange
+                reply.append(done.text)
+                return ["ok": true, "status": "added_to_calendar", "plan_id": draft.id]
+            case "discard":
+                await clearPendingPlan(id: draft.id)
+                reply.discardedPlanID = draft.id
+                reply.append(ReplyFormatter.planDiscarded)
+                return ["ok": true, "status": "discarded", "plan_id": draft.id]
+            default:
+                return ["ok": false, "error": "decision must be add or discard"]
+            }
 
         case .modifyEvent:
             let args = try call.decode(ModifyEventArgs.self)

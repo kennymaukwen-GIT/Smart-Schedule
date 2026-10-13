@@ -27,7 +27,13 @@ struct SmartScheduleApp: App {
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
-            case .active: Task { await schedule.refresh() }
+            case .active:
+                Task {
+                    // Events before the draft (reloadFromCache's order): a plan added from Siri or a notification
+                    // must already be in `events` when its card is settled. refresh() skips this while signed out.
+                    await schedule.reloadFromCache()
+                    await schedule.refresh()
+                }
             case .background: AppRefresh.schedule()
             default: break
             }
@@ -90,14 +96,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         switch response.actionIdentifier {
         case NotificationIDs.Action.reply:
             guard let text = (response as? UNTextInputNotificationResponse)?.userText else { return }
-            let answer: String
+            var answer: String
+            var planID: String?
             let assistant: any ScheduleAssisting = AppConstants.isDemoMode ? DemoAssistant() : ScheduleAssistant.shared
             do {
-                answer = try await assistant.handle(text, focusEventID: eventID, now: Date()).text
+                let reply = try await assistant.handle(text, focusEventID: eventID, now: Date())
+                answer = reply.text
+                if let plan = reply.planDraft {
+                    // Nothing is written yet. Expanding the follow-up shows the plan card (Add / Keep editing).
+                    answer = plan.summary + "\n" + String(localized: "Press and hold to review it, then tap Add.")
+                    planID = plan.id
+                }
             } catch {
                 answer = error.localizedDescription
             }
-            await Self.postFollowUp(answer)
+            await Self.postFollowUp(answer, planID: planID)
             await LiveActivityManager.shared.refreshIfRunning()
 
         case NotificationIDs.Action.snooze10:
@@ -111,11 +124,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    private static func postFollowUp(_ text: String) async {
+    /// `planID`: the draft plan this follow-up presents; the content extension shows its card while it is pending.
+    private static func postFollowUp(_ text: String, planID: String? = nil) async {
         let content = UNMutableNotificationContent()
         content.title = "Smart Schedule"
         content.body = text
         content.categoryIdentifier = NotificationIDs.Category.compose // keep the conversation going in place
+        if let planID { content.userInfo = [NotificationIDs.UserInfo.planID: planID] }
         let request = UNNotificationRequest(identifier: "ss.followup.\(UUID().uuidString)", content: content, trigger: nil)
         try? await UNUserNotificationCenter.current().add(request)
     }
