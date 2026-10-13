@@ -8,6 +8,7 @@ enum LiveActivityStateBuilder {
                       now: Date = Date(),
                       clock: WallClock = WallClock()) -> ScheduleActivityAttributes.ContentState {
         let calendar = clock.calendar
+        let events = events.filter { !$0.isDraft } // previews of plans and "Ask me first" batches are not booked
         let next = events
             .filter { !$0.isAllDay && $0.end > now && !$0.isCompleted }
             .min { $0.start < $1.start }
@@ -25,7 +26,8 @@ enum LiveActivityStateBuilder {
             weekStart: weekStart,
             todayIndex: min(max(todayIndex, 0), 6),
             days: [],
-            lastAssistantLine: lastLine.map { String($0.prefix(60)) }
+            lastAssistantLine: lastLine.map { String($0.prefix(60)) },
+            firstWeekday: calendar.firstWeekday
         )
 
         for (chipsPerDay, titleLength) in [(2, 10), (1, 8), (1, 5)] {
@@ -44,5 +46,15 @@ enum LiveActivityStateBuilder {
             if ((try? JSONEncoder().encode(state))?.count ?? 0) <= byteBudget { break }
         }
         return state
+    }
+
+    /// Settings › Dynamic Island "Show next event": true when the next visible timed event is in progress or starts
+    /// within `leadMinutes`. nil lead = never on its own (the Control Center button still summons it).
+    static func isNextEventDue(events: [ScheduleEvent], leadMinutes: Int?, now: Date = Date()) -> Bool {
+        guard let leadMinutes else { return false }
+        let horizon = now.addingTimeInterval(TimeInterval(leadMinutes) * 60)
+        return events.contains { event in
+            !event.isAllDay && !event.isCompleted && !event.isDraft && event.end > now && event.start <= horizon
+        }
     }
 }

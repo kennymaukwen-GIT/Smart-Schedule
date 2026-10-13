@@ -396,4 +396,58 @@ final class CalendarPagingTests: XCTestCase {
         // Persisted with @AppStorage("quickCaptureMode").
         XCTAssertEqual(CalendarScope.allCases.map(\.rawValue), ["day", "week", "month"])
     }
+
+    // MARK: Monday-first weeks (Settings › Week starts on)
+
+    func testMondayFirstWeeks() {
+        let monday = WallClock(timeZone: TestClock.zone, firstWeekday: 2).calendar
+        XCTAssertEqual(CalendarPaging.weekStart(containing: tuesday, calendar: monday), TestClock.local(2026, 10, 12))
+        // A Sunday belongs to the week that began the Monday before.
+        XCTAssertEqual(CalendarPaging.weekStart(containing: TestClock.local(2026, 10, 18, 20), calendar: monday),
+                       TestClock.local(2026, 10, 12))
+        XCTAssertEqual(CalendarPaging.days(ofWeekStarting: TestClock.local(2026, 10, 12), calendar: monday),
+                       (12...18).map { TestClock.local(2026, 10, $0) })
+        XCTAssertEqual(CalendarPaging.weekOffset(of: TestClock.local(2026, 10, 18), from: tuesday, calendar: monday), 0)
+        XCTAssertEqual(CalendarPaging.weekOffset(of: TestClock.local(2026, 10, 19), from: tuesday, calendar: monday), 1)
+    }
+
+    func testMondayFirstMonthGrid() {
+        let monday = WallClock(timeZone: TestClock.zone, firstWeekday: 2).calendar
+        // October 2026: Monday 28 Sep to Sunday 1 Nov.
+        let october = CalendarPaging.monthGridInterval(containing: tuesday, calendar: monday)
+        XCTAssertEqual(october.start, TestClock.local(2026, 9, 28))
+        XCTAssertEqual(october.end, TestClock.local(2026, 11, 2))
+        // January 2027 ends on a Sunday: five rows Monday-first, six Sunday-first.
+        let january = CalendarPaging.monthGridInterval(containing: TestClock.local(2027, 1, 15), calendar: monday)
+        XCTAssertEqual(january.start, TestClock.local(2026, 12, 28))
+        XCTAssertEqual(january.end, TestClock.local(2027, 2, 1))
+    }
+
+    func testWeekdayLettersFollowTheFirstWeekday() {
+        XCTAssertEqual(Theme.weekdayLetters(firstWeekday: 1), ["S", "M", "T", "W", "T", "F", "S"])
+        XCTAssertEqual(Theme.weekdayLetters(firstWeekday: 2), ["M", "T", "W", "T", "F", "S", "S"])
+        XCTAssertEqual(Theme.weekdayLetters(firstWeekday: 0), Theme.weekdayLetters)
+    }
+
+    // MARK: Header title (Artboard 5)
+
+    func testHeaderTitlePutsTheYearFirst() {
+        let october = TestClock.local(2027, 10, 1)
+        XCTAssertEqual(CalendarPaging.headerTitle(october, calendar: calendar, locale: english), "2027 October")
+        XCTAssertEqual(CalendarPaging.headerTitle(october, calendar: calendar, locale: Locale(identifier: "en_GB")),
+                       "2027 October")
+        XCTAssertEqual(CalendarPaging.headerTitle(october, calendar: calendar, locale: Locale(identifier: "zh_Hant_TW")),
+                       "2027年10月")
+        XCTAssertEqual(CalendarPaging.headerTitle(october, calendar: calendar, locale: Locale(identifier: "zh-Hant")),
+                       "2027年10月")
+    }
+
+    func testHeaderTitleUsesTheCalendarsTimeZone() {
+        // 23:30 on 31 Oct in London is already November in Tokyo.
+        let lateOctober = TestClock.local(2027, 10, 31, 23, 30)
+        var tokyo = calendar
+        tokyo.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        XCTAssertEqual(CalendarPaging.headerTitle(lateOctober, calendar: calendar, locale: english), "2027 October")
+        XCTAssertEqual(CalendarPaging.headerTitle(lateOctober, calendar: tokyo, locale: english), "2027 November")
+    }
 }

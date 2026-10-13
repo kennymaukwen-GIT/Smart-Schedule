@@ -23,12 +23,15 @@ enum GeminiError: LocalizedError {
     case http(status: Int, message: String)
     case blocked(reason: String)
     case malformed(String)
+    /// AI data sharing is not allowed (`AIConsentStore`); thrown before anything is built or sent.
+    case consentRequired
 
     var errorDescription: String? {
         switch self {
         case let .http(status, message): "Gemini HTTP \(status): \(message)"
         case let .blocked(reason): String(localized: "Gemini blocked the request (\(reason)).")
         case let .malformed(detail): String(localized: "Unexpected Gemini response: \(detail)")
+        case .consentRequired: String(localized: "Allow AI data sharing in Settings › AI & privacy to use the assistant.")
         }
     }
 }
@@ -84,23 +87,33 @@ struct GeminiResponse: Sendable {
 
 /// Minimal REST client for `models/{model}:generateContent` with function calling.
 /// Deliberately dependency-free so it also runs inside the notification content extension.
+///
+/// The one gate for AI data sharing: every entry point (chat, Quick Capture, Siri, notification replies, the
+/// notification extension) reaches Gemini through `generate`, which refuses without consent.
 final class GeminiClient: Sendable {
     let config: GeminiConfig
     private let declarationsJSON: Data
     private let session: URLSession
+    private let consentCheck: @Sendable () -> Bool
 
-    init(config: GeminiConfig = .fromBundle, session: URLSession = .shared) {
+    /// - Parameter consentCheck: whether the user allowed AI data sharing. Unit tests inject it.
+    init(config: GeminiConfig = .fromBundle,
+         session: URLSession = .shared,
+         consentCheck: @escaping @Sendable () -> Bool = { AIConsentStore.current.isGranted }) {
         self.config = config
         self.session = session
+        self.consentCheck = consentCheck
         self.declarationsJSON = Self.loadDeclarations()
     }
 
     /// - Parameter mode: "ANY" forces a function call every turn (deterministic parsing; plain chat
     ///   goes through `reply_to_user`). "AUTO" lets the model answer in text.
+    /// - Throws: `GeminiError.consentRequired` before anything is sent when AI data sharing is not allowed.
     func generate(system: String,
                   history: [GeminiTurn],
                   mode: String = "ANY",
                   allowedFunctions: [String]? = nil) async throws -> GeminiResponse {
+        guard consentCheck() else { throw GeminiError.consentRequired }
         var functionCallingConfig: [String: Any] = ["mode": mode]
         if let allowedFunctions { functionCallingConfig["allowedFunctionNames"] = allowedFunctions }
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Artboard 5. Top half = view area (year, month chips, month grid), both endless and kept in step through
-/// `displayedMonth`. Bottom = AI conversation.
+/// Artboard 5. Top = the header (hamburger · "2027 October" · avatar), then the view area (month chips, month
+/// grid), both endless and kept in step through `displayedMonth`. Bottom = AI conversation.
 struct MainView: View {
     @Environment(ScheduleViewModel.self) private var schedule
     @Environment(ChatViewModel.self) private var chat
@@ -11,21 +11,24 @@ struct MainView: View {
         @Bindable var schedule = schedule
 
         VStack(spacing: 12) {
-            Text(schedule.displayedMonth.formatted(.dateTime.year()))
-                .font(.system(size: 34, weight: .semibold))
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
+            AppHeader(month: schedule.displayedMonth,
+                      calendar: schedule.clock.calendar,
+                      avatarInitial: schedule.avatarInitial,
+                      onMenu: { withAnimation(.snappy) { router.isDrawerOpen = true } },
+                      onAvatar: { router.openSheet(.accounts) })
                 .padding(.top, 4)
 
             MonthPickerBar(selection: $schedule.displayedMonth)
+                .id(schedule.clockID)
 
             MonthGridView(
                 month: $schedule.displayedMonth,
                 today: Date(),
                 isLoading: schedule.isLoadingRange,
+                showsTitle: false,
                 eventsOnDay: schedule.events(on:),
                 onSelect: { event in
-                    // A ghost occurrence has no detail yet: bring its plan card (Add / Keep editing) into view.
+                    // A ghost occurrence has no detail yet: bring its plan or pending-events card (Add) into view.
                     if event.isDraft {
                         chat.revealOpenPlan()
                     } else {
@@ -33,6 +36,8 @@ struct MainView: View {
                     }
                 }
             )
+            // A new time zone or first weekday lays the pages out again from `displayedMonth`.
+            .id(schedule.clockID)
             .frame(maxHeight: .infinity)
 
             ChatPanel(takesFocusRequests: router.quickCapture == nil)

@@ -327,7 +327,9 @@ final class CalendarEventMapperTests: XCTestCase {
         let patch = mapper.patch(from: changes, existing: pushedMeeting)
         XCTAssertEqual(patch.reminders?.overrides?.map(\.minutes), [15, 5])
         XCTAssertEqual(patch.description, "Bring slides")
-        XCTAssertEqual(try Set(TestJSON.object(encoding: patch).keys), ["reminders", "description"])
+        // Only Smart Schedule's own reminder list among the private properties: PATCH merges that object's keys.
+        XCTAssertEqual(patch.extendedProperties?.private, ["ssReminders": "15,5"])
+        XCTAssertEqual(try Set(TestJSON.object(encoding: patch).keys), ["reminders", "description", "extendedProperties"])
     }
 
     func testPatchEndBeforeNewStartIsPushedOut() throws {
@@ -438,6 +440,124 @@ final class CalendarEventMapperTests: XCTestCase {
         """)))
         XCTAssertNil(mapper.scheduleEvent(from: try gcal(#"{"id": "x2", "status": "cancelled"}"#)))
         XCTAssertNil(mapper.scheduleEvent(from: try gcal(#"{"id": "x3", "start": {"dateTime": "nonsense"}, "end": {}}"#)))
+    }
+
+    // MARK: Smart Schedule's own reminders (ssReminders)
+
+    func testCreatedEventsRecordWhetherTheKindsDefaultsApply() throws {
+        let plain = try mapper.event(from: draft(#"{"title": "Sync", "start": "2026-10-14T09:00"}"#), seed: "a", utterance: "u").body
+        XCTAssertEqual(plain.extendedProperties?.private?["ssReminders"], "default")
+        let explicit = try mapper.event(from: draft(#"{"title": "Sync", "start": "2026-10-14T09:00", "reminder_minutes": [10, 60, 10]}"#),
+                                        seed: "b", utterance: "u").body
+        XCTAssertEqual(explicit.extendedProperties?.private?["ssReminders"], "60,10")
+        XCTAssertEqual(explicit.reminders?.overrides?.map(\.minutes), [60, 10])
+        let allDay = try mapper.event(from: draft(#"{"title": "Trip", "start": "2026-10-20", "reminder_minutes": [2340]}"#),
+                                      seed: "c", utterance: "u").body
+        XCTAssertEqual(allDay.extendedProperties?.private?["ssReminders"], "2340")
+        XCTAssertEqual(allDay.reminders?.overrides?.map(\.minutes), [2340])
+
+        let plan = try Fixtures.args(LongTermPlanArgs.self, from: "create_long_term_plan.muscle.json")
+        let planEvents = try mapper.events(fromPlan: plan, planID: "demoplan", utterance: "u")
+        XCTAssertEqual(Set(planEvents.compactMap { $0.body.extendedProperties?.private?["ssReminders"] }), ["default"])
+    }
+
+    func testSmartScheduleOnlyWritesNoGooglePopupsButKeepsItsOwnList() throws {
+        var policy = ReminderPolicy()
+        policy.writesGooglePopups = false
+        let quiet = CalendarEventMapper(clock: TestClock.clock, policy: policy)
+        let body = try quiet.event(from: draft(#"{"title": "Sync", "start": "2026-10-14T09:00", "reminder_minutes": [45]}"#),
+                                   seed: "q", utterance: "u").body
+        XCTAssertEqual(body.reminders?.useDefault, false)
+        XCTAssertEqual(body.reminders?.overrides?.count, 0)
+        XCTAssertEqual(body.extendedProperties?.private?["ssReminders"], "45")
+
+        // Read back from Google: Smart Schedule still reminds 45 minutes before, although Google shows nothing.
+        let listed = try gcal(#"""
+        {"id": "q1", "summary": "Sync", "start": {"dateTime": "2026-10-14T09:00:00+01:00"}, "end": {"dateTime": "2026-10-14T10:00:00+01:00"},
+         "reminders": {"useDefault": false, "overrides": []}, "extendedProperties": {"private": {"ssReminders": "45"}}}
+        """#)
+        XCTAssertEqual(mapper.scheduleEvent(from: listed)?.reminderMinutes, [45])
+    }
+
+    func testReadingReminderMinutes() throws {
+        func minutes(_ reminders: String, _ marker: String? = nil) throws -> [Int]? {
+            let properties = marker.map { #", "extendedProperties": {"private": {"ssReminders": "\#($0)"}}"# } ?? ""
+            let event = try gcal(#"{"id": "r", "start": {"dateTime": "2026-10-14T09:00:00Z"}, "end": {"dateTime": "2026-10-14T10:00:00Z"}"#
+                                 + reminders + properties + "}")
+            return try XCTUnwrap(mapper.scheduleEvent(from: event)).reminderMinutes
+        }
+        XCTAssertNil(try minutes(""))                                                    // Google's defaults
+        XCTAssertNil(try minutes(#", "reminders": {"useDefault": true}"#))
+        XCTAssertEqual(try minutes(#", "reminders": {"useDefault": false}"#), [])         // turned off in Google
+        XCTAssertEqual(try minutes(#", "reminders": {"useDefault": false, "overrides": [{"method": "popup", "minutes": 5}]}"#), [5])
+        XCTAssertNil(try minutes(#", "reminders": {"useDefault": false, "overrides": []}"#, "default")) // the kind's defaults
+        XCTAssertEqual(try minutes(#", "reminders": {"useDefault": true}"#, "60,10"), [60, 10])
+        XCTAssertEqual(try minutes(#", "reminders": {"useDefault": false, "overrides": [{"method": "popup", "minutes": 5}]}"#, "x,1"), [5])
+    }
+
+    func testDefaultLengthOfEventsAndRoutinesComesFromPreferences() throws {
+        let short = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy(), defaultEventMinutes: 30)
+        let meeting = try short.event(from: draft(#"{"title": "Sync", "start": "2026-10-14T09:00"}"#), seed: "m", utterance: "u").body
+        XCTAssertEqual(meeting.end?.dateTime, "2026-10-14T09:30:00")
+        let routine = try short.event(from: draft(#"{"title": "Run", "start": "2026-10-14T07:00", "kind": "routine"}"#),
+                                      seed: "r", utterance: "u").body
+        XCTAssertEqual(routine.end?.dateTime, "2026-10-14T07:30:00")
+        let long = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy(), defaultEventMinutes: 90)
+        let task = try long.event(from: draft(#"{"title": "Reply to Ann", "start": "2026-10-14T09:00", "kind": "task"}"#),
+                                  seed: "t", utterance: "u").body
+        XCTAssertEqual(task.end?.dateTime, "2026-10-14T09:30:00") // tasks and deadlines keep 30 min
+    }
+
+    // MARK: Listings of a connected calendar
+
+    func testCalendarListingsAreStampedWithTheirCalendar() throws {
+        let school = SampleAccounts.calendar("222", "student@university.example.edu", primary: true, hex: "#7986CB")
+        let plain = try XCTUnwrap(mapper.scheduleEvent(from: gcal(#"""
+        {"id": "m1", "iCalUID": "m1@google.com", "summary": "Seminar", "organizer": {"email": "prof@university.example.edu"},
+         "start": {"dateTime": "2026-10-14T09:00:00Z"}, "end": {"dateTime": "2026-10-14T10:00:00Z"}}
+        """#), in: school))
+        XCTAssertEqual(plain.calendarRef, school.id)
+        XCTAssertEqual(plain.ref, EventRef(accountID: "222", calendarID: "student@university.example.edu", eventID: "m1"))
+        XCTAssertEqual(plain.iCalUID, "m1@google.com")
+        XCTAssertEqual(plain.isOrganizer, false)
+        XCTAssertEqual(plain.usesCalendarColor, true)
+        XCTAssertEqual(plain.colorHex, "#7986CB")
+
+        let own = try XCTUnwrap(mapper.scheduleEvent(from: gcal(#"""
+        {"id": "g1", "summary": "Gym", "colorId": "10", "organizer": {"email": "student@university.example.edu", "self": true},
+         "start": {"dateTime": "2026-10-14T18:00:00Z"}, "end": {"dateTime": "2026-10-14T19:00:00Z"}}
+        """#), in: school))
+        XCTAssertEqual(own.isOrganizer, true)
+        XCTAssertEqual(own.usesCalendarColor, false)
+        XCTAssertEqual(own.colorHex, "#0B8043")
+        XCTAssertNil(own.iCalUID)
+
+        // The plain overload stays calendar-less (plan previews, demo).
+        let unscoped = try XCTUnwrap(mapper.scheduleEvent(from: gcal(#"{"id": "u", "start": {"date": "2026-10-20"}, "end": {"date": "2026-10-21"}}"#)))
+        XCTAssertNil(unscoped.calendarRef)
+        XCTAssertNil(unscoped.usesCalendarColor)
+    }
+
+    func testCalendarListEntries() throws {
+        let list = try JSONDecoder().decode(GCalCalendarList.self, from: Data(#"""
+        {"items": [
+          {"id": "kenny@example.com", "summary": "kenny@example.com", "backgroundColor": "#9fe1e7", "accessRole": "owner",
+           "primary": true, "timeZone": "Europe/London"},
+          {"id": "gym@group.calendar.google.com", "summary": "Gym", "summaryOverride": "Gym 🏋️", "backgroundColor": "#16a765",
+           "accessRole": "owner", "selected": true},
+          {"id": "en.uk#holiday@group.v.calendar.google.com", "summary": "Holidays", "accessRole": "reader"},
+          {"id": "old@group.calendar.google.com", "summary": "Old", "accessRole": "owner", "deleted": true},
+          {"summary": "No id"}
+        ]}
+        """#.utf8))
+        let calendars = (list.items ?? []).compactMap { $0.calendarInfo(accountID: "111", accountEmail: "kenny@example.com") }
+        XCTAssertEqual(calendars.map(\.name), ["kenny@example.com", "Gym 🏋️", "Holidays"])
+        XCTAssertEqual(calendars.map(\.isVisible), [true, true, false]) // Google's `selected`; the primary always
+        XCTAssertEqual(calendars.map(\.googleColorHex), ["#9FE1E7", "#16A765", CalendarInfo.defaultColorHex])
+        XCTAssertEqual(calendars.map(\.isWritable), [true, true, false])
+        XCTAssertEqual(calendars.first?.timeZone, "Europe/London")
+        XCTAssertTrue(calendars.allSatisfy { $0.notificationsEnabled && $0.colorOverrideHex == nil })
+        XCTAssertNil(GCalCalendarListEntry.normalizedHex("teal"))
     }
 
     func testInferKind() {

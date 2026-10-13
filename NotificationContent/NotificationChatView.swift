@@ -68,7 +68,9 @@ struct NotificationChatView: View {
                     NotificationTurnRow(turn: turn,
                                         isDemo: model.isDemo,
                                         onAddPlan: { model.addPlan(turn.id) },
-                                        onKeepEditing: { model.keepEditing(turn.id) })
+                                        onKeepEditing: { model.keepEditing(turn.id) },
+                                        onAddPendingEvents: { model.addPendingEvents(turn.id) },
+                                        onEditPendingEvents: { model.editPendingEvents(turn.id) })
                         .id(turn.id)
                 }
                 if model.isThinking {

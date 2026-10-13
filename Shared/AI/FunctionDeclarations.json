@@ -87,7 +87,7 @@
               },
               "reminder_minutes": {
                 "type": "array",
-                "description": "Minutes before start for push reminders. OMIT to use the user's defaults [1440, 60, 30]. Max 5 values, each 0-40320.",
+                "description": "Minutes before start for push reminders on THIS event, only when the user asks for them. OMIT to use the user's defaults (event_reminders and the other *_reminders lines in PREFERENCES). Max 5 values, each 0-40320.",
                 "maxItems": 5,
                 "items": { "type": "integer", "minimum": 0, "maximum": 40320 }
               },
@@ -283,14 +283,14 @@
   },
   {
     "name": "confirm_plan",
-    "description": "The user responded to the DRAFT PLAN shown for review. Use decision 'add' when they approve it ('looks good', 'add it', 'OK', '好', '加入') and 'discard' when they abandon it ('cancel the plan', '不要了'). Only call when a DRAFT PLAN block is present. For change requests do NOT call this: call create_long_term_plan again with the COMPLETE revised plan.",
+    "description": "The user responded to the DRAFT PLAN or the PENDING EVENTS shown for review. Use decision 'add' when they approve it ('looks good', 'add it', 'add them', 'OK', '好', '加入') and 'discard' when they abandon it ('cancel the plan', '不要了'). Only call when a DRAFT PLAN or PENDING EVENTS block is present; if both are, it applies to the newer one. For change requests do NOT call this: call create_long_term_plan again with the COMPLETE revised plan, or create_events again with the complete corrected list of events.",
     "parameters": {
       "type": "object",
       "properties": {
         "decision": {
           "type": "string",
           "enum": ["add", "discard"],
-          "description": "add = write the draft plan to the calendar; discard = drop it without writing anything."
+          "description": "add = write the draft plan or the pending events to the calendar; discard = drop them without writing anything."
         }
       },
       "required": ["decision"]
@@ -312,6 +312,41 @@
         }
       },
       "required": ["message"]
+    }
+  },
+  {
+    "name": "update_preferences",
+    "description": "Change the user's LASTING preferences: default reminders, reminder urgency, quiet hours, daily briefings, the daily reminder limit, the calendar and default length for new events, the first day of the week, the reply language and whether single events wait for approval. Use ONLY for standing instructions ('from now on', 'always', 'never', 'don't ever', 'every time', '以後', '別再', '每次', '一律', '從現在開始') or a reminder rule about a kind of activity with no specific date ('remind me 2 hours before gym'). A reminder change for one specific event belongs in modify_event or create_events reminder_minutes. Send only the keys that change; the app shows the user what changed and offers Undo.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "changes": {
+          "type": "array",
+          "description": "One entry per preference that changes. Current values are listed in PREFERENCES.",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "enum": ["event_reminders", "deadline_reminders", "task_reminders", "routine_reminders", "all_day_reminder", "event_urgency", "deadline_urgency", "task_urgency", "routine_urgency", "quiet_hours", "morning_briefing", "evening_preview", "daily_reminder_cap", "default_calendar", "default_duration", "week_start", "reply_language", "autonomy"],
+                "description": "Which preference. routine = workouts and plan sessions; event = meetings and appointments."
+              },
+              "value": {
+                "type": "string",
+                "description": "Encoded per key. *_reminders: minutes before start, comma-separated, 0 = at start, at most 5 values each 0-40320, or 'none' (e.g. '1440,60' or '120'). all_day_reminder: 'HH:mm' on the day before, or 'none'. *_urgency: 'automatic', 'time_sensitive', 'normal' or 'quiet'. quiet_hours: 'HH:mm-HH:mm' (may cross midnight) or 'off'; reminders inside still arrive, silently. morning_briefing, evening_preview: 'HH:mm' or 'off'. daily_reminder_cap: a number 1-50 or 'off'. default_calendar: one line of CALENDARS exactly as written, or 'automatic'. default_duration: minutes 5-480. week_start: 'sunday' or 'monday'. reply_language: 'match', 'zh-Hant' or 'en'. autonomy: 'add_directly' or 'ask_first'."
+              }
+            },
+            "required": ["key", "value"]
+          }
+        },
+        "summary_for_user": {
+          "type": "string",
+          "description": "One short sentence in the user's language saying what happens from now on, with 24-hour times. Example: 'From now on, reminders before 08:00 arrive silently.' or '以後 08:00 前的提醒會靜音送達。'"
+        }
+      },
+      "required": ["changes", "summary_for_user"]
     }
   }
 ]

@@ -7,17 +7,28 @@ import Foundation
 /// BST→GMT (2026-10-25) and GMT→BST (2027-03-28). Pinning "+01:00" would shift a 07:00 workout to 06:00
 /// for five months. Google Calendar accepts `dateTime` without offset when `timeZone` is set, and expands
 /// recurrences in that zone — so DST stays Google's problem, not ours.
+///
+/// `WallClock()` follows Settings › "Time zone" and "Week starts on" (`PreferencesStore.current()`); tests and
+/// anything that must not depend on the user's settings pass both explicitly.
 struct WallClock: Sendable {
     let timeZone: TimeZone
+    /// 1 = Sunday (the artboards' S M T W T F S), 2 = Monday.
+    let firstWeekday: Int
 
-    init(timeZone: TimeZone = .current) {
+    init() {
+        let preferences = PreferencesStore.shared.current()
+        self.init(timeZone: preferences.timeZone, firstWeekday: preferences.firstWeekday)
+    }
+
+    init(timeZone: TimeZone, firstWeekday: Int = 1) {
         self.timeZone = timeZone
+        self.firstWeekday = (1...7).contains(firstWeekday) ? firstWeekday : 1
     }
 
     var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        calendar.firstWeekday = 1 // Artboards use S M T W T F S
+        calendar.firstWeekday = firstWeekday
         return calendar
     }
 

@@ -1,21 +1,130 @@
-# 通知原地互動：「HOLD MESSAGE TO SPAWN」（Artboard 1）
+# 通知：提醒、每日摘要與「HOLD MESSAGE TO SPAWN」（Artboard 1）
 
-程式碼位置：`NotificationContent/`（UI 和流程）、`Shared/Notifications/`（category 和排程）
+程式碼位置：
+- `Shared/Notifications/ReminderPlanner.swift`：排什麼、多大聲、怎麼塞進 64 個名額（純邏輯，全部有單元測試）
+- `Shared/Notifications/ReminderScheduler.swift`：把計畫交給 `UNUserNotificationCenter`
+- `Shared/Notifications/BriefingBuilder.swift`：早晨摘要與晚間預覽的文字
+- `Shared/Notifications/ReminderEngagement.swift`：從「略過」學習
+- `Shared/Models/AppPreferences.swift`、`Shared/Storage/PreferencesStore.swift`：設定 › 通知 的所有值
+- `NotificationContent/`：長按展開後的對話 UI
 
 ## 1. 先講清楚做不到的事
 
-**Google Calendar App 發出的通知，Smart Schedule 不能擴充，也讀不到。** iOS 的 Notification Content Extension 只會套用在「本 App 送出、而且 `categoryIdentifier` 列在 extension Info.plist 裡」的通知。
-
-所以 Artboard 1 中「MESSAGE SENT FROM GOOGLE CALENDAR」這一步要改寫成：
+**Google Calendar App 發出的通知，Smart Schedule 不能擴充，也讀不到。** iOS 的 Notification Content Extension 只會套用在「本 App 送出、而且 `categoryIdentifier` 列在 extension Info.plist 裡」的通知。所以 Artboard 1 中「MESSAGE SENT FROM GOOGLE CALENDAR」這一步要改寫成：
 > Google Calendar 的事件資料同步到 Smart Schedule，再由 Smart Schedule 自己發出提醒。這則提醒可以長按展開。
+
+其他 iOS 不允許、所以設定頁只能用文字說明的事：
+
+| 做不到 | 原因 | App 的做法 |
+|---|---|---|
+| 替使用者關掉 Google Calendar App 的通知 | App 不能改其他 App 的設定 | 「由誰發送提醒」的註腳提醒使用者自己去關，避免重複提醒 |
+| 動態島在 App 關著時，自動在每個行程前出現 | 背景啟動 Live Activity 只能靠 App Intent（控制中心按鈕、Siri）或 **APNs push-to-start**，後者需要伺服器 | 開啟 App 時判斷要不要顯示（第 8 節）；設定頁註腳說明需要推播伺服器 |
+| 直接打開系統「專注模式」設定頁 | 沒有公開的 URL | 設定頁說明路徑：設定 App › 專注模式 › 選一個模式 › 加入過濾條件 › Smart Schedule |
+| 在 App 裡加控制中心按鈕、動作按鈕、鎖定畫面捷徑 | 只有使用者能加 | 設定 › 捷徑與 Siri 的說明頁 |
 
 通知來源有兩種：
 | 來源 | 做法 | 適用情境 |
 |---|---|---|
-| 本地通知（已實作） | `ReminderScheduler` 從 `SharedStore` 讀出事件，排定 `UNCalendarNotificationTrigger` | 不需要後端；MVP 階段 |
+| 本地通知（已實作） | `ReminderScheduler` 從 `SharedStore.visibleEvents` 讀出事件，排定 `UNCalendarNotificationTrigger` | 不需要後端；MVP 階段 |
 | 遠端推播 | 後端訂閱 `events.watch`，計算提醒時間，發 APNs，並設定 `category` 與 `mutable-content: 1` | 多裝置；事件在其他地方被修改時，提醒時間也能立刻更新 |
 
-## 2. 互動流程
+## 2. 由誰發送提醒（設定 › 通知）
+
+| 模式 | Smart Schedule 本地提醒 | 新增或修改的行程寫到 Google 的彈出提醒 | 每日摘要與計畫提醒 |
+|---|---|---|---|
+| 兩者都用（預設，等於原本的行為） | 有 | `useDefault: false`，覆寫值 = 使用者要求的或該類別的預設 | 有 |
+| 只用 Smart Schedule | 有 | `useDefault: false`、**空的覆寫值**（其他裝置不會跳 Google 提醒）；私有屬性 `ssReminders` 記住原本想要的提醒，本機提醒照樣正確 | 有 |
+| 只用 Google 日曆 | 沒有（重排時把已排的移除） | 同「兩者都用」 | 有 |
+
+- 切換模式不會回頭改寫已存在的行程（註腳寫的是「新行程」）。
+- `ReminderPolicy(preferences:)` 依模式設定 `writesGooglePopups`；`googleReminders` / `googleAllDayReminders` 在「只用 Smart Schedule」時回傳空覆寫值。
+- 「只用 Google 日曆」時，提醒無法原地回覆，緊急程度、安靜時段、每日上限三個區塊在設定頁會停用。
+
+## 3. 預設提醒、緊急程度、安靜時段
+
+**預設提醒**（使用者沒指定時用；每個行程最多 5 個，Google 的上限）：
+
+| 類別 | 預設 | 說明 |
+|---|---|---|
+| 行程 event | 1 天、1 小時、30 分鐘、開始時 | 會議與約會 |
+| 截止日 deadline | 1 天、1 小時 | |
+| 待辦事項 task | 1 小時 | |
+| 例行活動 routine | 30 分鐘 | 長期計畫的課程，一週 3–5 次，提醒太多會被習慣性忽略 |
+| 全天行程與計畫檢查點 | 前一天 09:00 | 存成「行程當天 00:00 往前 900 分鐘」 |
+
+全天提醒用「牆上時間」計算（往前幾天、那天幾點），所以跨越夏令時間時還是 09:00，不會變成 08:00 或 10:00。本機現在也會替全天行程發提醒（以前只寫到 Google）。
+
+**緊急程度**（每個類別各自設定）：
+
+| 選項 | `interruptionLevel` | 聲音 | 說明 |
+|---|---|---|---|
+| 自動（預設） | 開始前 30 分鐘以內 `.timeSensitive`，其餘 `.active` | 有 | 原本的規則 |
+| 時效性 | `.timeSensitive` | 有 | 會穿透專注模式；需要 `com.apple.developer.usernotifications.time-sensitive` entitlement（已在 project.yml） |
+| 標準 | `.active` | 有 | |
+| 安靜 | `.passive` | 無 | 直接進通知中心，不亮螢幕 |
+
+`relevanceScore`：時效性 1.0、標準 0.5、安靜 0.2。
+
+**安靜時段**（預設關閉，22:00–07:00，可跨午夜）：觸發時間落在時段內的提醒一律以 `.passive`、無聲送達，**不會被丟掉**。判斷用設定的時區（「跟隨這支 iPhone」或固定時區）。
+
+## 4. 每日摘要
+
+| 項目 | 內容 |
+|---|---|
+| 早晨摘要 | 預設開啟、07:30；標題「今天」；列出當天行程 |
+| 晚間預覽 | 預設關閉、21:00；標題「明天」；列出隔天行程 |
+| 識別碼 | `ss.briefing.morning.<yyyy-MM-dd>`、`ss.briefing.evening.<yyyy-MM-dd>`，日期是**送達那天** |
+| 排幾天 | 今天（時間還沒過才排）、明天、後天：最多 6 則 |
+| 內文 | 第一行「4 個行程，第一個在 09:00 開始」；接著最多 6 行「09:00 標題」（全天行程「全天 · 標題」）；超過時「還有 2 個」；被每日上限擋下的提醒列在「未發送提醒：…」 |
+| 類別 | `SS_COMPOSE`（可長按回覆），`userInfo.ssBriefingDay` = 摘要描述的那天，`threadIdentifier = "ss.briefing"` |
+| 音量 | `.active`、無聲；落在安靜時段內則 `.passive` |
+
+**內容在排程當下就寫好**（本地通知送達時不能再執行程式）。每次 `reschedule()` 都會重建：寫入、同步、啟動 App、背景更新、設定變更之後都會跑。所以如果使用者在別的裝置改了行程、而這支 iPhone 還沒同步，摘要會是舊的。當天沒有行程、也沒有被擋下的提醒，就不排摘要。
+
+## 5. 每日提醒上限
+
+預設關閉；開啟時每天最多 N 則（1–50，預設 10）。依觸發時間的「當地日期」分組，每天保留優先順序最高的 N 則，同順序先觸發的優先：
+
+1. 行程開始時的提醒（0 分鐘）
+2. 截止日
+3. 行程的其他提醒
+4. 待辦事項
+5. 例行活動
+
+（全天提醒算在各自類別。）被擋下的提醒列在**當天的早晨摘要**；如果早晨摘要關閉或時間已過，就不發送。上限先套用，再算 64 個名額；摘要與計畫提醒不算在上限內。
+
+## 6. 64 個上限與排程順序
+
+iOS 每個 App 最多保留 64 個待發本地通知，超過的會被默默丟掉。`ReminderPlanner.plan` 依序分配：
+
+1. 保留 2 個給「延後 10 分鐘」（`ss.reminder.snooze.<uuid>`，重排時不動）
+2. 進行中的計畫每日提醒（`ss.nudge.<planID>`，重複觸發；`endsOn` 過了就在下次重排時移除）
+3. 每日摘要（最多 6 則）
+4. 其餘名額給提醒，最早觸發的優先
+
+`reschedule()` 先移除所有 `ss.reminder.`（延後的除外）、`ss.nudge.`、`ss.briefing.` 開頭的待發通知，再全部重新加入。提醒只用「行事曆通知開啟」的行程（`EventAudience.reminders`：隱藏的行事曆、專注模式過濾掉的行事曆、關閉通知的行事曆都不提醒）；摘要用畫面上看得到的行程（`.display`）。
+
+## 7. 從「略過」學習
+
+- `SS_EVENT_REMINDER` 註冊了 `.customDismissAction`，使用者把提醒滑掉時，回應會送到 `AppDelegate`（或已展開的 content extension），呼叫 `ReminderEngagement.record(response)`。
+- 每則提醒的 `userInfo` 帶著 `ssKind`、`ssOffset`、`ssAllDay`、`ssFromDefaults`。**只有來自預設值的提醒**（`ssFromDefaults == true`）才計算；使用者自己指定的提醒、延後的副本、摘要都不算。
+- 以（類別, 提前時間）為單位計數：滑掉 +1；點開、延後、回覆歸零。連續 5 次滑掉、而且這個提前時間還在該類別的預設裡，就建立一則建議（每個 key 一輩子只問一次）：
+  > 你已連續 5 次略過行程的「1 天前」提醒。要停止發送嗎？［停止］［保留］
+- 建議出現在聊天（App 啟動或回到前景時）和 設定 › 通知 › 建議。按「停止」才會把那個提前時間從預設移除（全天提醒則關閉），並在「助理記得的事」記一筆「從你的習慣學到」；**沒有點按就不改任何東西**。
+
+## 8. 動態島（Dynamic Island）
+
+- 設定 › 通知 › 動態島「顯示下一個行程」：關閉、15 分鐘前、30 分鐘前（預設）、1 小時前、2 小時前。
+- App 回到前景時呼叫 `LiveActivityManager.summonIfDue()`：已在顯示就更新；沒有的話，若下一個有時間的行程正在進行或在設定的時間內開始，就啟動。控制中心按鈕（`SummonScheduleIntent`）則一律啟動。
+- **App 關著時自動在每個行程前出現，需要 APNs push-to-start，也就是需要推播伺服器**；本專案沒有，所以設定頁註腳照實說明。日後加了伺服器，可以把 `AppConstants.liveActivityPushEnabled` 打開並上傳 `pushToStartTokenUpdates`。
+- 週列的星期順序跟著「每週起始日」：`ContentState.firstWeekday`（舊的 payload 沒有這個欄位時當作星期日）。
+- 隱藏的行事曆與專注模式過濾掉的行事曆不會出現在動態島。
+
+## 9. 專注模式過濾條件
+
+`App/Intents/CalendarFocusFilter.swift`（`SetFocusFilterIntent`）讓使用者為每個專注模式選擇要顯示、要提醒的行事曆。專注模式開始與結束時系統會呼叫 `perform()`，App 存下過濾條件（結束時清除），然後重排提醒、更新動態島。App 不能直接打開專注模式設定頁，設定頁只說明路徑。需要在實機上驗證開啟與關閉兩次呼叫。
+
+## 10. 互動流程
 
 ```mermaid
 sequenceDiagram
@@ -39,7 +148,7 @@ sequenceDiagram
 
 **FOCUS 機制：** 通知的 `userInfo.ssEventId` 會變成 prompt 裡的 FOCUS 區塊。使用者只要說「延後 30 分鐘」或「改成線上」，不必說出事件名稱，模型就知道「it」指的是誰。
 
-## 3. Info.plist（由 project.yml 產生）
+## 11. Info.plist（由 project.yml 產生）
 
 ```yaml
 NSExtensionPointIdentifier: com.apple.usernotifications.content-extension
@@ -51,7 +160,7 @@ NSExtensionAttributes:
   UNNotificationExtensionDefaultContentHidden: true      # header 由我們自己畫（「31」圖示加大寫標題）
 ```
 
-## 4. 兩條輸入路徑
+## 12. 兩條輸入路徑
 
 | 路徑 | 可靠度 | 說明 |
 |---|---|---|
@@ -60,16 +169,19 @@ NSExtensionAttributes:
 
 另外，如果使用者在**收合狀態**的 banner 上直接回覆（沒有展開 extension），回覆會送到 `AppDelegate.userNotificationCenter(_:didReceive:)`，App 在背景被喚醒，跑同一條管線，再發一則 `SS_COMPOSE` 通知回報結果。這則回報通知本身也能長按繼續對話。
 
-## 5. 提醒排程與 iOS 的硬限制
+## 13. 識別碼與 userInfo
 
-| 限制 | 對策 |
+| 常數（`NotificationIDs`） | 值 |
 |---|---|
-| 每個 App 最多 64 個待發本地通知（超過的會被默默丟掉） | 滾動視窗：所有候選觸發點依時間排序，只排最前面的 64 減去 nudge 數再減 2；每次寫入、啟動、BG refresh 後重排 |
-| Focus 模式會擋掉通知 | 距開始 30 分鐘以內的提醒用 `interruptionLevel = .timeSensitive`（需要 `com.apple.developer.usernotifications.time-sensitive` entitlement，已加在 project.yml） |
-| 重複觸發的 trigger 不能設定結束日 | 計畫的每日 nudge 用 `repeats: true`，下次重排時檢查 `endsOn`，過期就移除 |
-| Extension 有記憶體上限 | UI 用 SwiftUI hosting；管線只用 `URLSession`，沒有其他 SDK |
+| `reminderPrefix` / `snoozePrefix` | `ss.reminder.<eventId>.<分鐘>` / `ss.reminder.snooze.<uuid>` |
+| `nudgePrefix` | `ss.nudge.<planId>` |
+| `briefingPrefix` | `ss.briefing.morning.<日期>` / `ss.briefing.evening.<日期>` |
+| `UserInfo.eventID` / `planID` | `ssEventId` / `ssPlanId` |
+| `UserInfo.kind` / `offset` / `allDay` / `fromDefaults` | `ssKind` / `ssOffset` / `ssAllDay` / `ssFromDefaults` |
+| `UserInfo.briefingDay` | `ssBriefingDay` |
+| `UserInfo.pendingBatchID` | `ssPendingBatchId`（「先問我」等待加入的行程） |
 
-## 6. 遠端推播範例（換成後端發送時用）
+遠端推播範例（換成後端發送時用；`Tests/Simulator/reminder.apns` 可以拖進模擬器測試）：
 
 ```json
 {
@@ -80,15 +192,27 @@ NSExtensionAttributes:
     "interruption-level": "time-sensitive",
     "mutable-content": 1
   },
-  "ssEventId": "ss0k3p…"
+  "ssEventId": "ss0k3p…",
+  "ssKind": "event",
+  "ssOffset": 30,
+  "ssAllDay": false,
+  "ssFromDefaults": true
 }
 ```
 `mutable-content` 讓 Notification Service Extension 有機會在送達前補上最新的時間和地點。這個 extension 本專案還沒建立，屬於選配。
 
-## 7. 實機測試清單
+## 14. 實機測試清單
 
 - [ ] 鎖定畫面長按 → 展開 → 用系統輸入框輸入 → 卡片保持展開，並顯示回覆。
 - [ ] 解鎖狀態在其他 App 裡收到 banner → 下拉 → 同上。
 - [ ] 在收合的 banner 直接回覆 → App 在背景處理 → 收到結果通知。
 - [ ] Inline TextField 能不能取得焦點（決定是否把它當主要輸入方式）。
-- [ ] 64 個上限：建立 30 個會議（每個 4 個提醒）後，最近的提醒仍然都在排程裡。
+- [ ] 64 個上限：建立 30 個會議（每個 4 個提醒）後，最近的提醒、計畫提醒和摘要仍然都在排程裡。
+- [ ] 「只用 Smart Schedule」：新行程在 Google 日曆網頁版沒有彈出提醒，本機提醒照常。
+- [ ] 「只用 Google 日曆」：切換後待發的本機提醒全部消失，摘要仍在。
+- [ ] 安靜時段 22:00–07:00：06:30 的提醒無聲進通知中心，07:00 的照常響。
+- [ ] 時效性提醒在專注模式下仍會出現（需要 Time Sensitive entitlement）。
+- [ ] 早晨摘要的內容在新增行程後會更新（重排）。
+- [ ] 滑掉同一個預設提醒 5 次 → 回到 App 出現建議卡片；按「保留」後不會再問。
+- [ ] 動態島：行程 30 分鐘內開始時打開 App 會自動出現；設定為「關閉」則不會。
+- [ ] 專注模式過濾條件：開啟時只顯示並提醒選定的行事曆，結束後恢復。

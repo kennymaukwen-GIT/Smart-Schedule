@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// WEEK mode of Quick Capture: a "This week" card with Sunday-first columns, time + title chips under each day
-/// and multi-day events as bars across the top. Pages sideways one week at a time with no end either way:
-/// "SCROLL →" advances a page, and the Today pill comes back to this week.
+/// WEEK mode of Quick Capture: a "This week" card with columns from Settings › "Week starts on", time + title
+/// chips under each day and multi-day events as bars across the top. Pages sideways one week at a time with no
+/// end either way: "SCROLL →" advances a page, and the Today pill comes back to this week.
 struct WeekAgendaCard: View {
     let events: [ScheduleEvent]
     let focusDay: Date

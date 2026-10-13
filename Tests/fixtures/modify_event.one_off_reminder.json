@@ -1,0 +1,11 @@
+{
+  "utterance": "remind me an hour before tomorrow's dentist",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "upcoming": "ssd3nt1st | Dentist | 2026-10-14T09:00 | 2026-10-14T09:45 | event",
+  "preferences": "event_reminders: 1440,60,30,0",
+  "expected_call": {
+    "name": "modify_event",
+    "args": { "event_id": "ssd3nt1st", "changes": { "reminder_minutes": [60] } }
+  }
+}

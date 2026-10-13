@@ -98,7 +98,11 @@ enum TestEvents {
                      kind: ScheduleEvent.Kind = .event,
                      seriesID: String? = nil,
                      planID: String? = nil,
-                     colorHex: String = GoogleColor.calendarDefault) -> ScheduleEvent {
+                     colorHex: String = GoogleColor.calendarDefault,
+                     calendar: CalendarRef? = nil,
+                     iCalUID: String? = nil,
+                     isOrganizer: Bool? = nil,
+                     usesCalendarColor: Bool? = nil) -> ScheduleEvent {
         ScheduleEvent(
             id: id,
             seriesID: seriesID,
@@ -113,7 +117,50 @@ enum TestEvents {
             notes: nil,
             reminderMinutes: nil,
             planID: planID,
-            htmlLink: nil
+            htmlLink: nil,
+            accountID: calendar?.accountID,
+            calendarID: calendar?.calendarID,
+            iCalUID: iCalUID,
+            isOrganizer: isOrganizer,
+            usesCalendarColor: usesCalendarColor
         )
+    }
+}
+
+/// Temporary App Group stand-ins: a hostless test bundle has no App Group, so stores get explicit files.
+final class TemporaryStoreFiles {
+    private var urls: [URL] = []
+
+    func url(_ prefix: String) -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(prefix)-\(UUID().uuidString).json")
+        urls.append(url)
+        return url
+    }
+
+    func removeAll() {
+        for url in urls { try? FileManager.default.removeItem(at: url) }
+        urls = []
+    }
+}
+
+enum SampleAccounts {
+    static func calendar(_ accountID: String, _ calendarID: String,
+                         email: String? = nil,
+                         name: String? = nil,
+                         primary: Bool = false,
+                         role: String = "owner",
+                         hex: String = CalendarInfo.defaultColorHex,
+                         visible: Bool = true,
+                         notifications: Bool = true) -> CalendarInfo {
+        CalendarInfo(accountID: accountID, accountEmail: email ?? "\(accountID)@example.com", calendarID: calendarID,
+                     name: name ?? calendarID, isPrimary: primary, accessRole: role, googleColorHex: hex,
+                     isVisible: visible, notificationsEnabled: notifications)
+    }
+
+    /// An account whose primary calendar id is its email, as Google does it.
+    static func account(_ id: String, email: String, extra: [CalendarInfo] = []) -> GoogleAccount {
+        GoogleAccount(id: id, email: email, connectedAt: TestClock.utc(2026, 10, 1),
+                      grantedScopes: [GoogleAccount.calendarListScope],
+                      calendars: [calendar(id, email, email: email, name: email, primary: true)] + extra)
     }
 }

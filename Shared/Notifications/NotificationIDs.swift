@@ -18,10 +18,26 @@ enum NotificationIDs {
     enum UserInfo {
         static let eventID = "ssEventId"
         static let planID = "ssPlanId"
+        /// Reminders: `ScheduleEvent.Kind` raw value, offset in minutes (all-day: before 00:00 of the event day),
+        /// whether the event is all-day, and whether the offset came from the kind's defaults (only those feed
+        /// the dismiss learning).
+        static let kind = "ssKind"
+        static let offset = "ssOffset"
+        static let allDay = "ssAllDay"
+        static let fromDefaults = "ssFromDefaults"
+        /// Briefings: the day the briefing describes, "yyyy-MM-dd".
+        static let briefingDay = "ssBriefingDay"
+        /// Follow-ups presenting an "Ask me first" batch (`PendingEventBatch.id`).
+        static let pendingBatchID = "ssPendingBatchId"
     }
 
     static let reminderPrefix = "ss.reminder."
+    /// Snoozed copies: `ss.reminder.snooze.<uuid>`. Rescheduling leaves them alone.
+    static let snoozePrefix = "ss.reminder.snooze."
     static let nudgePrefix = "ss.nudge."
+    /// `ss.briefing.morning.<yyyy-MM-dd>` / `ss.briefing.evening.<yyyy-MM-dd>`, dated by the delivery day.
+    static let briefingPrefix = "ss.briefing."
+    static let briefingThread = "ss.briefing"
 
     /// Call at every launch (app) — categories are per-app, not per-process.
     static func registerCategories() {
@@ -41,6 +57,8 @@ enum NotificationIDs {
             options: [],
             icon: UNNotificationActionIcon(systemImageName: "zzz")
         )
+        // customDismissAction: swiping a reminder away reaches the app (`ReminderEngagement`), which learns
+        // which default reminders the user keeps ignoring.
         let reminder = UNNotificationCategory(
             identifier: Category.eventReminder,
             actions: [reply, snooze],

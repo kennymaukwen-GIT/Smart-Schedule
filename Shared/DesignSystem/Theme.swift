@@ -16,6 +16,12 @@ enum Theme {
     static let cardRadius: CGFloat = 22
 
     static let weekdayLetters = ["S", "M", "T", "W", "T", "F", "S"]
+
+    /// `weekdayLetters` rotated to start on `firstWeekday` (1 = Sunday, 2 = Monday), like `Calendar.firstWeekday`.
+    static func weekdayLetters(firstWeekday: Int) -> [String] {
+        let start = (1...7).contains(firstWeekday) ? firstWeekday - 1 : 0
+        return Array(weekdayLetters[start...] + weekdayLetters[..<start])
+    }
 }
 
 extension Color {

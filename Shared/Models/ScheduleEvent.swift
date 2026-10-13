@@ -24,6 +24,23 @@ struct ScheduleEvent: Codable, Hashable, Identifiable, Sendable {
     var planID: String?
     var htmlLink: URL?
     var isCompleted: Bool = false
+    // Which connected calendar this copy came from. All nil for demo, draft and pre-migration events.
+    var accountID: String? = nil
+    var calendarID: String? = nil
+    /// Same for every copy of one meeting across accounts (and for every instance of a series).
+    var iCalUID: String? = nil
+    /// The account owning this copy organises the event (Google `organizer.self`).
+    var isOrganizer: Bool? = nil
+    /// No colorId of its own: drawn in its calendar's colour, so a local colour override applies.
+    var usesCalendarColor: Bool? = nil
+
+    /// Cache identity: the same Google id can be cached once per calendar.
+    var ref: EventRef { EventRef(accountID: accountID, calendarID: calendarID, eventID: id) }
+
+    var calendarRef: CalendarRef? {
+        guard let accountID, let calendarID else { return nil }
+        return CalendarRef(accountID: accountID, calendarID: calendarID)
+    }
 
     var duration: TimeInterval { end.timeIntervalSince(start) }
 

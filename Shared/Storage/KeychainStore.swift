@@ -33,12 +33,17 @@ enum KeychainStore {
         SecItemDelete(baseQuery(key: key) as CFDictionary)
     }
 
-    private static func baseQuery(key: String) -> [String: Any] {
+    /// Every item of the service: each account's tokens and the single-account version's item (erase).
+    static func deleteAll() {
+        SecItemDelete(baseQuery(key: nil) as CFDictionary)
+    }
+
+    private static func baseQuery(key: String?) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key
+            kSecAttrService as String: service
         ]
+        if let key { query[kSecAttrAccount as String] = key }
         if let group = AppConstants.keychainAccessGroup {
             query[kSecAttrAccessGroup as String] = group
         }

@@ -62,6 +62,10 @@ targets:
         SSGeminiBaseURL: $(GEMINI_BASE_URL)
         SSGeminiModelID: $(GEMINI_MODEL_ID)
         SSGeminiAPIKey: $(GEMINI_API_KEY)
+        # Placeholders shown in Settings › About and the account sheet; replace before submitting.
+        SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+        SSPrivacyURL: https://example.com/privacy
+        SSSupportEmail: support@example.com
     entitlements:
       path: App/SmartSchedule.entitlements
       properties:
@@ -75,6 +79,8 @@ targets:
     scheme:
       testTargets:
         - SmartScheduleCoreTests
+      # Local StoreKit testing for the Smart Schedule Pro products when run from Xcode (not bundled).
+      storeKitConfiguration: Config/SmartSchedule.storekit
 
   # ───────────── Widget extension: Live Activity / Dynamic Island + Control Center ─────────────
   SmartScheduleWidgets:

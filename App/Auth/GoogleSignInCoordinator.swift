@@ -2,16 +2,25 @@ import AuthenticationServices
 import CryptoKit
 import UIKit
 
+/// Who signed in and the tokens for that account. Nothing is stored yet: `AccountManager` decides whether this is
+/// a new account, a reconnect, or the wrong account for a reconnect.
+struct GoogleSignInResult: Sendable {
+    var tokens: GoogleTokens        // accountID, email, scopes filled
+    var accountID: String           // `sub` from the id_token payload
+    var email: String
+    var grantedScopes: [String]     // token response "scope", split on spaces
+}
+
 /// Google OAuth 2.0 for iOS with PKCE via ASWebAuthenticationSession — no GoogleSignIn SDK, so the
 /// same token store works in every extension.
 ///
-/// Setup: Google Cloud Console → enable "Google Calendar API" → OAuth consent screen (add scope
-/// `calendar.events`) → Credentials → OAuth client ID, type **iOS**, bundle id `com.smartschedule.app`.
-/// Put the client id + reversed client id into Config/Secrets.xcconfig.
+/// Setup: Google Cloud Console → enable "Google Calendar API" → OAuth consent screen (add the scopes
+/// `calendar.events` and `calendar.calendarlist.readonly`) → Credentials → OAuth client ID, type **iOS**,
+/// bundle id `com.smartschedule.app`. Put the client id + reversed client id into Config/Secrets.xcconfig.
 @MainActor
 final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
     enum SignInError: LocalizedError {
-        case notConfigured, cancelled, noCode, tokenExchange(String)
+        case notConfigured, cancelled, noCode, tokenExchange(String), noIdentity
 
         var errorDescription: String? {
             switch self {
@@ -19,13 +28,15 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
             case .cancelled: "Sign-in cancelled."
             case .noCode: "Google did not return an authorization code."
             case let .tokenExchange(reason): "Token exchange failed: \(reason)"
+            case .noIdentity: "Google did not say which account signed in."
             }
         }
     }
 
     private var session: ASWebAuthenticationSession?
 
-    func signIn() async throws {
+    /// - Parameter loginHint: the email of the account to reconnect; Google preselects it.
+    func signIn(loginHint: String? = nil) async throws -> GoogleSignInResult {
         let clientID = AppConstants.googleClientID
         let scheme = AppConstants.googleReversedClientID
         guard !clientID.isEmpty, !scheme.isEmpty else { throw SignInError.notConfigured }
@@ -43,8 +54,12 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
             URLQueryItem(name: "code_challenge", value: challenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent")
+            // select_account: the account chooser even when one Google account is signed in, so a second one can
+            // be added. consent: a refresh token every time.
+            URLQueryItem(name: "prompt", value: "consent select_account"),
+            URLQueryItem(name: "include_granted_scopes", value: "true")
         ]
+        if let loginHint { components.queryItems?.append(URLQueryItem(name: "login_hint", value: loginHint)) }
 
         let callback: URL = try await withCheckedThrowingContinuation { continuation in
             let session = ASWebAuthenticationSession(url: components.url!, callbackURLScheme: scheme) { url, error in
@@ -62,10 +77,10 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
 
         guard let code = URLComponents(url: callback, resolvingAgainstBaseURL: false)?
             .queryItems?.first(where: { $0.name == "code" })?.value else { throw SignInError.noCode }
-        try await exchange(code: code, verifier: verifier, clientID: clientID, redirectURI: redirectURI)
+        return try await exchange(code: code, verifier: verifier, clientID: clientID, redirectURI: redirectURI)
     }
 
-    private func exchange(code: String, verifier: String, clientID: String, redirectURI: String) async throws {
+    private func exchange(code: String, verifier: String, clientID: String, redirectURI: String) async throws -> GoogleSignInResult {
         var request = URLRequest(url: URL(string: "https://oauth2.googleapis.com/token")!)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -83,12 +98,16 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
               let expiresIn = json["expires_in"] as? Double else {
             throw SignInError.tokenExchange(json["error_description"] as? String ?? json["error"] as? String ?? "unknown")
         }
-        try await GoogleTokenProvider.shared.store(GoogleTokens(
-            accessToken: access,
-            refreshToken: refresh,
-            expiresAt: Date().addingTimeInterval(expiresIn),
-            email: nil
-        ))
+        guard let identity = (json["id_token"] as? String).flatMap(IDToken.init(jwt:)) else { throw SignInError.noIdentity }
+        let email = identity.email ?? ""
+        let granted = (json["scope"] as? String)?.split(separator: " ").map(String.init) ?? GoogleTokenProvider.scopes
+        let tokens = GoogleTokens(accessToken: access,
+                                  refreshToken: refresh,
+                                  expiresAt: Date().addingTimeInterval(expiresIn),
+                                  email: email,
+                                  accountID: identity.subject,
+                                  scopes: granted)
+        return GoogleSignInResult(tokens: tokens, accountID: identity.subject, email: email, grantedScopes: granted)
     }
 
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {

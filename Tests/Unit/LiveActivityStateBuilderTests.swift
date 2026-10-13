@@ -20,6 +20,59 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         XCTAssertFalse(state.isInProgress)
     }
 
+    func testStateRecordsTheFirstWeekday() {
+        XCTAssertEqual(build([]).firstWeekday, 1)
+    }
+
+    func testMondayFirstWeek() {
+        let monday = WallClock(timeZone: TestClock.zone, firstWeekday: 2)
+        let state = LiveActivityStateBuilder.build(events: [], lastLine: nil, now: now, clock: monday)
+        XCTAssertEqual(state.firstWeekday, 2)
+        XCTAssertEqual(state.days.map(\.dayNumber), [12, 13, 14, 15, 16, 17, 18])
+        XCTAssertEqual(state.weekStart, TestClock.local(2026, 10, 12))
+        XCTAssertEqual(state.todayIndex, 2)
+        // Sunday is the last day of a Monday-first week.
+        let sunday = LiveActivityStateBuilder.build(events: [], lastLine: nil, now: TestClock.local(2026, 10, 18, 9), clock: monday)
+        XCTAssertEqual(sunday.todayIndex, 6)
+        XCTAssertEqual(sunday.weekStart, TestClock.local(2026, 10, 12))
+    }
+
+    func testPayloadsWithoutFirstWeekdayStillDecode() throws {
+        var object = try TestJSON.object(encoding: build([]))
+        object.removeValue(forKey: "firstWeekday")
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let decoder = JSONDecoder()
+        let state = try decoder.decode(ScheduleActivityAttributes.ContentState.self, from: data)
+        XCTAssertNil(state.firstWeekday)
+    }
+
+    func testDraftsAreNeverTheNextEvent() {
+        let draft = TestEvents.make(id: "draft-ev-batch-0", start: TestClock.local(2026, 10, 14, 11), end: TestClock.local(2026, 10, 14, 12))
+        let real = TestEvents.make(id: "real", start: TestClock.local(2026, 10, 14, 13), end: TestClock.local(2026, 10, 14, 14))
+        XCTAssertEqual(build([draft, real]).eventID, "real")
+    }
+
+    // MARK: Dynamic Island lead time
+
+    func testNextEventIsDueWithinTheLeadTime() {
+        let soon = TestEvents.make(id: "soon", start: TestClock.local(2026, 10, 14, 10, 20), end: TestClock.local(2026, 10, 14, 11))
+        XCTAssertTrue(LiveActivityStateBuilder.isNextEventDue(events: [soon], leadMinutes: 30, now: now))
+        XCTAssertTrue(LiveActivityStateBuilder.isNextEventDue(events: [soon], leadMinutes: 20, now: now))
+        XCTAssertFalse(LiveActivityStateBuilder.isNextEventDue(events: [soon], leadMinutes: 15, now: now))
+        XCTAssertFalse(LiveActivityStateBuilder.isNextEventDue(events: [soon], leadMinutes: nil, now: now))
+        XCTAssertFalse(LiveActivityStateBuilder.isNextEventDue(events: [], leadMinutes: 120, now: now))
+    }
+
+    func testInProgressEventIsDueButAllDayCompletedAndPastAreNot() {
+        let current = TestEvents.make(id: "now", start: TestClock.local(2026, 10, 14, 9, 30), end: TestClock.local(2026, 10, 14, 10, 30))
+        XCTAssertTrue(LiveActivityStateBuilder.isNextEventDue(events: [current], leadMinutes: 15, now: now))
+        var done = current
+        done.isCompleted = true
+        let past = TestEvents.make(id: "past", start: TestClock.local(2026, 10, 14, 8), end: TestClock.local(2026, 10, 14, 9))
+        let allDay = TestEvents.make(id: "day", start: TestClock.local(2026, 10, 14), end: TestClock.local(2026, 10, 15), allDay: true)
+        XCTAssertFalse(LiveActivityStateBuilder.isNextEventDue(events: [done, past, allDay], leadMinutes: 120, now: now))
+    }
+
     func testWeekAcrossAutumnDSTChange() {
         // Tuesday after the clocks go back; the week starts on Sunday 25th, which is 25 hours long.
         let state = build([], now: TestClock.local(2026, 10, 27, 9, 0))

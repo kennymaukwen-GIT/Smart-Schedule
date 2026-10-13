@@ -13,15 +13,34 @@ struct AddPlanIntent: AppIntent {
     init() {}
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let assistant: any ScheduleAssisting = AppConstants.isDemoMode ? DemoAssistant() : ScheduleAssistant.shared
-        let reply = try await assistant.handle(text, focusEventID: nil, now: Date())
+        let demo = AppConstants.isDemoMode
+        // Nothing may reach Gemini before the user allowed it in the app (the sheet cannot be shown from Siri).
+        guard demo || AIConsentStore.current.isGranted else {
+            return .result(dialog: "\(Self.consentNeeded)")
+        }
+        let assistant: any ScheduleAssisting = demo ? DemoAssistant() : ScheduleAssistant.shared
+        let reply: ScheduleAssistant.Reply
+        do {
+            reply = try await assistant.handle(text, focusEventID: nil, now: Date())
+        } catch GeminiError.consentRequired {
+            return .result(dialog: "\(Self.consentNeeded)") // revoked meanwhile
+        }
         await LiveActivityManager.shared.refreshIfRunning()
+        let next = String(localized: "Open Smart Schedule to review it and tap Add.")
         if let plan = reply.planDraft {
             // The draft is already in the App Group; the app shows its card with Add / Keep editing.
-            let next = String(localized: "Open Smart Schedule to review it and tap Add.")
             return .result(dialog: "\(plan.summary) \(next)")
         }
+        if let batch = reply.pendingEvents {
+            // "Ask me first": the events wait in the App Group; the app shows them with Add / Edit.
+            let summary = ReplyFormatter.pendingEventsSummary(batch, clock: WallClock())
+            return .result(dialog: "\(summary) \(next)")
+        }
         return .result(dialog: "\(reply.text)")
+    }
+
+    private static var consentNeeded: String {
+        String(localized: "Turn on AI data sharing in Smart Schedule's Settings first.")
     }
 }
 

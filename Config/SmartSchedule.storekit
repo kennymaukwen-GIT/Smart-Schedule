@@ -1,0 +1,98 @@
+{
+  "identifier" : "5D1C2B7E",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA"
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21500001",
+      "localizations" : [
+        {
+          "description" : "Smart Schedule Pro",
+          "displayName" : "Smart Schedule Pro",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Smart Schedule Pro",
+          "displayName" : "Smart Schedule Pro",
+          "locale" : "zh_TW"
+        }
+      ],
+      "name" : "Smart Schedule Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6740000001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Placeholder: pricing not decided yet.",
+              "displayName" : "Pro Monthly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "暫定：價格尚未決定。",
+              "displayName" : "Pro 月訂閱",
+              "locale" : "zh_TW"
+            }
+          ],
+          "productID" : "com.smartschedule.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "24.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6740000002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Placeholder: pricing not decided yet.",
+              "displayName" : "Pro Yearly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "暫定：價格尚未決定。",
+              "displayName" : "Pro 年訂閱",
+              "locale" : "zh_TW"
+            }
+          ],
+          "productID" : "com.smartschedule.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Yearly",
+          "subscriptionGroupID" : "21500001",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

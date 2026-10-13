@@ -64,4 +64,40 @@ final class ScheduleEventTests: XCTestCase {
     func testDuration() {
         XCTAssertEqual(timed("a", 10, 0, 11, 30).duration, 5400)
     }
+
+    // MARK: Which calendar a copy came from
+
+    func testRefAndCalendarRef() {
+        let calendar = CalendarRef(accountID: "111", calendarID: "kenny@example.com")
+        let scoped = TestEvents.make(id: "e", start: TestClock.local(2026, 10, 14, 9), end: TestClock.local(2026, 10, 14, 10),
+                                     calendar: calendar)
+        XCTAssertEqual(scoped.calendarRef, calendar)
+        XCTAssertEqual(scoped.ref, EventRef(accountID: "111", calendarID: "kenny@example.com", eventID: "e"))
+
+        var unscoped = scoped
+        unscoped.calendarID = nil
+        XCTAssertNil(unscoped.calendarRef)
+        XCTAssertNotEqual(unscoped.ref, scoped.ref)
+    }
+
+    func testCachesWrittenBeforeAccountsStillDecodeAndNewFieldsRoundTrip() throws {
+        let old = #"{"id": "e1", "title": "Old", "start": 1791900000, "end": 1791903600, "isAllDay": false, "kind": "event", "colorHex": "#039BE5", "isCompleted": false}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let event = try decoder.decode(ScheduleEvent.self, from: Data(old.utf8))
+        XCTAssertNil(event.accountID)
+        XCTAssertNil(event.iCalUID)
+        XCTAssertNil(event.isOrganizer)
+        XCTAssertNil(event.usesCalendarColor)
+
+        var stamped = event
+        stamped.accountID = "111"
+        stamped.calendarID = "kenny@example.com"
+        stamped.iCalUID = "e1@google.com"
+        stamped.isOrganizer = true
+        stamped.usesCalendarColor = true
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        XCTAssertEqual(try decoder.decode(ScheduleEvent.self, from: encoder.encode(stamped)), stamped)
+    }
 }

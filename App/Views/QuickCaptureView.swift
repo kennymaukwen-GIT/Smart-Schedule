@@ -138,14 +138,16 @@ struct QuickCaptureView: View {
                                             now: Date(),
                                             calendar: calendar,
                                             locale: ChatFormat.dateLocale(environmentLocale))
+        // Settings › Time zone, not necessarily the device's.
+        let style = Date.FormatStyle(timeZone: calendar.timeZone)
 
         return ZStack(alignment: .bottom) {
             HStack(alignment: .bottom) {
                 VStack(spacing: 3) {
-                    Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                    Text(day.formatted(style.weekday(.abbreviated)).uppercased())
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white)
-                    Text(day.formatted(.dateTime.day()))
+                    Text(day.formatted(style.day()))
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(.black)
                         .frame(width: 40, height: 40)
@@ -159,7 +161,7 @@ struct QuickCaptureView: View {
                             .font(.system(size: 11, weight: .medium).monospacedDigit())
                             .foregroundStyle(Theme.textSecondary)
                     }
-                    Text(day.formatted(.dateTime.month(.abbreviated)))
+                    Text(day.formatted(style.month(.abbreviated)))
                         .font(.system(size: 28, weight: .light))
                         .foregroundStyle(.white)
                         .lineLimit(1)
@@ -209,6 +211,8 @@ struct QuickCaptureView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
             }
         }
+        // A new time zone or first weekday lays the pagers out again from the focus day.
+        .id(schedule.clockID)
         .animation(.snappy, value: mode)
     }
 
@@ -282,7 +286,8 @@ struct QuickCaptureView: View {
                                        isBusy: chat.isBusy,
                                        onConfirmDelete: { chat.confirmDeletion(in: message) },
                                        onAddPlan: { chat.addPlan(message) },
-                                       onKeepEditing: { chat.keepEditing(message) })
+                                       onKeepEditing: { chat.keepEditing(message) },
+                                       actions: ChatCardActions(message: message, chat: chat))
                             .id(message.id)
                     }
                     if chat.isSending {
@@ -294,6 +299,10 @@ struct QuickCaptureView: View {
                 .padding(.bottom, 4)
             }
             .scrollDismissesKeyboard(.interactively)
+
+            if chat.showsConsentBanner {
+                ConsentBanner { chat.reviewConsent() }
+            }
 
             ComposerBar(
                 text: $chat.draft,

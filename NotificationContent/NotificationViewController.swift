@@ -40,6 +40,9 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
 
     func didReceive(_ response: UNNotificationResponse,
                     completionHandler completion: @escaping (UNNotificationContentExtensionResponseOption) -> Void) {
+        // Replying or snoozing here counts as engaging with the reminder (learned suggestions).
+        Task { await ReminderEngagement.record(response) }
+
         switch response.actionIdentifier {
         case NotificationIDs.Action.reply:
             if let text = (response as? UNTextInputNotificationResponse)?.userText {

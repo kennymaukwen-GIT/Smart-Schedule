@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// One assistant turn in the chat panel and Quick Capture: the prose first, then whatever the reply carries as
-/// data (added-event rows, an agenda, a plan card), then its suggestion chips when it is the newest message.
+/// data (added-event rows, an agenda, a plan card, pending events, a settings change, a learned suggestion), then
+/// its suggestion chips when it is the newest message.
 struct AssistantMessageView: View {
     let message: ChatViewModel.Message
     /// Only the newest reply offers chips; an older one's would answer a question the conversation has left.
@@ -14,6 +15,7 @@ struct AssistantMessageView: View {
     var onConfirmDelete: () -> Void = {}
     var onAddPlan: () -> Void = {}
     var onKeepEditing: () -> Void = {}
+    var actions = ChatCardActions()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -25,6 +27,20 @@ struct AssistantMessageView: View {
             }
             if let agenda = message.agenda {
                 AgendaList(digest: agenda)
+            }
+            if let batch = message.pendingEvents {
+                PendingEventsCard(batch: batch,
+                                  status: message.pendingEventsStatus,
+                                  isDemo: isDemo,
+                                  compact: compact,
+                                  onAdd: actions.addPendingEvents,
+                                  onEdit: actions.editPendingEvents)
+            }
+            if let receipt = message.preferenceReceipt {
+                SettingsUpdatedCard(receipt: receipt, undo: message.receiptUndo, onUndo: actions.undoPreferences)
+            }
+            if let suggestion = message.learnedSuggestion {
+                LearnedSuggestionCard(suggestion: suggestion, onResolve: actions.resolveSuggestion)
             }
             if let plan = message.planDraft {
                 // The card lists the plan's assumptions itself.
@@ -51,6 +67,25 @@ struct AssistantMessageView: View {
                 SuggestionChips(suggestions: message.suggestions, isDisabled: isBusy, onSelect: onSuggestion)
             }
         }
+    }
+}
+
+/// What the cards of the "Ask me first", settings and learned-suggestion flows do when tapped.
+struct ChatCardActions {
+    var addPendingEvents: () -> Void = {}
+    var editPendingEvents: () -> Void = {}
+    var undoPreferences: () -> Void = {}
+    var resolveSuggestion: (_ accept: Bool) -> Void = { _ in }
+}
+
+extension ChatCardActions {
+    /// The actions on `message`'s cards, run by `chat`.
+    @MainActor
+    init(message: ChatViewModel.Message, chat: ChatViewModel) {
+        self.init(addPendingEvents: { chat.addPendingEvents(message) },
+                  editPendingEvents: { chat.editPendingEvents(message) },
+                  undoPreferences: { chat.undoPreferences(message) },
+                  resolveSuggestion: { chat.resolveSuggestion(message, accept: $0) })
     }
 }
 

@@ -108,6 +108,40 @@ final class WallClockTests: XCTestCase {
         XCTAssertNil(WallClock.parseRFC3339("2026-10-14"))
     }
 
+    // MARK: First weekday
+
+    func testFirstWeekdayDefaultsToSundayAndIsValidated() {
+        XCTAssertEqual(clock.firstWeekday, 1)
+        XCTAssertEqual(clock.calendar.firstWeekday, 1)
+        XCTAssertEqual(WallClock(timeZone: TestClock.zone, firstWeekday: 2).calendar.firstWeekday, 2)
+        XCTAssertEqual(WallClock(timeZone: TestClock.zone, firstWeekday: 9).firstWeekday, 1)
+        XCTAssertEqual(WallClock(timeZone: TestClock.zone, firstWeekday: 2).timeZone, TestClock.zone)
+    }
+
+    func testMondayFirstWeeks() {
+        let monday = WallClock(timeZone: TestClock.zone, firstWeekday: 2)
+        let wednesday = TestClock.local(2026, 10, 14, 10)
+        XCTAssertEqual(CalendarPaging.weekStart(containing: wednesday, calendar: monday.calendar), TestClock.local(2026, 10, 12))
+        XCTAssertEqual(CalendarPaging.weekStart(containing: wednesday, calendar: clock.calendar), TestClock.local(2026, 10, 11))
+        XCTAssertEqual(monday.calendar.dateInterval(of: .weekOfYear, for: wednesday)?.start, TestClock.local(2026, 10, 12))
+        // A Sunday belongs to the week that started the Monday before.
+        XCTAssertEqual(CalendarPaging.weekStart(containing: TestClock.local(2026, 10, 18, 9), calendar: monday.calendar),
+                       TestClock.local(2026, 10, 12))
+        // Across the autumn change: the week of Tuesday 27 Oct starts on Monday 26th (GMT).
+        XCTAssertEqual(CalendarPaging.weekInterval(containing: TestClock.local(2026, 10, 27, 9), calendar: monday.calendar),
+                       DateInterval(start: TestClock.local(2026, 10, 26), end: TestClock.local(2026, 11, 2)))
+        // The week holding the change (Mon 19 – Sun 25 Oct) is 7 days and 1 hour long.
+        let dstWeek = CalendarPaging.weekInterval(containing: TestClock.local(2026, 10, 25, 12), calendar: monday.calendar)
+        XCTAssertEqual(dstWeek.start, TestClock.local(2026, 10, 19))
+        XCTAssertEqual(dstWeek.duration, 7 * 86_400 + 3600)
+    }
+
+    func testFirstWeekdayDoesNotChangeParsing() {
+        let monday = WallClock(timeZone: TestClock.zone, firstWeekday: 2)
+        XCTAssertEqual(monday.dateTime("2026-10-14T14:00"), clock.dateTime("2026-10-14T14:00"))
+        XCTAssertEqual(monday.dateString(TestClock.utc(2026, 10, 13, 23, 30)), "2026-10-14")
+    }
+
     // MARK: DST (Europe/London)
 
     func testAutumnBoundary20261025() throws {

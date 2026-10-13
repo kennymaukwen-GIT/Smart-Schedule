@@ -8,11 +8,14 @@ extension ScheduleViewModel {
     /// Preview-only: demo events in memory; `bootstrap()` is never called, so nothing touches Google.
     /// `pendingPlan` draws that draft's occurrences as ghosts. Previews never load ranges on demand, so
     /// `alsoLoading` adds the weekly demo series of a far-off range in memory, as the app would load it.
+    /// `accounts` nil: the sample accounts in demo mode, none otherwise (signed out).
     static func preview(focusDay: Date? = nil,
                         displayedMonth: Date? = nil,
                         alsoLoading range: DateInterval? = nil,
                         isDemo: Bool = true,
-                        pendingPlan: PlanDraft? = nil) -> ScheduleViewModel {
+                        accounts: [GoogleAccount]? = nil,
+                        pendingPlan: PlanDraft? = nil,
+                        pendingEvents: PendingEventBatch? = nil) -> ScheduleViewModel {
         let model = ScheduleViewModel()
         model.events = DemoData.events(clock: model.clock)
         if let range {
@@ -21,7 +24,11 @@ extension ScheduleViewModel {
             model.events.sort { $0.start < $1.start }
         }
         model.isDemo = isDemo
+        model.accounts = accounts ?? (isDemo ? DemoData.accounts : [])
+        model.isSignedIn = !isDemo && !model.accounts.isEmpty
+        model.defaultWriteTarget = model.accounts.first?.primaryCalendar?.id
         model.pendingPlan = pendingPlan
+        model.pendingEvents = pendingEvents
         if let focusDay { model.focusDay = focusDay }
         if let displayedMonth { model.displayedMonth = displayedMonth }
         return model
@@ -524,5 +531,315 @@ private func repliesPreview(chinese: Bool) -> some View {
 #Preview("Replies · zh-Hant") {
     repliesPreview(chinese: true)
         .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
+// MARK: - Accounts, drawer, Settings (Artboard 5)
+
+/// Preview-only accounts with example addresses: a personal account with a few calendars, a school account whose
+/// sign-in expired, and one moved over from the single-account version (no calendar-list permission yet).
+enum PreviewAccounts {
+    static var personal: GoogleAccount {
+        let email = "kenny@example.com"
+        let id = "preview-personal"
+        return GoogleAccount(id: id, email: email, connectedAt: Date(),
+                             grantedScopes: [GoogleAccount.calendarListScope], needsReconnect: false,
+                             calendars: [
+                                 calendar(id, email, email, "Kenny", primary: true, "#039BE5"),
+                                 calendar(id, email, "gym", "Gym", primary: false, "#0B8043"),
+                                 calendar(id, email, "holidays", "Holidays in Hong Kong", primary: false, "#7986CB",
+                                          role: "reader", visible: false)
+                             ],
+                             calendarsUpdatedAt: Date())
+    }
+
+    static var school: GoogleAccount {
+        let email = "student@university.example.edu"
+        let id = "preview-school"
+        return GoogleAccount(id: id, email: email, connectedAt: Date(),
+                             grantedScopes: [GoogleAccount.calendarListScope], needsReconnect: true,
+                             calendars: [calendar(id, email, email, "Student", primary: true, "#E67C73")],
+                             calendarsUpdatedAt: Date())
+    }
+
+    static var migrated: GoogleAccount {
+        let email = "work@example.com"
+        let id = "preview-work"
+        return GoogleAccount(id: id, email: email, connectedAt: Date(), grantedScopes: [], needsReconnect: false,
+                             calendars: [calendar(id, email, email, email, primary: true, "#039BE5")],
+                             calendarsUpdatedAt: nil)
+    }
+
+    static var all: [GoogleAccount] { [personal, school, migrated] }
+
+    private static func calendar(_ accountID: String, _ email: String, _ calendarID: String, _ name: String,
+                                 primary: Bool, _ hex: String, role: String = "owner",
+                                 visible: Bool = true) -> CalendarInfo {
+        CalendarInfo(accountID: accountID, accountEmail: email, calendarID: calendarID, name: name, isPrimary: primary,
+                     accessRole: role, googleColorHex: hex, timeZone: "Europe/London", isVisible: visible,
+                     colorOverrideHex: nil, notificationsEnabled: true)
+    }
+}
+
+/// Preview-only cards: a settings change made by voice, a learned suggestion and "Ask me first" events.
+@MainActor
+enum PreviewCards {
+    static func receipt(chinese: Bool) -> PreferenceChangeReceipt {
+        var after = AppPreferences()
+        after.quietHours = QuietHours(isEnabled: true, startMinute: 22 * 60, endMinute: 8 * 60)
+        after.setReminders([120], for: .routine)
+        let before = AppPreferences()
+        let changes = [PreferenceKey.quietHours, .routineReminders].map { key in
+            PreferenceChange(key: key, oldValue: before.canonicalValue(for: key), newValue: after.canonicalValue(for: key),
+                             oldDisplay: before.displayValue(for: key), newDisplay: after.displayValue(for: key),
+                             replacedEntry: nil)
+        }
+        return PreferenceChangeReceipt(id: UUID(), date: Date(),
+                                       source: .voice(utterance: chinese ? "以後 8 點前不要提醒我，健身提前 2 小時提醒"
+                                                                         : "From now on don't remind me before 8am"),
+                                       changes: changes)
+    }
+
+    static func suggestion(_ status: LearnedSuggestion.Status = .pending) -> LearnedSuggestion {
+        LearnedSuggestion(id: UUID(), kind: .event, offsetMinutes: 1440, isAllDay: false, dismissCount: 5,
+                          createdAt: Date(), status: status, shownInChat: true)
+    }
+
+    static func batch(schedule: ScheduleViewModel, chinese: Bool) -> PendingEventBatch {
+        let samples = PreviewChat(schedule: schedule, chinese: chinese)
+        var lunch = samples.lunch
+        lunch.id = "draft-ev-preview0-0" // a draft id: drawn as a ghost
+        let previews = [lunch]
+        return PendingEventBatch(id: "batch-preview0", createdAt: Date(), utterance: "", seed: "preview",
+                                 argsJSON: Data("{}".utf8), target: DemoData.defaultCalendar,
+                                 targetLabel: "My calendar · kenny@example.com", previewEvents: previews)
+    }
+
+    static func chat(schedule: ScheduleViewModel, chinese: Bool) -> ChatViewModel {
+        let chat = ChatViewModel(schedule: schedule, assistant: DemoAssistant())
+        let samples = PreviewChat(schedule: schedule, chinese: chinese)
+        chat.messages = [
+            .init(role: .user, text: samples.text("From now on don't remind me before 8am", "以後 8 點前不要提醒我")),
+            .init(role: .assistant,
+                  text: samples.text("OK. From now on, reminders before 08:00 arrive silently.",
+                                     "好的，以後 08:00 前的提醒會靜音送達。"),
+                  preferenceReceipt: receipt(chinese: chinese)),
+            .init(role: .assistant, text: "", learnedSuggestion: suggestion()),
+            .init(role: .user, text: samples.text("Lunch with Andrew tomorrow 1pm at Café Lucia",
+                                                  "明天下午一點跟 Andrew 在 Café Lucia 吃午餐")),
+            .init(role: .assistant, text: "", pendingEvents: batch(schedule: schedule, chinese: chinese))
+        ]
+        return chat
+    }
+
+    static func ledger(chinese: Bool) -> [LedgerEntry] {
+        receipt(chinese: chinese).changes.map { change in
+            LedgerEntry(id: UUID(), key: change.key, value: change.newValue, display: change.newDisplay,
+                        previousDisplay: change.oldDisplay, source: receipt(chinese: chinese).source, date: Date())
+        }
+    }
+
+    static func settings(chinese: Bool = false) -> SettingsModel {
+        var preferences = AppPreferences()
+        preferences.quietHours = QuietHours(isEnabled: true, startMinute: 22 * 60, endMinute: 8 * 60)
+        preferences.setReminders([120], for: .routine)
+        return SettingsModel(preview: preferences, ledger: ledger(chinese: chinese), suggestions: [suggestion()],
+                             consent: AIConsent(status: .granted, version: AIConsent.disclosureVersion, decidedAt: Date()))
+    }
+}
+
+@MainActor
+private func signedInSchedule() -> ScheduleViewModel {
+    ScheduleViewModel.preview(isDemo: false, accounts: PreviewAccounts.all)
+}
+
+#Preview("Main · signed in") {
+    let schedule = signedInSchedule()
+    MainView()
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule))
+        .environment(AppRouter())
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Header · zh-Hant") {
+    VStack(spacing: 20) {
+        AppHeader(month: PreviewDates.january2027, calendar: WallClock().calendar, avatarInitial: "K")
+        AppHeader(month: PreviewDates.march2031, calendar: WallClock().calendar, avatarInitial: nil)
+    }
+    .padding(12)
+    .background(Theme.canvas)
+    .environment(\.locale, Locale(identifier: "zh-Hant"))
+    .preferredColorScheme(.dark)
+}
+
+/// Swipe it towards the left edge or tap the dimmed side to close (in the app).
+@MainActor
+private func drawerPreview(_ schedule: ScheduleViewModel, chinese: Bool = false) -> some View {
+    ZStack(alignment: .top) {
+        Theme.canvas.ignoresSafeArea()
+        Color.black.opacity(0.45).ignoresSafeArea()
+        CalendarDrawer(onClose: {})
+    }
+    .environment(schedule)
+    .environment(ChatViewModel.preview(schedule: schedule, chinese: chinese))
+    .environment(AppRouter())
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Drawer · signed in") {
+    drawerPreview(signedInSchedule())
+}
+
+#Preview("Drawer · demo · zh-Hant") {
+    drawerPreview(ScheduleViewModel.preview(), chinese: true)
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
+
+#Preview("Drawer · signed out") {
+    drawerPreview(ScheduleViewModel.preview(isDemo: false))
+}
+
+#Preview("Calendar details") {
+    let schedule = signedInSchedule()
+    NavigationStack {
+        CalendarDetailsView(ref: PreviewAccounts.personal.calendars[1].id)
+    }
+    .environment(schedule)
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Calendar details · read-only · zh-Hant") {
+    let schedule = signedInSchedule()
+    NavigationStack {
+        CalendarDetailsView(ref: PreviewAccounts.personal.calendars[2].id)
+    }
+    .environment(schedule)
+    .environment(\.locale, Locale(identifier: "zh-Hant"))
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Account sheet") {
+    let schedule = signedInSchedule()
+    AccountSheet()
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule))
+}
+
+#Preview("Account sheet · demo · zh-Hant") {
+    let schedule = ScheduleViewModel.preview()
+    AccountSheet()
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule, chinese: true))
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
+
+@MainActor
+private func settingsPreview<Page: View>(chinese: Bool = false, @ViewBuilder page: () -> Page) -> some View {
+    let schedule = signedInSchedule()
+    let content = page()
+    return NavigationStack { content }
+        .environment(PreviewCards.settings(chinese: chinese))
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule, chinese: chinese))
+        .environment(\.locale, Locale(identifier: chinese ? "zh-Hant" : "en_US"))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Settings") {
+    let schedule = signedInSchedule()
+    SettingsView(model: PreviewCards.settings())
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule))
+}
+
+#Preview("Settings · zh-Hant") {
+    let schedule = signedInSchedule()
+    SettingsView(model: PreviewCards.settings(chinese: true))
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule, chinese: true))
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
+
+#Preview("Settings · Notifications") {
+    settingsPreview { NotificationSettingsView() }
+}
+
+#Preview("Settings · Notifications · zh-Hant") {
+    settingsPreview(chinese: true) { NotificationSettingsView() }
+}
+
+#Preview("Settings · Default reminders") {
+    settingsPreview { ReminderListEditor(kind: .event) }
+}
+
+#Preview("Settings · Calendar & new events") {
+    settingsPreview { CalendarSettingsView() }
+}
+
+#Preview("Settings · Assistant · zh-Hant") {
+    settingsPreview(chinese: true) { AssistantSettingsView() }
+}
+
+#Preview("Settings · AI & privacy") {
+    settingsPreview { PrivacySettingsView() }
+}
+
+#Preview("Settings · AI & privacy · zh-Hant") {
+    settingsPreview(chinese: true) { PrivacySettingsView() }
+}
+
+#Preview("Settings · Data") {
+    settingsPreview { DataSettingsView() }
+}
+
+#Preview("Settings · Shortcuts and Siri · zh-Hant") {
+    settingsPreview(chinese: true) { ShortcutsGuideView() }
+}
+
+#Preview("AI consent") {
+    Color.black
+        .sheet(isPresented: .constant(true)) {
+            AIConsentSheet(onAllow: {}, onNotNow: {})
+        }
+}
+
+#Preview("Chat cards") {
+    let schedule = signedInSchedule()
+    ChatPanel()
+        .frame(height: 640)
+        .padding(12)
+        .background(Theme.canvas)
+        .environment(schedule)
+        .environment(PreviewCards.chat(schedule: schedule, chinese: false))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Chat cards · zh-Hant") {
+    let schedule = signedInSchedule()
+    ChatPanel()
+        .frame(height: 640)
+        .padding(12)
+        .background(Theme.canvas)
+        .environment(schedule)
+        .environment(PreviewCards.chat(schedule: schedule, chinese: true))
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Chat cards · settled") {
+    let schedule = signedInSchedule()
+    ScrollView {
+        VStack(spacing: 16) {
+            SettingsUpdatedCard(receipt: PreviewCards.receipt(chinese: false), undo: .undone)
+            SettingsUpdatedCard(receipt: PreviewCards.receipt(chinese: false), undo: .changedSince)
+            LearnedSuggestionCard(suggestion: PreviewCards.suggestion(.accepted))
+            LearnedSuggestionCard(suggestion: PreviewCards.suggestion(.declined))
+            PendingEventsCard(batch: PreviewCards.batch(schedule: schedule, chinese: false), status: .added(demo: false))
+            PendingEventsCard(batch: PreviewCards.batch(schedule: schedule, chinese: false), status: .replaced)
+            ConsentBanner(onReview: {})
+        }
+        .padding(12)
+    }
+    .background(Theme.surface)
+    .preferredColorScheme(.dark)
 }
 #endif

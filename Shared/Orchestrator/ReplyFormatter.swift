@@ -220,4 +220,52 @@ enum ReplyFormatter {
     static func planAdded(_ title: String) -> String {
         String(localized: "Added “\(title)” to Google Calendar.")
     }
+
+    // MARK: "Ask me first" pending events
+
+    /// What waits for Add: "Ready to add: Lunch with Andrew · Wed, Oct 14 · 13:00–14:00", or a count and one
+    /// "• " line per event.
+    static func pendingEventsSummary(_ batch: PendingEventBatch, clock: WallClock,
+                                     locale: Locale = ReplyFormatter.displayLocale) -> String {
+        let events = batch.previewEvents.sorted { $0.start < $1.start }
+        guard let first = events.first else { return "" }
+        if events.count == 1 {
+            return String(localized: "Ready to add: \(first.title) · \(when(first, clock: clock, locale: locale))")
+        }
+        let lines = events.map { "• \($0.title) · \(when($0, clock: clock, locale: locale))" }
+        return String(localized: "Ready to add \(events.count) events:") + "\n" + lines.joined(separator: "\n")
+    }
+
+    /// Follows the pending events while they wait for Add.
+    static var pendingEventsPrompt: String {
+        String(localized: "Tap Add to put it in your calendar, or Edit to change it.")
+    }
+
+    static func pendingEventsAdded(_ count: Int) -> String {
+        count == 1 ? String(localized: "Added 1 event to Google Calendar.")
+                   : String(localized: "Added \(count) events to Google Calendar.")
+    }
+
+    static var pendingEventsDiscarded: String {
+        String(localized: "Discarded. Nothing was added to your calendar.")
+    }
+
+    // MARK: Settings changed by voice
+
+    /// Text version of the "Settings updated" card: a header, then "• Quiet hours: Off → 22:00–08:00" per change.
+    static func preferencesUpdated(_ receipt: PreferenceChangeReceipt) -> String {
+        let lines = receipt.changes.map { "• \($0.key.title): \($0.oldDisplay) → \($0.newDisplay)" }
+        return ([String(localized: "Settings updated")] + lines).joined(separator: "\n")
+    }
+
+    /// nil when nothing was refused. The reasons stay with Gemini (English); the user gets the setting names.
+    static func preferencesRejected(_ rejected: [PreferenceRejection]) -> String? {
+        guard !rejected.isEmpty else { return nil }
+        var seen = Set<String>()
+        let names = rejected
+            .map { PreferenceKey(rawValue: $0.key)?.title ?? $0.key }
+            .filter { seen.insert($0).inserted }
+            .joined(separator: ", ")
+        return String(localized: "I couldn't change \(names). You can change it in Settings.")
+    }
 }

@@ -66,4 +66,45 @@ final class DemoDataRangeTests: XCTestCase {
         XCTAssertFalse(series.contains { $0.id == "demo-gym-2026-10-23" || $0.id == "demo-yoga-2026-10-24" })
         XCTAssertTrue(series.contains { $0.id == "demo-gym-2026-10-21" })
     }
+
+    // MARK: Sample accounts
+
+    func testSampleAccountsAndWhereEachSampleEventLives() {
+        let accounts = DemoData.accounts
+        XCTAssertEqual(accounts.map(\.email), ["you@example.com", "student@university.example.edu"])
+        XCTAssertTrue(accounts.allSatisfy { $0.isDemo && $0.canListCalendars && !$0.needsReconnect })
+        XCTAssertEqual(accounts[0].calendars.map(\.id), [DemoData.personalCalendar, DemoData.gymCalendar])
+        XCTAssertEqual(accounts[0].calendars.map(\.googleColorHex), ["#039BE5", "#0B8043"])
+        XCTAssertEqual(accounts[1].calendars.map(\.id), [DemoData.schoolCalendar])
+        XCTAssertEqual(accounts[1].primaryCalendar?.googleColorHex, "#7986CB")
+        XCTAssertTrue(accounts.flatMap(\.calendars).allSatisfy { $0.isWritable && $0.isVisible && $0.notificationsEnabled })
+        XCTAssertEqual(accounts[0].primaryCalendar?.id, DemoData.defaultCalendar)
+        XCTAssertEqual(accounts[1].calendars.first?.promptLabel, "My calendar | student@university.example.edu")
+
+        let seed = DemoData.events(now: now, clock: clock)
+        XCTAssertTrue(seed.allSatisfy { $0.calendarRef != nil })
+        func calendar(_ title: String) -> Set<CalendarRef?> {
+            Set((seed + DemoData.recurringEvents(in: DemoData.seedWindow(now: now, clock: clock), clock: clock))
+                .filter { $0.title == title }.map(\.calendarRef))
+        }
+        XCTAssertEqual(calendar("Gym"), [DemoData.gymCalendar])
+        XCTAssertEqual(calendar("Yoga"), [DemoData.gymCalendar])
+        XCTAssertEqual(calendar("Weekly team sync"), [DemoData.schoolCalendar])
+        XCTAssertEqual(calendar("Deadline for Plan 5008"), [DemoData.schoolCalendar])
+        XCTAssertEqual(calendar("Lunch"), [DemoData.personalCalendar])
+        XCTAssertEqual(calendar("Pay bills"), [DemoData.personalCalendar])
+
+        // Tasks and deadlines keep their own colour; the rest follow their calendar's (and a local override).
+        let sync = seed.first { $0.title == "Weekly team sync" }
+        XCTAssertEqual(sync?.colorHex, "#7986CB")
+        XCTAssertEqual(sync?.usesCalendarColor, true)
+        let bills = seed.first { $0.title == "Pay bills" }
+        XCTAssertEqual(bills?.colorHex, DemoData.taskHex)
+        XCTAssertEqual(bills?.usesCalendarColor, false)
+    }
+
+    func testTheSampleWeekIgnoresWeekStart() {
+        let mondayFirst = WallClock(timeZone: TestClock.zone, firstWeekday: 2)
+        XCTAssertEqual(DemoData.seedWindow(now: now, clock: mondayFirst), DemoData.seedWindow(now: now, clock: clock))
+    }
 }

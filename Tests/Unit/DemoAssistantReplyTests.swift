@@ -16,9 +16,12 @@ final class DemoAssistantReplyTests: XCTestCase {
 
     private func makeAssistant() -> DemoAssistant {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("DemoAssistantReplyTests-\(UUID().uuidString).json")
-        storeFiles.append(url)
-        // No notification center in a hostless test bundle.
-        return DemoAssistant(store: SharedStore(fileURL: url), clock: TestClock.clock, rescheduleReminders: { _ in })
+        let preferencesURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DemoAssistantReplyTests-prefs-\(UUID().uuidString).json")
+        storeFiles += [url, preferencesURL]
+        // Default settings in a file of its own; no notification center in a hostless test bundle.
+        return DemoAssistant(store: SharedStore(fileURL: url), clock: TestClock.clock,
+                             preferences: PreferencesStore(fileURL: preferencesURL), rescheduleReminders: { _ in })
     }
 
     private func ask(_ assistant: DemoAssistant, _ text: String) async throws -> Reply {

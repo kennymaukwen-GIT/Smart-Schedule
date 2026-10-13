@@ -20,6 +20,19 @@ struct GCalEvent: Codable, Sendable {
     var extendedProperties: GCalExtendedProperties?
     var hangoutLink: String?
     var htmlLink: String?
+    /// Same in every attendee's calendar and for every instance of a series (read only).
+    var iCalUID: String?
+    var organizer: GCalPerson?
+}
+
+struct GCalPerson: Codable, Sendable {
+    var email: String?
+    var isSelf: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case email
+        case isSelf = "self"
+    }
 }
 
 struct GCalDateTime: Codable, Sendable {
@@ -70,6 +83,55 @@ struct GCalEventList: Decodable, Sendable {
     var nextSyncToken: String?
 }
 
+/// One entry of `users/me/calendarList` (needs the `calendar.calendarlist.readonly` scope).
+struct GCalCalendarListEntry: Codable, Sendable {
+    var id: String?
+    var summary: String?
+    var summaryOverride: String?
+    var backgroundColor: String?    // "#9fe1e7": the calendar palette, not the event palette
+    var accessRole: String?         // owner | writer | reader | freeBusyReader
+    var primary: Bool?
+    var selected: Bool?             // shown in Google Calendar's own list
+    var hidden: Bool?
+    var deleted: Bool?
+    var timeZone: String?
+}
+
+struct GCalCalendarList: Decodable, Sendable {
+    var items: [GCalCalendarListEntry]?
+    var nextPageToken: String?
+}
+
+extension GCalCalendarListEntry {
+    /// A calendar of `accountID` as first listed: visible when Google shows it (the primary calendar always),
+    /// notifications on. `AccountStore.replaceCalendars` keeps the local settings of calendars it already knows.
+    func calendarInfo(accountID: String, accountEmail: String) -> CalendarInfo? {
+        guard let id, !id.isEmpty, hidden != true, deleted != true else { return nil }
+        let isPrimary = primary == true
+        return CalendarInfo(
+            accountID: accountID,
+            accountEmail: accountEmail,
+            calendarID: id,
+            name: summaryOverride.nonBlank ?? summary.nonBlank ?? id,
+            isPrimary: isPrimary,
+            accessRole: accessRole ?? "reader",
+            googleColorHex: backgroundColor.flatMap(Self.normalizedHex) ?? CalendarInfo.defaultColorHex,
+            timeZone: timeZone,
+            isVisible: isPrimary || selected == true,
+            colorOverrideHex: nil,
+            notificationsEnabled: true
+        )
+    }
+
+    /// "#9fe1e7" → "#9FE1E7"; nil for anything that is not #RRGGBB.
+    static func normalizedHex(_ value: String) -> String? {
+        let hex = value.trimmingCharacters(in: .whitespaces).uppercased()
+        guard hex.count == 7, hex.hasPrefix("#"),
+              hex.dropFirst().allSatisfy({ $0.isHexDigit }) else { return nil }
+        return hex
+    }
+}
+
 /// Keys written to `extendedProperties.private` so events created by Smart Schedule can be found,
 /// grouped into plans and round-tripped without parsing titles. Queryable with
 /// `privateExtendedProperty=ssPlanId=<id>` on events.list.
@@ -78,6 +140,9 @@ enum SSProperty {
     static let kind = "ssKind"         // ScheduleEvent.Kind raw value
     static let planID = "ssPlanId"
     static let schema = "ssSchema"     // bump when the mapping changes
+    /// The reminders Smart Schedule itself sends: "default" (the kind's defaults) or minutes like "60,10".
+    /// Google's own pop-ups may differ (none at all in "Smart Schedule only" mode).
+    static let localReminders = "ssReminders"
 }
 
 /// Google Calendar event colorIds (fixed palette) → hex used for chips.

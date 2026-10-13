@@ -4,13 +4,22 @@ import Observation
 @MainActor
 @Observable
 final class ScheduleViewModel {
+    /// Visible events (`SharedStore.visibleEvents`): hidden and Focus-filtered calendars left out, one copy per
+    /// meeting seen in several accounts.
     var events: [ScheduleEvent] = []
     /// A long-term plan shown for review but not in Google Calendar yet. Its `previewEvents` are drawn as ghosts.
     var pendingPlan: PlanDraft?
+    /// "Ask me first": single events waiting for Add. Their `previewEvents` are drawn as ghosts too.
+    var pendingEvents: PendingEventBatch?
     var displayedMonth: Date
     var focusDay = Date()
     /// The latest range the assistant asked to show (Quick Capture switches scope and scrolls to it).
     private(set) var focusRequest: FocusRequest?
+    /// Connected Google accounts in connection order; the sample accounts in demo mode.
+    var accounts: [GoogleAccount] = []
+    /// Where new events go (Settings › Calendar & new events, or the first account's primary calendar).
+    var defaultWriteTarget: CalendarRef?
+    /// Any Google account connected (one needing reconnection included), demo mode or not.
     var isSignedIn = false
     var isRefreshing = false
     var isDemo = false
@@ -18,7 +27,8 @@ final class ScheduleViewModel {
     /// True while `ensureEvents(covering:)` is loading a range the cache did not hold (a subtle progress hint).
     private(set) var isLoadingRange = false
 
-    let clock = WallClock()
+    /// Follows Settings › "Time zone" and "Week starts on"; rebuilt when preferences change.
+    private(set) var clock = WallClock()
 
     /// Cache cap: past this many cached events, ranges more than `keepMonths` from both today and the range last
     /// on screen are dropped (and listed again if they come back). About 1 MB of App Group JSON.
@@ -26,14 +36,21 @@ final class ScheduleViewModel {
     private static let keepMonths = 12
     /// `ensureEvents` waits this long after the last call, so a fling loads only where it settles.
     private static let rangeDebounce: Duration = .milliseconds(300)
-    /// Xcode Previews keep their in-memory sample events; a load would swap them for the preview sandbox's cache.
-    private static let loadsRangesOnDemand = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1"
+    /// Xcode Previews keep their in-memory sample events and accounts; a load would swap them for the preview
+    /// sandbox's empty App Group.
+    private static let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+    private static let loadsRangesOnDemand = !isPreview
+    /// Settings changes (a stepper, a run of toggles) and account edits arrive in bursts: react once they settle.
+    private static let changeDebounce: Duration = .milliseconds(400)
 
     @ObservationIgnored private var rangeDebounceTask: Task<Void, Never>?
     @ObservationIgnored private var pendingRanges: [DateInterval] = []
     @ObservationIgnored private var rangesInFlight = LoadedRanges()
     /// What the calendars last asked for (or `focus` jumped to): re-listed after a rolling refresh, kept by the cap.
     @ObservationIgnored private var lastRequestedRange: DateInterval?
+    @ObservationIgnored private var observations: [SharedChangeObservation] = []
+    @ObservationIgnored private var preferencesTask: Task<Void, Never>?
+    @ObservationIgnored private var accountsTask: Task<Void, Never>?
 
     /// A fresh `id` per request, so asking for the same range twice still reaches `onChange` observers.
     struct FocusRequest: Equatable {
@@ -47,40 +64,206 @@ final class ScheduleViewModel {
         displayedMonth = WallClock().calendar.dateInterval(of: .month, for: Date())?.start ?? Date()
     }
 
+    /// Launch: moves a single-account sign-in to per-account storage first, then accounts, the cache, a sync.
     func bootstrap() async {
+        startObserving()
+        await AccountManager.shared.migrateLegacyAccountIfNeeded()
         if AppConstants.isDemoMode {
             // Copies a `-SSDemoMode YES` launch argument into the App Group so the notification extension follows.
             AppConstants.setDemoMode(true)
             isDemo = true
-        } else {
-            isSignedIn = await GoogleTokenProvider.shared.isSignedIn
         }
+        await reloadAccounts()
         await reloadFromCache()
         await refresh()
     }
 
-    /// Calendar events plus the pending plan's preview occurrences, for the WEEK and MONTH cards.
+    /// Calendar events plus the ghost previews of the pending plan and of "Ask me first" events, for the WEEK and
+    /// MONTH cards.
     var displayEvents: [ScheduleEvent] {
-        guard let preview = pendingPlan?.previewEvents, !preview.isEmpty else { return events }
-        return events + preview
+        let previews = previewEvents
+        return previews.isEmpty ? events : events + previews
+    }
+
+    private var previewEvents: [ScheduleEvent] {
+        (pendingPlan?.previewEvents ?? []) + (pendingEvents?.previewEvents ?? [])
+    }
+
+    /// Changes whenever the calendars must be laid out again from scratch (time zone or first weekday).
+    var clockID: String {
+        "\(clock.timeZone.identifier)|\(clock.firstWeekday)"
+    }
+
+    /// The first account's initial for the header avatar; nil (a person glyph) when signed out or in demo mode.
+    var avatarInitial: String? {
+        guard !isDemo, let account = accounts.first else { return nil }
+        return account.initial
     }
 
     func reloadFromCache() async {
         await reloadEvents()
         await reloadPendingPlan() // after `events`: ChatViewModel.syncPendingPlan looks for the plan's events
+        await reloadPendingEvents()
         // A rolling refresh (here, in the background or in another process) forgets the on-demand ranges, so
         // the one on screen is listed again. A no-op when it is still loaded.
         if let lastRequestedRange { ensureEvents(covering: lastRequestedRange) }
     }
 
     private func reloadEvents() async {
-        events = await SharedStore.shared.snapshot().events.sorted { $0.start < $1.start }
+        // Previews keep their in-memory sample events: the preview sandbox is not in demo mode, so its cached
+        // demo events would not be visible.
+        guard !Self.isPreview else { return }
+        events = await SharedStore.shared.visibleEvents()
     }
 
     /// The draft lives in the App Group, so Siri and the notification extension can create, add or discard it too.
     func reloadPendingPlan() async {
         let plan = await SharedStore.shared.pendingPlan()
         if plan != pendingPlan { pendingPlan = plan }
+    }
+
+    /// The "Ask me first" batch is a single App Group slot, shared with Siri and the notification extension.
+    func reloadPendingEvents() async {
+        let batch = await SharedStore.shared.pendingEventBatch()
+        if batch != pendingEvents { pendingEvents = batch }
+    }
+
+    // MARK: Accounts
+
+    func reloadAccounts() async {
+        guard !Self.isPreview else { return }
+        let store = AccountStore.shared
+        let loaded = await store.accounts()
+        if loaded != accounts { accounts = loaded }
+        defaultWriteTarget = await store.defaultWriteTarget()?.id
+        isSignedIn = await GoogleTokenProvider.shared.isSignedIn
+    }
+
+    /// "Add Google account" / "Connect Google Calendar": signs in and syncs the new account's calendars.
+    func addAccount() async {
+        let wasSignedIn = isSignedIn
+        do {
+            try await AccountManager.shared.addAccount()
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+            return
+        }
+        await reloadAccounts()
+        await reloadFromCache()
+        // The first connection shows the island at once, so it is clear where the next event will appear.
+        if !wasSignedIn && !isDemo { try? await LiveActivityManager.shared.summon() }
+    }
+
+    func reconnect(accountID: String) async {
+        do {
+            try await AccountManager.shared.reconnect(accountID: accountID)
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+        await reloadAccounts()
+        await reloadFromCache()
+    }
+
+    /// Revokes the grant and removes the account and its cached events from this iPhone (Google keeps them).
+    func disconnect(accountID: String) async {
+        await AccountManager.shared.disconnect(accountID: accountID)
+        await reloadAccounts()
+        await reloadFromCache()
+    }
+
+    /// The drawer's colour square: shows or hides a calendar at once; the store's `.accounts` change then reloads
+    /// events and reminders.
+    func setVisible(_ visible: Bool, calendar ref: CalendarRef) {
+        updateCalendar(ref) { $0.isVisible = visible }
+        Task { await AccountStore.shared.setVisible(visible, calendar: ref) }
+    }
+
+    func setColorOverride(_ hex: String?, calendar ref: CalendarRef) {
+        updateCalendar(ref) { $0.colorOverrideHex = hex }
+        Task { await AccountStore.shared.setColorOverride(hex, calendar: ref) }
+    }
+
+    func setNotificationsEnabled(_ enabled: Bool, calendar ref: CalendarRef) {
+        updateCalendar(ref) { $0.notificationsEnabled = enabled }
+        Task { await AccountStore.shared.setNotificationsEnabled(enabled, calendar: ref) }
+    }
+
+    /// Calendar details › "Use for new events".
+    func setDefaultCalendar(_ calendar: CalendarInfo?) {
+        defaultWriteTarget = calendar?.id ?? accounts.first?.primaryCalendar?.id
+        let ref = calendar?.id
+        let label = calendar?.promptLabel
+        Task {
+            await PreferencesStore.shared.update(source: .settings) { preferences in
+                if let ref {
+                    preferences.defaultCalendar = ref
+                    preferences.defaultCalendarLabel = label
+                } else {
+                    preferences.reset(.defaultCalendar)
+                }
+            }
+            await reloadAccounts()
+        }
+    }
+
+    func calendar(_ ref: CalendarRef) -> CalendarInfo? {
+        accounts.lazy.flatMap(\.calendars).first { $0.id == ref }
+    }
+
+    /// Answers the toggle before the store has written it.
+    private func updateCalendar(_ ref: CalendarRef, _ change: (inout CalendarInfo) -> Void) {
+        for accountIndex in accounts.indices {
+            guard let index = accounts[accountIndex].calendars.firstIndex(where: { $0.id == ref }) else { continue }
+            change(&accounts[accountIndex].calendars[index])
+            return
+        }
+    }
+
+    // MARK: Changes from other processes and from Settings
+
+    /// Preferences change the clock (time zone, first weekday) and every reminder; accounts change what is visible
+    /// and reminded. Each process posts its writes, this one included.
+    private func startObserving() {
+        guard observations.isEmpty, !Self.isPreview else { return }
+        observations = [
+            SharedChangeNotifier.observe(.preferences) { [weak self] in
+                Task { @MainActor [weak self] in self?.preferencesChanged() }
+            },
+            SharedChangeNotifier.observe(.accounts) { [weak self] in
+                Task { @MainActor [weak self] in self?.accountsChanged() }
+            }
+        ]
+    }
+
+    private func preferencesChanged() {
+        preferencesTask?.cancel()
+        preferencesTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.changeDebounce)
+            guard !Task.isCancelled, let self else { return }
+            let latest = WallClock()
+            if latest.timeZone != self.clock.timeZone || latest.firstWeekday != self.clock.firstWeekday {
+                self.clock = latest
+                self.displayedMonth = CalendarPaging.monthStart(containing: self.displayedMonth,
+                                                                calendar: latest.calendar)
+            }
+            self.defaultWriteTarget = await AccountStore.shared.defaultWriteTarget()?.id
+            await ReminderScheduler.shared.reschedule()
+            await LiveActivityManager.shared.refreshIfRunning()
+        }
+    }
+
+    private func accountsChanged() {
+        accountsTask?.cancel()
+        accountsTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.changeDebounce)
+            guard !Task.isCancelled, let self else { return }
+            await self.reloadAccounts()
+            await self.reloadEvents()
+            await ReminderScheduler.shared.reschedule()
+            await LiveActivityManager.shared.refreshIfRunning()
+        }
     }
 
     func refresh() async {
@@ -99,14 +282,19 @@ final class ScheduleViewModel {
             lastError = nil
         } catch {
             lastError = error.localizedDescription
-            if let authError = error as? AuthError, case .refreshFailed = authError { isSignedIn = false }
+            // One account's expired sign-in marks only that account (the drawer offers Reconnect); the others
+            // keep syncing. Reloading picks up which accounts need it, and signs out only when none is left.
+            if error is AuthError { await reloadAccounts() }
         }
     }
 
-    /// "Try demo (no account)": sample data, offline assistant, Live Activity, no Google or Gemini.
+    /// "Try without signing in": sample data and accounts, offline assistant, Live Activity, no Google or Gemini.
     func startDemo() async {
         AppConstants.setDemoMode(true)
-        await SharedStore.shared.setPendingPlan(nil) // a draft belongs to the assistant that made it
+        // A draft or batch belongs to the assistant that made it.
+        await SharedStore.shared.setPendingPlan(nil)
+        await SharedStore.shared.setPendingEventBatch(nil)
+        await reloadAccounts() // the sample accounts
         await refreshDemo(reseed: true)
         try? await LiveActivityManager.shared.summon()
     }
@@ -121,13 +309,34 @@ final class ScheduleViewModel {
         for planID in Set(snapshot.nudges.map(\.planID).filter(DemoData.isDemoID)) {
             await store.removeNudges(planID: planID)
         }
-        await store.setPendingPlan(nil) // a demo draft must not reach Google through the real assistant
+        // A demo draft or batch must not reach Google through the real assistant.
+        await store.setPendingPlan(nil)
+        await store.setPendingEventBatch(nil)
+        await reloadAccounts() // the real accounts again
         await reloadFromCache()
         await ReminderScheduler.shared.reschedule()
         await LiveActivityManager.shared.refreshIfRunning()
-        // bootstrap() skips the keychain check in demo mode, and seeding replaced the cached Google window.
-        isSignedIn = await GoogleTokenProvider.shared.isSignedIn
+        // Seeding replaced the cached Google window.
         if isSignedIn { await refresh() }
+    }
+
+    /// After Settings › Data › "Erase all data on this device": back to the signed-out welcome state.
+    func resetAfterErase() async {
+        isDemo = false
+        isSignedIn = false
+        accounts = []
+        defaultWriteTarget = nil
+        events = []
+        pendingPlan = nil
+        pendingEvents = nil
+        lastError = nil
+        rangesInFlight = LoadedRanges()
+        lastRequestedRange = nil
+        clock = WallClock()
+        focusDay = Date()
+        displayedMonth = CalendarPaging.monthStart(containing: Date(), calendar: clock.calendar)
+        await reloadAccounts()
+        await reloadFromCache()
     }
 
     /// Demo replacement for the Google sync: seeds `DemoData` (once, unless `reseed`), then refreshes the
@@ -147,21 +356,10 @@ final class ScheduleViewModel {
         await LiveActivityManager.shared.refreshIfRunning()
     }
 
-    func signIn() async {
-        do {
-            try await GoogleSignInCoordinator().signIn()
-            isSignedIn = true
-            await refresh()
-            try? await LiveActivityManager.shared.summon()
-        } catch {
-            lastError = error.localizedDescription
-        }
-    }
-
-    /// Includes the pending plan's ghost occurrences.
+    /// Includes the ghost occurrences of the pending plan and of "Ask me first" events.
     func events(on day: Date) -> [ScheduleEvent] {
         let interval = CalendarPaging.dayInterval(containing: day, calendar: clock.calendar) // 23/25 h on DST days
-        let preview = pendingPlan?.previewEvents.filter { $0.intersects(interval) } ?? []
+        let preview = previewEvents.filter { $0.intersects(interval) }
         return (events.filter { $0.intersects(interval) } + preview)
             .sorted { lhs, rhs in
                 // Multi-day bars first so they line up across cells, then by time.
@@ -217,6 +415,7 @@ final class ScheduleViewModel {
         isLoadingRange = true
 
         var loadedAny = false
+        var authFailed = false
         for piece in missing {
             do {
                 if demo {
@@ -229,12 +428,13 @@ final class ScheduleViewModel {
                 }
                 loadedAny = true
             } catch {
-                if let authError = error as? AuthError, case .refreshFailed = authError { isSignedIn = false }
+                if error is AuthError { authFailed = true }
                 // Anything else is left for the next request of this range; the cache keeps what it had.
             }
         }
         for piece in missing { rangesInFlight.remove(piece) }
         isLoadingRange = !rangesInFlight.isEmpty
+        if authFailed { await reloadAccounts() } // which accounts need Reconnect
 
         guard loadedAny else { return }
         await capCache()

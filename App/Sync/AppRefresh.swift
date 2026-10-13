@@ -10,12 +10,15 @@ enum AppRefresh {
         try? BGTaskScheduler.shared.submit(request)
     }
 
-    /// Only the rolling window is re-listed here. Ranges loaded on demand are forgotten by it and listed again
-    /// when the app next shows them (`ScheduleViewModel.ensureEvents`), so a background run stays a few requests.
+    /// Only the rolling window of each calendar is re-listed here. Ranges loaded on demand are forgotten by it and
+    /// listed again when the app next shows them (`ScheduleViewModel.ensureEvents`), so a background run stays a
+    /// few requests per calendar. Calendar lists older than 6 hours are fetched again first (which also finishes
+    /// moving a single-account sign-in, if that could not run yet).
     static func run() async {
         schedule()
         // Demo data lives only in the cache; a Google listing must not replace the seeded window (same as refresh()).
         if !AppConstants.isDemoMode {
+            await AccountManager.shared.refreshCalendarLists()
             try? await CalendarSync().refreshWindow()
         }
         await ReminderScheduler.shared.reschedule()

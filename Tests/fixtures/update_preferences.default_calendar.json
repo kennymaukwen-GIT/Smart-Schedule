@@ -1,0 +1,14 @@
+{
+  "utterance": "以後用學校帳號",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "preferences": "default_calendar: automatic\ndefault_duration: 60",
+  "calendars": "- My calendar | you@example.com (default)\n- Gym | you@example.com\n- My calendar | student@university.example.edu",
+  "expected_call": {
+    "name": "update_preferences",
+    "args": {
+      "changes": [{ "key": "default_calendar", "value": "My calendar | student@university.example.edu" }],
+      "summary_for_user": "以後新行程會加到學校帳號的行事曆。"
+    }
+  }
+}

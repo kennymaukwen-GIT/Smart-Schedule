@@ -18,7 +18,7 @@ final class LiveActivityManager {
         ScheduleActivity.activities.first { $0.activityState == .active || $0.activityState == .stale }
     }
 
-    /// Called by the Control Center button (via `SummonScheduleIntent`) and on app launch.
+    /// Called by the Control Center button (via `SummonScheduleIntent`): always starts or updates the activity.
     func summon() async throws {
         let content = await makeContent()
         if let current {
@@ -36,6 +36,23 @@ final class LiveActivityManager {
     func refreshIfRunning() async {
         guard let current else { return }
         await current.update(await makeContent())
+    }
+
+    /// When the app becomes active: refreshes a running activity, otherwise starts one if Settings › Dynamic Island
+    /// "Show next event" is on and the next timed event is in progress or starts within that lead time.
+    ///
+    /// Starting it on its own before every event, with the app closed, would need APNs push-to-start from a
+    /// server, which Smart Schedule does not have.
+    func summonIfDue(now: Date = Date()) async {
+        if current != nil {
+            await refreshIfRunning()
+            return
+        }
+        let lead = PreferencesStore.shared.current().liveActivityLeadMinutes
+        guard lead != nil, isAvailable else { return }
+        let events = await SharedStore.shared.visibleEvents(audience: .display)
+        guard LiveActivityStateBuilder.isNextEventDue(events: events, leadMinutes: lead, now: now) else { return }
+        try? await summon()
     }
 
     func dismiss() async {
@@ -62,8 +79,11 @@ final class LiveActivityManager {
     }
 
     private func makeContent() async -> ActivityContent<ScheduleActivityAttributes.ContentState> {
-        let snapshot = await SharedStore.shared.snapshot()
-        let state = LiveActivityStateBuilder.build(events: snapshot.events, lastLine: snapshot.lastAssistantLine)
+        let store = SharedStore.shared
+        let lastLine = await store.snapshot().lastAssistantLine
+        // Hidden and Focus-filtered calendars stay out of the island, like everywhere else on screen.
+        let events = await store.visibleEvents(audience: .display)
+        let state = LiveActivityStateBuilder.build(events: events, lastLine: lastLine)
         // Stale once the countdown target passes, so the system dims it instead of showing "0:00" forever.
         return ActivityContent(state: state,
                                staleDate: state.countdownTarget?.addingTimeInterval(60),

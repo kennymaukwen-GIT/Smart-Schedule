@@ -3,7 +3,8 @@ import Foundation
 // Typed mirrors of the Gemini function declarations in Shared/AI/FunctionDeclarations.json.
 // Decoded with `.convertFromSnakeCase`. Enum-like fields stay `String` and are validated by the mapper,
 // so one unexpected value from the model degrades gracefully instead of failing the whole decode.
-// The plan types are also Encodable (`.convertToSnakeCase`) so the offline demo can produce the same args JSON.
+// The plan and create_events types are also Encodable (`.convertToSnakeCase`) so the offline demo can produce the
+// same args JSON.
 
 enum AssistantFunction: String, CaseIterable, Sendable {
     case createEvents = "create_events"
@@ -13,15 +14,16 @@ enum AssistantFunction: String, CaseIterable, Sendable {
     case querySchedule = "query_schedule"
     case replyToUser = "reply_to_user"
     case confirmPlan = "confirm_plan"
+    case updatePreferences = "update_preferences"
 }
 
 // MARK: create_events
 
-struct CreateEventsArgs: Decodable, Sendable {
+struct CreateEventsArgs: Codable, Sendable {
     var events: [EventDraft]
 }
 
-struct EventDraft: Decodable, Sendable {
+struct EventDraft: Codable, Sendable {
     var title: String
     var start: String                 // "YYYY-MM-DDTHH:mm" or "YYYY-MM-DD" (all-day)
     var end: String?
@@ -36,7 +38,7 @@ struct EventDraft: Decodable, Sendable {
     var notes: String?
 }
 
-struct RecurrenceDraft: Decodable, Sendable {
+struct RecurrenceDraft: Codable, Sendable {
     var frequency: String             // DAILY | WEEKLY | MONTHLY | YEARLY
     var interval: Int?
     var byWeekday: [String]?          // MO TU WE TH FR SA SU
@@ -127,4 +129,51 @@ struct ReplyToUserArgs: Decodable, Sendable {
 
 struct ConfirmPlanArgs: Decodable, Sendable {
     var decision: String              // add | discard
+}
+
+// MARK: update_preferences
+
+struct UpdatePreferencesArgs: Decodable, Sendable {
+    struct Change: Decodable, Sendable {
+        var key: String         // validated against PreferenceKey; unknown keys are rejected, not a decode failure
+        var value: String
+
+        init(key: String, value: String) {
+            self.key = key
+            self.value = value
+        }
+
+        /// A number sent where the schema says string ("value": 120) still reads as "120".
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            key = (try? c.decode(String.self, forKey: .key)) ?? ""
+            if let text = try? c.decode(String.self, forKey: .value) {
+                value = text
+            } else if let number = try? c.decode(Int.self, forKey: .value) {
+                value = String(number)
+            } else if let flag = try? c.decode(Bool.self, forKey: .value) {
+                value = flag ? "on" : "off"
+            } else {
+                value = ""
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey { case key, value }
+    }
+
+    var changes: [Change]
+    var summaryForUser: String
+
+    init(changes: [Change], summaryForUser: String) {
+        self.changes = changes
+        self.summaryForUser = summaryForUser
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        changes = try c.decode([Change].self, forKey: .changes)
+        summaryForUser = (try? c.decodeIfPresent(String.self, forKey: .summaryForUser)) ?? ""
+    }
+
+    private enum CodingKeys: String, CodingKey { case changes, summaryForUser }
 }

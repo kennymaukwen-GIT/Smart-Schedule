@@ -12,10 +12,6 @@ enum AppConstants {
     /// (and restarted after the 8-hour cap via push-to-start) from the server.
     static let liveActivityPushEnabled = false
 
-    /// When true the app schedules its own interactive reminders (Artboard 1). Recommended:
-    /// keep Google popups for web/desktop and mute the Google Calendar iOS app's notifications.
-    static let localRemindersEnabled = true
-
     // MARK: Demo mode
 
     /// Demo mode runs on `DemoData` and the offline `DemoAssistant`: no Google account, no Gemini key.

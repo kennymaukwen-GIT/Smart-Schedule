@@ -23,6 +23,16 @@
         }
       }
     },
+    "%lld a day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天 %lld 則"
+          }
+        }
+      }
+    },
     "%lld days" : {
       "localizations" : {
         "en" : {
@@ -101,6 +111,36 @@
         }
       }
     },
+    "%lld events, all day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個全天行程"
+          }
+        }
+      }
+    },
+    "%lld events, first at %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 個行程，第一個 %@ 開始"
+          }
+        }
+      }
+    },
+    "%lld h" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 小時"
+          }
+        }
+      }
+    },
     "%lld hours before" : {
       "comment" : "Reminder time",
       "localizations" : {
@@ -175,6 +215,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 分鐘"
+          }
+        }
+      }
+    },
+    "%lld min before" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分鐘前"
           }
         }
       }
@@ -306,6 +356,26 @@
         }
       }
     },
+    "1 event, all day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 個全天行程"
+          }
+        }
+      }
+    },
+    "1 event, at %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 個行程，%@ 開始"
+          }
+        }
+      }
+    },
     "1 hour before" : {
       "comment" : "Reminder time",
       "localizations" : {
@@ -327,6 +397,116 @@
         }
       }
     },
+    "30 days" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 天"
+          }
+        }
+      }
+    },
+    "7 days" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "7 天"
+          }
+        }
+      }
+    },
+    "A JSON file with your settings, what the assistant remembers, cached events and chat history. Sign-in tokens are never included." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一個 JSON 檔，包含你的設定、助理記得的事、快取的行程和聊天記錄。登入權杖絕不會包含在內。"
+          }
+        }
+      }
+    },
+    "A summary of the day's events, prepared ahead and refreshed whenever your calendar changes. The evening preview covers tomorrow." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當天行程的摘要，事先準備好，行事曆有變動時就會更新。晚間預覽是明天的行程。"
+          }
+        }
+      }
+    },
+    "AI & privacy" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 與隱私"
+          }
+        }
+      }
+    },
+    "AI data sharing" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 資料分享"
+          }
+        }
+      }
+    },
+    "About" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關於"
+          }
+        }
+      }
+    },
+    "Access" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "權限"
+          }
+        }
+      }
+    },
+    "Accounts" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帳號"
+          }
+        }
+      }
+    },
+    "Accounts and subscription" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帳號與訂閱"
+          }
+        }
+      }
+    },
+    "Action Button" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動作按鈕"
+          }
+        }
+      }
+    },
     "Add" : {
       "comment" : "Button that writes the draft plan to the calendar",
       "localizations" : {
@@ -334,6 +514,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "加入"
+          }
+        }
+      }
+    },
+    "Add Google account" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增 Google 帳號"
           }
         }
       }
@@ -348,12 +538,42 @@
         }
       }
     },
+    "Add directly" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接加入"
+          }
+        }
+      }
+    },
+    "Add reminder" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增提醒"
+          }
+        }
+      }
+    },
     "Add to Smart Schedule" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "加入 Smart Schedule"
+          }
+        }
+      }
+    },
+    "Added %lld events to Google Calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已將 %lld 個行程加入 Google 日曆。"
           }
         }
       }
@@ -374,6 +594,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已加入（示範）"
+          }
+        }
+      }
+    },
+    "Added 1 event to Google Calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已將 1 個行程加入 Google 日曆。"
           }
         }
       }
@@ -421,6 +651,16 @@
         }
       }
     },
+    "Adding events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入行程"
+          }
+        }
+      }
+    },
     "Adding…" : {
       "localizations" : {
         "zh-Hant" : {
@@ -431,12 +671,112 @@
         }
       }
     },
+    "Adds to %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入到 %@"
+          }
+        }
+      }
+    },
+    "All calendars" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有行事曆"
+          }
+        }
+      }
+    },
     "All day" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "全天"
+          }
+        }
+      }
+    },
+    "All-day event reminder" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全天行程提醒"
+          }
+        }
+      }
+    },
+    "All-day events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全天行程"
+          }
+        }
+      }
+    },
+    "Allow" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允許"
+          }
+        }
+      }
+    },
+    "Allow AI data sharing in Settings › AI & privacy to use the assistant." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請到「設定 › AI 與隱私」允許 AI 資料分享，才能使用助理。"
+          }
+        }
+      }
+    },
+    "Allowed" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已允許"
+          }
+        }
+      }
+    },
+    "Ask me first" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先問我"
+          }
+        }
+      }
+    },
+    "Ask me first: single events wait on a card with Add and Edit. Long-term plans always wait for your review." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先問我：單一行程會先停在卡片上，有「加入」和「編輯」。長期計畫一律等你確認。"
+          }
+        }
+      }
+    },
+    "Assistant" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "助理"
           }
         }
       }
@@ -462,6 +802,16 @@
         }
       }
     },
+    "At most %lld a day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天最多 %lld 則"
+          }
+        }
+      }
+    },
     "At start" : {
       "comment" : "Reminder time",
       "localizations" : {
@@ -469,6 +819,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開始時"
+          }
+        }
+      }
+    },
+    "Automatic" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動"
+          }
+        }
+      }
+    },
+    "Automatic: Time Sensitive when 30 minutes or less before the start, otherwise Normal. Time Sensitive reminders break through Focus. Quiet reminders arrive silently in Notification Center." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動：開始前 30 分鐘內為時效性，其他為標準。時效性提醒會穿過專注模式。安靜的提醒會無聲出現在通知中心。"
+          }
+        }
+      }
+    },
+    "Both" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兩者都用"
+          }
+        }
+      }
+    },
+    "Calendar" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行事曆"
+          }
+        }
+      }
+    },
+    "Calendar & new events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行事曆與新行程"
+          }
+        }
+      }
+    },
+    "Calendar colour" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行事曆顏色"
+          }
+        }
+      }
+    },
+    "Calendar for new events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新行程的行事曆"
+          }
+        }
+      }
+    },
+    "Calendars" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行事曆"
+          }
+        }
+      }
+    },
+    "Can edit" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可編輯"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
           }
         }
       }
@@ -495,6 +945,36 @@
         }
       }
     },
+    "Changed again since. Adjust it in Settings." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "之後又改過了，請到設定調整。"
+          }
+        }
+      }
+    },
+    "Changed in Settings" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在設定中更改"
+          }
+        }
+      }
+    },
+    "Changes the colour on this iPhone only. Google Calendar keeps its own colour." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只改變這支 iPhone 上的顏色，Google 日曆保留原本的顏色。"
+          }
+        }
+      }
+    },
     "Check-in on %@" : {
       "comment" : "The plan's only check-in date",
       "localizations" : {
@@ -516,6 +996,56 @@
         }
       }
     },
+    "Choose which calendars show and alert while a Focus is on: open the Settings app, tap Focus, choose a Focus, then Add Filter › Smart Schedule." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇專注模式開啟時要顯示並提醒哪些行事曆：打開「設定」App，點「專注模式」，選一個專注模式，再點「加入過濾條件」› Smart Schedule。"
+          }
+        }
+      }
+    },
+    "Choose which calendars show and send reminders while this Focus is on." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇這個專注模式開啟時要顯示並提醒哪些行事曆。"
+          }
+        }
+      }
+    },
+    "Clear" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除"
+          }
+        }
+      }
+    },
+    "Clear chat history" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除聊天記錄"
+          }
+        }
+      }
+    },
+    "Clear chat history?" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除聊天記錄嗎？"
+          }
+        }
+      }
+    },
     "Close" : {
       "localizations" : {
         "zh-Hant" : {
@@ -533,6 +1063,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收合對話"
+          }
+        }
+      }
+    },
+    "Colour" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顏色"
           }
         }
       }
@@ -573,6 +1113,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請先在 Smart Schedule 連接 Google 日曆。"
+          }
+        }
+      }
+    },
+    "Connected" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已連接"
+          }
+        }
+      }
+    },
+    "Contact support" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聯絡客服"
+          }
+        }
+      }
+    },
+    "Control Center" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "控制中心"
           }
         }
       }
@@ -639,6 +1209,26 @@
         }
       }
     },
+    "Daily briefing" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每日摘要"
+          }
+        }
+      }
+    },
+    "Daily limit" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每日上限"
+          }
+        }
+      }
+    },
     "Daily reminder %@" : {
       "comment" : "Time of the plan's morning reminder",
       "localizations" : {
@@ -656,6 +1246,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每天 %@ 提醒"
+          }
+        }
+      }
+    },
+    "Daily reminder limit" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每日提醒上限"
+          }
+        }
+      }
+    },
+    "Data" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "資料"
+          }
+        }
+      }
+    },
+    "Deadline reminders" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截止日提醒"
+          }
+        }
+      }
+    },
+    "Deadline urgency" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截止日緊急程度"
+          }
+        }
+      }
+    },
+    "Deadlines" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截止日"
+          }
+        }
+      }
+    },
+    "Default duration" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預設時長"
+          }
+        }
+      }
+    },
+    "Default reminders" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "預設提醒"
           }
         }
       }
@@ -726,6 +1386,36 @@
         }
       }
     },
+    "Deleting an item puts that setting back to its default." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除一個項目，該設定就會回到預設值。"
+          }
+        }
+      }
+    },
+    "Demo mode" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式"
+          }
+        }
+      }
+    },
+    "Demo mode is on" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式已開啟"
+          }
+        }
+      }
+    },
     "Demo mode: nothing was written to Google Calendar." : {
       "localizations" : {
         "zh-Hant" : {
@@ -786,6 +1476,46 @@
         }
       }
     },
+    "Discarded. Nothing was added to your calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已捨棄，行事曆沒有任何變動。"
+          }
+        }
+      }
+    },
+    "Disconnect" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中斷連接"
+          }
+        }
+      }
+    },
+    "Disconnect %@?" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要中斷連接 %@ 嗎？"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        }
+      }
+    },
     "Done." : {
       "localizations" : {
         "zh-Hant" : {
@@ -812,6 +1542,96 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "草稿，尚未加入行事曆"
+          }
+        }
+      }
+    },
+    "Dynamic Island" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "動態島"
+          }
+        }
+      }
+    },
+    "Edit" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯"
+          }
+        }
+      }
+    },
+    "Erase" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除"
+          }
+        }
+      }
+    },
+    "Erase all data on this device" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除這台裝置上的所有資料"
+          }
+        }
+      }
+    },
+    "Erase all data on this device?" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除這台裝置上的所有資料嗎？"
+          }
+        }
+      }
+    },
+    "Evening preview" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "晚間預覽"
+          }
+        }
+      }
+    },
+    "Event reminders" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行程提醒"
+          }
+        }
+      }
+    },
+    "Event urgency" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行程緊急程度"
+          }
+        }
+      }
+    },
+    "Events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行程"
           }
         }
       }
@@ -847,6 +1667,86 @@
         }
       }
     },
+    "Expires %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 到期"
+          }
+        }
+      }
+    },
+    "Export my data" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯出我的資料"
+          }
+        }
+      }
+    },
+    "Focus" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "專注模式"
+          }
+        }
+      }
+    },
+    "Focus filters" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "專注模式過濾條件"
+          }
+        }
+      }
+    },
+    "Follow this iPhone" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟隨這支 iPhone"
+          }
+        }
+      }
+    },
+    "Forever" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久"
+          }
+        }
+      }
+    },
+    "Free" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "免費版"
+          }
+        }
+      }
+    },
+    "From" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始"
+          }
+        }
+      }
+    },
     "Full description" : {
       "comment" : "Discloses the rest of a plan summary that is longer than two lines",
       "localizations" : {
@@ -868,12 +1768,72 @@
         }
       }
     },
+    "General" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一般"
+          }
+        }
+      }
+    },
+    "Google Calendar alerts you on all your devices. Smart Schedule sends no reminders, so you can't reply to them." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 日曆會在你所有的裝置上提醒你。Smart Schedule 不發送提醒，所以你無法直接回覆提醒。"
+          }
+        }
+      }
+    },
+    "Google Calendar only" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只用 Google 日曆"
+          }
+        }
+      }
+    },
+    "Google accounts" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 帳號"
+          }
+        }
+      }
+    },
     "Google sign-in expired (%@). Open Smart Schedule to reconnect." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Google 登入已過期（%@）。請打開 Smart Schedule 重新連接。"
+          }
+        }
+      }
+    },
+    "Google sign-in for %@ expired. Open Smart Schedule to reconnect." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的 Google 登入已過期。請打開 Smart Schedule 重新連接。"
+          }
+        }
+      }
+    },
+    "Hidden calendars stay on this iPhone but are not shown and send no reminders." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隱藏的行事曆仍保留在這支 iPhone 上，但不會顯示，也不會發送提醒。"
           }
         }
       }
@@ -894,6 +1854,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "長按回覆：告訴我要新增或修改什麼。"
+          }
+        }
+      }
+    },
+    "I couldn't change %@. You can change it in Settings." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法更改「%@」。你可以到「設定」中調整。"
           }
         }
       }
@@ -998,12 +1968,42 @@
         }
       }
     },
+    "Keep" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留"
+          }
+        }
+      }
+    },
+    "Keep chat history" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留聊天記錄"
+          }
+        }
+      }
+    },
     "Keep editing" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "繼續修改"
+          }
+        }
+      }
+    },
+    "Language" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語言"
           }
         }
       }
@@ -1018,6 +2018,26 @@
         }
       }
     },
+    "Learned from your habits" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從你的習慣學到"
+          }
+        }
+      }
+    },
+    "Limit reminders per day" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "限制每天的提醒數量"
+          }
+        }
+      }
+    },
     "Loading events" : {
       "comment" : "Accessibility: spinner while events for a far-off date range load",
       "localizations" : {
@@ -1025,6 +2045,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在載入行程"
+          }
+        }
+      }
+    },
+    "Lock Screen" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鎖定畫面"
           }
         }
       }
@@ -1062,6 +2092,36 @@
         }
       }
     },
+    "Manage Subscription" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理訂閱"
+          }
+        }
+      }
+    },
+    "Match what I type" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟我輸入的語言相同"
+          }
+        }
+      }
+    },
+    "Monday" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "星期一"
+          }
+        }
+      }
+    },
     "Monthly check-ins ×%lld" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1072,12 +2132,62 @@
         }
       }
     },
+    "Morning briefing" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "早晨摘要"
+          }
+        }
+      }
+    },
+    "My calendar" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的行事曆"
+          }
+        }
+      }
+    },
     "NOW" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在"
+          }
+        }
+      }
+    },
+    "New events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新行程"
+          }
+        }
+      }
+    },
+    "New events are created in this time zone and your calendar is shown in it." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新行程會以這個時區建立，行事曆也以這個時區顯示。"
+          }
+        }
+      }
+    },
+    "New events from the assistant go to this calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "助理新增的行程會加入這個行事曆。"
           }
         }
       }
@@ -1103,12 +2213,102 @@
         }
       }
     },
+    "No purchases to restore." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有可回復的購買項目。"
+          }
+        }
+      }
+    },
+    "None" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無"
+          }
+        }
+      }
+    },
+    "Normal" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標準"
+          }
+        }
+      }
+    },
+    "Not allowed" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未允許"
+          }
+        }
+      }
+    },
+    "Not in your calendar yet" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未加入行事曆"
+          }
+        }
+      }
+    },
+    "Not now" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暫時不要"
+          }
+        }
+      }
+    },
+    "Not sent as reminders: %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未發送提醒：%@"
+          }
+        }
+      }
+    },
+    "Not supported for this language" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個語言不支援裝置端辨識"
+          }
+        }
+      }
+    },
     "Nothing is added until you tap Add." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "按「加入」前不會寫入行事曆。"
+          }
+        }
+      }
+    },
+    "Nothing is sent until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode works without sharing anything." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點「允許」之前不會傳送任何資料。你隨時可以在「設定 › AI 與隱私」停止分享。示範模式不會分享任何資料。"
           }
         }
       }
@@ -1134,6 +2334,96 @@
         }
       }
     },
+    "Nothing yet. Try saying “from now on, remind me 2 hours before gym”." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前還沒有。試著說「以後健身提前 2 小時提醒我」。"
+          }
+        }
+      }
+    },
+    "Notifications" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知"
+          }
+        }
+      }
+    },
+    "OK, it stays on." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好的，繼續保留。"
+          }
+        }
+      }
+    },
+    "OK. The assistant stays off until you allow AI data sharing in Settings › AI & privacy." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好的。在設定 › AI 與隱私允許 AI 資料分享之前，助理會保持關閉。"
+          }
+        }
+      }
+    },
+    "Off" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉"
+          }
+        }
+      }
+    },
+    "Off: Smart Schedule sends no reminders for events in this calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉：Smart Schedule 不會為這個行事曆裡的行程發送提醒。"
+          }
+        }
+      }
+    },
+    "Older messages are deleted automatically. At most the last 200 messages are kept." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "較舊的訊息會自動刪除，最多保留最近 200 則訊息。"
+          }
+        }
+      }
+    },
+    "On" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟"
+          }
+        }
+      }
+    },
+    "On iPhone 15 Pro and later: open the Settings app › Action Button, swipe to Shortcut, then choose Add to Smart Schedule." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 15 Pro 和後續機型：打開「設定」App › 動作按鈕，滑到「捷徑」，再選擇「加入 Smart Schedule」。"
+          }
+        }
+      }
+    },
     "On the day at %@" : {
       "comment" : "All-day event reminder time",
       "localizations" : {
@@ -1141,6 +2431,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "當天 %@"
+          }
+        }
+      }
+    },
+    "On-device recognition" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "裝置端辨識"
+          }
+        }
+      }
+    },
+    "Only for reminders sent by Smart Schedule." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只適用於 Smart Schedule 發送的提醒。"
+          }
+        }
+      }
+    },
+    "Open Control Center, tap +, then Add a Control. Search for Smart Schedule and choose it." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開控制中心，點 ＋，再點「加入控制項目」。搜尋 Smart Schedule 並選擇它。"
           }
         }
       }
@@ -1172,6 +2492,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間重疊：%@"
+          }
+        }
+      }
+    },
+    "Owner" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "擁有者"
           }
         }
       }
@@ -1216,6 +2546,46 @@
         }
       }
     },
+    "Privacy Policy" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隱私權政策"
+          }
+        }
+      }
+    },
+    "Pro" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro"
+          }
+        }
+      }
+    },
+    "Pro · Monthly" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro · 月訂閱"
+          }
+        }
+      }
+    },
+    "Pro · Yearly" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pro · 年訂閱"
+          }
+        }
+      }
+    },
     "Push the team sync 30 min" : {
       "comment" : "Example prompt; the demo assistant must understand the translation",
       "localizations" : {
@@ -1223,6 +2593,116 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一個行程延後 30 分鐘"
+          }
+        }
+      }
+    },
+    "Quiet" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安靜"
+          }
+        }
+      }
+    },
+    "Quiet hours" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安靜時段"
+          }
+        }
+      }
+    },
+    "Ready to add %lld events:" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備加入 %lld 個行程："
+          }
+        }
+      }
+    },
+    "Ready to add: %@ · %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備加入：%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Recipient: Google, through the Gemini API." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收件者：Google（透過 Gemini API）。"
+          }
+        }
+      }
+    },
+    "Reconnect" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新連接"
+          }
+        }
+      }
+    },
+    "Reconnect needed" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要重新連接"
+          }
+        }
+      }
+    },
+    "Remind me" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒我"
+          }
+        }
+      }
+    },
+    "Reminders" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提醒"
+          }
+        }
+      }
+    },
+    "Reminders during quiet hours arrive silently. None are dropped." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安靜時段內的提醒會無聲送達，不會遺漏任何一則。"
+          }
+        }
+      }
+    },
+    "Renews %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 續訂"
           }
         }
       }
@@ -1237,12 +2717,92 @@
         }
       }
     },
+    "Replaced by a newer version" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已由較新的版本取代"
+          }
+        }
+      }
+    },
     "Replaced by revision %lld" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "已由第 %lld 版取代"
+          }
+        }
+      }
+    },
+    "Replies" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回覆"
+          }
+        }
+      }
+    },
+    "Reply language" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回覆語言"
+          }
+        }
+      }
+    },
+    "Restore Purchases" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回復購買項目"
+          }
+        }
+      }
+    },
+    "Review" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看"
+          }
+        }
+      }
+    },
+    "Routine reminders" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例行活動提醒"
+          }
+        }
+      }
+    },
+    "Routine urgency" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例行活動緊急程度"
+          }
+        }
+      }
+    },
+    "Routines" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例行活動"
           }
         }
       }
@@ -1257,6 +2817,16 @@
         }
       }
     },
+    "Sample data and an offline assistant. Nothing is sent to Google." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用範例資料和離線助理，不會傳送任何資料到 Google。"
+          }
+        }
+      }
+    },
     "Sample data · nothing is sent to Google" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1267,12 +2837,92 @@
         }
       }
     },
+    "Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Show my schedule in Smart Schedule”." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對 Siri 說「Add a plan in Smart Schedule」、「Schedule something with Smart Schedule」或「Show my schedule in Smart Schedule」。"
+          }
+        }
+      }
+    },
+    "See everything the assistant remembers in Settings › AI & privacy." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在設定 › AI 與隱私可以看到助理記得的所有事。"
+          }
+        }
+      }
+    },
     "Send" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "傳送"
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定"
+          }
+        }
+      }
+    },
+    "Settings updated" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定已更新"
+          }
+        }
+      }
+    },
+    "Shortcuts and Siri" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捷徑與 Siri"
+          }
+        }
+      }
+    },
+    "Show %@" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示「%@」"
+          }
+        }
+      }
+    },
+    "Show all calendars" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示所有行事曆"
+          }
+        }
+      }
+    },
+    "Show in Smart Schedule" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Smart Schedule 中顯示"
           }
         }
       }
@@ -1288,12 +2938,32 @@
         }
       }
     },
+    "Show next event" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示下一個行程"
+          }
+        }
+      }
+    },
     "Shows your next event and this week in the Dynamic Island." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "在動態島顯示下一個行程和本週行程。"
+          }
+        }
+      }
+    },
+    "Siri" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri"
           }
         }
       }
@@ -1305,6 +2975,66 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Smart Schedule"
+          }
+        }
+      }
+    },
+    "Smart Schedule can show your next event in the Dynamic Island when you open the app or use its Control Center button. Starting it on its own before every event would need a push server, which Smart Schedule doesn't have." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開 App 或使用控制中心按鈕時，Smart Schedule 可以在動態島顯示下一個行程。要在每個行程開始前自動出現，需要推播伺服器，而 Smart Schedule 沒有。"
+          }
+        }
+      }
+    },
+    "Smart Schedule needs permission to see your calendar list." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule 需要權限才能看到你的行事曆列表。"
+          }
+        }
+      }
+    },
+    "Smart Schedule notices reminders you keep dismissing and offers to stop them. Nothing changes until you tap." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule 會留意你一直略過的提醒，並詢問是否停止。在你點選之前，什麼都不會改變。"
+          }
+        }
+      }
+    },
+    "Smart Schedule only" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只用 Smart Schedule"
+          }
+        }
+      }
+    },
+    "Smart Schedule will stop using this account's calendars and remove its events from this iPhone. Nothing is deleted from Google Calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule 會停止使用這個帳號的行事曆，並從這支 iPhone 移除它的行程。Google 日曆裡的資料不會被刪除。"
+          }
+        }
+      }
+    },
+    "Smart Schedule's reminders let you reply, snooze or reschedule right in the notification. New events get no Google pop-ups, so your other devices won't alert you about them. Turn off notifications for the Google Calendar app on this iPhone to avoid duplicates." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule 的提醒可以直接在通知裡回覆、延後或改時間。新行程不會設定 Google 彈出式通知，所以你的其他裝置不會提醒這些行程。關閉這支 iPhone 上 Google 日曆 App 的通知，可以避免重複提醒。"
           }
         }
       }
@@ -1325,6 +3055,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已延後 %lld 分鐘"
+          }
+        }
+      }
+    },
+    "Speech language" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音辨識語言"
           }
         }
       }
@@ -1350,12 +3090,82 @@
         }
       }
     },
+    "Status" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "狀態"
+          }
+        }
+      }
+    },
     "Stop dictation" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止聽寫"
+          }
+        }
+      }
+    },
+    "Stop it" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
+          }
+        }
+      }
+    },
+    "Stop sharing" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止分享"
+          }
+        }
+      }
+    },
+    "Stop sharing with Google Gemini?" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要停止與 Google Gemini 分享嗎？"
+          }
+        }
+      }
+    },
+    "Stopped. You can turn it back on in Settings › Notifications." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已停止。可以在設定 › 通知重新開啟。"
+          }
+        }
+      }
+    },
+    "Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period. Manage or cancel them in your Apple Account settings." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "訂閱會自動續訂，除非在期間結束前至少 24 小時取消。請在 Apple 帳號設定中管理或取消訂閱。"
+          }
+        }
+      }
+    },
+    "Suggestions" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建議"
           }
         }
       }
@@ -1380,12 +3190,122 @@
         }
       }
     },
+    "Sunday" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "星期日"
+          }
+        }
+      }
+    },
+    "Supported for this language" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個語言支援裝置端辨識"
+          }
+        }
+      }
+    },
+    "Tap Add to put it in your calendar, or Edit to change it." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點「加入」放進行事曆，或點「編輯」修改。"
+          }
+        }
+      }
+    },
     "Tap Add to put it in your calendar, or Keep editing to change it." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "點「加入」放進行事曆，或點「繼續修改」調整內容。"
+          }
+        }
+      }
+    },
+    "Task reminders" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待辦事項提醒"
+          }
+        }
+      }
+    },
+    "Task urgency" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待辦事項緊急程度"
+          }
+        }
+      }
+    },
+    "Tasks" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待辦事項"
+          }
+        }
+      }
+    },
+    "Terms of Use" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用條款"
+          }
+        }
+      }
+    },
+    "The assistant is off until you allow AI data sharing." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在你允許 AI 資料分享之前，助理會保持關閉。"
+          }
+        }
+      }
+    },
+    "The assistant sends your requests to Google's Gemini API to understand them." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "助理會把你的要求傳送到 Google 的 Gemini API 來理解內容。"
+          }
+        }
+      }
+    },
+    "The assistant will stop working until you allow sharing again. Demo mode keeps working." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在你再次允許分享之前，助理會停止運作。示範模式仍可使用。"
+          }
+        }
+      }
+    },
+    "The day before at" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前一天"
           }
         }
       }
@@ -1411,6 +3331,16 @@
         }
       }
     },
+    "The names of your calendars and your assistant settings" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的行事曆名稱和助理設定"
+          }
+        }
+      }
+    },
     "There is no draft plan waiting for review." : {
       "localizations" : {
         "zh-Hant" : {
@@ -1431,12 +3361,82 @@
         }
       }
     },
+    "This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and disconnects every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這會從這支 iPhone 移除你的設定、快取的行程、聊天記錄、登入權杖、已排定的提醒和即時動態，並中斷連接所有 Google 帳號。Google 日曆裡的行程不會被刪除。訂閱屬於你的 Apple 帳號，不受影響。"
+          }
+        }
+      }
+    },
     "This week" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "本週"
+          }
+        }
+      }
+    },
+    "Time" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間"
+          }
+        }
+      }
+    },
+    "Time Sensitive" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時效性"
+          }
+        }
+      }
+    },
+    "Time zone" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時區"
+          }
+        }
+      }
+    },
+    "Titles, times and locations of your events in the days the request is about (the next two weeks by default)" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要求涉及的日子裡，你的行程標題、時間和地點（預設為接下來兩週）"
+          }
+        }
+      }
+    },
+    "To" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束"
+          }
+        }
+      }
+    },
+    "To understand your requests, Smart Schedule sends them to Google's Gemini API. This includes:" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "為了理解你的要求，Smart Schedule 會把要求傳送到 Google 的 Gemini API，內容包括："
           }
         }
       }
@@ -1461,12 +3461,42 @@
         }
       }
     },
-    "Try demo (no account)" : {
+    "Touch and hold the Lock Screen, tap Customize › Lock Screen, tap a control at the bottom and choose Smart Schedule." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "試用示範（不需帳號）"
+            "value" : "按住鎖定畫面，點「自訂」› 鎖定畫面，點下方的控制項目，再選擇 Smart Schedule。"
+          }
+        }
+      }
+    },
+    "Try without signing in" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不登入先試用"
+          }
+        }
+      }
+    },
+    "Turn on AI data sharing in Smart Schedule › Settings › AI & privacy to reply here." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先在 Smart Schedule › 設定 › AI 與隱私開啟 AI 資料分享，才能在這裡回覆。"
+          }
+        }
+      }
+    },
+    "Turn on AI data sharing in Smart Schedule's Settings first." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先在 Smart Schedule 的設定中開啟 AI 資料分享。"
           }
         }
       }
@@ -1497,6 +3527,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "輸入行程、目標或計畫，或貼上附日期時間的連結"
+          }
+        }
+      }
+    },
+    "Undo" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "復原"
+          }
+        }
+      }
+    },
+    "Undone" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已復原"
           }
         }
       }
@@ -1542,6 +3592,86 @@
         }
       }
     },
+    "Urgency" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "緊急程度"
+          }
+        }
+      }
+    },
+    "Use for new events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用於新行程"
+          }
+        }
+      }
+    },
+    "Use the AI assistant?" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要使用 AI 助理嗎？"
+          }
+        }
+      }
+    },
+    "Used when you don't ask for specific reminders. Google allows up to 5 per event." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有指定提醒時使用。Google 每個行程最多允許 5 個提醒。"
+          }
+        }
+      }
+    },
+    "Used when you don't say how long." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有說明時長時使用。"
+          }
+        }
+      }
+    },
+    "Version" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本"
+          }
+        }
+      }
+    },
+    "View only" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅供檢視"
+          }
+        }
+      }
+    },
+    "Voice input" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音輸入"
+          }
+        }
+      }
+    },
     "WEEK" : {
       "comment" : "Quick Capture mode picker",
       "localizations" : {
@@ -1549,6 +3679,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "週"
+          }
+        }
+      }
+    },
+    "Week starts on" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每週起始日"
           }
         }
       }
@@ -1564,12 +3704,32 @@
         }
       }
     },
+    "What is sent" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "傳送的內容"
+          }
+        }
+      }
+    },
     "What should I schedule?" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "要安排什麼？"
+          }
+        }
+      }
+    },
+    "What the assistant remembers" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "助理記得的事"
           }
         }
       }
@@ -1584,12 +3744,162 @@
         }
       }
     },
+    "What you type or say to the assistant" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你對助理輸入或說出的內容"
+          }
+        }
+      }
+    },
+    "When a day has more, the most important are sent: events starting now, then deadlines, other event reminders, tasks and routines. The rest are listed in that day's morning briefing." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "某天的提醒超過上限時，會先發送最重要的：行程開始時的提醒，接著是截止日、其他行程提醒、待辦事項和例行活動。其餘的會列在當天的早晨摘要裡。"
+          }
+        }
+      }
+    },
+    "When on, speech in languages this iPhone supports is recognised on the device and never leaves it. Other languages use Apple's servers." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟時，這支 iPhone 支援的語言會在裝置上辨識，語音不會離開裝置。其他語言會使用 Apple 的伺服器。"
+          }
+        }
+      }
+    },
+    "Where the assistant adds events. Automatic uses My calendar of your first account." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "助理新增行程的位置。「自動」會使用你第一個帳號的「我的行事曆」。"
+          }
+        }
+      }
+    },
+    "Who sends reminders" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由誰發送提醒"
+          }
+        }
+      }
+    },
     "Yesterday" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "昨天"
+          }
+        }
+      }
+    },
+    "You can't add events to this calendar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你無法在這個行事曆新增行程。"
+          }
+        }
+      }
+    },
+    "You can't change events in “%@”." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你無法修改「%@」裡的行程。"
+          }
+        }
+      }
+    },
+    "You dismissed the “%@” reminder for %@ %lld times in a row. Stop sending it?" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已連續 %3$lld 次略過%2$@的「%1$@」提醒。要停止發送嗎？"
+          }
+        }
+      }
+    },
+    "You may get two alerts for the same event, one from Google and one from Smart Schedule. Turning off notifications for the Google Calendar app on this iPhone avoids that." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一個行程可能會收到兩則提醒，一則來自 Google，一則來自 Smart Schedule。關閉這支 iPhone 上 Google 日曆 App 的通知就能避免。"
+          }
+        }
+      }
+    },
+    "You said: “%@”" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你說：「%@」"
+          }
+        }
+      }
+    },
+    "You signed in as %@. Choose %@ to reconnect." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你登入的是 %1$@。請選擇 %2$@ 重新連接。"
+          }
+        }
+      }
+    },
+    "Your time zone and language" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的時區和語言"
+          }
+        }
+      }
+    },
+    "all-day events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全天行程"
+          }
+        }
+      }
+    },
+    "at start" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始時"
+          }
+        }
+      }
+    },
+    "deadlines" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截止日"
           }
         }
       }
@@ -1604,12 +3914,62 @@
         }
       }
     },
+    "events" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行程"
+          }
+        }
+      }
+    },
+    "iOS doesn't let apps add these for you." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 不允許 App 替你加入這些項目。"
+          }
+        }
+      }
+    },
+    "iOS sets each app's language in the Settings app." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iOS 在「設定」App 裡設定每個 App 的語言。"
+          }
+        }
+      }
+    },
     "now" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在"
+          }
+        }
+      }
+    },
+    "routines" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例行活動"
+          }
+        }
+      }
+    },
+    "tasks" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待辦事項"
           }
         }
       }

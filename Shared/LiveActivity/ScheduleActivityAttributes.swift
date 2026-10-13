@@ -15,8 +15,10 @@ struct ScheduleActivityAttributes: ActivityAttributes {
         var isInProgress: Bool
         var weekStart: Date
         var todayIndex: Int
-        var days: [DayDigest]             // always 7, Sunday first
+        var days: [DayDigest]             // always 7, starting on `firstWeekday`
         var lastAssistantLine: String?
+        /// Settings › "Week starts on" (1 = Sunday, 2 = Monday) for the week strip letters; nil (older payloads) = Sunday.
+        var firstWeekday: Int? = nil
     }
 
     struct DayDigest: Codable, Hashable {

@@ -6,6 +6,9 @@ import Foundation
 /// Three processes write here, so every access re-reads the file under `NSFileCoordinator`.
 /// The file is small (a 90-day window ≈ 50–150 KB; ranges loaded on demand are capped by
 /// `ScheduleViewModel.maxCachedEvents`); move to SQLite/SwiftData only if profiling says so.
+///
+/// Events are cached per copy (`EventRef`: account, calendar, event id), so one meeting seen through two accounts
+/// is two cached copies; `visibleEvents` shows one of them (`EventVisibility`).
 actor SharedStore {
     static let shared = SharedStore()
 
@@ -18,9 +21,14 @@ actor SharedStore {
         var lastAssistantLine: String?
         /// The long-term plan waiting for Add / Keep editing. Optional so caches written before drafts existed decode.
         var pendingPlan: PlanDraft?
-        /// Ranges outside the rolling window whose events were loaded on demand (sorted, merged). Written by the
-        /// app only (Shared/Calendar/SharedStore+LoadedRanges.swift); `replaceWindow` empties it.
+        /// Ranges outside the rolling window whose calendar-less (demo, pre-migration) events were loaded on demand
+        /// (sorted, merged). Written by the app only (Shared/Calendar/SharedStore+LoadedRanges.swift);
+        /// `replaceWindow` empties it.
         var loadedRanges: [DateInterval] = []
+        /// Per synced calendar (`CalendarRef.key`): its rolling window plus the ranges loaded on demand, merged.
+        var coverageByCalendar: [String: [DateInterval]] = [:]
+        /// "Ask me first": single events waiting for Add, shared with Siri and the notification extension.
+        var pendingEventBatch: PendingEventBatch?
 
         /// The rolling sync window (`windowStart ..< windowEnd`), when a sync or the demo seed has set one.
         var window: DateInterval? {
@@ -30,65 +38,126 @@ actor SharedStore {
     }
 
     private let fileURL: URL
+    /// Visibility rules and synced calendars come from here. nil (unit tests without one): every cached event is
+    /// visible and coverage is the calendar-less one, as before accounts existed.
+    let accounts: AccountStore?
 
     init(fileName: String = "schedule-cache.json") {
         let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConstants.appGroupID)
             ?? FileManager.default.temporaryDirectory
         fileURL = container.appendingPathComponent(fileName)
+        accounts = .shared
     }
 
     /// A cache at an explicit location. Unit tests use a temporary file, since a hostless test bundle has no
     /// App Group entitlement.
-    init(fileURL: URL) {
+    init(fileURL: URL, accounts: AccountStore? = nil) {
         self.fileURL = fileURL
+        self.accounts = accounts
     }
 
     // MARK: Reads
 
+    /// Every cached copy, hidden calendars and other accounts' copies of a meeting included: for storage
+    /// maintenance. Surfaces use `visibleEvents`.
     func snapshot() -> Snapshot { read() }
 
-    func events(in interval: DateInterval) -> [ScheduleEvent] {
-        read().events.filter { $0.intersects(interval) }.sorted { $0.start < $1.start }
+    /// What a surface shows: hidden calendars (and, while a Focus filter is on, calendars outside it) left out,
+    /// `.reminders` also leaves out calendars whose notifications are off, local colours applied, one copy per
+    /// meeting, sorted by start. Calendars the account store does not know stay visible.
+    func visibleEvents(in interval: DateInterval? = nil, audience: EventAudience = .display) async -> [ScheduleEvent] {
+        let cached = read().events
+        let candidates = interval.map { range in cached.filter { $0.intersects(range) } } ?? cached
+        let rules = await visibilityRules()
+        return EventVisibility.apply(candidates, rules: rules, audience: audience)
     }
 
-    func event(id: String) -> ScheduleEvent? {
-        read().events.first { $0.id == id }
+    func events(in interval: DateInterval) async -> [ScheduleEvent] {
+        await visibleEvents(in: interval, audience: .display)
+    }
+
+    /// The visible copy of `id`, else any cached copy (an event in a hidden calendar can still be opened).
+    func event(id: String) async -> ScheduleEvent? {
+        let copies = read().events.filter { $0.id == id }
+        guard !copies.isEmpty else { return nil }
+        let rules = await visibilityRules()
+        return EventVisibility.apply(copies, rules: rules, audience: .display).first ?? copies.first
     }
 
     func pendingPlan() -> PlanDraft? {
         read().pendingPlan
     }
 
+    func pendingEventBatch() -> PendingEventBatch? {
+        read().pendingEventBatch
+    }
+
     // MARK: Writes
 
+    /// Inserts or replaces by `EventRef`: the same id in another calendar is another copy and stays.
     func upsert(_ events: [ScheduleEvent]) {
         mutate { snapshot in
-            let incoming = Dictionary(events.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
-            snapshot.events.removeAll { incoming[$0.id] != nil }
+            let incoming = Dictionary(events.map { ($0.ref, $0) }, uniquingKeysWith: { _, new in new })
+            snapshot.events.removeAll { incoming[$0.ref] != nil }
             snapshot.events.append(contentsOf: incoming.values)
         }
     }
 
+    /// Every copy with one of these ids, in any calendar, and the instances of these series (demo mode).
     func remove(ids: Set<String>, seriesIDs: Set<String> = []) {
         mutate { snapshot in
             snapshot.events.removeAll { ids.contains($0.id) || ($0.seriesID.map { seriesIDs.contains($0) } ?? false) }
         }
     }
 
-    /// Replaces everything inside `interval` with a fresh server listing; keeps events outside it, except older
-    /// copies of listed ids (an event moved into the window from a range loaded on demand).
+    /// These copies only. `includingSeries` also removes the instances of a ref that names a series, in the same
+    /// calendar (deleting "all occurrences").
+    func remove(_ refs: [EventRef], includingSeries: Bool = false) {
+        guard !refs.isEmpty else { return }
+        let targets = Set(refs)
+        mutate { snapshot in
+            snapshot.events.removeAll { event in
+                if targets.contains(event.ref) { return true }
+                guard includingSeries, let seriesID = event.seriesID else { return false }
+                return targets.contains(EventRef(accountID: event.accountID, calendarID: event.calendarID, eventID: seriesID))
+            }
+        }
+    }
+
+    /// Replaces everything inside `interval` with a fresh listing; keeps events outside it, except older copies of
+    /// listed events (an event moved into the window from a range loaded on demand). Used by demo seeding and the
+    /// single-account fallback; every calendar's coverage is forgotten, as all events in the window are replaced.
     ///
     /// Also forgets the on-demand ranges: their events stay cached and on screen, but each range is listed again
     /// the next time it is shown, so edits made elsewhere reach far dates too.
     func replaceWindow(_ interval: DateInterval, with events: [ScheduleEvent]) {
         mutate { snapshot in
-            let incoming = Dictionary(events.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
-            snapshot.events.removeAll { $0.intersects(interval) || incoming[$0.id] != nil }
+            let incoming = Dictionary(events.map { ($0.ref, $0) }, uniquingKeysWith: { _, new in new })
+            snapshot.events.removeAll { $0.intersects(interval) || incoming[$0.ref] != nil }
             snapshot.events.append(contentsOf: incoming.values)
             snapshot.windowStart = interval.start
             snapshot.windowEnd = interval.end
             snapshot.lastRefresh = Date()
             snapshot.loadedRanges = []
+            snapshot.coverageByCalendar = [:]
+        }
+    }
+
+    /// One calendar's rolling window: replaces that calendar's events inside `interval` (and older copies of listed
+    /// events elsewhere in it), leaves every other calendar alone, and sets that calendar's coverage to the window,
+    /// forgetting its on-demand ranges like the calendar-less version.
+    func replaceWindow(_ interval: DateInterval, calendar: CalendarRef, with events: [ScheduleEvent]) {
+        mutate { snapshot in
+            let stamped = events.map { Self.stamped($0, calendar: calendar) }
+            let incoming = Dictionary(stamped.map { ($0.ref, $0) }, uniquingKeysWith: { _, new in new })
+            snapshot.events.removeAll { event in
+                incoming[event.ref] != nil || (event.calendarRef == calendar && event.intersects(interval))
+            }
+            snapshot.events.append(contentsOf: incoming.values)
+            snapshot.windowStart = interval.start
+            snapshot.windowEnd = interval.end
+            snapshot.lastRefresh = Date()
+            snapshot.coverageByCalendar[calendar.key] = [interval]
         }
     }
 
@@ -110,6 +179,75 @@ actor SharedStore {
     /// nil clears it (after Add or discard).
     func setPendingPlan(_ draft: PlanDraft?) {
         mutate { $0.pendingPlan = draft }
+    }
+
+    /// nil clears it (after Add or discard). A new batch replaces the old one.
+    func setPendingEventBatch(_ batch: PendingEventBatch?) {
+        mutate { $0.pendingEventBatch = batch }
+    }
+
+    // MARK: Accounts
+
+    /// A disconnected account: its cached events and range bookkeeping go, and the morning nudges of plans that
+    /// lived only in its calendars.
+    func purge(accountID: String) {
+        purgeEvents(where: { $0.accountID == accountID }, coverage: { CalendarRef(key: $0)?.accountID == accountID })
+    }
+
+    /// A calendar that left the account's calendar list.
+    func purge(calendar: CalendarRef) {
+        purgeEvents(where: { $0.calendarRef == calendar }, coverage: { $0 == calendar.key })
+    }
+
+    /// After the single-account migration: Google events cached before events carried their calendar. Demo events
+    /// and plan previews stay; the next sync lists the account's calendars again.
+    func dropUnscopedGoogleEvents() {
+        update { snapshot in
+            let before = snapshot.events.count
+            snapshot.events.removeAll { $0.accountID == nil && !$0.isDraft && !DemoData.isDemoID($0.id) }
+            guard snapshot.events.count != before || !snapshot.loadedRanges.isEmpty else { return false }
+            snapshot.loadedRanges = []
+            return true
+        }
+    }
+
+    /// Events, ranges, nudges, the pending plan and the pending batch (erase all data).
+    func eraseAll() {
+        var coordinationError: NSError?
+        NSFileCoordinator().coordinate(writingItemAt: fileURL, options: .forDeleting, error: &coordinationError) { url in
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    private func purgeEvents(where matches: (ScheduleEvent) -> Bool, coverage: (String) -> Bool) {
+        update { snapshot in
+            let purged = snapshot.events.filter(matches)
+            let coverageKeys = snapshot.coverageByCalendar.keys.filter(coverage)
+            guard !purged.isEmpty || !coverageKeys.isEmpty else { return false }
+            snapshot.events.removeAll(where: matches)
+            for key in coverageKeys { snapshot.coverageByCalendar[key] = nil }
+            let remainingPlans = Set(snapshot.events.compactMap(\.planID))
+            let orphaned = Set(purged.compactMap(\.planID)).subtracting(remainingPlans)
+            snapshot.nudges.removeAll { orphaned.contains($0.planID) }
+            return true
+        }
+    }
+
+    // MARK: Helpers
+
+    func visibilityRules() async -> VisibilityRules {
+        if let accounts { return await accounts.visibilityRules() }
+        var rules = VisibilityRules()
+        rules.separatesDemoEvents = false
+        return rules
+    }
+
+    static func stamped(_ event: ScheduleEvent, calendar: CalendarRef) -> ScheduleEvent {
+        guard event.accountID != calendar.accountID || event.calendarID != calendar.calendarID else { return event }
+        var event = event
+        event.accountID = calendar.accountID
+        event.calendarID = calendar.calendarID
+        return event
     }
 
     // MARK: File I/O
@@ -164,5 +302,8 @@ extension SharedStore.Snapshot {
         pendingPlan = try? container.decodeIfPresent(PlanDraft.self, forKey: .pendingPlan)
         // Missing in caches written before on-demand loading; unreadable means "load again", never a lost cache.
         loadedRanges = (try? container.decodeIfPresent([DateInterval].self, forKey: .loadedRanges)) ?? []
+        // Missing before multiple accounts: every calendar loads its ranges again.
+        coverageByCalendar = (try? container.decodeIfPresent([String: [DateInterval]].self, forKey: .coverageByCalendar)) ?? [:]
+        pendingEventBatch = try? container.decodeIfPresent(PendingEventBatch.self, forKey: .pendingEventBatch)
     }
 }

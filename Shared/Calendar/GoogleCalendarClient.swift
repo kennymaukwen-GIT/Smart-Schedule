@@ -14,11 +14,15 @@ enum CalendarAPIError: LocalizedError {
     }
 }
 
-/// Thin Calendar API v3 client (events.insert / patch / get / delete / list).
+/// Thin Calendar API v3 client (events.insert / patch / get / delete / list, calendarList.list) for one calendar
+/// of one account.
 struct GoogleCalendarClient: Sendable {
+    /// nil: the first connected account (or, before the multi-account migration, the single legacy sign-in).
+    var accountID: String? = nil
     var calendarID = "primary"
     var tokens: GoogleTokenProvider = .shared
-    private let base = "https://www.googleapis.com/calendar/v3"
+    // Static: a private stored property would make the memberwise initializer private.
+    private static let base = "https://www.googleapis.com/calendar/v3"
 
     // MARK: Writes
 
@@ -106,6 +110,24 @@ struct GoogleCalendarClient: Sendable {
         return all
     }
 
+    /// Every calendar the account can read (`minAccessRole=reader`), minus ones Google marks hidden or deleted.
+    /// Needs `GoogleAccount.calendarListScope`; without it Google answers 403.
+    func listCalendars() async throws -> [GCalCalendarListEntry] {
+        var all: [GCalCalendarListEntry] = []
+        var pageToken: String?
+        repeat {
+            var query = [
+                URLQueryItem(name: "minAccessRole", value: "reader"),
+                URLQueryItem(name: "maxResults", value: "250")
+            ]
+            if let pageToken { query.append(URLQueryItem(name: "pageToken", value: pageToken)) }
+            let page: GCalCalendarList = try await send("GET", path: "/users/me/calendarList", query: query)
+            all += page.items ?? []
+            pageToken = page.nextPageToken
+        } while pageToken != nil
+        return all.filter { $0.hidden != true && $0.deleted != true }
+    }
+
     // MARK: Transport
 
     private var eventsPath: String { "/calendars/\(encode(calendarID))/events" }
@@ -123,11 +145,11 @@ struct GoogleCalendarClient: Sendable {
                                            body: Data? = nil,
                                            attempt: Int = 0,
                                            forceTokenRefresh: Bool = false) async throws -> Response {
-        var components = URLComponents(string: base + path)!
+        var components = URLComponents(string: Self.base + path)!
         if !query.isEmpty { components.queryItems = query }
         var request = URLRequest(url: components.url!, timeoutInterval: 20)
         request.httpMethod = method
-        let token = try await tokens.accessToken(forceRefresh: forceTokenRefresh)
+        let token = try await tokens.accessToken(accountID: accountID, forceRefresh: forceTokenRefresh)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

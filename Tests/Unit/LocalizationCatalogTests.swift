@@ -45,6 +45,27 @@ final class LocalizationCatalogTests: XCTestCase {
         XCTAssertEqual(zh("I want to be muscular in 6 month design me a daily routine", in: table), "我想在 6 個月內增肌，幫我排每天的訓練")
     }
 
+    /// Artboard 5's header, drawer, account sheet and Settings (glossary in docs/SETTINGS.md §2.10).
+    func testSettingsLabels() throws {
+        let table = try chineseTable()
+        XCTAssertEqual(zh("Try without signing in", in: table), "不登入先試用")
+        XCTAssertEqual(zh("Add Google account", in: table), "新增 Google 帳號")
+        XCTAssertEqual(zh("General", in: table), "一般")
+        XCTAssertEqual(zh("Settings updated", in: table), "設定已更新")
+        XCTAssertEqual(zh("What the assistant remembers", in: table), "助理記得的事")
+        XCTAssertEqual(zh("Erase all data on this device", in: table), "清除這台裝置上的所有資料")
+        XCTAssertEqual(zh("Not in your calendar yet", in: table), "尚未加入行事曆")
+    }
+
+    func testSettingsFormatArguments() throws {
+        let table = try chineseTable()
+        XCTAssertEqual(String(format: zh("Disconnect %@?", in: table), "student@university.example.edu"),
+                       "要中斷連接 student@university.example.edu 嗎？")
+        XCTAssertEqual(String(format: zh("At most %lld a day", in: table), 10), "每天最多 10 則")
+        XCTAssertEqual(String(format: zh("Adds to %@", in: table), "我的行事曆 · kenny@example.com"),
+                       "加入到 我的行事曆 · kenny@example.com")
+    }
+
     func testFormatArgumentsKeepTheirPositions() throws {
         let table = try chineseTable()
         XCTAssertEqual(String(format: zh("Added: %@ · %@", in: table), "午餐", "10月14日（週三）13:00–14:00"),

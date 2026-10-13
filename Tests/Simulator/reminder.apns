@@ -10,5 +10,9 @@
     "interruption-level": "time-sensitive",
     "sound": "default"
   },
-  "ssEventId": "demo-meeting-joe"
+  "ssEventId": "demo-meeting-joe",
+  "ssKind": "event",
+  "ssOffset": 30,
+  "ssAllDay": false,
+  "ssFromDefaults": true
 }

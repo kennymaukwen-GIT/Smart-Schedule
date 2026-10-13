@@ -1,47 +1,49 @@
 import Foundation
 import UserNotifications
 
-/// Schedules Smart Schedule's own interactive reminders (Artboard 1) from the shared cache.
+/// Schedules Smart Schedule's own notifications from the shared cache and Settings › Notifications: interactive
+/// event reminders (Artboard 1), the morning briefing and evening preview, and plan nudges.
 ///
-/// iOS keeps at most 64 pending local notifications per app and silently drops the rest, so this is a
-/// rolling window: soonest triggers first, re-run after every write, app launch and background refresh.
-/// 4 offsets × N events exhausts 64 fast — that is why routines only get one ping by default.
+/// iOS keeps at most 64 pending local notifications per app and silently drops the rest, so this is a rolling
+/// window (`ReminderPlanner`): re-run after every write, sync, app launch, background refresh and preference change.
+/// "Google Calendar only" schedules no reminders; briefings and nudges stay.
 actor ReminderScheduler {
     static let shared = ReminderScheduler()
-    private static let pendingLimit = 64
 
     private let center = UNUserNotificationCenter.current()
-    private let policy = ReminderPolicy()
 
     func reschedule(store: SharedStore = .shared, now: Date = Date()) async {
-        guard AppConstants.localRemindersEnabled else { return }
-        let snapshot = await store.snapshot()
-        let activeNudges = snapshot.nudges.filter { $0.endsOn > now }
-
-        var candidates: [(fire: Date, event: ScheduleEvent, minutes: Int)] = []
-        for event in snapshot.events where !event.isAllDay && event.start > now && !event.isCompleted {
-            let offsets = event.reminderMinutes ?? policy.defaults(for: event.kind)
-            for minutes in Set(offsets) {
-                let fire = event.start.addingTimeInterval(-Double(minutes) * 60)
-                if fire > now { candidates.append((fire, event, minutes)) }
-            }
+        let preferences = PreferencesStore.shared.current()
+        let clock = WallClock(timeZone: preferences.timeZone, firstWeekday: preferences.firstWeekday)
+        let nudges = await store.snapshot().nudges
+        var reminderEvents: [ScheduleEvent] = []
+        if preferences.localRemindersEnabled {
+            reminderEvents = await store.visibleEvents(audience: .reminders)
         }
-        candidates.sort { $0.fire < $1.fire }
-        let budget = max(0, Self.pendingLimit - activeNudges.count - 2) // 2 slots spare for snoozes
-        let chosen = candidates.prefix(budget)
+        let today = clock.calendar.startOfDay(for: now)
+        let briefingRange = DateInterval(start: today, duration: Double(ReminderPlanner.briefingDays + 2) * 86_400)
+        let briefingEvents = await store.visibleEvents(in: briefingRange, audience: .display)
+
+        let plan = ReminderPlanner.plan(reminderEvents: reminderEvents, briefingEvents: briefingEvents, nudges: nudges,
+                                        preferences: preferences, now: now, clock: clock)
 
         let pending = await center.pendingNotificationRequests()
-        let ours = pending.map(\.identifier).filter {
-            $0.hasPrefix(NotificationIDs.reminderPrefix) || $0.hasPrefix(NotificationIDs.nudgePrefix)
-        }
-        center.removePendingNotificationRequests(withIdentifiers: ours)
+        center.removePendingNotificationRequests(withIdentifiers: pending.map(\.identifier).filter(Self.isRescheduled))
 
-        for item in chosen {
-            try? await center.add(request(for: item.event, minutes: item.minutes, fire: item.fire))
+        for nudge in plan.nudges {
+            try? await center.add(Self.nudgeRequest(nudge))
         }
-        for nudge in activeNudges {
-            try? await center.add(nudgeRequest(nudge))
+        for briefing in plan.briefings {
+            try? await center.add(Self.briefingRequest(briefing))
         }
+        for reminder in plan.reminders {
+            try? await center.add(Self.request(for: reminder, clock: clock))
+        }
+    }
+
+    /// Erase: every pending request of this app, snoozes included.
+    func removeAll() async {
+        center.removeAllPendingNotificationRequests()
     }
 
     /// Re-posts the same content later. Usable from the notification content extension.
@@ -49,37 +51,62 @@ actor ReminderScheduler {
         guard let copy = content.mutableCopy() as? UNMutableNotificationContent else { return }
         copy.subtitle = String(localized: "Snoozed \(minutes) min")
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(minutes * 60), repeats: false)
-        let request = UNNotificationRequest(identifier: NotificationIDs.reminderPrefix + "snooze." + UUID().uuidString,
+        let request = UNNotificationRequest(identifier: NotificationIDs.snoozePrefix + UUID().uuidString,
                                             content: copy, trigger: trigger)
         try? await UNUserNotificationCenter.current().add(request)
     }
 
-    // MARK: - Builders
-
-    private func request(for event: ScheduleEvent, minutes: Int, fire: Date) -> UNNotificationRequest {
-        let content = UNMutableNotificationContent()
-        content.title = event.title
-        content.subtitle = Self.leadText(minutes)
-        let time = ReplyFormatter.clockTime(event.start, clock: WallClock())
-        content.body = [time, event.location ?? (event.meetURL != nil ? "Google Meet" : nil)]
-            .compactMap { $0 }.joined(separator: " · ")
-        content.categoryIdentifier = NotificationIDs.Category.eventReminder
-        content.threadIdentifier = event.id
-        content.userInfo = [NotificationIDs.UserInfo.eventID: event.id]
-        content.sound = .default
-        // Needs the Time Sensitive entitlement; breaks through Focus for imminent meetings only.
-        content.interruptionLevel = minutes <= 30 ? .timeSensitive : .active
-        content.relevanceScore = minutes <= 30 ? 1.0 : 0.5
-
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fire)
-        return UNNotificationRequest(
-            identifier: "\(NotificationIDs.reminderPrefix)\(event.id).\(minutes)",
-            content: content,
-            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        )
+    /// Reminders (not snoozes), nudges and briefings: everything a reschedule replaces.
+    static func isRescheduled(_ identifier: String) -> Bool {
+        (identifier.hasPrefix(NotificationIDs.reminderPrefix) && !identifier.hasPrefix(NotificationIDs.snoozePrefix))
+            || identifier.hasPrefix(NotificationIDs.nudgePrefix)
+            || identifier.hasPrefix(NotificationIDs.briefingPrefix)
     }
 
-    private func nudgeRequest(_ nudge: PlanNudge) -> UNNotificationRequest {
+    // MARK: - Builders
+
+    static func request(for reminder: PlannedReminder, clock: WallClock) -> UNNotificationRequest {
+        let event = reminder.event
+        let content = UNMutableNotificationContent()
+        content.title = event.title
+        let place = event.location ?? (event.meetURL != nil ? "Google Meet" : nil)
+        if reminder.isAllDay {
+            content.subtitle = allDayLeadText(reminder.minutes)
+            content.body = [String(localized: "All day"), place].compactMap { $0 }.joined(separator: " · ")
+        } else {
+            content.subtitle = leadText(reminder.minutes)
+            content.body = [ReplyFormatter.clockTime(event.start, clock: clock), place].compactMap { $0 }.joined(separator: " · ")
+        }
+        content.categoryIdentifier = NotificationIDs.Category.eventReminder
+        content.threadIdentifier = event.id
+        content.userInfo = [
+            NotificationIDs.UserInfo.eventID: event.id,
+            NotificationIDs.UserInfo.kind: event.kind.rawValue,
+            NotificationIDs.UserInfo.offset: reminder.minutes,
+            NotificationIDs.UserInfo.allDay: reminder.isAllDay,
+            NotificationIDs.UserInfo.fromDefaults: reminder.fromDefaults
+        ]
+        // .timeSensitive needs the Time Sensitive entitlement and breaks through Focus; .passive arrives silently.
+        content.interruptionLevel = reminder.level
+        content.relevanceScore = ReminderPlanner.relevanceScore(reminder.level)
+        content.sound = reminder.level == .passive ? nil : .default
+        return UNNotificationRequest(identifier: reminder.identifier, content: content, trigger: trigger(at: reminder.fire))
+    }
+
+    static func briefingRequest(_ briefing: PlannedBriefing) -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = briefing.content.title
+        content.body = briefing.content.body
+        content.categoryIdentifier = NotificationIDs.Category.compose // long-press to reply in place
+        content.threadIdentifier = NotificationIDs.briefingThread
+        content.userInfo = [NotificationIDs.UserInfo.briefingDay: briefing.describedDay]
+        content.interruptionLevel = briefing.isQuiet ? .passive : .active
+        content.relevanceScore = ReminderPlanner.relevanceScore(content.interruptionLevel)
+        content.sound = nil // a summary, not an alarm
+        return UNNotificationRequest(identifier: briefing.identifier, content: content, trigger: trigger(at: briefing.fire))
+    }
+
+    static func nudgeRequest(_ nudge: PlanNudge) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
         content.title = "Smart Schedule"
         content.body = nudge.message
@@ -91,6 +118,13 @@ actor ReminderScheduler {
         return UNNotificationRequest(identifier: NotificationIDs.nudgePrefix + nudge.planID, content: content, trigger: trigger)
     }
 
+    /// The device calendar turns the absolute instant into components, so a fixed time zone in Settings still
+    /// fires at the right moment.
+    private static func trigger(at fire: Date) -> UNCalendarNotificationTrigger {
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fire)
+        return UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+    }
+
     static func leadText(_ minutes: Int) -> String {
         switch minutes {
         case 0: String(localized: "Starting now")
@@ -98,6 +132,15 @@ actor ReminderScheduler {
         case 60..<1440: String(localized: "In \(minutes / 60) h")
         case 1440..<2880: String(localized: "Tomorrow")
         default: String(localized: "In \(minutes / 1440) days")
+        }
+    }
+
+    /// All-day reminders count back from 00:00 of the event day: 900 fires the day before, so "Tomorrow".
+    static func allDayLeadText(_ minutes: Int) -> String {
+        switch (max(0, minutes) + 1439) / 1440 {
+        case 0: String(localized: "Today")
+        case 1: String(localized: "Tomorrow")
+        case let days: String(localized: "In \(days) days")
         }
     }
 }

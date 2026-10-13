@@ -22,16 +22,30 @@ enum MappingError: LocalizedError {
 struct CalendarEventMapper: Sendable {
     let clock: WallClock
     let policy: ReminderPolicy
+    /// Length of timed `event` and `routine` items given no end or duration; tasks and deadlines keep 30 min.
+    let defaultEventMinutes: Int
 
     /// Matches the provenance line in Artboard 5's Google Calendar detail view.
     static let provenancePrefix = "由 Smart Schedule 智慧助理自動排程："
     static let schemaVersion = "1"
-    /// All-day reminders are relative to 00:00 of the event day; 900 = the day before at 09:00.
+    /// `ReminderPolicy()`'s all-day default: relative to 00:00 of the event day, 900 = the day before at 09:00.
     static let allDayReminder = [900]
+    /// `SSProperty.localReminders` value for "the kind's defaults".
+    static let defaultRemindersMarker = "default"
 
-    init(clock: WallClock = WallClock(), policy: ReminderPolicy = ReminderPolicy()) {
+    init(clock: WallClock = WallClock(), policy: ReminderPolicy = ReminderPolicy(), defaultEventMinutes: Int = 60) {
         self.clock = clock
         self.policy = policy
+        self.defaultEventMinutes = defaultEventMinutes
+    }
+
+    /// The mapper for one request, from the current preferences (reminders, source mode, default length). Build it
+    /// per request: never keep one in a long-lived object, or a change in Settings would not reach it.
+    static func current(clock: WallClock = WallClock()) -> CalendarEventMapper {
+        let preferences = PreferencesStore.shared.current()
+        return CalendarEventMapper(clock: clock,
+                                   policy: ReminderPolicy(preferences: preferences),
+                                   defaultEventMinutes: preferences.defaultEventMinutes)
     }
 
     // MARK: - create_events
@@ -44,7 +58,6 @@ struct CalendarEventMapper: Sendable {
         body.description = description(utterance: utterance, extra: [draft.notes])
         body.location = draft.location.nonBlank
         body.colorId = GoogleColor.colorID(for: kind)
-        body.extendedProperties = properties(kind: kind, planID: nil)
 
         let isAllDay = draft.allDay == true || !draft.start.contains("T")
         if isAllDay {
@@ -53,11 +66,10 @@ struct CalendarEventMapper: Sendable {
             let endExclusive = clock.calendar.date(byAdding: .day, value: 1, to: lastDay)!
             body.start = GCalDateTime(date: clock.dateString(firstDay))
             body.end = GCalDateTime(date: clock.dateString(endExclusive))
-            body.reminders = GCalReminders(
-                useDefault: false,
-                overrides: policy.minutes(for: kind, requested: draft.reminderMinutes ?? Self.allDayReminder)
-                    .map { .init(method: "popup", minutes: $0) }
-            )
+            body.reminders = policy.googleAllDayReminders(requested: draft.reminderMinutes)
+            body.extendedProperties = properties(kind: kind, planID: nil,
+                                                 reminders: localReminders(requested: draft.reminderMinutes,
+                                                                           resolved: policy.allDayMinutes(requested:)))
         } else {
             guard var start = clock.dateTime(draft.start) else { throw MappingError.invalidDate(draft.start) }
             let fallback = TimeInterval(draft.durationMinutes ?? defaultDuration(kind)) * 60
@@ -77,6 +89,10 @@ struct CalendarEventMapper: Sendable {
             body.start = timed(start)
             body.end = timed(end)
             body.reminders = policy.googleReminders(for: kind, requested: draft.reminderMinutes)
+            body.extendedProperties = properties(kind: kind, planID: nil,
+                                                 reminders: localReminders(requested: draft.reminderMinutes) {
+                                                     policy.minutes(for: kind, requested: $0)
+                                                 })
         }
 
         if let recurrence = draft.recurrence, let rule = RecurrenceRule.make(from: recurrence, clock: clock) {
@@ -128,7 +144,7 @@ struct CalendarEventMapper: Sendable {
             body.recurrence = [rule]
             body.colorId = GoogleColor.colorID(for: .routine)
             body.reminders = policy.googleReminders(for: .routine, requested: nil)
-            body.extendedProperties = properties(kind: .routine, planID: planID)
+            body.extendedProperties = properties(kind: .routine, planID: planID, reminders: Self.defaultRemindersMarker)
             output.append(MappedEvent(body: body, wantsConference: false))
         }
 
@@ -142,8 +158,8 @@ struct CalendarEventMapper: Sendable {
             body.start = GCalDateTime(date: clock.dateString(day))
             body.end = GCalDateTime(date: clock.dateString(next))
             body.colorId = GoogleColor.colorID(for: .deadline)
-            body.reminders = GCalReminders(useDefault: false, overrides: Self.allDayReminder.map { .init(method: "popup", minutes: $0) })
-            body.extendedProperties = properties(kind: .deadline, planID: planID)
+            body.reminders = policy.googleAllDayReminders(requested: nil)
+            body.extendedProperties = properties(kind: .deadline, planID: planID, reminders: Self.defaultRemindersMarker)
             output.append(MappedEvent(body: body, wantsConference: false))
         }
 
@@ -180,7 +196,18 @@ struct CalendarEventMapper: Sendable {
             body.end = timed(existing.start.addingTimeInterval(duration))
         }
         if let requested = changes.reminderMinutes {
-            body.reminders = policy.googleReminders(for: existing?.kind ?? .event, requested: requested)
+            let kind = existing?.kind ?? .event
+            if existing?.isAllDay == true {
+                body.reminders = policy.googleAllDayReminders(requested: requested)
+                body.extendedProperties = GCalExtendedProperties(private: [
+                    SSProperty.localReminders: localReminders(requested: requested, resolved: policy.allDayMinutes(requested:))
+                ])
+            } else {
+                body.reminders = policy.googleReminders(for: kind, requested: requested)
+                body.extendedProperties = GCalExtendedProperties(private: [
+                    SSProperty.localReminders: localReminders(requested: requested) { policy.minutes(for: kind, requested: $0) }
+                ])
+            }
         }
         return body
     }
@@ -201,6 +228,22 @@ struct CalendarEventMapper: Sendable {
     // MARK: - Google → ScheduleEvent
 
     func scheduleEvent(from event: GCalEvent) -> ScheduleEvent? {
+        scheduleEvent(from: event, fallbackColorHex: GoogleColor.calendarDefault)
+    }
+
+    /// A listing of one connected calendar: stamped with the account and calendar, the meeting's iCalUID and
+    /// organizer flag, and drawn in the calendar's colour unless the event has a colour of its own.
+    func scheduleEvent(from event: GCalEvent, in calendar: CalendarInfo) -> ScheduleEvent? {
+        guard var mapped = scheduleEvent(from: event, fallbackColorHex: calendar.googleColorHex) else { return nil }
+        mapped.accountID = calendar.accountID
+        mapped.calendarID = calendar.calendarID
+        mapped.iCalUID = event.iCalUID
+        mapped.isOrganizer = event.organizer.map { $0.isSelf == true }
+        mapped.usesCalendarColor = event.colorId == nil
+        return mapped
+    }
+
+    private func scheduleEvent(from event: GCalEvent, fallbackColorHex: String) -> ScheduleEvent? {
         guard let id = event.id, event.status != "cancelled",
               let startField = event.start, let endField = event.end else { return nil }
         let props = event.extendedProperties?.private ?? [:]
@@ -229,11 +272,11 @@ struct CalendarEventMapper: Sendable {
             end: end,
             isAllDay: isAllDay,
             kind: kind,
-            colorHex: event.colorId.flatMap { GoogleColor.palette[$0] } ?? GoogleColor.calendarDefault,
+            colorHex: event.colorId.flatMap { GoogleColor.palette[$0] } ?? fallbackColorHex,
             location: event.location,
             meetURL: meet.flatMap(URL.init(string:)),
             notes: event.description,
-            reminderMinutes: event.reminders?.useDefault == false ? event.reminders?.overrides?.map(\.minutes) : nil,
+            reminderMinutes: Self.reminderMinutes(of: event),
             planID: props[SSProperty.planID],
             htmlLink: event.htmlLink.flatMap(URL.init(string:))
         )
@@ -251,9 +294,31 @@ struct CalendarEventMapper: Sendable {
 
     private func defaultDuration(_ kind: ScheduleEvent.Kind) -> Int {
         switch kind {
-        case .event, .routine: 60
+        case .event, .routine: defaultEventMinutes
         case .task, .deadline: 30
         }
+    }
+
+    /// What `ScheduleEvent.reminderMinutes` means: nil = the kind's defaults (from preferences when reminding),
+    /// [] = none, otherwise these minutes. Smart Schedule's own marker wins over Google's pop-ups, which are empty
+    /// in "Smart Schedule only" mode. Without it: Google's defaults → nil; overrides → their minutes;
+    /// `useDefault == false` with no overrides → [] (reminders turned off in Google).
+    static func reminderMinutes(of event: GCalEvent) -> [Int]? {
+        if let marker = event.extendedProperties?.private?[SSProperty.localReminders] {
+            if marker == defaultRemindersMarker { return nil }
+            let parts = marker.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            let minutes = parts.compactMap(Int.init)
+            if minutes.count == parts.count { return minutes }
+        }
+        guard let reminders = event.reminders, !reminders.useDefault else { return nil }
+        return reminders.overrides?.map(\.minutes) ?? []
+    }
+
+    /// `SSProperty.localReminders` for a write: the marker when the kind's defaults apply, else the explicit
+    /// minutes as `resolved` clamps them ("60,10").
+    func localReminders(requested: [Int]?, resolved: ([Int]?) -> [Int]) -> String {
+        guard let requested, !requested.isEmpty else { return Self.defaultRemindersMarker }
+        return resolved(requested).map(String.init).joined(separator: ",")
     }
 
     private func description(utterance: String, extra: [String?]) -> String {
@@ -261,8 +326,9 @@ struct CalendarEventMapper: Sendable {
             .joined(separator: "\n\n")
     }
 
-    private func properties(kind: ScheduleEvent.Kind, planID: String?) -> GCalExtendedProperties {
-        var values = [SSProperty.source: "smart-schedule", SSProperty.kind: kind.rawValue, SSProperty.schema: Self.schemaVersion]
+    private func properties(kind: ScheduleEvent.Kind, planID: String?, reminders: String) -> GCalExtendedProperties {
+        var values = [SSProperty.source: "smart-schedule", SSProperty.kind: kind.rawValue, SSProperty.schema: Self.schemaVersion,
+                      SSProperty.localReminders: reminders]
         if let planID { values[SSProperty.planID] = planID }
         return GCalExtendedProperties(private: values)
     }

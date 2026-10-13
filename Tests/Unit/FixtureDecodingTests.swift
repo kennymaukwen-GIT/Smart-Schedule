@@ -6,7 +6,7 @@ import XCTest
 final class FixtureDecodingTests: XCTestCase {
     func testEveryFixtureDecodesIntoItsArgsType() throws {
         let names = try Fixtures.allNames()
-        XCTAssertGreaterThanOrEqual(names.count, 5)
+        XCTAssertGreaterThanOrEqual(names.count, 11)
         for name in names {
             let call = try Fixtures.call(name)
             let function = try XCTUnwrap(AssistantFunction(rawValue: call.name), "\(name): unknown function \(call.name)")
@@ -25,6 +25,8 @@ final class FixtureDecodingTests: XCTestCase {
                 XCTAssertNoThrow(try TestJSON.decode(ReplyToUserArgs.self, data: call.args), name)
             case .confirmPlan:
                 XCTAssertNoThrow(try TestJSON.decode(ConfirmPlanArgs.self, data: call.args), name)
+            case .updatePreferences:
+                XCTAssertNoThrow(try TestJSON.decode(UpdatePreferencesArgs.self, data: call.args), name)
             }
         }
     }
@@ -106,6 +108,72 @@ final class FixtureDecodingTests: XCTestCase {
         XCTAssertEqual(args.changes.start, "2026-10-13T16:00")
         XCTAssertNil(args.changes.end)
         XCTAssertNil(args.changes.title)
+    }
+
+    func testOneOffReminderStaysOnTheEvent() throws {
+        // "remind me an hour before tomorrow's dentist" is about one event, not a lasting preference.
+        let name = "modify_event.one_off_reminder.json"
+        let args = try Fixtures.args(ModifyEventArgs.self, from: name)
+        XCTAssertEqual(args.eventId, "ssd3nt1st")
+        XCTAssertEqual(args.changes.reminderMinutes, [60])
+        XCTAssertNil(args.changes.start)
+        let upcoming = try XCTUnwrap(Fixtures.root(name)["upcoming"] as? String)
+        XCTAssertTrue(upcoming.hasPrefix("ssd3nt1st | Dentist |"), upcoming)
+    }
+
+    // MARK: update_preferences
+
+    func testQuietHoursPreference() throws {
+        let args = try Fixtures.args(UpdatePreferencesArgs.self, from: "update_preferences.quiet_hours.json")
+        XCTAssertEqual(args.changes.map(\.key), ["quiet_hours"])
+        XCTAssertEqual(args.changes.first?.value, "22:00-08:00")
+        XCTAssertEqual(args.summaryForUser, "以後 08:00 前的提醒會靜音送達。")
+        // The value is one the app's normaliser accepts, starting from quiet hours being off.
+        var preferences = AppPreferences()
+        try preferences.apply(canonical: preferences.normalized("22:00-08:00", for: .quietHours), for: .quietHours)
+        XCTAssertEqual(preferences.quietHours, QuietHours(isEnabled: true, startMinute: 22 * 60, endMinute: 8 * 60))
+    }
+
+    func testRoutineRemindersPreference() throws {
+        let args = try Fixtures.args(UpdatePreferencesArgs.self, from: "update_preferences.routine_reminders.json")
+        XCTAssertEqual(args.changes.map(\.key), ["routine_reminders"])
+        XCTAssertEqual(args.changes.first?.value, "120")
+        var preferences = AppPreferences()
+        try preferences.apply(canonical: preferences.normalized("120", for: .routineReminders), for: .routineReminders)
+        XCTAssertEqual(preferences.routineReminders, [120])
+    }
+
+    func testDefaultCalendarPreferenceNamesACalendarsLine() throws {
+        let name = "update_preferences.default_calendar.json"
+        let args = try Fixtures.args(UpdatePreferencesArgs.self, from: name)
+        XCTAssertEqual(args.changes.map(\.key), ["default_calendar"])
+        let value = try XCTUnwrap(args.changes.first?.value)
+        XCTAssertEqual(value, "My calendar | student@university.example.edu")
+        let calendars = try XCTUnwrap(Fixtures.root(name)["calendars"] as? String)
+        XCTAssertTrue(calendars.components(separatedBy: "\n").contains("- \(value)"), calendars)
+        // The same label the demo's school calendar shows in CALENDARS.
+        XCTAssertTrue(DemoData.accounts.flatMap(\.calendars).contains { $0.promptLabel == value })
+    }
+
+    func testEveryPreferenceFixtureUsesKnownKeys() throws {
+        for name in try Fixtures.allNames() where name.hasPrefix("update_preferences.") {
+            let args = try Fixtures.args(UpdatePreferencesArgs.self, from: name)
+            XCTAssertFalse(args.changes.isEmpty, name)
+            for change in args.changes {
+                XCTAssertNotNil(PreferenceKey(rawValue: change.key), "\(name): \(change.key)")
+            }
+            XCTAssertFalse(args.summaryForUser.isEmpty, name)
+        }
+    }
+
+    func testUpdatePreferencesDecodingIsTolerant() throws {
+        // A number where the schema says string, and an unknown key: both decode; the key is rejected later.
+        let args = try TestJSON.decode(UpdatePreferencesArgs.self, json: """
+        {"changes": [{"key": "default_duration", "value": 30}, {"key": "theme", "value": "dark"}],
+         "summary_for_user": "OK."}
+        """)
+        XCTAssertEqual(args.changes.map(\.value), ["30", "dark"])
+        XCTAssertNil(PreferenceKey(rawValue: args.changes[1].key))
     }
 
     func testQuerySchedule() throws {

@@ -3,6 +3,9 @@ import Foundation
 /// Sample schedule mirroring the designer's artboards, laid out around the *current* week so Xcode Previews,
 /// the Simulator and demo mode always look alive. Ids are deterministic and start with `demo-`.
 ///
+/// Two sample accounts hold it: gym and yoga are in the personal account's "Gym" calendar, the team sync and the
+/// Plan 5008 deadline in the school account, everything else in the personal account's primary calendar.
+///
 /// Compiled into every target (Shared/Core), so it may only use Shared/Core + Shared/Models: colors are
 /// literal Google Calendar palette hexes rather than `GoogleColor`.
 enum DemoData {
@@ -14,6 +17,44 @@ enum DemoData {
     static let routineHex = "#0B8043"   // Basil
 
     static let meetingID = idPrefix + "meeting-joe"
+
+    // MARK: Sample accounts
+
+    static let personalAccountID = idPrefix + "personal"
+    static let schoolAccountID = idPrefix + "school"
+    static let personalEmail = "you@example.com"
+    static let schoolEmail = "student@university.example.edu"
+    static let personalHex = eventHex   // Peacock
+    static let gymHex = routineHex      // Basil
+    static let schoolHex = "#7986CB"    // Lavender
+
+    /// A primary calendar's id is the account's email, as in Google.
+    static let personalCalendar = CalendarRef(accountID: personalAccountID, calendarID: personalEmail)
+    static let gymCalendar = CalendarRef(accountID: personalAccountID, calendarID: idPrefix + "gym")
+    static let schoolCalendar = CalendarRef(accountID: schoolAccountID, calendarID: schoolEmail)
+    /// Where the demo assistant adds events unless "Use for new events" or `default_calendar` picks another.
+    static var defaultCalendar: CalendarRef { personalCalendar }
+
+    /// Two sample accounts, so the drawer, calendar visibility and `default_calendar` work offline. `AccountStore`
+    /// returns them in demo mode with the user's settings for each calendar applied.
+    static var accounts: [GoogleAccount] {
+        let connectedAt = Date(timeIntervalSince1970: 1_791_849_600) // fixed: the sample never changes
+        func calendar(_ ref: CalendarRef, email: String, name: String, primary: Bool, hex: String) -> CalendarInfo {
+            CalendarInfo(accountID: ref.accountID, accountEmail: email, calendarID: ref.calendarID, name: name,
+                         isPrimary: primary, accessRole: "owner", googleColorHex: hex)
+        }
+        return [
+            GoogleAccount(id: personalAccountID, email: personalEmail, connectedAt: connectedAt,
+                          grantedScopes: [GoogleAccount.calendarListScope],
+                          calendars: [calendar(personalCalendar, email: personalEmail, name: personalEmail, primary: true, hex: personalHex),
+                                      calendar(gymCalendar, email: personalEmail, name: "Gym", primary: false, hex: gymHex)],
+                          calendarsUpdatedAt: connectedAt),
+            GoogleAccount(id: schoolAccountID, email: schoolEmail, connectedAt: connectedAt,
+                          grantedScopes: [GoogleAccount.calendarListScope],
+                          calendars: [calendar(schoolCalendar, email: schoolEmail, name: schoolEmail, primary: true, hex: schoolHex)],
+                          calendarsUpdatedAt: connectedAt)
+        ]
+    }
 
     static func colorHex(for kind: ScheduleEvent.Kind) -> String {
         switch kind {
@@ -84,7 +125,8 @@ enum DemoData {
                  notes: "Product quality review", reminderMinutes: [20, 5, 0]),
             make("lunch", "Lunch", lunch, minutes(60, after: lunch), .event, location: "Café Lucia"),
             make("andrew", "Meeting With Andrew", andrew, minutes(60, after: andrew), .event),
-            make("deadline-5008", "Deadline for Plan 5008", deadline, minutes(30, after: deadline), .deadline),
+            make("deadline-5008", "Deadline for Plan 5008", deadline, minutes(30, after: deadline), .deadline,
+                 calendar: schoolCalendar),
             make("reply-joe", "Reply to Joe", reply, minutes(30, after: reply), .task),
             make("pay-bills", "Pay bills", bills, minutes(30, after: bills), .task),
             make("dentist", "Dentist", dentist, minutes(60, after: dentist), .event, location: "Smile Dental"),
@@ -123,7 +165,7 @@ enum DemoData {
                 let end = start.addingTimeInterval(TimeInterval(series.minutes) * 60)
                 guard start < range.end && end > range.start else { continue }
                 events.append(make("\(series.key)-\(clock.dateString(start))", series.title, start, end, series.kind,
-                                   seriesID: series.key))
+                                   seriesID: series.key, calendar: series.calendar))
             }
             guard let next = calendar.date(byAdding: .day, value: 1, to: day), next > day else { break }
             day = next
@@ -147,21 +189,33 @@ enum DemoData {
         let minutes: Int
         let kind: ScheduleEvent.Kind
         let pausesWhenAway: Bool
+        let calendar: CalendarRef
     }
 
     private static let weeklySeries: [WeeklySeries] = [
         WeeklySeries(key: "gym", title: "Gym", weekdays: [2, 4, 6], hour: 18, minute: 30, minutes: 60,
-                     kind: .routine, pausesWhenAway: true),
+                     kind: .routine, pausesWhenAway: true, calendar: gymCalendar),
         WeeklySeries(key: "team-sync", title: "Weekly team sync", weekdays: [2], hour: 10, minute: 0, minutes: 30,
-                     kind: .event, pausesWhenAway: false),
+                     kind: .event, pausesWhenAway: false, calendar: schoolCalendar),
         WeeklySeries(key: "yoga", title: "Yoga", weekdays: [7], hour: 9, minute: 0, minutes: 60,
-                     kind: .routine, pausesWhenAway: true)
+                     kind: .routine, pausesWhenAway: true, calendar: gymCalendar)
     ]
 
-    /// Sunday on or before `date` (`WallClock().calendar` weeks start on Sunday).
+    /// The colour a sample calendar is drawn in before the user overrides it.
+    private static func googleColorHex(of calendar: CalendarRef) -> String {
+        switch calendar {
+        case gymCalendar: gymHex
+        case schoolCalendar: schoolHex
+        default: personalHex
+        }
+    }
+
+    /// Sunday on or before `date`, whichever day "Week starts on" picks, so the sample week looks the same.
     private static func sunday(onOrBefore date: Date, calendar: Calendar) -> Date {
-        let today = calendar.startOfDay(for: date)
-        return calendar.dateInterval(of: .weekOfYear, for: today)?.start ?? today
+        var sundayFirst = calendar
+        sundayFirst.firstWeekday = 1
+        let today = sundayFirst.startOfDay(for: date)
+        return sundayFirst.dateInterval(of: .weekOfYear, for: today)?.start ?? today
     }
 
     private static func make(_ id: String,
@@ -174,8 +228,11 @@ enum DemoData {
                              location: String? = nil,
                              meetURL: URL? = nil,
                              notes: String? = nil,
-                             reminderMinutes: [Int]? = nil) -> ScheduleEvent {
-        ScheduleEvent(
+                             reminderMinutes: [Int]? = nil,
+                             calendar: CalendarRef = DemoData.personalCalendar) -> ScheduleEvent {
+        // Like Google: tasks and deadlines carry a colour of their own, everything else shows its calendar's.
+        let usesCalendarColor = kind != .task && kind != .deadline
+        return ScheduleEvent(
             id: idPrefix + id,
             seriesID: seriesID.map { idPrefix + $0 },
             title: title,
@@ -183,14 +240,17 @@ enum DemoData {
             end: end,
             isAllDay: allDay,
             kind: kind,
-            colorHex: colorHex(for: kind),
+            colorHex: usesCalendarColor ? googleColorHex(of: calendar) : colorHex(for: kind),
             location: location,
             meetURL: meetURL,
             notes: notes,
             reminderMinutes: reminderMinutes,
             planID: nil,
             htmlLink: nil,
-            isCompleted: false
+            isCompleted: false,
+            accountID: calendar.accountID,
+            calendarID: calendar.calendarID,
+            usesCalendarColor: usesCalendarColor
         )
     }
 }

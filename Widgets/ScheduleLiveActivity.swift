@@ -76,10 +76,13 @@ struct IslandWeekStrip: View {
     let state: ScheduleActivityAttributes.ContentState
 
     var body: some View {
+        // Older payloads have no `firstWeekday`: their week started on Sunday.
+        let letters = Theme.weekdayLetters(firstWeekday: state.firstWeekday ?? 1)
+
         HStack(alignment: .top, spacing: 2) {
             ForEach(Array(state.days.enumerated()), id: \.offset) { index, day in
                 VStack(spacing: 2) {
-                    Text(Theme.weekdayLetters[index % 7])
+                    Text(letters[index % 7])
                         .font(.system(size: 7, weight: .semibold))
                         .foregroundStyle(Theme.textSecondary)
                     Text("\(day.dayNumber)")

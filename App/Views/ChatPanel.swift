@@ -15,8 +15,9 @@ struct ChatPanel: View {
 
         VStack(spacing: 10) {
             if !schedule.isSignedIn && !schedule.isDemo {
+                // Welcome: connect, or look around with sample data (App Review guideline 2.1).
                 Button {
-                    Task { await schedule.signIn() }
+                    Task { await schedule.addAccount() }
                 } label: {
                     Label("Connect Google Calendar", systemImage: "calendar.badge.plus")
                         .font(.system(size: 15, weight: .semibold))
@@ -29,7 +30,7 @@ struct ChatPanel: View {
                     chat.enableDemo()
                     Task { await schedule.startDemo() }
                 } label: {
-                    Label("Try demo (no account)", systemImage: "sparkles")
+                    Label("Try without signing in", systemImage: "sparkles")
                         .font(.system(size: 14, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -57,7 +58,8 @@ struct ChatPanel: View {
                                        onSuggestion: { chat.send($0) },
                                        onConfirmDelete: { chat.confirmDeletion(in: message) },
                                        onAddPlan: { chat.addPlan(message) },
-                                       onKeepEditing: { chat.keepEditing(message) })
+                                       onKeepEditing: { chat.keepEditing(message) },
+                                       actions: ChatCardActions(message: message, chat: chat))
                             .id(message.id)
                     }
                     if chat.isSending {
@@ -67,6 +69,10 @@ struct ChatPanel: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
+            }
+
+            if chat.showsConsentBanner {
+                ConsentBanner { chat.reviewConsent() }
             }
 
             ComposerBar(
@@ -133,6 +139,7 @@ struct ChatMessageRow: View {
     var onConfirmDelete: () -> Void = {}
     var onAddPlan: () -> Void = {}
     var onKeepEditing: () -> Void = {}
+    var actions = ChatCardActions()
 
     var body: some View {
         switch message.role {
@@ -168,7 +175,8 @@ struct ChatMessageRow: View {
                                  onSuggestion: onSuggestion,
                                  onConfirmDelete: onConfirmDelete,
                                  onAddPlan: onAddPlan,
-                                 onKeepEditing: onKeepEditing)
+                                 onKeepEditing: onKeepEditing,
+                                 actions: actions)
                 .padding(.horizontal, 4)
         }
     }

@@ -7,7 +7,9 @@
    payload a fixture produces, including DST-correct UNTIL values.
 4. Re-implements the draft-plan preview (Shared/Calendar/RecurrenceExpander.swift + PlanDraftBuilder.swift):
    weekly occurrences at a fixed wall-clock time, capped at the plan or 26 weeks, whichever is shorter.
-5. Checks that fixture texts follow the prompt's "# Writing style" (short summaries, no "Tue/Thu", no times).
+5. Checks that fixture texts follow the prompt's "# Writing style" (short summaries, no "Tue/Thu", no times),
+   and update_preferences values against the per-key encoding the app's normaliser accepts
+   (docs/SETTINGS.md §6.2); a default_calendar value must be a line of the fixture's CALENDARS.
 6. Checks Shared/Localization/Localizable.xcstrings: every key has a zh-Hant translation whose format
    specifiers match the key's (positional %1$@ allowed), and every String(localized:) literal in the
    Swift sources is a key.
@@ -175,9 +177,61 @@ SENTENCE_END = re.compile(r"[.!?。！？]+")
 CLOCK_TIME = re.compile(r"\b\d{1,2}:\d{2}\b")
 
 
+HHMM = r"([01]\d|2[0-3]):[0-5]\d"
+PREFERENCE_VALUES = {
+    # key → (regex the value must fully match, case-insensitive)
+    "all_day_reminder": rf"none|{HHMM}",
+    "quiet_hours": rf"off|on|{HHMM}-{HHMM}",
+    "morning_briefing": rf"off|on|{HHMM}",
+    "evening_preview": rf"off|on|{HHMM}",
+    "daily_reminder_cap": r"off|[1-9]|[1-4]\d|50",
+    "week_start": r"sunday|monday",
+    "reply_language": r"match|zh-hant|zh_tw|zh-tw|en",
+    "autonomy": r"add_directly|ask_first",
+}
+for kind in ("event", "deadline", "task", "routine"):
+    PREFERENCE_VALUES[f"{kind}_reminders"] = r"none|\d{1,5}(\s*,\s*\d{1,5})*"
+    PREFERENCE_VALUES[f"{kind}_urgency"] = r"automatic|time_sensitive|normal|quiet"
+
+
+def calendar_lines(root: dict) -> list[str]:
+    """The fixture's CALENDARS block as default_calendar values: "- <label> (default)" → "<label>"."""
+    raw = root.get("calendars", "")
+    lines = raw if isinstance(raw, list) else raw.splitlines()
+    return [re.sub(r"\s*\(default\)$", "", line.strip().removeprefix("- ").strip()) for line in lines if line.strip()]
+
+
+def preference_checks(args: dict, root: dict, fixture: str) -> None:
+    """update_preferences: one change per key, each value in the encoding the app's normaliser accepts."""
+    keys = [change["key"] for change in args["changes"]]
+    if len(keys) != len(set(keys)):
+        errors.append(f"{fixture}: update_preferences changes a key twice")
+    for change in args["changes"]:
+        key, value = change["key"], change["value"].strip()
+        if key == "default_calendar":
+            if value.lower() != "automatic" and value not in calendar_lines(root):
+                errors.append(f"{fixture}: default_calendar {value!r} is not a line of the fixture's calendars")
+        elif key == "default_duration":
+            if not value.isdigit() or not 5 <= int(value) <= 480:
+                errors.append(f"{fixture}: default_duration must be minutes 5-480, got {value!r}")
+        elif not re.fullmatch(PREFERENCE_VALUES[key], value, re.IGNORECASE):
+            errors.append(f"{fixture}: {key} value {value!r} is not in the documented encoding")
+        elif key.endswith("_reminders") and value.lower() != "none":
+            minutes = [int(part) for part in re.split(r"\s*,\s*", value)]
+            if len(minutes) > 5 or any(not 0 <= m <= 40320 for m in minutes):
+                errors.append(f"{fixture}: {key} allows at most 5 values, each 0-40320")
+        elif key == "quiet_hours" and "-" in value and value[:5] == value[6:]:
+            errors.append(f"{fixture}: quiet_hours must not start and end at the same time")
+
+
 def style_checks(name: str, args: dict, fixture: str) -> None:
     """The prompt's "# Writing style": the card's table shows days and times, so the summary must not."""
     texts = []
+    if name == "update_preferences":
+        summary = args["summary_for_user"]
+        texts.append(("summary_for_user", summary))
+        if len([part for part in SENTENCE_END.split(summary) if part.strip()]) > 1:
+            errors.append(f"{fixture}: update_preferences.summary_for_user must be one sentence")
     if name == "create_long_term_plan":
         summary = args["summary_for_user"]
         texts.append(("summary_for_user", summary))
@@ -197,10 +251,19 @@ def style_checks(name: str, args: dict, fixture: str) -> None:
 
 
 def context_checks(root: dict, fixture: str) -> None:
-    """Draft-review fixtures: confirm_plan needs a draft on screen; a revision is a complete plan that keeps its title."""
+    """Review fixtures: confirm_plan needs a draft plan or pending events on screen; a revision is a complete plan
+    that keeps its title; modify_event uses an id the prompt showed; update_preferences values are well-formed."""
     call = root["expected_call"]
-    if call["name"] == "confirm_plan" and not root.get("draft_plan"):
-        errors.append(f"{fixture}: confirm_plan is only valid while a DRAFT PLAN is shown (add 'draft_plan')")
+    if call["name"] == "confirm_plan" and not (root.get("draft_plan") or root.get("pending_events")):
+        errors.append(f"{fixture}: confirm_plan is only valid while a DRAFT PLAN or PENDING EVENTS block is shown "
+                      "(add 'draft_plan' or 'pending_events')")
+    if call["name"] == "update_preferences":
+        preference_checks(call["args"], root, fixture)
+    if call["name"] == "modify_event" and ("upcoming" in root or "focus_event" in root):
+        rows = (root.get("upcoming", "") + "\n" + root.get("focus_event", "")).splitlines()
+        shown = {row.split("|")[0].strip() for row in rows if row.strip()}
+        if call["args"]["event_id"] not in shown:
+            errors.append(f"{fixture}: modify_event uses an id that is not in UPCOMING or FOCUS")
     if "revises" in root:
         original = json.loads((FIXTURES / root["revises"]).read_text())["expected_call"]
         if original["name"] != call["name"] or call["name"] != "create_long_term_plan":

@@ -98,8 +98,9 @@ struct MonthScrollCard: View {
             }
 
             HStack(spacing: 0) {
-                ForEach(0..<7, id: \.self) { index in
-                    Text(Theme.weekdayLetters[index])
+                ForEach(Array(Theme.weekdayLetters(firstWeekday: calendar.firstWeekday).enumerated()),
+                        id: \.offset) { _, letter in
+                    Text(letter)
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(Theme.textSecondary)
                         .frame(maxWidth: .infinity)

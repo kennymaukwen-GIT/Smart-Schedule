@@ -1,0 +1,14 @@
+{
+  "utterance": "8 點前不要提醒我",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "preferences": "event_reminders: 1440,60,30,0\nquiet_hours: off\nmorning_briefing: 07:30\nevening_preview: off\ndaily_reminder_cap: off",
+  "calendars": "- My calendar | you@example.com (default)\n- Gym | you@example.com\n- My calendar | student@university.example.edu",
+  "expected_call": {
+    "name": "update_preferences",
+    "args": {
+      "changes": [{ "key": "quiet_hours", "value": "22:00-08:00" }],
+      "summary_for_user": "以後 08:00 前的提醒會靜音送達。"
+    }
+  }
+}

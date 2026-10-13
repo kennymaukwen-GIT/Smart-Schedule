@@ -2,15 +2,17 @@ import AVFoundation
 import Observation
 import Speech
 
-/// Push-to-talk dictation for the mic buttons. On-device recognition when the locale supports it
-/// (no audio leaves the phone; works offline).
+/// Push-to-talk dictation for the mic buttons, in Settings › Assistant › "Speech language" (the device language
+/// when automatic). With "On-device recognition" on and a language this iPhone supports, no audio leaves the
+/// phone and dictation works offline.
 @MainActor
 @Observable
 final class SpeechTranscriber {
     var transcript = ""
     var isRecording = false
 
-    @ObservationIgnored private let recognizer = SFSpeechRecognizer(locale: Locale.current)
+    /// Built per recording, so a language picked in Settings applies to the next one.
+    @ObservationIgnored private var recognizer: SFSpeechRecognizer?
     @ObservationIgnored private let audioEngine = AVAudioEngine()
     @ObservationIgnored private var request: SFSpeechAudioBufferRecognitionRequest?
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
@@ -20,7 +22,11 @@ final class SpeechTranscriber {
     }
 
     func start() async {
-        guard !isRecording, await Self.authorize(), let recognizer, recognizer.isAvailable else { return }
+        guard !isRecording, await Self.authorize() else { return }
+        let preferences = PreferencesStore.shared.current()
+        let locale = preferences.speechLanguage.localeIdentifier.map(Locale.init(identifier:)) ?? Locale.current
+        guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else { return }
+        self.recognizer = recognizer
         transcript = ""
 
         let session = AVAudioSession.sharedInstance()
@@ -31,7 +37,7 @@ final class SpeechTranscriber {
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
-        request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+        request.requiresOnDeviceRecognition = preferences.speechOnDevice && recognizer.supportsOnDeviceRecognition
         request.addsPunctuation = true
         self.request = request
 

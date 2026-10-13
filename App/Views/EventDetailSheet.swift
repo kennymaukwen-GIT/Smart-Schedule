@@ -51,34 +51,20 @@ struct EventDetailSheet: View {
     }
 
     private var timeLine: String {
+        // Settings › Time zone, not necessarily the device's.
+        let clock = WallClock()
+        let day = event.start.formatted(
+            Date.FormatStyle(timeZone: clock.timeZone).weekday(.wide).month(.abbreviated).day()
+        )
         if event.isAllDay {
-            return event.start.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()) + " · "
-                + String(localized: "All day")
+            return day + " · " + String(localized: "All day")
         }
-        let day = event.start.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
         // 24-hour, like the timeline and the chat.
-        return "\(day) · \(ReplyFormatter.timeRange(event, clock: WallClock()))"
+        return "\(day) · \(ReplyFormatter.timeRange(event, clock: clock))"
     }
 
+    /// "1 hour before", "The day before at 09:00": the wording Settings uses too.
     static func reminderText(_ minutes: Int, allDay: Bool = false) -> String {
-        if allDay {
-            // All-day reminders count back from 00:00 of the event day: 900 = the day before at 09:00.
-            let daysBefore = (minutes + 1439) / 1440
-            let minuteOfDay = daysBefore * 1440 - minutes
-            let time = String(format: "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
-            switch daysBefore {
-            case 0: return String(localized: "On the day at \(time)")
-            case 1: return String(localized: "The day before at \(time)")
-            default: return String(localized: "\(daysBefore) days before at \(time)")
-            }
-        }
-        return switch minutes {
-        case 0: String(localized: "At start")
-        case 1..<60: String(localized: "\(minutes) minutes before")
-        case 60..<120: String(localized: "1 hour before")
-        case 120..<1440: String(localized: "\(minutes / 60) hours before")
-        case 1440..<2880: String(localized: "1 day before")
-        default: String(localized: "\(minutes / 1440) days before")
-        }
+        ReminderText.offset(minutes, allDay: allDay)
     }
 }

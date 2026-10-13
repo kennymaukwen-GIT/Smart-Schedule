@@ -10,6 +10,8 @@ struct NotificationTurnRow: View {
     var isDemo = false
     var onAddPlan: () -> Void = {}
     var onKeepEditing: () -> Void = {}
+    var onAddPendingEvents: () -> Void = {}
+    var onEditPendingEvents: () -> Void = {}
 
     var body: some View {
         switch turn.role {
@@ -36,6 +38,10 @@ struct NotificationTurnRow: View {
                 if let plan = turn.planDraft {
                     NotificationPlanCard(draft: plan, status: turn.planStatus,
                                          onAdd: onAddPlan, onKeepEditing: onKeepEditing)
+                }
+                if let batch = turn.pendingEvents {
+                    NotificationPendingEventsCard(batch: batch, status: turn.pendingEventsStatus, isDemo: isDemo,
+                                                 onAdd: onAddPendingEvents, onEdit: onEditPendingEvents)
                 }
             }
         }

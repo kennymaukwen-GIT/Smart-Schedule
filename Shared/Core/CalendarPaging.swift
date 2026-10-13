@@ -185,6 +185,20 @@ enum CalendarPaging {
         return start + " – " + formatted(lastDate, template: "y", calendar: calendar, locale: locale)
     }
 
+    /// The main screen's title (Artboard 5): "2027 October" in English and other languages, "2027年10月" in Chinese.
+    static func headerTitle(_ month: Date, calendar: Calendar, locale: Locale) -> String {
+        if locale.language.languageCode?.identifier == "zh" {
+            return formatted(month, template: "yMMMM", calendar: calendar, locale: locale)
+        }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        // Year first, then the standalone month name ("LLLL", the nominative form in inflected languages).
+        formatter.dateFormat = "yyyy LLLL"
+        return formatter.string(from: month)
+    }
+
     private static func formatted(_ date: Date, template: String, calendar: Calendar, locale: Locale) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale

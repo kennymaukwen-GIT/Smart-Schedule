@@ -146,7 +146,7 @@ final class GeminiClientParseTests: XCTestCase {
                                 "Shared/AI/FunctionDeclarations.json must be a resource of the test bundle")
         let declarations = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
         let names = declarations.compactMap { $0["name"] as? String }
-        XCTAssertEqual(names.count, 7)
+        XCTAssertEqual(names.count, 8)
         XCTAssertEqual(Set(names), Set(AssistantFunction.allCases.map(\.rawValue)))
         for declaration in declarations {
             XCTAssertNotNil(declaration["parameters"] as? [String: Any], "\(declaration["name"] ?? "?")")
@@ -169,4 +169,88 @@ final class GeminiClientParseTests: XCTestCase {
         XCTAssertEqual(AssistantFunction(rawValue: call.name), .confirmPlan)
         XCTAssertEqual(try call.decode(ConfirmPlanArgs.self).decision, "discard")
     }
+
+    func testUpdatePreferencesCallDecodes() throws {
+        let response = try parse("""
+        {"candidates": [{"content": {"parts": [
+          {"functionCall": {"name": "update_preferences", "args": {
+            "changes": [{"key": "quiet_hours", "value": "22:00-08:00"}, {"key": "routine_reminders", "value": "120"}],
+            "summary_for_user": "From now on, reminders before 08:00 arrive silently."}}}
+        ]}, "finishReason": "STOP"}]}
+        """)
+        let call = try XCTUnwrap(response.functionCalls.first)
+        XCTAssertEqual(AssistantFunction(rawValue: call.name), .updatePreferences)
+        let args = try call.decode(UpdatePreferencesArgs.self)
+        XCTAssertEqual(args.changes.map(\.key), ["quiet_hours", "routine_reminders"])
+        XCTAssertEqual(args.changes.map(\.value), ["22:00-08:00", "120"])
+        XCTAssertEqual(args.summaryForUser, "From now on, reminders before 08:00 arrive silently.")
+    }
+
+    // MARK: AI data-sharing consent
+
+    /// A session whose every request is counted and fails, so a test can prove nothing was sent.
+    private func countingSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [CountingURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+
+    private let offlineConfig = GeminiConfig(baseURL: "https://gemini.example.invalid/v1beta", modelID: "test-model",
+                                             apiKey: "test-key", thinkingLevel: nil)
+
+    func testWithoutConsentNothingIsSent() async {
+        CountingURLProtocol.counter.reset()
+        let client = GeminiClient(config: offlineConfig, session: countingSession(), consentCheck: { false })
+        do {
+            _ = try await client.generate(system: "system", history: [.user("Lunch with Andrew tomorrow 1pm")])
+            XCTFail("expected GeminiError.consentRequired")
+        } catch GeminiError.consentRequired {
+            // expected
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+        XCTAssertEqual(CountingURLProtocol.counter.value, 0, "no request may leave the device without consent")
+    }
+
+    func testWithConsentTheRequestIsSent() async {
+        CountingURLProtocol.counter.reset()
+        let client = GeminiClient(config: offlineConfig, session: countingSession(), consentCheck: { true })
+        do {
+            _ = try await client.generate(system: "system", history: [.user("hi")])
+            XCTFail("the counting session always fails")
+        } catch GeminiError.consentRequired {
+            XCTFail("consent was granted")
+        } catch {
+            // The transport error of the counting session.
+        }
+        XCTAssertGreaterThan(CountingURLProtocol.counter.value, 0)
+    }
+
+    func testConsentErrorExplainsWhereToAllowSharing() {
+        XCTAssertEqual(GeminiError.consentRequired.errorDescription,
+                       "Allow AI data sharing in Settings › AI & privacy to use the assistant.")
+    }
+}
+
+/// Counts requests and fails each one (no network in unit tests).
+private final class CountingURLProtocol: URLProtocol {
+    final class Counter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+        var value: Int { lock.lock(); defer { lock.unlock() }; return count }
+        func increment() { lock.lock(); count += 1; lock.unlock() }
+        func reset() { lock.lock(); count = 0; lock.unlock() }
+    }
+
+    static let counter = Counter()
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.counter.increment()
+        client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+    }
+
+    override func stopLoading() {}
 }

@@ -18,8 +18,24 @@ final class NotificationChatModel {
         /// A long-term plan shown for review; nothing is in the calendar until the user taps Add.
         var planDraft: PlanDraft?
         var planStatus: PlanStatus = .pending
+        /// "Ask me first": single events waiting for Add.
+        var pendingEvents: PendingEventBatch?
+        var pendingEventsStatus: PendingEventsStatus = .pending
 
         var hasOpenPlan: Bool { planDraft != nil && planStatus == .pending }
+        var hasOpenPendingEvents: Bool { pendingEvents != nil && pendingEventsStatus == .pending }
+    }
+
+    /// Where a pending events card stands. Only `.pending` offers Add and Edit.
+    enum PendingEventsStatus: Equatable {
+        case pending
+        case adding
+        case added(demo: Bool)
+        case discarded
+        /// A newer batch took its place.
+        case replaced
+
+        var isOpen: Bool { self == .pending || self == .adding }
     }
 
     /// Where a plan card stands. Only `.pending` offers Add and Keep editing.
@@ -86,7 +102,8 @@ final class NotificationChatModel {
 
     var isDemo: Bool { assistant is DemoAssistant }
 
-    var hasPlan: Bool { turns.contains { $0.planDraft != nil } }
+    /// A plan or pending events card is in the conversation: the card needs the taller size.
+    var hasPlan: Bool { turns.contains { $0.planDraft != nil || $0.pendingEvents != nil } }
 
     func load(_ content: UNNotificationContent) {
         headerTitle = content.title
@@ -99,6 +116,14 @@ final class NotificationChatModel {
             Task {
                 if let pending = await SharedStore.shared.pendingPlan(), pending.id == planID {
                     showPending(pending)
+                }
+            }
+        }
+        // Likewise "Ask me first" events presented by a follow-up.
+        if let batchID = content.userInfo[NotificationIDs.UserInfo.pendingBatchID] as? String {
+            Task {
+                if let batch = await SharedStore.shared.pendingEventBatch(), batch.id == batchID {
+                    showPendingEvents(batch)
                 }
             }
         }
@@ -122,6 +147,10 @@ final class NotificationChatModel {
             do {
                 let reply = try await assistant.handle(text, focusEventID: focusEventID, now: Date())
                 apply(reply)
+            } catch GeminiError.consentRequired {
+                // Asking for consent needs the app; nothing was sent.
+                turns.append(Turn(role: .assistant,
+                                  text: String(localized: "Turn on AI data sharing in Smart Schedule › Settings › AI & privacy to reply here.")))
             } catch {
                 turns.append(Turn(role: .assistant, text: error.localizedDescription))
             }
@@ -171,6 +200,36 @@ final class NotificationChatModel {
         inputFocusRequest += 1
     }
 
+    // MARK: "Ask me first" pending events
+
+    /// "Add": writes the batch to its calendar.
+    func addPendingEvents(_ turnID: Turn.ID) {
+        guard !isWorking,
+              let turn = turns.first(where: { $0.id == turnID }), turn.hasOpenPendingEvents,
+              let batch = turn.pendingEvents else { return }
+        setPendingEventsStatus(.adding, turnID: turnID)
+        isWorking = true
+        Task {
+            do {
+                let reply = try await assistant.commitPendingEvents(batch)
+                setPendingEventsStatus(.added(demo: isDemo), turnID: turnID)
+                let text = Self.shownText(of: reply, clock: clock)
+                if !text.isEmpty { turns.append(Turn(role: .assistant, text: text)) }
+            } catch {
+                setPendingEventsStatus(.pending, turnID: turnID)
+                turns.append(Turn(role: .assistant, text: error.localizedDescription))
+            }
+            isWorking = false
+        }
+    }
+
+    /// "Edit": asks what to change and focuses the inline field; the answer produces a new batch.
+    func editPendingEvents(_ turnID: Turn.ID) {
+        guard !isWorking, turns.contains(where: { $0.id == turnID && $0.hasOpenPendingEvents }) else { return }
+        turns.append(Turn(role: .assistant, text: String(localized: "What would you like to change?")))
+        inputFocusRequest += 1
+    }
+
     // MARK: Private
 
     private func apply(_ reply: ScheduleAssistant.Reply) {
@@ -180,15 +239,50 @@ final class NotificationChatModel {
         if let planID = reply.committedPlanID { settlePlans(planID: planID, as: .added(demo: isDemo)) }
         if let planID = reply.discardedPlanID { settlePlans(planID: planID, as: .discarded) }
         if let plan = reply.planDraft { prepareForPlan(plan) }
+        if let batchID = reply.committedEventBatchID {
+            settlePendingEvents(batchID: batchID, as: .added(demo: isDemo))
+        }
+        if let batchID = reply.discardedEventBatchID { settlePendingEvents(batchID: batchID, as: .discarded) }
+        if reply.pendingEvents != nil { prepareForPendingEvents() }
 
         let turn = Turn(role: .assistant,
                         text: Self.shownText(of: reply, clock: clock),
                         addedEvents: reply.addedEvents,
                         agenda: reply.agenda,
-                        planDraft: reply.planDraft)
-        if !turn.text.isEmpty || !turn.addedEvents.isEmpty || turn.agenda != nil || turn.planDraft != nil {
+                        planDraft: reply.planDraft,
+                        pendingEvents: reply.pendingEvents)
+        if !turn.text.isEmpty || !turn.addedEvents.isEmpty || turn.agenda != nil || turn.planDraft != nil
+            || turn.pendingEvents != nil {
             turns.append(turn)
         }
+    }
+
+    /// A batch that arrived with the notification (made from a collapsed reply or in the app).
+    private func showPendingEvents(_ batch: PendingEventBatch) {
+        guard !turns.contains(where: { $0.pendingEvents?.id == batch.id }) else { return }
+        prepareForPendingEvents()
+        turns.append(Turn(role: .assistant, text: "", pendingEvents: batch))
+    }
+
+    /// Older cards stop offering Add: there is one batch at a time.
+    private func prepareForPendingEvents() {
+        for index in turns.indices where turns[index].hasOpenPendingEvents {
+            turns[index].pendingEventsStatus = .replaced
+        }
+        focusEventID = nil // the conversation is about the new events now, not the reminder's event
+        onPreferredHeightChange?(Self.planHeight)
+    }
+
+    private func settlePendingEvents(batchID: String, as status: PendingEventsStatus) {
+        for index in turns.indices
+        where turns[index].pendingEvents?.id == batchID && turns[index].pendingEventsStatus.isOpen {
+            turns[index].pendingEventsStatus = status
+        }
+    }
+
+    private func setPendingEventsStatus(_ status: PendingEventsStatus, turnID: Turn.ID) {
+        guard let index = turns.firstIndex(where: { $0.id == turnID }) else { return }
+        turns[index].pendingEventsStatus = status
     }
 
     /// A draft that arrived with the notification (made from a collapsed reply or in the app).
@@ -223,8 +317,9 @@ final class NotificationChatModel {
     }
 
     /// `Reply.text` is the full text version (it is also the collapsed notification's body). Here the plan card,
-    /// added-event rows and agenda show those parts, so their lines are left out; anything else (a revision's
-    /// "what changed", an overlap warning) stays. Mirrors `ChatViewModel.shownText` in the app.
+    /// pending events card, added-event rows and agenda show those parts, so their lines are left out; anything else
+    /// (a revision's "what changed", an overlap warning, a settings change) stays. Mirrors `ChatViewModel.shownText`
+    /// in the app, which also draws settings changes as a card.
     static func shownText(of reply: ScheduleAssistant.Reply, clock: WallClock) -> String {
         var drawn: [String] = []
         if let plan = reply.planDraft {
@@ -237,6 +332,12 @@ final class NotificationChatModel {
         }
         if let agenda = reply.agenda {
             drawn.append(ReplyFormatter.agenda(agenda, clock: clock))
+        }
+        if let batch = reply.pendingEvents {
+            drawn += [ReplyFormatter.pendingEventsSummary(batch, clock: clock), ReplyFormatter.pendingEventsPrompt]
+        }
+        if reply.committedEventBatchID != nil {
+            drawn.append(ReplyFormatter.pendingEventsAdded(reply.addedEvents.count))
         }
         guard !drawn.isEmpty else { return reply.text }
 

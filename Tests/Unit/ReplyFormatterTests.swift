@@ -132,4 +132,46 @@ final class ReplyFormatterTests: XCTestCase {
         XCTAssertEqual(ReplyFormatter.planReviewPrompt.filter { ".!?".contains($0) }.count, 1, "one sentence")
         XCTAssertEqual(ReplyFormatter.planAdded("Muscle 6M"), "Added “Muscle 6M” to Google Calendar.")
     }
+
+    // MARK: "Ask me first" and settings by voice
+
+    private func batch(_ events: [ScheduleEvent]) -> PendingEventBatch {
+        PendingEventBatch(id: "batch-abc12345", createdAt: now, utterance: "u", seed: "s",
+                          argsJSON: Data("{}".utf8), previewEvents: events)
+    }
+
+    func testPendingEventsSummary() {
+        XCTAssertEqual(ReplyFormatter.pendingEventsSummary(batch([lunch]), clock: clock, locale: english),
+                       "Ready to add: Lunch with Andrew · Wed, Oct 14 · 13:00–14:00")
+        XCTAssertEqual(ReplyFormatter.pendingEventsSummary(batch([gym, lunch]), clock: clock, locale: english)
+                           .components(separatedBy: "\n"),
+                       ["Ready to add 2 events:",
+                        "• Lunch with Andrew · Wed, Oct 14 · 13:00–14:00",
+                        "• Gym · Fri, Oct 16 · 18:00–19:00"])
+        XCTAssertEqual(ReplyFormatter.pendingEventsSummary(batch([]), clock: clock, locale: english), "")
+        XCTAssertEqual(ReplyFormatter.pendingEventsPrompt, "Tap Add to put it in your calendar, or Edit to change it.")
+        XCTAssertEqual(ReplyFormatter.pendingEventsAdded(1), "Added 1 event to Google Calendar.")
+        XCTAssertEqual(ReplyFormatter.pendingEventsAdded(3), "Added 3 events to Google Calendar.")
+        XCTAssertFalse(ReplyFormatter.pendingEventsDiscarded.contains("/"))
+    }
+
+    func testPreferenceReceiptText() {
+        let receipt = PreferenceChangeReceipt(
+            id: UUID(), date: now, source: .voice(utterance: "8 點前不要提醒我"),
+            changes: [PreferenceChange(key: .quietHours, oldValue: "off 22:00-07:00", newValue: "on 22:00-08:00",
+                                       oldDisplay: "Off", newDisplay: "22:00–08:00", replacedEntry: nil)])
+        XCTAssertEqual(ReplyFormatter.preferencesUpdated(receipt).components(separatedBy: "\n"),
+                       ["Settings updated", "• \(PreferenceKey.quietHours.title): Off → 22:00–08:00"])
+    }
+
+    func testRejectedPreferencesNameTheSettingNotTheReason() {
+        XCTAssertNil(ReplyFormatter.preferencesRejected([]))
+        let text = ReplyFormatter.preferencesRejected([
+            PreferenceRejection(key: "quiet_hours", value: "10pm", reason: "quiet_hours must be HH:mm-HH:mm or off"),
+            PreferenceRejection(key: "quiet_hours", value: "x", reason: "again"),
+            PreferenceRejection(key: "theme", value: "dark", reason: "unknown key")
+        ])
+        XCTAssertEqual(text, "I couldn't change \(PreferenceKey.quietHours.title), theme. You can change it in Settings.")
+        XCTAssertFalse(text?.contains("HH:mm") ?? true)
+    }
 }

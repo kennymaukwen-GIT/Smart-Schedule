@@ -16,29 +16,53 @@ actor DemoAssistant: ScheduleAssisting {
 
     static var demoNote: String { String(localized: "Demo mode: nothing was written to Google Calendar.") }
 
+    private enum Proposal { case plan, events }
+
     private let store: SharedStore
-    private let clock: WallClock
-    private let mapper: CalendarEventMapper
-    private let planBuilder: PlanDraftBuilder
+    private let preferences: PreferencesStore
+    private let fixedClock: WallClock?
+    private let fixedPolicy: ReminderPolicy?
     private let rescheduleReminders: @Sendable (SharedStore) async -> Void
     /// Title and day from a "what time?" question, so tapping the "14:00" suggestion completes that event.
     private var pendingDraft: (title: String, day: Date?)?
+    /// Which proposal was shown last, so "好" approves the newer of a draft plan and pending events.
+    private var lastProposal: Proposal?
 
-    /// - Parameter rescheduleReminders: runs after every write. Unit tests pass a no-op because a hostless
-    ///   test bundle has no notification center.
+    /// - Parameters:
+    ///   - clock: nil = Settings › Time zone and "Week starts on", read per request.
+    ///   - policy: nil = the reminder defaults in Settings, read per request.
+    ///   - preferences: where "from now on…" changes are written. Unit tests pass a temporary store.
+    ///   - rescheduleReminders: runs after every write. Unit tests pass a no-op because a hostless
+    ///     test bundle has no notification center.
     init(store: SharedStore = .shared,
-         clock: WallClock = WallClock(),
-         policy: ReminderPolicy = ReminderPolicy(),
+         clock: WallClock? = nil,
+         policy: ReminderPolicy? = nil,
+         preferences: PreferencesStore = .shared,
          rescheduleReminders: @escaping @Sendable (SharedStore) async -> Void = { store in
              await ReminderScheduler.shared.reschedule(store: store)
          }) {
-        let mapper = CalendarEventMapper(clock: clock, policy: policy)
         self.store = store
-        self.clock = clock
-        self.mapper = mapper
-        self.planBuilder = PlanDraftBuilder(mapper: mapper)
+        self.preferences = preferences
+        self.fixedClock = clock
+        self.fixedPolicy = policy
         self.rescheduleReminders = rescheduleReminders
     }
+
+    // Read per use, so a change in Settings or by voice applies at once.
+    private var settings: AppPreferences { preferences.current() }
+
+    private var clock: WallClock {
+        fixedClock ?? WallClock(timeZone: settings.timeZone, firstWeekday: settings.firstWeekday)
+    }
+
+    private var mapper: CalendarEventMapper {
+        let current = settings
+        return CalendarEventMapper(clock: clock,
+                                   policy: fixedPolicy ?? ReminderPolicy(preferences: current),
+                                   defaultEventMinutes: current.defaultEventMinutes)
+    }
+
+    private var planBuilder: PlanDraftBuilder { PlanDraftBuilder(mapper: mapper) }
 
     func handle(_ utterance: String, focusEventID: String? = nil, now: Date = Date()) async throws -> Reply {
         let text = utterance.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -48,12 +72,17 @@ actor DemoAssistant: ScheduleAssisting {
         let pending = pendingDraft
         pendingDraft = nil
 
-        // A pending draft plan gets first look; it hands back anything clearly about other events.
+        // "From now on…" goes first, so "8 點前不要提醒我" never becomes an 08:00 event.
+        // A pending draft plan gets first look after that; it hands back anything clearly about other events.
         // Shift runs next: it only claims an utterance with a move word plus an amount (or a time and a focus
         // event), so "push the gym routine 30 min" is not mistaken for a new plan.
         let reply: Reply
-        if let reviewed = try await review(text, lower: lower, focusEventID: focusEventID,
-                                           answersTimeQuestion: pending != nil, language: language, parser: parser) {
+        if let changed = await preferenceChange(text, lower: lower, language: language, parser: parser) {
+            reply = changed
+        } else if let decided = try await reviewPendingEvents(text, lower: lower, focusEventID: focusEventID, parser: parser) {
+            reply = decided
+        } else if let reviewed = try await review(text, lower: lower, focusEventID: focusEventID,
+                                                  answersTimeQuestion: pending != nil, language: language, parser: parser) {
             reply = reviewed
         } else if let shifted = await shift(text, lower: lower, focusEventID: focusEventID, language: language, parser: parser) {
             reply = shifted
@@ -91,6 +120,19 @@ actor DemoAssistant: ScheduleAssisting {
 
     func discardPlan(_ draft: PlanDraft) async -> Reply {
         let reply = await discard(draft)
+        await store.setLastAssistantLine(reply.text)
+        return reply
+    }
+
+    func commitPendingEvents(_ batch: PendingEventBatch) async throws -> Reply {
+        let reply = try await writeBatch(batch)
+        await rescheduleReminders(store)
+        await store.setLastAssistantLine(reply.text)
+        return reply
+    }
+
+    func discardPendingEvents(_ batch: PendingEventBatch) async -> Reply {
+        let reply = await discardBatch(batch)
         await store.setLastAssistantLine(reply.text)
         return reply
     }
@@ -135,6 +177,7 @@ actor DemoAssistant: ScheduleAssisting {
                                           revision: (pending?.revision ?? 0) + 1,
                                           utterance: pending?.utterance ?? text)
         await store.setPendingPlan(draft)
+        lastProposal = .plan
         return reviewReply(for: draft, lead: nil)
     }
 
@@ -166,6 +209,7 @@ actor DemoAssistant: ScheduleAssisting {
                         parser: DemoParser) async throws -> Reply? {
         // A reminder's "push it 30 min" is about that event, and "14:00" answers the last "What time…?" question.
         guard focusEventID == nil, let draft = await store.pendingPlan() else { return nil }
+        if lastProposal == .events, await store.pendingEventBatch() != nil { return nil }
         if answersTimeQuestion, parser.containsTime(text) { return nil }
         // A tapped "07:00" chip has no words: keep talking in the plan's language.
         let language = DemoLanguage.of(text, fallback: DemoLanguage.of(draft.utterance, fallback: inputLanguage))
@@ -233,6 +277,7 @@ actor DemoAssistant: ScheduleAssisting {
                                             revision: draft.revision + 1,
                                             utterance: draft.utterance)
         await store.setPendingPlan(revised)
+        lastProposal = .plan
         return reviewReply(for: revised, lead: change.sentences(language))
     }
 
@@ -396,7 +441,7 @@ actor DemoAssistant: ScheduleAssisting {
         return reply
     }
 
-    private static func relativeMinutes(_ lower: String) -> Int? {
+    fileprivate static func relativeMinutes(_ lower: String) -> Int? {
         if ["half an hour", "半小時", "半小时", "半個小時", "半个小时"].contains(where: { lower.contains($0) }) { return 30 }
         if let match = DemoParser.match(#"(\d{1,3})\s*(?:mins?|minutes?)\b"#, in: lower), let value = Int(match.group(1) ?? "") {
             return value
@@ -548,25 +593,17 @@ actor DemoAssistant: ScheduleAssisting {
         }
 
         let kind = CalendarEventMapper.inferKind(title)
-        let event = ScheduleEvent(
-            id: DemoData.idPrefix + "chat-" + UUID().uuidString.prefix(8).lowercased(),
-            seriesID: nil,
-            title: title,
-            start: start,
-            end: start.addingTimeInterval(3600),
-            isAllDay: false,
-            kind: kind,
-            colorHex: DemoData.colorHex(for: kind),
-            location: nil,
-            meetURL: nil,
-            notes: CalendarEventMapper.provenancePrefix + text,
-            reminderMinutes: nil,
-            planID: nil,
-            htmlLink: nil,
-            isCompleted: false
-        )
+        let minutes = Self.defaultMinutes(for: kind, settings: settings)
         let dayInterval = DateInterval(start: calendar.startOfDay(for: start), duration: 86_400)
         let sameDay = await store.events(in: dayInterval)
+
+        if settings.autonomy == .askFirst {
+            return await proposeBatch(title: title, start: start, minutes: minutes, kind: kind, utterance: text,
+                                      now: now, dayInterval: dayInterval, sameDay: sameDay)
+        }
+
+        let event = makeEvent(id: DemoData.idPrefix + "chat-" + UUID().uuidString.prefix(8).lowercased(),
+                              title: title, start: start, minutes: minutes, kind: kind, utterance: text)
         await store.upsert([event])
 
         reply.changed = true
@@ -577,6 +614,435 @@ actor DemoAssistant: ScheduleAssisting {
         reply.append(ReplyFormatter.conflicts([event], against: sameDay))
         reply.append(Self.demoNote)
         return reply
+    }
+
+    /// Kinds that get the default length from Settings (events, routines); tasks and deadlines keep an hour here,
+    /// as the demo always did.
+    private static func defaultMinutes(for kind: ScheduleEvent.Kind, settings: AppPreferences) -> Int {
+        switch kind {
+        case .event, .routine: settings.defaultEventMinutes
+        case .task, .deadline: 60
+        }
+    }
+
+    /// A captured event in the calendar new events go to (Settings or "以後用學校帳號").
+    private func makeEvent(id: String, title: String, start: Date, minutes: Int, kind: ScheduleEvent.Kind,
+                           utterance: String) -> ScheduleEvent {
+        let target = Self.demoTarget(for: settings)
+        return ScheduleEvent(
+            id: id,
+            seriesID: nil,
+            title: title,
+            start: start,
+            end: start.addingTimeInterval(TimeInterval(minutes) * 60),
+            isAllDay: false,
+            kind: kind,
+            colorHex: DemoData.colorHex(for: kind),
+            location: nil,
+            meetURL: nil,
+            notes: CalendarEventMapper.provenancePrefix + utterance,
+            reminderMinutes: nil,
+            planID: nil,
+            htmlLink: nil,
+            isCompleted: false,
+            accountID: target.accountID,
+            calendarID: target.calendarID
+        )
+    }
+
+    /// The sample calendar new events go to: the one chosen in Settings or by voice, else the personal calendar.
+    static func demoTarget(for settings: AppPreferences) -> CalendarRef {
+        if let chosen = settings.defaultCalendar, demoWritableCalendars.contains(where: { $0.id == chosen }) { return chosen }
+        return DemoData.defaultCalendar
+    }
+
+    private static var demoWritableCalendars: [CalendarInfo] {
+        DemoData.accounts.flatMap(\.calendars).filter(\.isWritable)
+    }
+
+    // MARK: - "Ask me first": pending events
+
+    /// Same as capture, but nothing is written: the event waits on a card with Add and Edit.
+    private func proposeBatch(title: String, start: Date, minutes: Int, kind: ScheduleEvent.Kind, utterance: String,
+                              now: Date, dayInterval: DateInterval, sameDay: [ScheduleEvent]) async -> Reply {
+        let draft = EventDraft(title: title, start: clock.promptDateTimeString(start), durationMinutes: minutes,
+                               kind: kind.rawValue)
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let argsJSON = (try? encoder.encode(CreateEventsArgs(events: [draft]))) ?? Data("{\"events\":[]}".utf8)
+        let id = PendingEventBatch.newID()
+        var preview = makeEvent(id: PendingEventBatch.previewID(batchID: id, index: 0), title: title, start: start,
+                                minutes: minutes, kind: kind, utterance: utterance)
+        // Previews belong to no calendar, like plan previews: always drawn, never hidden.
+        preview.accountID = nil
+        preview.calendarID = nil
+        let batch = PendingEventBatch(id: id, createdAt: now, utterance: utterance, seed: id,
+                                      argsJSON: argsJSON, previewEvents: [preview])
+        await store.setPendingEventBatch(batch)
+        lastProposal = .events
+
+        var reply = Reply()
+        reply.pendingEvents = batch
+        reply.showRange = dayInterval
+        reply.append(ReplyFormatter.pendingEventsSummary(batch, clock: clock))
+        reply.append(ReplyFormatter.conflicts([preview], against: sameDay))
+        reply.append(ReplyFormatter.pendingEventsPrompt)
+        return reply
+    }
+
+    /// "Add": the batch's args, written locally with ids derived from the batch (a second Add changes nothing).
+    private func writeBatch(_ batch: PendingEventBatch) async throws -> Reply {
+        let args = try ScheduleAssistant.decodeCreateArgs(batch.argsJSON)
+        let suffix = batch.id.hasPrefix(PendingEventBatch.idPrefix)
+            ? String(batch.id.dropFirst(PendingEventBatch.idPrefix.count)) : batch.id
+        var events: [ScheduleEvent] = []
+        for (index, draft) in args.events.prefix(20).enumerated() {
+            guard let start = clock.dateTime(draft.start) else { throw MappingError.invalidDate(draft.start) }
+            let kind = ScheduleEvent.Kind(rawValue: draft.kind ?? "") ?? .event
+            events.append(makeEvent(id: DemoData.idPrefix + "chat-\(suffix)-\(index)", title: draft.title, start: start,
+                                    minutes: draft.durationMinutes ?? Self.defaultMinutes(for: kind, settings: settings),
+                                    kind: kind, utterance: batch.utterance))
+        }
+        await store.upsert(events)
+        if await store.pendingEventBatch()?.id == batch.id { await store.setPendingEventBatch(nil) }
+        if lastProposal == .events { lastProposal = nil }
+
+        var reply = Reply(changed: true)
+        reply.created = events
+        reply.addedEvents = events
+        reply.committedEventBatchID = batch.id
+        reply.showRange = ScheduleAssistant.dayRange(of: events, clock: clock)
+        reply.append(ReplyFormatter.confirmation(for: events, clock: clock))
+        reply.append(Self.demoNote)
+        return reply
+    }
+
+    private func discardBatch(_ batch: PendingEventBatch) async -> Reply {
+        if await store.pendingEventBatch()?.id == batch.id { await store.setPendingEventBatch(nil) }
+        if lastProposal == .events { lastProposal = nil }
+        var reply = Reply()
+        reply.discardedEventBatchID = batch.id
+        reply.append(ReplyFormatter.pendingEventsDiscarded)
+        return reply
+    }
+
+    /// While events wait for Add, a bare "好" / "add them" adds them and "不要" / "never mind" drops them. Anything
+    /// else keeps its usual handling (and a new capture replaces the batch).
+    private func reviewPendingEvents(_ text: String, lower: String, focusEventID: String?,
+                                     parser: DemoParser) async throws -> Reply? {
+        guard focusEventID == nil, let batch = await store.pendingEventBatch() else { return nil }
+        if await store.pendingPlan() != nil, lastProposal != .events { return nil }
+        // "加入明天 3 點開會" is a new event, not an approval.
+        var leftover = text
+        let namesWhen = parser.containsTime(text) || parser.extractDay(from: &leftover) != nil
+        if !namesWhen, Self.isApproval(lower) { return try await writeBatch(batch) }
+        let bare = lower.replacingOccurrences(of: "’", with: "'")
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
+        let abandonment: Set<String> = ["no", "nope", "discard", "cancel", "never mind", "nevermind", "don't add",
+                                        "dont add", "forget it", "不要", "不要了", "算了", "取消", "不用了"]
+        if abandonment.contains(bare) { return await discardBatch(batch) }
+        return nil
+    }
+}
+
+// MARK: - (f) "From now on…": preferences by voice
+
+extension DemoAssistant {
+    /// Lasting instructions the demo understands offline, applied through the same `PreferencesStore.apply` as
+    /// Gemini's update_preferences (validation, ledger, Undo). Nil for anything else, which keeps its usual handling.
+    fileprivate func preferenceChange(_ text: String, lower: String, language: DemoLanguage,
+                                      parser: DemoParser) async -> Reply? {
+        guard let intent = DemoPreferenceIntent.parse(text, lower: lower, settings: settings, parser: parser) else {
+            return nil
+        }
+        let result = await preferences.apply(intent.requests, source: .voice(utterance: text), resolveCalendar: { value in
+            DemoPreferenceIntent.calendar(matching: value).map { CalendarChoice(ref: $0.id, label: $0.promptLabel) }
+        })
+        // No demo note: nothing would have gone to Google either way.
+        var reply = Reply()
+        ScheduleAssistant.describe(result.receipt, rejected: result.rejected, summary: intent.sentence(language),
+                                   in: &reply)
+        if ScheduleAssistant.touchesNotifications(result.receipt) { await rescheduleReminders(store) }
+        return reply
+    }
+}
+
+/// One recognised lasting instruction: the update_preferences changes it means and what to say back.
+private struct DemoPreferenceIntent {
+    var requests: [PreferenceChangeRequest]
+    var english: String
+    var chinese: String
+
+    func sentence(_ language: DemoLanguage) -> String { language == .chinese ? chinese : english }
+
+    static func parse(_ text: String, lower: String, settings: AppPreferences, parser: DemoParser) -> DemoPreferenceIntent? {
+        let lower = lower.replacingOccurrences(of: "’", with: "'")
+        var leftover = text
+        // A date or a time of day makes it about one event ("remind me 2 hours before gym tomorrow").
+        let namesWhen = parser.extractDay(from: &leftover) != nil || parser.containsTime(text)
+        return quietHours(lower, settings: settings)
+            ?? reminderRule(lower, settings: settings, namesWhen: namesWhen)
+            ?? defaultCalendar(lower, namesWhen: namesWhen)
+            ?? defaultDuration(text, lower: lower, namesWhen: namesWhen)
+            ?? replyLanguage(lower)
+            ?? autonomy(lower)
+    }
+
+    // MARK: Vocabulary
+
+    private static let lastingMarkers = [
+        "以後", "以后", "從現在開始", "从现在开始", "從今以後", "从今以后", "今後", "今后", "別再", "别再", "不要再", "每次",
+        "一律", "總是", "总是", "永遠", "永远", "from now on", "always", "never", "don't ever", "do not ever",
+        "every time", "going forward", "in future", "in the future", "by default"
+    ]
+
+    private static func hasLastingMarker(_ lower: String) -> Bool {
+        lastingMarkers.contains { lower.contains($0) }
+    }
+
+    /// "不要提醒", "別再提前一天提醒", "don't remind", "no reminders", "never notify"; not "別忘了提醒我".
+    private static func isNegative(_ lower: String) -> Bool {
+        DemoParser.match(#"(?:不要|不用|別|别|勿|不想|停止)(?!忘)[^，。,.!?！？]{0,10}?(?:提醒|通知|吵)"#, in: lower) != nil
+            || DemoParser.match(#"\b(?:don't|dont|do not|never|stop|no)\b.*\b(?:remind|reminders?|notify|notifications?|alerts?|ping)\b"#, in: lower) != nil
+    }
+
+    private static func mentionsReminder(_ lower: String) -> Bool {
+        ["提醒", "通知"].contains { lower.contains($0) }
+            || DemoParser.match(#"\b(?:remind|reminders?|alerts?|notify|notifications?)\b"#, in: lower) != nil
+    }
+
+    /// The kind of activity a reminder rule is about.
+    private static func activityKind(_ lower: String) -> ScheduleEvent.Kind? {
+        let kinds: [(ScheduleEvent.Kind, String)] = [
+            (.deadline, #"截止|期限|\bdeadlines?\b|\bdue\b"#),
+            (.task, #"待辦|待办|任務|任务|\btasks?\b|\bto-?dos?\b"#),
+            (.routine, #"健身|運動|运动|訓練|训练|瑜伽|跑步|例行|\bgym\b|\bworkouts?\b|\btraining\b|\bexercises?\b|\broutines?\b|\byoga\b|\bruns?\b"#),
+            (.event, #"會議|会议|開會|开会|行程|約會|约会|\bmeetings?\b|\bappointments?\b|\bevents?\b"#)
+        ]
+        return kinds.first { DemoParser.match($0.1, in: lower) != nil }?.0
+    }
+
+    private static func kindName(_ kind: ScheduleEvent.Kind) -> (english: String, chinese: String) {
+        switch kind {
+        case .routine: ("workouts and other routines", "健身和例行活動")
+        case .event: ("events", "行程")
+        case .deadline: ("deadlines", "截止日")
+        case .task: ("tasks", "待辦事項")
+        }
+    }
+
+    /// How long before: "2 小時", "兩小時", "一天", "30 min", "2 hours", "a day".
+    private static func leadMinutes(_ lower: String) -> Int? {
+        if let match = DemoParser.match(#"(\#(DemoParser.cnNumber))\s*(?:個|个)?\s*(?:天|days?\b)"#, in: lower),
+           let days = DemoParser.number(match.group(1) ?? "") {
+            return days * 1440
+        }
+        if DemoParser.match(#"\b(?:a|one)\s+day\b|\bthe day before\b"#, in: lower) != nil { return 1440 }
+        if DemoParser.match(#"(?:一|1)\s*(?:個|个)?\s*(?:星期|禮拜|礼拜|週|周)|\b(?:a|one)\s+week\b"#, in: lower) != nil { return 10_080 }
+        return DemoAssistant.relativeMinutes(lower)
+    }
+
+    private static func amountText(_ minutes: Int) -> (english: String, chinese: String) {
+        if minutes >= 1440, minutes % 1440 == 0 {
+            let days = minutes / 1440
+            return (days == 1 ? "1 day" : "\(days) days", "\(days) 天")
+        }
+        if minutes >= 60, minutes % 60 == 0 {
+            let hours = minutes / 60
+            return (hours == 1 ? "1 hour" : "\(hours) hours", "\(hours) 小時")
+        }
+        return ("\(minutes) minutes", "\(minutes) 分鐘")
+    }
+
+    private static func clock(_ minuteOfDay: Int) -> String {
+        String(format: "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
+    }
+
+    // MARK: Quiet hours: "8 點前不要提醒我", "don't remind me before 8am", "10 點後別提醒我"
+
+    private static func quietHours(_ lower: String, settings: AppPreferences) -> DemoPreferenceIntent? {
+        guard isNegative(lower) else { return nil }
+        let period = #"(凌晨|清晨|早上|早晨|上午|中午|下午|傍晚|晚上)?\s*"#
+        let clockTime = #"(\#(DemoParser.cnNumber))\s*[點点](?:\s*(半|\#(DemoParser.cnNumber))\s*分?)?\s*"#
+        let quiet = settings.quietHours
+        if let match = DemoParser.match(period + clockTime + "(?:以前|之前|前)", in: lower),
+           let time = chineseMinute(match, evening: false) {
+            return before(time, quiet: quiet)
+        }
+        if let match = DemoParser.match(period + clockTime + "(?:以後|以后|之後|之后|後|后)", in: lower),
+           let time = chineseMinute(match, evening: true) {
+            return after(time, quiet: quiet)
+        }
+        let english = #"\s+(\d{1,2})(?:[:.]([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)?"#
+        if let match = DemoParser.match(#"\bbefore"# + english, in: lower), let time = englishMinute(match, evening: false) {
+            return before(time, quiet: quiet)
+        }
+        if let match = DemoParser.match(#"\bafter"# + english, in: lower), let time = englishMinute(match, evening: true) {
+            return after(time, quiet: quiet)
+        }
+        return nil
+    }
+
+    /// Reminders before `end` arrive silently, from the current start (22:00 while quiet hours are off).
+    private static func before(_ end: Int, quiet: QuietHours) -> DemoPreferenceIntent {
+        let start = quiet.isEnabled ? quiet.startMinute : 22 * 60
+        let time = clock(end)
+        return DemoPreferenceIntent(
+            requests: [PreferenceChangeRequest(key: .quietHours, value: "\(clock(start))-\(time)")],
+            english: "OK. From now on, reminders before \(time) arrive silently.",
+            chinese: "好的，以後 \(time) 前的提醒會靜音送達。")
+    }
+
+    /// Reminders after `start` arrive silently, until the current end (07:00 while quiet hours are off).
+    private static func after(_ start: Int, quiet: QuietHours) -> DemoPreferenceIntent {
+        let end = quiet.isEnabled ? quiet.endMinute : 7 * 60
+        let time = clock(start)
+        return DemoPreferenceIntent(
+            requests: [PreferenceChangeRequest(key: .quietHours, value: "\(time)-\(clock(end))")],
+            english: "OK. From now on, reminders after \(time) arrive silently.",
+            chinese: "好的，以後 \(time) 後的提醒會靜音送達。")
+    }
+
+    /// Groups: 1 period, 2 hour, 3 minutes or 半. A bare hour "after" something means the evening (10 點後 = 22:00).
+    private static func chineseMinute(_ match: DemoParser.RegexMatch, evening: Bool) -> Int? {
+        guard var hour = DemoParser.number(match.group(2) ?? "") else { return nil }
+        let minute = match.group(3).map { $0 == "半" ? 30 : (DemoParser.number($0) ?? 0) } ?? 0
+        switch match.group(1) ?? "" {
+        case "下午", "傍晚", "晚上": if hour < 12 { hour += 12 }
+        case "中午": if hour < 6 { hour += 12 }
+        case "凌晨", "清晨", "早上", "早晨", "上午": if hour == 12 { hour = 0 }
+        default: if evening, (1...11).contains(hour) { hour += 12 }
+        }
+        guard (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+        return hour * 60 + minute
+    }
+
+    /// Groups: 1 hour, 2 minutes, 3 am/pm.
+    private static func englishMinute(_ match: DemoParser.RegexMatch, evening: Bool) -> Int? {
+        guard var hour = Int(match.group(1) ?? "") else { return nil }
+        let minute = Int(match.group(2) ?? "") ?? 0
+        if let meridiem = match.group(3)?.lowercased() {
+            hour = hour % 12 + (meridiem.hasPrefix("p") ? 12 : 0)
+        } else if evening, (1...11).contains(hour) {
+            hour += 12
+        }
+        guard (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+        return hour * 60 + minute
+    }
+
+    // MARK: Reminder rules: "健身提前 2 小時提醒", "remind me 2 hours before gym", "別再提前一天提醒截止日"
+
+    private static func reminderRule(_ lower: String, settings: AppPreferences, namesWhen: Bool) -> DemoPreferenceIntent? {
+        guard !namesWhen, mentionsReminder(lower),
+              DemoParser.match(#"提前|之前|前|\bbefore\b|\bahead\b|\bearly\b|\bin advance\b"#, in: lower) != nil,
+              let minutes = leadMinutes(lower), (0...40_320).contains(minutes) else { return nil }
+        guard let kind = activityKind(lower) ?? (hasLastingMarker(lower) ? .event : nil) else { return nil }
+        let key: PreferenceKey = switch kind {
+        case .event: .eventReminders
+        case .deadline: .deadlineReminders
+        case .task: .taskReminders
+        case .routine: .routineReminders
+        }
+        let names = kindName(kind)
+        let amount = amountText(minutes)
+        if isNegative(lower) {
+            let remaining = settings.reminders(for: kind).filter { $0 != minutes }
+            let value = remaining.isEmpty ? "none" : remaining.map(String.init).joined(separator: ",")
+            return DemoPreferenceIntent(
+                requests: [PreferenceChangeRequest(key: key, value: value)],
+                english: "OK. From now on, \(names.english) get no reminder \(amount.english) before.",
+                chinese: "好的，以後\(names.chinese)不會再提前 \(amount.chinese)提醒。")
+        }
+        return DemoPreferenceIntent(
+            requests: [PreferenceChangeRequest(key: key, value: String(minutes))],
+            english: "OK. From now on, \(names.english) get a reminder \(amount.english) before.",
+            chinese: "好的，以後\(names.chinese)會提前 \(amount.chinese)提醒。")
+    }
+
+    // MARK: Calendar for new events: "以後用學校帳號", "from now on use my school account"
+
+    private static let schoolPattern = #"學校|学校|學生|学生|大學|大学|\bschool\b|\buni\b|\buniversity\b|\bcollege\b|\bstudent\b|\.edu\b|\.ac\."#
+
+    private static func defaultCalendar(_ lower: String, namesWhen: Bool) -> DemoPreferenceIntent? {
+        guard !namesWhen,
+              DemoParser.match(#"帳號|账号|帳戶|账户|行事曆|行事历|日曆|日历|信箱|郵箱|邮箱|\baccount\b|\bcalendar\b|\bemail\b"#, in: lower) != nil,
+              DemoParser.match(#"用|改用|換成|换成|切換|切换|放到|放在|加到|\buse\b|\bswitch\b|\bput\b|\bsave\b"#, in: lower) != nil
+        else { return nil }
+        let primaries = DemoData.accounts.compactMap(\.primaryCalendar).filter(\.isWritable)
+        let chosen: CalendarInfo?
+        if let email = DemoParser.match(#"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}"#, in: lower)?.group(0) {
+            chosen = primaries.first { $0.accountEmail.lowercased() == email }
+        } else if DemoParser.match(schoolPattern, in: lower) != nil {
+            chosen = primaries.first { DemoParser.match(schoolPattern, in: $0.accountEmail.lowercased()) != nil }
+        } else if DemoParser.match(#"個人|个人|私人|自己的|\bpersonal\b|\bprivate\b|\bhome\b|\bmy own\b"#, in: lower) != nil {
+            chosen = primaries.first { DemoParser.match(schoolPattern, in: $0.accountEmail.lowercased()) == nil }
+        } else {
+            chosen = nil
+        }
+        guard let chosen else { return nil }
+        return DemoPreferenceIntent(
+            requests: [PreferenceChangeRequest(key: .defaultCalendar, value: chosen.promptLabel)],
+            english: "OK. From now on, new events go to \(chosen.displayName) (\(chosen.accountEmail)).",
+            chinese: "好的，以後新行程會加到 \(chosen.accountEmail) 的「\(chosen.displayName)」。")
+    }
+
+    /// The demo's `resolveCalendar`: an exact CALENDARS line of a writable sample calendar.
+    static func calendar(matching value: String) -> CalendarInfo? {
+        let wanted = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return DemoData.accounts.flatMap(\.calendars).first { $0.isWritable && $0.promptLabel.lowercased() == wanted }
+    }
+
+    // MARK: Default length: "以後會議預設 30 分鐘", "make meetings 30 minutes by default"
+
+    private static func defaultDuration(_ text: String, lower: String, namesWhen: Bool) -> DemoPreferenceIntent? {
+        guard !namesWhen, !mentionsReminder(lower) else { return nil }
+        let saysDefault = DemoParser.match(#"預設|默認|默认|\bdefault\b|\bby default\b"#, in: lower) != nil
+        guard saysDefault || (hasLastingMarker(lower) && activityKind(lower) != nil) else { return nil }
+        var leftover = lower
+        guard let minutes = DemoParser.extractMinutes(from: &leftover) else { return nil }
+        return DemoPreferenceIntent(
+            requests: [PreferenceChangeRequest(key: .defaultDuration, value: String(minutes))],
+            english: "OK. From now on, events last \(minutes) minutes unless you say how long.",
+            chinese: "好的，以後沒說長度的行程預設 \(minutes) 分鐘。")
+    }
+
+    // MARK: Reply language: "以後用英文回覆", "always reply in Chinese"
+
+    private static func replyLanguage(_ lower: String) -> DemoPreferenceIntent? {
+        guard DemoParser.match(#"回覆|回复|回答|回應|回应|回話|回话|\breply\b|\breplies\b|\brespond\b|\banswer\b|\btalk\b|\bspeak\b"#, in: lower) != nil
+        else { return nil }
+        func intent(_ value: String, _ english: String, _ chinese: String) -> DemoPreferenceIntent {
+            DemoPreferenceIntent(requests: [PreferenceChangeRequest(key: .replyLanguage, value: value)],
+                                 english: english, chinese: chinese)
+        }
+        if DemoParser.match(#"same language|language i (?:type|write|use)|跟我(?:一樣|一样|相同)|我(?:用|輸入|输入)的語言|我(?:用|輸入|输入)的语言"#, in: lower) != nil {
+            return intent("match", "OK. From now on, I'll reply in the language you type.", "好的，以後用你輸入的語言回覆。")
+        }
+        if DemoParser.match(#"英文|英語|英语|\benglish\b"#, in: lower) != nil {
+            return intent("en", "OK. From now on, I'll reply in English.", "好的，以後用英文回覆。")
+        }
+        if DemoParser.match(#"中文|繁體|繁体|國語|国语|\bchinese\b|\bmandarin\b"#, in: lower) != nil {
+            return intent("zh-Hant", "OK. From now on, I'll reply in Chinese.", "好的，以後用中文回覆。")
+        }
+        return nil
+    }
+
+    // MARK: Adding events: "以後先問我再加", "ask me before adding events", "直接加就好"
+
+    private static func autonomy(_ lower: String) -> DemoPreferenceIntent? {
+        if DemoParser.match(#"先問我|先问我|問過我|问过我|先跟我確認|先跟我确认|先確認|先确认|\bask me (?:first|before)|\bcheck with me\b|\bconfirm with me\b|\bask before\b"#, in: lower) != nil {
+            return DemoPreferenceIntent(
+                requests: [PreferenceChangeRequest(key: .autonomy, value: AssistantAutonomy.askFirst.rawValue)],
+                english: "OK. From now on, I'll ask before adding events.",
+                chinese: "好的，以後新增行程前會先問你。")
+        }
+        if DemoParser.match(#"直接加|直接新增|直接放|不用問|不用问|不要問|不要问|別問|别问|\bdon't ask\b|\bdo not ask\b|\bno need to ask\b|\bwithout asking\b|\badd (?:them |events |it )?directly\b"#, in: lower) != nil {
+            return DemoPreferenceIntent(
+                requests: [PreferenceChangeRequest(key: .autonomy, value: AssistantAutonomy.addDirectly.rawValue)],
+                english: "OK. From now on, I'll add events directly.",
+                chinese: "好的，以後會直接加入行程。")
+        }
+        return nil
     }
 }
 

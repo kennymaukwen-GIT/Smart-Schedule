@@ -31,6 +31,23 @@ extension NotificationChatModel {
         ]
         return model
     }
+
+    /// Preview-only: "Ask me first" is on, so the coffee waits for Add / Edit.
+    static func pendingEventsPreview(chinese: Bool = false) -> NotificationChatModel {
+        let model = NotificationChatModel(assistant: DemoAssistant())
+        model.headerTitle = "Smart Schedule"
+        model.headerBody = chinese ? "長按回覆" : "Hold to reply"
+        var coffee = NotificationPreviewSamples().coffee(chinese: chinese)
+        coffee.id = "draft-ev-preview0-0" // a draft id, as the assistant gives previews
+        let batch = PendingEventBatch(id: "batch-preview0", createdAt: Date(), utterance: "", seed: "preview",
+                                      argsJSON: Data("{}".utf8), target: nil,
+                                      targetLabel: "My calendar · kenny@example.com", previewEvents: [coffee])
+        model.turns = [
+            Turn(role: .user, text: chinese ? "明天早上 9 點跟 Mia 在 Blue Bottle 喝咖啡" : "Coffee with Mia tomorrow 9am at Blue Bottle"),
+            Turn(role: .assistant, text: "", pendingEvents: batch)
+        ]
+        return model
+    }
 }
 
 /// Sample rows for the previews: events around today, nothing read from the App Group.
@@ -116,6 +133,17 @@ private func previewPlanDraft(chinese: Bool = false) -> PlanDraft {
 #Preview("Hold to reply · plan draft") {
     NotificationChatView(model: NotificationChatModel.planPreview())
         .frame(height: NotificationChatModel.planHeight)
+}
+
+#Preview("Hold to reply · ask me first") {
+    NotificationChatView(model: NotificationChatModel.pendingEventsPreview())
+        .frame(height: NotificationChatModel.planHeight)
+}
+
+#Preview("Hold to reply · ask me first · zh-Hant") {
+    NotificationChatView(model: NotificationChatModel.pendingEventsPreview(chinese: true))
+        .frame(height: NotificationChatModel.planHeight)
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
 }
 
 #Preview("Hold to reply · zh-Hant") {

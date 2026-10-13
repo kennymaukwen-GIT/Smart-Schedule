@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// "October 2026" card of Artboard 5: Sunday-first grid, adjacent-month days dimmed, today circled,
-/// colored chips, task rows with checkboxes, multi-day bars ("Trip to San Diego") drawn as connected
+/// Month card of Artboard 5: weeks start on Settings › "Week starts on", adjacent-month days dimmed, today
+/// circled, colored chips, task rows with checkboxes, multi-day bars ("Trip to San Diego") drawn as connected
 /// segments across cells, "+N" overflow. Swipes sideways a month at a time with no end either way.
 ///
 /// `month` (the view model's `displayedMonth`) is the source of truth both ways: a swipe that comes to rest
@@ -12,6 +12,8 @@ struct MonthGridView: View {
     let isLoading: Bool
     let eventsOnDay: (Date) -> [ScheduleEvent]
     let onSelect: (ScheduleEvent) -> Void
+    /// False on the main screen, whose header already names the month.
+    var showsTitle = true
 
     private let calendar = WallClock().calendar
     private let maxChips = 3
@@ -22,11 +24,13 @@ struct MonthGridView: View {
     init(month: Binding<Date>,
          today: Date,
          isLoading: Bool = false,
+         showsTitle: Bool = true,
          eventsOnDay: @escaping (Date) -> [ScheduleEvent],
          onSelect: @escaping (ScheduleEvent) -> Void) {
         _month = month
         self.today = today
         self.isLoading = isLoading
+        self.showsTitle = showsTitle
         self.eventsOnDay = eventsOnDay
         self.onSelect = onSelect
         _anchor = State(initialValue: CalendarPaging.monthStart(containing: month.wrappedValue,
@@ -39,11 +43,13 @@ struct MonthGridView: View {
 
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text(month.formatted(.dateTime.month(.wide).year()))
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                if showsTitle {
+                    Text(month.formatted(Date.FormatStyle(timeZone: calendar.timeZone).month(.wide).year()))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
                 Spacer(minLength: 6)
                 CalendarStatusAccessory(showsToday: CalendarPaging.monthOffset(of: month, from: today,
                                                                                calendar: calendar) != 0,
@@ -59,8 +65,9 @@ struct MonthGridView: View {
             }
 
             HStack(spacing: 0) {
-                ForEach(0..<7, id: \.self) { index in
-                    Text(Theme.weekdayLetters[index])
+                ForEach(Array(Theme.weekdayLetters(firstWeekday: calendar.firstWeekday).enumerated()),
+                        id: \.offset) { _, letter in
+                    Text(letter)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Theme.textSecondary)
                         .frame(maxWidth: .infinity)

@@ -12,6 +12,10 @@ protocol ScheduleAssisting: Sendable {
     func commitPlan(_ draft: PlanDraft) async throws -> ScheduleAssistant.Reply
     /// Drops a draft plan without writing anything.
     func discardPlan(_ draft: PlanDraft) async -> ScheduleAssistant.Reply
+    /// "Add" on a pending events card ("Ask me first"): writes the batch to its target and clears the slot.
+    func commitPendingEvents(_ batch: PendingEventBatch) async throws -> ScheduleAssistant.Reply
+    /// Drops a pending batch without writing anything.
+    func discardPendingEvents(_ batch: PendingEventBatch) async -> ScheduleAssistant.Reply
 }
 
 extension ScheduleAssistant: ScheduleAssisting {}

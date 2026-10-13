@@ -17,10 +17,13 @@ final class DemoAssistantPlanTests: XCTestCase {
 
     private func makeAssistant() -> (DemoAssistant, SharedStore) {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("DemoAssistantPlanTests-\(UUID().uuidString).json")
-        storeFiles.append(url)
+        let preferencesURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DemoAssistantPlanTests-prefs-\(UUID().uuidString).json")
+        storeFiles += [url, preferencesURL]
         let store = SharedStore(fileURL: url)
-        // No notification center in a hostless test bundle.
-        return (DemoAssistant(store: store, clock: TestClock.clock, rescheduleReminders: { _ in }), store)
+        // Default settings in a file of its own; no notification center in a hostless test bundle.
+        return (DemoAssistant(store: store, clock: TestClock.clock, preferences: PreferencesStore(fileURL: preferencesURL),
+                              rescheduleReminders: { _ in }), store)
     }
 
     private func ask(_ assistant: DemoAssistant, _ text: String) async throws -> Reply {
