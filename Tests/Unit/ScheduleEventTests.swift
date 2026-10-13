@@ -81,7 +81,7 @@ final class ScheduleEventTests: XCTestCase {
     }
 
     func testCachesWrittenBeforeAccountsStillDecodeAndNewFieldsRoundTrip() throws {
-        let old = #"{"id": "e1", "title": "Old", "start": 1791900000, "end": 1791903600, "isAllDay": false, "kind": "event", "colorHex": "#039BE5", "isCompleted": false}"#
+        let old = ##"{"id": "e1", "title": "Old", "start": 1791900000, "end": 1791903600, "isAllDay": false, "kind": "event", "colorHex": "#039BE5", "isCompleted": false}"##
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
         let event = try decoder.decode(ScheduleEvent.self, from: Data(old.utf8))

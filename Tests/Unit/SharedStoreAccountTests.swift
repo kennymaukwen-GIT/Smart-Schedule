@@ -264,7 +264,7 @@ final class SharedStoreAccountTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
         // Before multiple accounts: no coverage, no batch, events without calendars.
-        let old = #"{"events": [{"id": "e1", "title": "Old", "start": 1791900000, "end": 1791903600, "isAllDay": false, "kind": "event", "colorHex": "#039BE5", "isCompleted": false}], "nudges": []}"#
+        let old = ##"{"events": [{"id": "e1", "title": "Old", "start": 1791900000, "end": 1791903600, "isAllDay": false, "kind": "event", "colorHex": "#039BE5", "isCompleted": false}], "nudges": []}"##
         let snapshot = try decoder.decode(SharedStore.Snapshot.self, from: Data(old.utf8))
         XCTAssertEqual(snapshot.events.first?.ref, EventRef(accountID: nil, calendarID: nil, eventID: "e1"))
         XCTAssertNil(snapshot.events.first?.calendarRef)
