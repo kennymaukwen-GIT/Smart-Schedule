@@ -1,0 +1,151 @@
+name: iOS CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  schema:
+    name: Function schema + fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install jsonschema
+        run: python -m pip install jsonschema==4.23.0
+
+      - name: Validate declarations and fixtures
+        run: python -I scripts/validate_schema.py --print-payloads
+
+  ios:
+    name: Build + unit tests (simulator)
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          # Beta/RC bundles are skipped unless they are the only ones installed.
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|_rc|release_candidate' | sort -V | tail -1 || true)
+          if [ -z "$XCODE" ]; then
+            XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          fi
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+
+      - name: Generate Xcode project
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: |
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen --version || true
+          xcodegen generate
+
+      - name: Pick simulator
+        run: |
+          SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/devices.json"
+          SIM_UDID=$(python3 -I - "$RUNNER_TEMP/devices.json" "$SDK_VERSION" <<'PY'
+          import json, re, sys
+
+          def version(text):
+              return tuple(int(p) for p in re.findall(r"\d+", text)[:3])
+
+          with open(sys.argv[1]) as fh:
+              devices = json.load(fh)["devices"]
+          sdk = version(sys.argv[2])
+
+          candidates = []
+          for runtime, entries in devices.items():
+              match = re.search(r"SimRuntime\.iOS-([\d-]+)$", runtime)
+              if not match:
+                  continue
+              rt = version(match.group(1).replace("-", "."))
+              if rt < (18, 0):  # deployment target
+                  continue
+              # A runtime newer than the selected SDK may be unusable by this Xcode: rank those last,
+              # nearest-to-SDK first.
+              usable = rt[:2] <= sdk[:2]
+              rank = rt if usable else tuple(-p for p in rt)
+              for d in entries:
+                  if d.get("isAvailable", True) and d["name"].startswith("iPhone"):
+                      candidates.append((usable, rank, "Pro" in d["name"], d["name"], rt, d["udid"]))
+
+          if not candidates:
+              sys.exit("No available iPhone simulator on an iOS 18+ runtime")
+          *_, name, rt, udid = max(candidates)
+          print(f"Simulator: {name} (iOS {'.'.join(map(str, rt))}) {udid}", file=sys.stderr)
+          print(udid)
+          PY
+          )
+          test -n "$SIM_UDID"
+          echo "SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
+
+      - name: Build app
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project SmartSchedule.xcodeproj \
+            -scheme SmartSchedule \
+            -destination "id=$SIM_UDID" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log
+
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project SmartSchedule.xcodeproj \
+            -scheme SmartSchedule \
+            -destination "id=$SIM_UDID" \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log
+
+      - name: Upload logs and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs
+          path: |
+            build.log
+            test.log
+            TestResults.xcresult
+          if-no-files-found: ignore
+
+      # Kept last so the digest is the final thing in the job log.
+      - name: Error digest
+        if: failure()
+        run: |
+          # xcodebuild repeats each diagnostic several times, so identical lines are collapsed.
+          DIGEST=$(grep -hE "error:|fatal error|[Tt]est [Cc]ase .* failed|\*\* (BUILD|TEST) FAILED \*\*|Testing failed:" \
+            build.log test.log 2>/dev/null | awk '!seen[$0]++' | head -300 || true)
+          if [ -z "$DIGEST" ]; then
+            DIGEST="No compiler or test errors matched; see the full step logs or the ios-build-logs artifact."
+          fi
+          echo "$DIGEST"
+          {
+            echo "### iOS build/test errors"
+            echo '```'
+            echo "$DIGEST"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

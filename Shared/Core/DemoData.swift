@@ -72,9 +72,11 @@ enum DemoData {
         let dinner = at(day(8, from: today), 19, 0)
 
         var events: [ScheduleEvent] = [
+            // 20 min before = about a minute after seeding, so the hold-to-reply reminder (Artboard 1) can be
+            // tried in the Simulator right away.
             make("meeting-joe", "Online meeting with Joe", meetingStart, meetingEnd, .event,
                  meetURL: URL(string: "https://meet.google.com/abc-defg-hij"),
-                 notes: "Product quality review"),
+                 notes: "Product quality review", reminderMinutes: [20, 5, 0]),
             make("lunch", "Lunch", lunch, minutes(60, after: lunch), .event, location: "Café Lucia"),
             make("andrew", "Meeting With Andrew", andrew, minutes(60, after: andrew), .event),
             make("deadline-5008", "Deadline for Plan 5008", deadline, minutes(30, after: deadline), .deadline),
@@ -120,7 +122,8 @@ enum DemoData {
                              allDay: Bool = false,
                              location: String? = nil,
                              meetURL: URL? = nil,
-                             notes: String? = nil) -> ScheduleEvent {
+                             notes: String? = nil,
+                             reminderMinutes: [Int]? = nil) -> ScheduleEvent {
         ScheduleEvent(
             id: idPrefix + id,
             seriesID: seriesID.map { idPrefix + $0 },
@@ -133,7 +136,7 @@ enum DemoData {
             location: location,
             meetURL: meetURL,
             notes: notes,
-            reminderMinutes: nil,
+            reminderMinutes: reminderMinutes,
             planID: nil,
             htmlLink: nil,
             isCompleted: false

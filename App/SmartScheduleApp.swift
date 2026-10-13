@@ -91,8 +91,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         case NotificationIDs.Action.reply:
             guard let text = (response as? UNTextInputNotificationResponse)?.userText else { return }
             let answer: String
+            let assistant: any ScheduleAssisting = AppConstants.isDemoMode ? DemoAssistant() : ScheduleAssistant.shared
             do {
-                answer = try await ScheduleAssistant.shared.handle(text, focusEventID: eventID).text
+                answer = try await assistant.handle(text, focusEventID: eventID, now: Date()).text
             } catch {
                 answer = error.localizedDescription
             }

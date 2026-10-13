@@ -11,7 +11,7 @@ struct ChatPanel: View {
         @Bindable var chat = chat
 
         VStack(spacing: 10) {
-            if !schedule.isSignedIn {
+            if !schedule.isSignedIn && !schedule.isDemo {
                 Button {
                     Task { await schedule.signIn() }
                 } label: {
@@ -21,6 +21,24 @@ struct ChatPanel: View {
                         .padding(.vertical, 12)
                         .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
                         .foregroundStyle(.black)
+                }
+                Button {
+                    chat.enableDemo()
+                    Task { await schedule.startDemo() }
+                } label: {
+                    Label("Try demo (no account)", systemImage: "sparkles")
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.hairline))
+                        .foregroundStyle(.white)
+                }
+            }
+
+            if schedule.isDemo {
+                DemoBadge {
+                    chat.disableDemo()
+                    Task { await schedule.stopDemo() }
                 }
             }
 
@@ -57,6 +75,35 @@ struct ChatPanel: View {
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 28, style: .continuous).fill(Theme.surface))
+    }
+}
+
+/// "DEMO" capsule shown while the app runs on sample data; its menu leaves demo mode.
+private struct DemoBadge: View {
+    var onExit: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Menu {
+                Button(role: .destructive, action: onExit) {
+                    Label("Exit demo", systemImage: "xmark.circle")
+                }
+            } label: {
+                Text("DEMO")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(1.2)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color(hex: DemoData.taskHex)))
+            }
+            Text("Sample data · nothing is sent to Google")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 4)
     }
 }
 

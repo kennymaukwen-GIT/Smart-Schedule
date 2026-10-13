@@ -21,11 +21,29 @@ final class ChatViewModel {
     var isSending = false
 
     @ObservationIgnored private let schedule: ScheduleViewModel
-    @ObservationIgnored private let assistant: ScheduleAssistant
+    @ObservationIgnored private var assistant: any ScheduleAssisting
 
-    init(schedule: ScheduleViewModel, assistant: ScheduleAssistant = .shared) {
+    /// `assistant` nil = the mode's default: `DemoAssistant` in demo mode, otherwise `ScheduleAssistant.shared`.
+    init(schedule: ScheduleViewModel, assistant: (any ScheduleAssisting)? = nil) {
         self.schedule = schedule
-        self.assistant = assistant
+        if let assistant {
+            self.assistant = assistant
+        } else if AppConstants.isDemoMode {
+            self.assistant = DemoAssistant()
+        } else {
+            self.assistant = ScheduleAssistant.shared
+        }
+    }
+
+    /// Switches to the offline assistant ("Try demo" in the chat panel).
+    func enableDemo() {
+        assistant = DemoAssistant()
+        let hint = String(localized: "Demo mode: sample data, nothing leaves this device. Try “Lunch with Andrew tomorrow 1pm”, “push the team sync 30 min” or “I want to be muscular in 6 months”.")
+        messages.append(Message(role: .assistant, text: hint))
+    }
+
+    func disableDemo() {
+        assistant = ScheduleAssistant.shared
     }
 
     /// The latest user line + reply, for Quick Capture (Artboard 4 shows only the last exchange).
@@ -45,7 +63,7 @@ final class ChatViewModel {
         Task {
             defer { isSending = false }
             do {
-                let reply = try await assistant.handle(text)
+                let reply = try await assistant.handle(text, focusEventID: nil, now: Date())
                 messages.append(Message(role: .assistant, text: reply.text, suggestions: reply.suggestions,
                                         assumptions: reply.assumptions, pendingDeletion: reply.pendingDeletion))
                 if let range = reply.showRange { schedule.focus(range) }

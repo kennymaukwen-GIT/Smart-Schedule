@@ -13,7 +13,8 @@ struct AddPlanIntent: AppIntent {
     init() {}
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let reply = try await ScheduleAssistant.shared.handle(text)
+        let assistant: any ScheduleAssisting = AppConstants.isDemoMode ? DemoAssistant() : ScheduleAssistant.shared
+        let reply = try await assistant.handle(text, focusEventID: nil, now: Date())
         await LiveActivityManager.shared.refreshIfRunning()
         return .result(dialog: "\(reply.text)")
     }

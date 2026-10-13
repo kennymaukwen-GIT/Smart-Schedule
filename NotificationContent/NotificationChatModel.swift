@@ -24,8 +24,18 @@ final class NotificationChatModel {
 
     @ObservationIgnored var onPreferredHeightChange: ((CGFloat) -> Void)?
     @ObservationIgnored private var focusEventID: String?
-    // Own instance: the extension is a separate process from the app.
-    @ObservationIgnored private let assistant = ScheduleAssistant()
+    @ObservationIgnored private let assistant: any ScheduleAssisting
+
+    /// `assistant` nil = `DemoAssistant` in demo mode, otherwise a `ScheduleAssistant`.
+    init(assistant: (any ScheduleAssisting)? = nil) {
+        if let assistant {
+            self.assistant = assistant
+        } else if AppConstants.isDemoMode {
+            self.assistant = DemoAssistant()
+        } else {
+            self.assistant = ScheduleAssistant() // own instance: the extension is a separate process from the app
+        }
+    }
 
     func load(_ content: UNNotificationContent) {
         headerTitle = content.title
@@ -49,7 +59,7 @@ final class NotificationChatModel {
         Task {
             let replyText: String
             do {
-                let reply = try await assistant.handle(text, focusEventID: focusEventID)
+                let reply = try await assistant.handle(text, focusEventID: focusEventID, now: Date())
                 pendingDeletion = reply.pendingDeletion
                 replyText = reply.text
             } catch {

@@ -9,6 +9,7 @@ final class ScheduleViewModel {
     var focusDay = Date()
     var isSignedIn = false
     var isRefreshing = false
+    var isDemo = false
     var lastError: String?
 
     let clock = WallClock()
@@ -25,7 +26,13 @@ final class ScheduleViewModel {
     }
 
     func bootstrap() async {
-        isSignedIn = await GoogleTokenProvider.shared.isSignedIn
+        if AppConstants.isDemoMode {
+            // Copies a `-SSDemoMode YES` launch argument into the App Group so the notification extension follows.
+            AppConstants.setDemoMode(true)
+            isDemo = true
+        } else {
+            isSignedIn = await GoogleTokenProvider.shared.isSignedIn
+        }
         await reloadFromCache()
         await refresh()
     }
@@ -35,6 +42,10 @@ final class ScheduleViewModel {
     }
 
     func refresh() async {
+        if isDemo || AppConstants.isDemoMode {
+            await refreshDemo(reseed: false)
+            return
+        }
         guard isSignedIn, !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
@@ -48,6 +59,45 @@ final class ScheduleViewModel {
             lastError = error.localizedDescription
             if let authError = error as? AuthError, case .refreshFailed = authError { isSignedIn = false }
         }
+    }
+
+    /// "Try demo (no account)": sample data, offline assistant, Live Activity, no Google or Gemini.
+    func startDemo() async {
+        AppConstants.setDemoMode(true)
+        await refreshDemo(reseed: true)
+        try? await LiveActivityManager.shared.summon()
+    }
+
+    func stopDemo() async {
+        AppConstants.setDemoMode(false)
+        isDemo = false
+        let store = SharedStore.shared
+        let snapshot = await store.snapshot()
+        await store.remove(ids: Set(snapshot.events.map(\.id).filter(DemoData.isDemoID)))
+        for planID in Set(snapshot.nudges.map(\.planID).filter(DemoData.isDemoID)) {
+            await store.removeNudges(planID: planID)
+        }
+        await reloadFromCache()
+        await ReminderScheduler.shared.reschedule()
+        await LiveActivityManager.shared.refreshIfRunning()
+    }
+
+    /// Demo replacement for the Google sync: seeds `DemoData` (once, unless `reseed`), then refreshes the
+    /// same local surfaces a real sync would.
+    private func refreshDemo(reseed: Bool) async {
+        isDemo = true
+        let store = SharedStore.shared
+        let hasDemoData = await store.snapshot().events.contains { DemoData.isDemoID($0.id) }
+        if reseed || !hasDemoData {
+            let demo = DemoData.events(clock: clock)
+            if let window = DemoData.interval(covering: demo) {
+                await store.replaceWindow(window, with: demo)
+            }
+        }
+        await reloadFromCache()
+        lastError = nil
+        await ReminderScheduler.shared.reschedule()
+        await LiveActivityManager.shared.refreshIfRunning()
     }
 
     func signIn() async {
