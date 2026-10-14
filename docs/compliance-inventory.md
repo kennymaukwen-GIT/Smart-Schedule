@@ -55,3 +55,22 @@ Extension 的 sources 含 `Shared/AI`、`Shared/Calendar`、`Shared/Auth`、`Sha
 2. iOS 26 排程啟動的正式簽名是 `request(attributes:content:pushType:style:alertConfiguration:start:)`，`alertConfiguration` **必填**（系統在 activity 開始時提醒使用者），而且這個呼叫本身仍然只能在前景做；背景更新只能 `update` / `end`。
 3. `Config/Base.xcconfig` 的 `#include? "Secrets.xcconfig"` 已存在，但放在**最下方**：xcconfig 後面的定義會蓋掉前面的，若改到最上方，Base 裡的空預設值（`DEVELOPMENT_TEAM =` 等）會把 Secrets 的值清空。保留在最下方（功能等同「缺檔不報錯」）。
 4. `SummonScheduleIntent` 不只控制中心在用，Siri App Shortcut 也用；兩者一起改。
+
+## 7. Step 4：iOS 26 API 防護稽核
+
+Deployment target 是 iOS 18.0，所以 iOS 26 才有的 API 若沒有包在 `#available` 裡，**編譯就會失敗**（不是警告），CI 的 build 本身就是這項檢查。全專案只有 `Shared/LiveActivity/ActivityScheduler.swift` 使用：
+
+| 用到的 iOS 26 API | 位置 | 防護 |
+|---|---|---|
+| `Activity.request(…, style: .standard, alertConfiguration:, start:)` | `start(_:events:lastLine:now:)` | `if #available(iOS 26.0, *) { … }`；else 分支（iOS 18）不排程，改由 `PushToStartRegistrar` |
+| `ActivityState.pending` | `keep(_:as:…)`、`isLive(_:)` | `if #available(iOS 26.0, *), activity.activityState == .pending` |
+| `AlertConfiguration`（排程啟動必填） | `startAlert(_:)` | `@available(iOS 26.0, *)`，只在上面的 iOS 26 分支呼叫 |
+| iOS 18 路徑 | `pass(now:)` | `if #unavailable(iOS 26.0) { observePushToStartTokens(); PushToStartRegistrar.sync(…) }` |
+
+`Activity.request(` 的其他呼叫（行程已在提前量內、App 在前景時立即啟動）不帶 `start:`，iOS 18 與 26 都可用。本地 `UNUserNotification` 提醒排程沒有改動，與 Live Activity 並行。
+
+重現：
+
+```sh
+grep -rn "start: item.triggerAt\|activityState == .pending\|style: .standard\|AlertConfiguration\|#available(iOS 26\|#unavailable(iOS 26\|@available(iOS 26" --include=*.swift Shared Widgets App NotificationContent
+```
