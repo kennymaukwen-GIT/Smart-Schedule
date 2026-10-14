@@ -46,9 +46,9 @@ enum OutboxOverlay {
     /// Queued inserts present (weekly series expanded through `horizon`, as Google's `singleEvents` would), edits
     /// applied, deletions gone; every copy touched is marked `isPendingSync`. Failed items are skipped, so the next
     /// listing rolls their optimistic change back.
-    static func apply(_ items: [OutboxItem], to events: [ScheduleEvent], mapper: CalendarEventMapper,
+    static func apply(_ items: [OutboxItem], to cached: [ScheduleEvent], mapper: CalendarEventMapper,
                       horizon: Date) -> [ScheduleEvent] {
-        var events = events
+        var events = cached
         for item in items where !item.isFailed {
             switch item.kind {
             case .insert:
@@ -77,6 +77,8 @@ enum OutboxOverlay {
                 events.removeAll { belongs($0, to: item.calendar) && ($0.id == item.eventID || $0.seriesID == item.eventID) }
             }
         }
+        // A queued insert is drawn from its body, which has no note suggestions: keep the cached copy's.
+        ScheduleEvent.keepingLocalFields(&events, from: cached)
         return events
     }
 
@@ -219,8 +221,10 @@ enum IncrementalChanges {
                 let before = result.count
                 result.removeAll { $0.calendarRef == calendar && ($0.id == id || $0.seriesID == id) }
                 if result.count != before { changed = true }
-            } else if let mapped = mapper.scheduleEvent(from: change, in: info) {
+            } else if var mapped = mapper.scheduleEvent(from: change, in: info) {
                 if let index = result.firstIndex(where: { $0.ref == mapped.ref }) {
+                    // Google's copy has no note suggestions (local only): they are no change.
+                    mapped.suggestedNotes = mapped.suggestedNotes ?? result[index].suggestedNotes
                     if result[index] != mapped {
                         result[index] = mapped
                         changed = true

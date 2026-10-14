@@ -1,0 +1,22 @@
+{
+  "utterance": "下週五早上 9 點飛東京",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "create_events",
+    "args": {
+      "events": [
+        {
+          "title": "飛東京",
+          "start": "2026-10-23T09:00",
+          "kind": "event",
+          "suggested_notes": [
+            "帶護照",
+            "提早 2-3 小時到機場",
+            "準備日圓現金"
+          ]
+        }
+      ]
+    }
+  }
+}

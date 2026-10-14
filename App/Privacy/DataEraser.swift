@@ -20,6 +20,8 @@ enum DataEraser {
         await ChatHistoryStore.shared.eraseAll()
         removeExportCopies()
         AIConsentStore.reset()
+        // Which events' note suggestions were hidden with "×" (event ids, App Group).
+        NoteSuggestionDismissals.reset()
         AppConstants.setDemoMode(false)
         if let bundleID = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleID)

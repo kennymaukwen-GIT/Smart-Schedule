@@ -37,6 +37,11 @@ struct ScheduleEvent: Codable, Hashable, Identifiable, Sendable {
     var etag: String? = nil
     /// Changed on this iPhone and waiting in the outbox for Google (offline, or Google unreachable).
     var isPendingSync: Bool? = nil
+    /// Things this event may need that the assistant suggested when it created the event (`create_events`
+    /// `suggested_notes`) or on the event page ("✨ AI suggestions"), offered as chips under its notes. Local only:
+    /// never part of a Google write (the mapper and `EventEdit` ignore it) and kept across listings by
+    /// `ScheduleEvent.keepingLocalFields`. nil = none; [] = cleared.
+    var suggestedNotes: [String]? = nil
 
     var isWaitingToSync: Bool { isPendingSync == true }
 
@@ -56,6 +61,35 @@ struct ScheduleEvent: Codable, Hashable, Identifiable, Sendable {
 
     func intersects(_ interval: DateInterval) -> Bool {
         start < interval.end && end > interval.start
+    }
+}
+
+extension ScheduleEvent {
+    /// Local-only fields that a Google listing, a refresh or an outbox overlay does not carry
+    /// (`suggestedNotes`): a copy in `events` that comes back without them keeps what the same copy (`EventRef`) had
+    /// in `previous`; a new occurrence of a series takes what its series had. Copies that have their own value keep
+    /// it, so `[]` (cleared) is never refilled.
+    static func keepingLocalFields(_ events: inout [ScheduleEvent], from previous: [ScheduleEvent]) {
+        var byRef: [EventRef: [String]] = [:]
+        var bySeries: [EventRef: [String]] = [:]
+        for event in previous {
+            guard let notes = event.suggestedNotes else { continue }
+            byRef[event.ref] = notes
+            let series = event.seriesRef
+            if bySeries[series] == nil { bySeries[series] = notes }
+        }
+        guard !byRef.isEmpty else { return }
+        for index in events.indices where events[index].suggestedNotes == nil {
+            let event = events[index]
+            if let notes = byRef[event.ref] ?? bySeries[event.seriesRef] {
+                events[index].suggestedNotes = notes
+            }
+        }
+    }
+
+    /// The series this copy belongs to in its calendar (the copy itself when it is not an occurrence).
+    var seriesRef: EventRef {
+        EventRef(accountID: accountID, calendarID: calendarID, eventID: seriesID ?? id)
     }
 }
 

@@ -27,6 +27,8 @@ final class FixtureDecodingTests: XCTestCase {
                 XCTAssertNoThrow(try TestJSON.decode(ConfirmPlanArgs.self, data: call.args), name)
             case .updatePreferences:
                 XCTAssertNoThrow(try TestJSON.decode(UpdatePreferencesArgs.self, data: call.args), name)
+            case .suggestEventNotes:
+                XCTAssertNoThrow(try TestJSON.decode(SuggestEventNotesArgs.self, data: call.args), name)
             }
         }
     }
@@ -51,6 +53,27 @@ final class FixtureDecodingTests: XCTestCase {
         XCTAssertEqual(event.kind, "event")
         XCTAssertEqual(event.addVideoConference, true)
         XCTAssertNil(event.recurrence)
+    }
+
+    func testCreateEventsWithSuggestedNotes() throws {
+        let args = try Fixtures.args(CreateEventsArgs.self, from: "create_events.suggested_notes.json")
+        let event = try XCTUnwrap(args.events.first)
+        XCTAssertEqual(event.title, "飛東京")
+        XCTAssertEqual(event.suggestedNotes, ["帶護照", "提早 2-3 小時到機場", "準備日圓現金"])
+        XCTAssertNil(event.notes, "suggestions are not notes")
+        // Optional: the other create_events fixtures have none.
+        XCTAssertNil(try Fixtures.args(CreateEventsArgs.self, from: "create_events.single.json").events.first?.suggestedNotes)
+    }
+
+    func testSuggestEventNotes() throws {
+        let tokyo = try Fixtures.args(SuggestEventNotesArgs.self, from: "suggest_event_notes.tokyo.json")
+        XCTAssertEqual(tokyo.items, ["Yen cash", "IC transit card", "Visit Japan Web entry QR", "eSIM or pocket Wi-Fi"])
+        XCTAssertNotNil(tokyo.reason)
+        let hiking = try Fixtures.args(SuggestEventNotesArgs.self, from: "suggest_event_notes.hiking.json")
+        XCTAssertEqual(hiking.items, ["保暖外套", "防曬乳和帽子", "登山杖", "垃圾袋"])
+        // Tolerant: no items, or one string.
+        XCTAssertEqual(try TestJSON.decode(SuggestEventNotesArgs.self, json: "{}").items, [])
+        XCTAssertEqual(try TestJSON.decode(SuggestEventNotesArgs.self, json: #"{"items": "Passport"}"#).items, ["Passport"])
     }
 
     func testCreateEventsMulti() throws {

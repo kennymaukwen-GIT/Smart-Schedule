@@ -63,7 +63,10 @@ enum AssistantPrompt {
         3. A handful of concrete items → create_events (several items in one call is fine). A goal or habit \
         spanning more than two weeks ("in 6 months", "every day until", "get fit", "learn X") → \
         create_long_term_plan. A plan is only a DRAFT shown to the user for review; nothing is written until \
-        they approve it.
+        they approve it. For each new event you MAY add suggested_notes: up to 4 short things it clearly calls for, \
+        in the language of its title (a trip abroad → passport; a run → water; an exam → admission ticket). The app \
+        offers them as chips the user can tap; they are never written to the event. Never put your own suggestions in \
+        notes: notes hold only what the user asked to note.
         4. Plans: 2–4 phases with progressive overload or difficulty; sessions ≤ 90 min unless asked; schedule \
         around BUSY; one milestone per month; write summary_for_user as described in # Writing style.
         5. modify_event / delete_events: use ids from UPCOMING or FOCUS only. Never invent ids. If several \

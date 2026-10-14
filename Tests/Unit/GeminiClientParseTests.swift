@@ -146,8 +146,11 @@ final class GeminiClientParseTests: XCTestCase {
                                 "Shared/AI/FunctionDeclarations.json must be a resource of the test bundle")
         let declarations = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
         let names = declarations.compactMap { $0["name"] as? String }
-        XCTAssertEqual(names.count, 8)
+        XCTAssertEqual(names.count, 9)
         XCTAssertEqual(Set(names), Set(AssistantFunction.allCases.map(\.rawValue)))
+        // A chat turn may call every function but suggest_event_notes, which has its own request.
+        XCTAssertEqual(AssistantFunction.conversational.count, 8)
+        XCTAssertFalse(AssistantFunction.conversational.contains(.suggestEventNotes))
         for declaration in declarations {
             XCTAssertNotNil(declaration["parameters"] as? [String: Any], "\(declaration["name"] ?? "?")")
         }

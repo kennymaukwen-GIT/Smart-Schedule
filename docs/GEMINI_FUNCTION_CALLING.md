@@ -3,13 +3,13 @@
 唯一的 schema 來源是 [`Shared/AI/FunctionDeclarations.json`](../Shared/AI/FunctionDeclarations.json)，App 和 notification extension 都直接讀這個檔，作為 bundle resource 載入。
 驗證方式：`python3 -I scripts/validate_schema.py --print-payloads`（lint、fixtures、DST 參考測試）。
 
-## 1. 為什麼拆成 8 個函式，而不是一個大函式
+## 1. 為什麼拆成 9 個函式，而不是一個大函式
 
 需求是「一個 schema 同時處理單一事件和長期計畫」。實作上用的是**一組 toolset**，由模型自己選要呼叫哪一個：
 
 | 函式 | 負責的情境 | 設計重點 |
 |---|---|---|
-| `create_events` | 一句話裡有 1 到 20 個具體事件，也可以帶簡單的重複規則 | `events[]` 陣列，一句話寫入多筆 |
+| `create_events` | 一句話裡有 1 到 20 個具體事件，也可以帶簡單的重複規則 | `events[]` 陣列，一句話寫入多筆；每個行程可以附 `suggested_notes`（最多 4 個備註建議，只存在這支 iPhone，見第 12 節） |
 | `create_long_term_plan` | 跨度超過 2 週的目標：「半年變壯」「三月前考到 IELTS 7.5」 | 分階段 `phases` 和 `sessions` 樣板，加上 `daily_nudge`、`milestones`。只產生**草稿**給使用者審閱；修改時再呼叫一次，帶上**完整**的修訂版（見第 5 節） |
 | `modify_event` | 「延後 30 分鐘」「改到四點」「加個備註：帶護照」 | `event_id` 只能取自 UPCOMING 或 FOCUS；`changes.notes` 只放**新加的**那句備註，App 接在原本的備註下面（見第 4.4 節） |
 | `delete_events` | 取消事件或整個計畫 | 支援 `plan_id`；批次刪除由 App 要求使用者確認 |
@@ -17,6 +17,7 @@
 | `confirm_plan` | 使用者對畫面上的草稿計畫或「等你確認的行程」說「好」「looks good」或「不要了」 | `decision`：`add` 或 `discard`。只有 prompt 裡有 DRAFT PLAN 或 PENDING EVENTS 區塊時才能呼叫；兩個都有時，套用在比較新的那個 |
 | `reply_to_user` | 缺資訊時追問，或婉拒 | `suggested_replies` 讓使用者一鍵回答 |
 | `update_preferences` | 「以後」「從現在開始」「別再」「always」這類**長期**指示：「8 點前不要提醒我」「健身提前 2 小時提醒」「以後用學校帳號」 | `changes[]`（`key` 是 18 個固定值之一，`value` 依 key 編碼）+ `summary_for_user`。只改設定，不碰行事曆；App 顯示「設定已更新」卡片並提供復原（見第 10 節） |
+| `suggest_event_notes` | 行程頁按「✨ AI 建議」：這個行程可能需要帶什麼、準備什麼 | **只在自己的 request 裡用**（mode ANY、`allowedFunctionNames` 只有它），聊天的每一輪都不允許呼叫。`items[]`（2–4 個）+ 選填的 `reason`。不寫入任何東西（見第 12 節） |
 
 不做成一個大函式加 `oneOf` 的理由：
 1. **分流更準。** 函式名稱和描述本身就是分類器。「健身半年」和「明天開會」的參數結構完全不同，硬塞進同一個物件會讓模型在必填欄位之間猶豫，產生半成品的呼叫。
@@ -27,7 +28,7 @@
 
 | 決策 | 原因 |
 |---|---|
-| `functionCallingConfig.mode = "ANY"` | 每一輪都**一定**是結構化呼叫，純聊天走 `reply_to_user`。解析結果可預測，不需要處理自由文字 |
+| `functionCallingConfig.mode = "ANY"` | 每一輪都**一定**是結構化呼叫，純聊天走 `reply_to_user`。解析結果可預測，不需要處理自由文字。聊天時 `allowedFunctionNames` 是 `AssistantFunction.conversational`（`suggest_event_notes` 以外的 8 個） |
 | 時間一律輸出**本地牆上時間** `YYYY-MM-DDTHH:mm`（不帶 offset、不帶 Z） | 模型最常犯的錯是算 offset，尤其跨夏令時間時。由 client 加上 IANA `timeZone`，交給 Google 展開，DST 就不會出錯（見 Calendar 文件第 3 節） |
 | `sessions` 攤平，用 `phase_index` 指回所屬階段，不巢狀在 `phases` 底下 | 減少 2 層巢狀，降低格式錯誤率 |
 | `summary_for_user` 放在函式參數裡 | 模型解析的同時也把要回給使用者的話寫好了，**一次 round trip** 就完成，不用執行完再呼叫第二次產生回覆，大約省 1 秒。內容只寫 1–2 句（見第 6 節） |
@@ -49,7 +50,7 @@ x-goog-api-key: <dev only — production goes through proxy>
     { "role": "user", "parts": [{ "text": "I want to be muscular in 6 month design me a daily routine" }] }
   ],
   "tools": [{ "functionDeclarations": [ "...FunctionDeclarations.json..." ] }],
-  "toolConfig": { "functionCallingConfig": { "mode": "ANY" } },
+  "toolConfig": { "functionCallingConfig": { "mode": "ANY", "allowedFunctionNames": ["create_events", "…（suggest_event_notes 以外的 8 個）"] } },
   "generationConfig": { "thinkingConfig": { "thinkingLevel": "low" } }
 }
 ```
@@ -269,4 +270,91 @@ python3 -I scripts/validate_schema.py --print-payloads
 - `confirm_plan` 的 fixture 必須帶 `draft_plan`；帶 `revises` 的 fixture 必須是 `create_long_term_plan`，而且保留原本的 `plan_title`。
 - 回覆寫法：fixture 的 `summary_for_user` 最多 2 句、不列時間、不用斜線（第 6 節）；`update_preferences` 的 `summary_for_user` 只能 1 句。
 - `update_preferences`：每個 key 只能出現一次，`value` 符合該 key 的編碼（第 10 節表格）；`default_calendar` 的值必須是 fixture `calendars` 裡的一行。`confirm_plan` 的 fixture 要有 `draft_plan` 或 `pending_events`；`modify_event` 的 `event_id` 必須出現在 fixture 的 `upcoming` 或 `focus_event`（列裡的 `| notes: …` 不影響比對，例如 `modify_event.add_note.json`）。
+- 備註建議（第 12 節）：`suggest_event_notes` 的 `items` 和 `create_events` 的 `suggested_notes` 每項最多 40 字、跟行程標題同一種語言、沒有項目符號或句點、不重複、沒有價格或劑量，也不能重複行程備註或 request 的 `ALREADY SUGGESTED` 那一行已經有的東西；`suggest_event_notes` 的 fixture 要帶 `event`，`utterance` 就是 App 送出的那段文字。另外檢查 `suggest_event_notes` 宣告存在（`items` 必填、最多 4 個），`create_events.events[].suggested_notes` 是選填、最多 4 個。
 - String Catalog：每個 key 都有 zh-Hant 翻譯、格式參數一致，原始碼裡的每個 `String(localized:)` 都在 catalog 裡。
+
+## 12. 備註建議：規則、`suggest_event_notes`、`suggested_notes`
+
+使用者說：「備注的部分 ai 要能自動辨別行程可能會需要什麼提供備註建議，例如出國旅遊建議帶護照、去運動建議帶水」。做法：**建議永遠不會自動寫進備註**，只是膠囊（「+ 帶護照」），點一下才在備註最後加一行「• 帶護照」。有兩層：
+
+| 層 | 什麼時候 | 在哪裡 |
+|---|---|---|
+| 內建規則 `NoteSuggester` | 馬上、離線、不送任何資料 | `Shared/Orchestrator/NoteSuggester.swift`（比對、去重、加一行）、`NoteSuggestionRules.swift`（關鍵字和建議表） |
+| AI：`suggest_event_notes` | 行程頁按「✨ AI 建議」，要先同意 AI 資料分享 | `ScheduleAssistant.suggestNotes(for:)`、`Shared/AI/NoteSuggestionPrompt.swift` |
+| AI：`create_events.suggested_notes` | Gemini 新增行程時**可以**附上 | `ScheduleAssistant` 存到 `ScheduleEvent.suggestedNotes`（只在這支 iPhone） |
+
+### 12.1 內建規則
+
+看行程的標題、地點和備註（備註裡 Smart Schedule 的來源行只拿掉固定的開頭，使用者原本說的話留著），繁中、簡中和英文的關鍵字都認得；英文只比對完整的字（「gym」不會在「gymnastics」裡找到、「pool」不會在「carpool」裡找到），比對前先忽略大小寫、全形半形和重音。
+
+| 類別 | 例子 | 建議（依實用程度排序，最多顯示 4 個） |
+|---|---|---|
+| 出國 `abroad` | 出國、國外、出境、外國地名加上旅遊／旅行／出差／去／飛（「東京旅遊」「飛東京」「Trip to Japan」）、機場、航班、班機、flight、airport、abroad、在外國地名的多日全天行程 | 帶護照、（搭飛機）提早 2–3 小時到機場、確認簽證或入境文件、帶轉接插頭、投保旅遊保險、（搭飛機）完成線上報到、帶行動電源 |
+| 國內旅行 `travel` | 高鐵、台鐵、火車、客運、旅遊、出差、環島、train、trip、travel、vacation；或飛往使用者所在國家的地方（「澎湖班機」「飛澎湖」，所在國家由時區判斷） | 帶身分證、準備好車票（開車或搭飛機時不給）、（搭飛機）完成線上報到、帶行動電源、（出差、客戶、研討會）帶名片 |
+| 開車 `driving` | 開車、自駕、租車、路考、road trip、car rental、drive to | （出國時）帶國際駕照、帶駕照、查好路線和停車、（自駕、租車、長途）確認油量或電量 |
+| 運動 `workout` | 健身、重訓、跑步、運動、球類、單車、gym、workout、run、running、jog、HIIT、tennis… | 帶水、帶毛巾、穿運動服和運動鞋、帶替換衣物 |
+| 瑜伽 `yoga` | 瑜伽、瑜珈、皮拉提斯、yoga、pilates（取代「運動」的建議） | 帶瑜伽墊、帶水、穿舒適的衣服、帶毛巾 |
+| 游泳 `swimming` | 游泳、泳池、泳課、swim、swimming pool（取代「運動」） | 帶泳衣、帶泳鏡、帶毛巾、帶泳帽 |
+| 登山 `hiking` | 登山、爬山、健行、步道、百岳、hike、trek（取代「運動」） | 帶水、帶雨具、帶行動糧、帶頭燈、查看天氣預報 |
+| 露營 `camping`、海邊 `beach` | 露營、camping；海邊、浮潛、衝浪、beach、snorkeling | 帳篷和睡袋、頭燈、防蚊液、雨具；防曬乳、泳衣、毛巾、帽子 |
+| 面試 `interview` | 面試、口試、interview（取代「會議」） | 帶履歷、提早 10 分鐘到、準備想問的問題；線上時：測試麥克風和鏡頭 |
+| 簡報 `presentation` | 簡報、提案、演講、報告、presentation、pitch（取代「會議」） | 帶筆電和充電器、備份簡報檔、帶投影轉接頭、提早 10 分鐘到；線上時：測試麥克風和鏡頭 |
+| 會議 `meeting` | 會議、開會、拜訪、研討會、meeting、1:1、workshop | 帶筆電和充電器、提早 10 分鐘到、（客戶）帶名片；線上時：測試麥克風和鏡頭、確認會議連結 |
+| 看醫生 `doctor` | 看醫生、門診、回診、牙醫、洗牙、醫院、診所、健檢、疫苗、doctor、dentist、clinic、check-up | 帶健保卡、帶目前用藥清單、寫下想問醫生的問題 |
+| 考試 `exam` | 考試、期中考、期末考、學測、多益、托福、雅思、exam、test、quiz | 帶准考證（隨堂考、期中期末不給）、帶身分證、帶文具、帶計算機（語文考試不給） |
+| 生日和聚會 `party`、婚禮 `wedding` | 生日、慶生、派對、聚會、birthday、party；婚禮、喜宴、wedding | 準備禮物、（生日、週年）寫張卡片；準備紅包（英文：Wedding gift or card）、確認服裝規定 |
+| 演唱會和看展 `concert` | 演唱會、音樂會、看展、展覽、博物館、球賽、concert、exhibition、museum、theatre | 準備好門票、帶身分證、帶行動電源 |
+| 訂位 `reservation` | 訂位、餐廳、約會、聚餐、reservation、restaurant、date night | 確認訂位 |
+| 辦事 `errands` | 銀行、郵局、戶政、監理站、辦護照、換證、大使館、DMV、embassy | 帶身分證、帶齊所需文件、（護照、簽證、駕照）帶證件照 |
+
+**排除**（避免誤判）：「跑步機維修」「買跑鞋」「運動傷害」不算運動（維修、修理、購買、退貨、傷害、轉播、看球）；「接機」「送機」「pick up」不算出國或旅行；「國內」「domestic」不算出國；「日本料理」「韓國菜」「日語課」「大使館」不算到那個國家旅行；「Google Drive」「hard drive」不算開車；「third-party」不算派對；「blood test」「eye exam」算看醫生、不算考試；「看報告」「交報告」不算簡報；「Running late」不算跑步；「swim lane」不算游泳；動物醫院、獸醫、探病不算看醫生。線上行程（有 Meet 連結，或標題、地點寫線上、視訊、Zoom、call）不算出國、旅行或開車，會議類改給「測試麥克風和鏡頭」「確認會議連結」。排除詞看標題和地點；備註裡的排除詞只在標題和地點都看不出是哪一類時才算（「Flight to Tokyo」備註寫「Dad will pick me up」、「日本旅遊」備註寫「訂飯店」、「健身」備註寫「順便買菜」都照樣給建議；「Pick up Anna」備註寫「her flight lands at 6pm」不算出國）。「飛輪」「飛盤」「飛鏢」的「飛」不算搭飛機。地址常常寫著使用者自己國家的城市（「台北市信義區…」），所以國內地名只有搭配明確的旅行字眼（旅遊、出差、trip…），或標題裡寫「去／前往／go to + 地名」（「開車去台中」）才算國內旅行。
+
+**排序和數量**：標題裡認出的類別先於地點，地點先於備註；同一欄位裡照上表的順序。有好幾個類別時，第一個類別最多佔 3 個，其他類別輪流各補 1 個（「東京自駕旅遊」：帶護照、確認簽證或入境文件、帶轉接插頭、帶國際駕照）。備註裡已經有的（中英文都算，忽略大小寫、全形半形、標點和「帶」「Bring」這類開頭；英文只比對完整的字）就不再建議，空出來的位置給下一個。
+
+**語言**：跟著行程標題：有中文字就用繁體中文，有其他字母就用英文；標題沒有文字（例如只有 emoji）才用 App 的語言。建議文字直接寫在規則表裡（英文和繁中各一份），不是 String Catalog 的 key。
+
+**不是醫療建議**：只有清單名詞或 2–6 個字的動作（「帶目前用藥清單」是帶清單，不是建議吃什麼藥）。
+
+### 12.2 `suggest_event_notes`（行程頁的「✨ AI 建議」）
+
+`ScheduleAssistant.suggestNotes(for:)` 送一個**獨立的** request：不帶聊天記錄、不改對話、`mode: ANY`、`allowedFunctionNames: ["suggest_event_notes"]`。system instruction 很短（`NoteSuggestionPrompt.system`）：只給實用的東西、跟標題同語言、不要重複備註和 ALREADY SUGGESTED、不給醫療法律財務建議、不寫價格或可能過時的規定。user 訊息是一段資料（`NoteSuggestionPrompt.request`），例如 [`suggest_event_notes.tokyo.json`](../Tests/fixtures/suggest_event_notes.tokyo.json) 的 `utterance`：
+
+```
+EVENT
+title: Tokyo trip
+when: 2026-10-20 → 2026-10-24 (all day, 5 days)
+location: Tokyo
+notes: (none)
+time_zone: Europe/London
+today: 2026-10-13
+language: en
+ALREADY SUGGESTED: Bring passport; Check visa or entry documents; Pack a plug adapter; Get travel insurance
+```
+```json
+{ "name": "suggest_event_notes", "args": {
+  "items": ["Yen cash", "IC transit card", "Visit Japan Web entry QR", "eSIM or pocket Wi-Fi"],
+  "reason": "Five days in Tokyo: cash, getting around and arrival." } }
+```
+
+| 環節 | 做法 |
+|---|---|
+| 同意 | 跟所有 Gemini 呼叫一樣經過 `GeminiClient.generate`：沒同意就丟 `GeminiError.consentRequired`，什麼都不送。行程頁跳出同意說明，按「允許」後再試一次 |
+| 回傳 | 先是規則的建議（`.rules`，就是頁面已經顯示的那些），再接 AI 新增的（`.ai`，最多 4 個）。AI 的項目會整理（去掉項目符號、編號、句點，超過 60 字的丟掉），和規則、行程已存的建議、備註**意思一樣**的不要（「Passport」和「Bring passport」算同一個） |
+| 沒有新的 | 回傳裡沒有 `.ai` 項目時，頁面顯示「來自 Smart Schedule 的建議」 |
+| 離線 | `URLError` 往上丟，頁面改用規則（`NoteSuggester`，最多 8 個），一樣顯示「來自 Smart Schedule 的建議」 |
+| 示範模式 | `DemoAssistant.suggestNotes` 只用規則，最多 8 個（`NoteSuggester.requestLimit`），什麼都不送 |
+| 寫入 | 不寫入。點膠囊只改行程頁正在編輯的備註，按「儲存」才寫進 Google（和其他修改同一條路徑） |
+
+### 12.3 `create_events.suggested_notes`
+
+Gemini 新增行程時**可以**在每個行程附上 `suggested_notes`（選填，最多 4 個，跟標題同語言）。prompt 規則 3 說明：只有行程明顯需要時才給；App 把它們當膠囊，**不會寫進行程**；`notes` 只放使用者要記下的東西。Fixture：[`create_events.suggested_notes.json`](../Tests/fixtures/create_events.suggested_notes.json)（「下週五早上 9 點飛東京」→ 帶護照、提早 2–3 小時到機場、準備日圓現金）。
+
+- `ScheduleAssistant.suggestedNotes(_:mapped:)` 依 mapper 給的 Google event id 對應，整理過（同上）、去掉行程自己的 `notes` 已經有的。
+- 寫入後放在 `Reply.addedEvents` 的行程上（`ScheduleEvent.suggestedNotes`），聊天卡片最多顯示 3 個；同時用 `SharedStore.setSuggestedNotes` 存到快取裡那個行程（重複行程：同一系列的每一次），行程頁也看得到。「先問我」的預覽行程也帶著，按「加入」後寫入時再存一次。
+- **只在這支 iPhone**：`CalendarEventMapper` 和 `EventEdit` 都不碰這個欄位，Google 的 payload 裡沒有。Google 的列表和同步帶回來的行程沒有這個欄位，`SharedStore` 每次寫入時用 `ScheduleEvent.keepingLocalFields` 從快取原本的那一份補回來（新出現的重複行程那一次從同系列補）；`IncrementalChanges` 和 `OutboxOverlay` 也一樣保留，所以不會被當成「有變更」。清掉時存成 `[]`，不會再被補回。
+- 助理自己**不寫備註**，除非使用者要求（「加個備註：帶護照」照樣走 `modify_event`，第 4.4 節）。
+
+### 12.4 收起建議
+
+行程頁「建議」旁的「×」：`NoteSuggestionDismissals`（App Group 的 `UserDefaults`，key `SSNoteSuggestionDismissals`，event id → 時間，最多保留最新的 500 筆）。重複行程用系列的 id（`NoteSuggestionDismissals.key(for:)`），一次收起整個系列。只在這支 iPhone。
+

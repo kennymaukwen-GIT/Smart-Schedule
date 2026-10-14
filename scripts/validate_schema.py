@@ -10,6 +10,9 @@
 5. Checks that fixture texts follow the prompt's "# Writing style" (short summaries, no "Tue/Thu", no times),
    and update_preferences values against the per-key encoding the app's normaliser accepts
    (docs/SETTINGS.md §6.2); a default_calendar value must be a line of the fixture's CALENDARS.
+   Note suggestions (suggest_event_notes items, create_events suggested_notes) are short checklist items in the
+   language of the event title, without bullets, repeats, prices or doses, and say nothing the event's notes or the
+   request's ALREADY SUGGESTED line already say (docs/GEMINI_FUNCTION_CALLING.md §12).
 6. Checks Shared/Localization/Localizable.xcstrings: every key has a zh-Hant translation whose format
    specifiers match the key's (positional %1$@ allowed), and every String(localized:) literal in the
    Swift sources is a key.
@@ -22,6 +25,7 @@ import hashlib
 import json
 import re
 import sys
+import unicodedata
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -250,6 +254,94 @@ def style_checks(name: str, args: dict, fixture: str) -> None:
             errors.append(f"{fixture}: {field} uses a slash (write 'Tuesday and Thursday', not 'Tue/Thu')")
 
 
+NOTE_ITEM_MAX = 40
+BULLET_START = re.compile(r"^\s*(?:[•·・\-–—*+✓✔]|\d{1,2}[.):、])")
+PRICE = re.compile(r"[$€£¥]|\b(?:usd|eur|gbp|jpy|twd|ntd|nt)\b|\d\s*(?:元|円|塊|美元|日圓|日幣|台幣|歐元|英鎊)", re.IGNORECASE)
+DOSE = re.compile(r"\b\d+\s*mg\b|\bdos(?:e|age)\b|劑量|服用|吃藥|退燒藥|止痛藥|antibiotic", re.IGNORECASE)
+CJK = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]")
+
+
+def note_key(text: str) -> str:
+    """Compared like NoteSuggester.normalized: case, width and punctuation ignored, no spaces."""
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    return "".join(ch for ch in folded if ch.isalnum())
+
+
+def note_item_checks(items: list[str], title: str, notes: str, already: list[str], where: str) -> None:
+    """Suggested notes: chips in the language of the title, short, no bullets, repeats, prices or doses, nothing the
+    notes or the app's own suggestions (ALREADY SUGGESTED) already say."""
+    chinese = bool(CJK.search(title))
+    seen: list[str] = []
+    taken = [note_key(text) for text in already if note_key(text)]
+    notes_key = note_key(notes)
+    for item in items:
+        key = note_key(item)
+        if not key:
+            errors.append(f"{where}: empty item")
+            continue
+        if len(item) > NOTE_ITEM_MAX:
+            errors.append(f"{where}: {item!r} is longer than {NOTE_ITEM_MAX} characters")
+        if BULLET_START.match(item) or item.rstrip().endswith((".", "。")):
+            errors.append(f"{where}: {item!r} has a bullet, numbering or a final full stop (the app adds the bullet)")
+        if chinese and not CJK.search(item):
+            errors.append(f"{where}: {item!r} is not in the language of the title {title!r}")
+        if not chinese and CJK.search(item):
+            errors.append(f"{where}: {item!r} is not in the language of the title {title!r}")
+        if PRICE.search(item):
+            errors.append(f"{where}: {item!r} names a price")
+        if DOSE.search(item):
+            errors.append(f"{where}: {item!r} reads as medical advice")
+        if any(key in other or other in key for other in seen):
+            errors.append(f"{where}: {item!r} repeats another item")
+        if any(key in other or other in key for other in taken):
+            errors.append(f"{where}: {item!r} repeats what ALREADY SUGGESTED offers")
+        if notes_key and key in notes_key:
+            errors.append(f"{where}: {item!r} is already in the event's notes")
+        seen.append(key)
+
+
+def suggestion_checks(name: str, args: dict, root: dict, fixture: str) -> None:
+    if name == "create_events":
+        for index, event in enumerate(args["events"]):
+            if "suggested_notes" in event:
+                note_item_checks(event["suggested_notes"], event["title"], event.get("notes", ""), [],
+                                 f"{fixture}: events[{index}].suggested_notes")
+    if name == "suggest_event_notes":
+        event = root.get("event")
+        if not isinstance(event, dict) or not event.get("title"):
+            errors.append(f"{fixture}: suggest_event_notes fixtures need the 'event' the request describes")
+            return
+        utterance = root.get("utterance", "")
+        if not utterance.startswith(f"EVENT\ntitle: {event['title']}\n"):
+            errors.append(f"{fixture}: the utterance is the request the app sends (EVENT, then 'title: …')")
+        lines = {line.split(": ", 1)[0]: line.split(": ", 1)[1] for line in utterance.splitlines() if ": " in line}
+        offered = lines.get("ALREADY SUGGESTED", "")
+        already = [] if offered in ("", "(none)") else offered.split("; ")
+        expected_language = "zh-Hant" if CJK.search(event["title"]) else "en"
+        if lines.get("language") != expected_language:
+            errors.append(f"{fixture}: language must be {expected_language}, the language of the title")
+        if not 1 <= len(args["items"]) <= 4:
+            errors.append(f"{fixture}: suggest_event_notes gives 1-4 items")
+        note_item_checks(args["items"], event["title"], event.get("notes", ""), already, f"{fixture}: items")
+
+
+def declaration_checks(by_name: dict) -> None:
+    """suggest_event_notes exists (items only, at most 4) and create_events may carry suggested_notes (at most 4)."""
+    suggest = by_name.get("suggest_event_notes")
+    if not suggest:
+        errors.append("suggest_event_notes is missing from the declarations")
+    else:
+        params = suggest["parameters"]
+        if params.get("required") != ["items"] or params["properties"]["items"].get("maxItems") != 4:
+            errors.append("suggest_event_notes: 'items' is required and holds at most 4")
+    event_props = by_name["create_events"]["parameters"]["properties"]["events"]["items"]["properties"]
+    suggested = event_props.get("suggested_notes")
+    if not suggested or suggested.get("type") != "array" or suggested.get("maxItems") != 4:
+        errors.append("create_events: events[].suggested_notes must be an optional array of at most 4")
+    if "suggested_notes" in by_name["create_events"]["parameters"]["properties"]["events"]["items"].get("required", []):
+        errors.append("create_events: suggested_notes must stay optional")
+
+
 def context_checks(root: dict, fixture: str) -> None:
     """Review fixtures: confirm_plan needs a draft plan or pending events on screen; a revision is a complete plan
     that keeps its title; modify_event uses an id the prompt showed; update_preferences values are well-formed."""
@@ -381,6 +473,7 @@ def main() -> int:
         jsonschema.Draft202012Validator.check_schema(decl["parameters"])
         by_name[name] = decl
         print(f"✓ {name:<24} nesting depth {depth}")
+    declaration_checks(by_name)
 
     for path in sorted(FIXTURES.glob("*.json")):
         fixture = json.loads(path.read_text())
@@ -393,6 +486,7 @@ def main() -> int:
             errors.append(f"{path.name}: {'/'.join(map(str, err.path))}: {err.message}")
         semantic_checks(call["name"], call["args"], path.name)
         style_checks(call["name"], call["args"], path.name)
+        suggestion_checks(call["name"], call["args"], fixture, path.name)
         context_checks(fixture, path.name)
         print(f"✓ fixture {path.name}")
 

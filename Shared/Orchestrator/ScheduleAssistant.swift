@@ -149,7 +149,9 @@ actor ScheduleAssistant {
                                             preferences: ctx.preferences, calendars: calendars,
                                             defaultTarget: defaultTarget, pendingEvents: pendingEvents)
         var exchange = [GeminiTurn.user(utterance)]
-        let response = try await gemini.generate(system: system, history: exchanges.flatMap { $0 } + exchange)
+        // suggest_event_notes has its own request (`suggestNotes`); a chat turn never calls it.
+        let response = try await gemini.generate(system: system, history: exchanges.flatMap { $0 } + exchange,
+                                                 allowedFunctions: AssistantFunction.conversational.map(\.rawValue))
         exchange.append(response.modelTurn)
 
         var reply = Reply()
@@ -300,18 +302,19 @@ actor ScheduleAssistant {
         }
         let events = try await ctx.router.insert(mapped, into: target, mapper: ctx.mapper, now: now)
         await clearPendingBatch(id: batch.id)
-        return (events, target)
+        return (await keepSuggestedNotes(Self.suggestedNotes(args, mapped: mapped), on: events), target)
     }
 
     /// Mapped but not written: previews with draft ids, the args kept verbatim for Add.
     private func makeBatch(_ mapped: [MappedEvent], argsJSON: Data, seed: String, utterance: String,
-                           ctx: Context, now: Date) async -> PendingEventBatch {
+                           suggested: [String: [String]] = [:], ctx: Context, now: Date) async -> PendingEventBatch {
         let target = try? await ctx.router.defaultTarget()
         // The single-account stand-in before migration has no account id: Add then uses the default calendar.
         let named = target.flatMap { $0.accountID.isEmpty ? nil : $0 }
         let id = PendingEventBatch.newID()
         let previews = mapped.enumerated().compactMap { (index, item) -> ScheduleEvent? in
             guard var preview = ctx.mapper.scheduleEvent(from: item.body) else { return nil }
+            preview.suggestedNotes = item.body.id.flatMap { suggested[$0] }
             preview.id = PendingEventBatch.previewID(batchID: id, index: index)
             preview.seriesID = nil
             return preview
@@ -363,10 +366,12 @@ actor ScheduleAssistant {
             let mapped = try args.events.prefix(20).enumerated().map { index, draft in
                 try ctx.mapper.event(from: draft, seed: "\(seed)|\(index)", utterance: utterance)
             }
+            // suggested_notes stay on this iPhone: chips on the card and the event page, never in Google.
+            let suggested = Self.suggestedNotes(args, mapped: mapped)
             if ctx.preferences.autonomy == .askFirst {
                 // Nothing is written: the batch waits for Add (a newer batch replaces this one).
                 let batch = await makeBatch(mapped, argsJSON: call.argsJSON, seed: seed, utterance: utterance,
-                                            ctx: ctx, now: now)
+                                            suggested: suggested, ctx: ctx, now: now)
                 await store.setPendingEventBatch(batch)
                 lastProposal = .events
                 reply.pendingEvents = batch
@@ -378,7 +383,8 @@ actor ScheduleAssistant {
                         "batch_id": batch.id]
             }
             let target = try await ctx.router.defaultTarget()
-            let events = try await ctx.router.insert(mapped, into: target, mapper: ctx.mapper, now: now)
+            let inserted = try await ctx.router.insert(mapped, into: target, mapper: ctx.mapper, now: now)
+            let events = await keepSuggestedNotes(suggested, on: inserted)
             reply.created += events
             reply.addedEvents += events
             reply.changed = true
@@ -579,9 +585,81 @@ actor ScheduleAssistant {
                     },
                     "rejected": rejected.map { ["key": $0.key, "value": $0.value, "reason": $0.reason] }]
 
+        case .suggestEventNotes:
+            // Only allowed in suggestNotes' own request; a chat turn that calls it changes nothing.
+            return ["ok": false, "error": "suggest_event_notes is only for the note suggestion request"]
+
         case nil:
             return ["ok": false, "error": "unknown function \(call.name)"]
         }
+    }
+
+    // MARK: - Note suggestions
+
+    /// `suggested_notes` per new event, by the Google id the mapper gave it: tidied (`NoteSuggester.cleanedItems`),
+    /// at most 4, none that the event's own notes already hold. Events without any are left out.
+    static func suggestedNotes(_ args: CreateEventsArgs, mapped: [MappedEvent]) -> [String: [String]] {
+        var result: [String: [String]] = [:]
+        for (draft, item) in zip(args.events.prefix(20), mapped) {
+            guard let id = item.body.id else { continue }
+            let notes = NoteSuggester.cleanedItems(draft.suggestedNotes, existingNotes: draft.notes)
+            if !notes.isEmpty, result[id] == nil { result[id] = notes }
+        }
+        return result
+    }
+
+    /// The new events with their `suggestedNotes`, which are also kept on their cached copies (a repeating event's
+    /// occurrences included) so the event page shows them. Local only.
+    private func keepSuggestedNotes(_ suggested: [String: [String]], on events: [ScheduleEvent]) async -> [ScheduleEvent] {
+        guard !suggested.isEmpty else { return events }
+        var result = events
+        for index in result.indices {
+            let event = result[index]
+            guard let notes = suggested[event.id] ?? event.seriesID.flatMap({ suggested[$0] }) else { continue }
+            result[index].suggestedNotes = notes
+            await store.setSuggestedNotes(notes, for: event)
+        }
+        return result
+    }
+
+    /// "✨ AI suggestions" on the event page: one `suggest_event_notes` request of its own (mode ANY, only that
+    /// function; the chat history is neither sent nor changed), behind the AI consent like every Gemini call.
+    /// Returns the rules the page already shows, then Gemini's items that say something new (at most 4). Nothing is
+    /// written or kept.
+    /// - Throws: `GeminiError.consentRequired` (nothing was sent), `URLError` offline, other Gemini errors.
+    func suggestNotes(for event: ScheduleEvent) async throws -> [NoteSuggestion] {
+        try await suggestNotes(for: event, now: Date())
+    }
+
+    /// Same, with the request's "today" given (unit tests).
+    func suggestNotes(for event: ScheduleEvent, now: Date) async throws -> [NoteSuggestion] {
+        let ctx = context()
+        let chinese = NoteSuggester.usesChinese(for: event)
+        let rules = NoteSuggester.ruleSuggestions(for: event, existingNotes: event.notes, preferChinese: chinese,
+                                                  homeTimeZone: ctx.clock.timeZone)
+        let shown = NoteSuggester.merging(rules, into: NoteSuggester.storedSuggestions(for: event, existingNotes: event.notes),
+                                          existingNotes: event.notes, limit: NoteSuggester.requestLimit)
+        let response = try await gemini.generate(
+            system: NoteSuggestionPrompt.system(chinese: chinese),
+            history: [.user(NoteSuggestionPrompt.request(for: event, clock: ctx.clock, now: now, chinese: chinese,
+                                                         alreadySuggested: shown.map(\.text)))],
+            mode: "ANY",
+            allowedFunctions: [AssistantFunction.suggestEventNotes.rawValue])
+        return Self.noteSuggestions(from: response, rules: rules, shown: shown, existingNotes: event.notes)
+    }
+
+    /// `rules`, then the items of the response's `suggest_event_notes` call that are not alike anything in `shown`
+    /// (the rules and the event's kept suggestions) or in the notes; at most 4 of those.
+    static func noteSuggestions(from response: GeminiResponse, rules: [NoteSuggestion], shown: [NoteSuggestion],
+                                existingNotes: String?) -> [NoteSuggestion] {
+        let call = response.functionCalls.first { $0.name == AssistantFunction.suggestEventNotes.rawValue }
+        let items = (call.flatMap { try? $0.decode(SuggestEventNotesArgs.self) })?.items ?? []
+        let known = NoteSuggester.merging(shown, into: rules, existingNotes: nil, limit: .max)
+        let fresh = NoteSuggester.cleanedItems(items, existingNotes: existingNotes, limit: NoteSuggester.requestLimit)
+            .map { NoteSuggestion.ai($0) }
+        let merged = NoteSuggester.merging(fresh, into: known, existingNotes: existingNotes, limit: .max)
+        let added = merged.filter { suggestion in !known.contains { $0.id == suggestion.id } }.prefix(4)
+        return rules + Array(added)
     }
 
     /// Said when a change could not reach Google: it is on this iPhone and goes out from the outbox.

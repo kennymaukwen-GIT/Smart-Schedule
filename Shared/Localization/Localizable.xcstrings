@@ -537,6 +537,17 @@
         }
       }
     },
+    "AI suggestions" : {
+      "comment" : "Event page: button asking Gemini for suggested notes",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 建議"
+          }
+        }
+      }
+    },
     "About" : {
       "localizations" : {
         "zh-Hant" : {
@@ -670,6 +681,17 @@
         }
       }
     },
+    "Add “%@” to notes" : {
+      "comment" : "Accessibility label of a suggested-note chip; the item, e.g. Bring passport",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把「%@」加入備註"
+          }
+        }
+      }
+    },
     "Added %lld events to Google Calendar." : {
       "localizations" : {
         "zh-Hant" : {
@@ -738,6 +760,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已將「%@」加入 Google 日曆。"
+          }
+        }
+      }
+    },
+    "Added: %@" : {
+      "comment" : "Chat card: a suggested note that is now in the event's notes",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入：%@"
           }
         }
       }
@@ -1358,6 +1391,17 @@
         }
       }
     },
+    "Couldn't add the note." : {
+      "comment" : "Chat card: writing a suggested note to the event failed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法加入備註。"
+          }
+        }
+      }
+    },
     "Couldn't delete" : {
       "comment" : "Alert title when deleting an event failed",
       "localizations" : {
@@ -1375,6 +1419,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除失敗，請到 App 再試一次。"
+          }
+        }
+      }
+    },
+    "Couldn't get AI suggestions." : {
+      "comment" : "Event page: the AI suggestions request failed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法取得 AI 建議。"
           }
         }
       }
@@ -2223,6 +2278,17 @@
         }
       }
     },
+    "Getting suggestions…" : {
+      "comment" : "Event page: AI suggested notes are loading",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在取得建議…"
+          }
+        }
+      }
+    },
     "Gmail, school and work accounts on Google all work. If the address isn't a Google account, Google's page will say so." : {
       "comment" : "Add Google account page: under the email field",
       "localizations" : {
@@ -2333,6 +2399,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "隱藏 Smart Schedule"
+          }
+        }
+      }
+    },
+    "Hide suggestions" : {
+      "comment" : "Event page: the × that hides the suggested notes of this event",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隱藏建議"
           }
         }
       }
@@ -2819,6 +2896,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一次：%@"
+          }
+        }
+      }
+    },
+    "No more suggestions" : {
+      "comment" : "Event page: AI found nothing new to suggest",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有其他建議"
           }
         }
       }
@@ -3827,6 +3915,17 @@
         }
       }
     },
+    "Show suggestions" : {
+      "comment" : "Event page: brings back the suggested notes hidden with ×",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示建議"
+          }
+        }
+      }
+    },
     "Shows events in the next 12 months." : {
       "comment" : "Events list footnote",
       "localizations" : {
@@ -4084,12 +4183,34 @@
         }
       }
     },
+    "Suggested" : {
+      "comment" : "Event page: heading of the suggested notes under Notes",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建議"
+          }
+        }
+      }
+    },
     "Suggestions" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "建議"
+          }
+        }
+      }
+    },
+    "Suggestions from Smart Schedule" : {
+      "comment" : "Event page: suggested notes came from the app's own rules (demo mode, offline)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來自 Smart Schedule 的建議"
           }
         }
       }
@@ -4216,6 +4337,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "點「加入」放進行事曆，或點「繼續修改」調整內容。"
+          }
+        }
+      }
+    },
+    "Tap a suggestion to add it to the notes, then Save." : {
+      "comment" : "Event page: footer under the suggested notes",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點一下建議就會加入備註，再按「儲存」。"
           }
         }
       }
@@ -4445,12 +4577,12 @@
         }
       }
     },
-    "Titles, times and locations of your events in the days the request is about (the next two weeks by default)" : {
+    "Titles, times, locations and notes of your events in the days the request is about (the next two weeks by default)" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要求涉及的日子裡，你的行程標題、時間和地點（預設為接下來兩週）"
+            "value" : "要求涉及的日子裡，你的行程標題、時間、地點和備註（預設為接下來兩週）"
           }
         }
       }

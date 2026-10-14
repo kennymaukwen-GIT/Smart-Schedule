@@ -203,7 +203,8 @@ extension AssistantText {
 /// What a reply put in the calendar, as rows instead of a sentence: a checkmark eyebrow, then each event's title,
 /// day and time, and place. `Reply.text` keeps the sentence for Siri and notifications. Events Google has not
 /// confirmed yet (offline, Google unreachable) say so instead. "Manage" opens the event page while the calendar
-/// still has the event.
+/// still has the event. Under an upcoming event, up to three suggested notes ("+ Bring passport"): a tap writes the
+/// note to the event at once (`AddedEventNoteChips`).
 struct EventAddedRows: View {
     let events: [ScheduleEvent]
     var isDemo = false
@@ -252,6 +253,20 @@ struct EventAddedRows: View {
     }
 
     private func row(_ event: ScheduleEvent) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            details(event)
+            if let schedule, let live = schedule.manageableEvent(for: event),
+               AddedEventNoteChips.isOffered(for: live, in: schedule) {
+                AddedEventNoteChips(event: event, live: live, schedule: schedule)
+            }
+        }
+        .padding(.leading, 11)
+        .background(alignment: .leading) {
+            Capsule().fill(Color(hex: event.colorHex)).frame(width: 3)
+        }
+    }
+
+    private func details(_ event: ScheduleEvent) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -286,10 +301,6 @@ struct EventAddedRows: View {
             .accessibilityElement(children: .combine)
 
             manageButton(event)
-        }
-        .padding(.leading, 11)
-        .background(alignment: .leading) {
-            Capsule().fill(Color(hex: event.colorHex)).frame(width: 3)
         }
     }
 

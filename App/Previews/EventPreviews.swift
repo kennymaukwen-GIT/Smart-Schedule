@@ -1,8 +1,8 @@
 #if DEBUG
 import SwiftUI
 
-// Xcode Canvas previews of the drawer's Events section, the events list and the event page, on in-memory demo
-// data: nothing is loaded, saved or sent.
+// Xcode Canvas previews of the drawer's Events section, the events list, the event page and its suggested notes, on
+// in-memory demo data: nothing is loaded, saved or sent.
 
 /// Preview-only events: the demo week plus a design review under way (so "Now" has a row), notes with a link on
 /// the meeting with Joe, and a holiday in a calendar the sample account can only read. `chinese` gives the
@@ -91,6 +91,54 @@ enum PreviewEvents {
     }
 }
 
+// MARK: - Suggested notes
+
+/// Preview-only events for suggested notes: a flight to Tokyo the day after tomorrow (travel abroad) next to the
+/// demo week's Gym series (workout).
+extension PreviewEvents {
+    static let tripID = DemoData.idPrefix + "tokyo-flight"
+    static var gymSeriesID: String { DemoData.idPrefix + "gym" }
+
+    /// `schedule(chinese:)` plus the flight; `tripNotes` are its notes in the calendar.
+    static func notesSchedule(chinese: Bool = false, tripNotes: String? = nil) -> ScheduleViewModel {
+        let model = schedule(chinese: chinese)
+        var flight = trip(in: model, chinese: chinese)
+        flight.notes = tripNotes
+        model.events = (model.events + [flight]).sorted { $0.start < $1.start }
+        return model
+    }
+
+    static func trip(in schedule: ScheduleViewModel, chinese: Bool) -> ScheduleEvent {
+        let calendar = schedule.clock.calendar
+        let day = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: Date())) ?? Date()
+        let start = schedule.clock.combine(day: day, time: (hour: 8, minute: 50)) ?? day
+        return ScheduleEvent(id: tripID, seriesID: nil, title: chinese ? "飛東京" : "Flight to Tokyo",
+                             start: start, end: start.addingTimeInterval(3.5 * 3600), isAllDay: false, kind: .event,
+                             colorHex: DemoData.personalHex,
+                             location: chinese ? "桃園機場第二航廈" : "Taoyuan Airport Terminal 2",
+                             meetURL: nil, notes: nil, reminderMinutes: nil, planID: nil, htmlLink: nil,
+                             accountID: DemoData.personalCalendar.accountID,
+                             calendarID: DemoData.personalCalendar.calendarID, usesCalendarColor: true)
+    }
+
+    /// The next Gym session: an occurrence of a repeating series.
+    static func gym(in schedule: ScheduleViewModel) -> ScheduleEvent {
+        schedule.events.first { $0.seriesID == gymSeriesID && $0.end > Date() } ?? schedule.events[0]
+    }
+
+    /// What Gemini's `create_events` might give the flight as `suggested_notes`.
+    static func tripSuggestedNotes(chinese: Bool) -> [String] {
+        chinese ? ["護照", "日圓現金", "Suica 或 PASMO 交通卡"] : ["Passport", "Yen cash", "Suica or PASMO card"]
+    }
+
+    /// What "AI suggestions" might bring for the flight.
+    static func tripRequested(chinese: Bool) -> [NoteSuggestion] {
+        (chinese ? ["日圓現金", "IC 交通卡", "Visit Japan Web 入境 QR 碼"]
+                 : ["Yen cash", "IC transit card", "Visit Japan Web entry QR"])
+            .map { NoteSuggestion.ai($0) }
+    }
+}
+
 @MainActor
 private func eventsDrawerPreview(chinese: Bool = false) -> some View {
     let schedule = PreviewEvents.schedule(chinese: chinese)
@@ -167,6 +215,98 @@ private func eventPagePreview(chinese: Bool = false,
 
 #Preview("Event page · read-only · zh-Hant") {
     eventPagePreview(chinese: true) { PreviewEvents.event(PreviewEvents.holidayID, in: $0) }
+}
+
+/// The event page with its "Suggested" row; `phase` and `requested` set the "AI suggestions" state.
+@MainActor
+private func suggestionsPagePreview(chinese: Bool = false,
+                                    phase: NoteSuggestionsModel.Phase = .idle,
+                                    requested: [NoteSuggestion] = [],
+                                    _ pick: (ScheduleViewModel) -> ScheduleEvent) -> some View {
+    let schedule = PreviewEvents.notesSchedule(chinese: chinese)
+    let event = pick(schedule)
+    return NavigationStack {
+        EventPage(event: event,
+                  noteSuggestions: NoteSuggestionsModel(event: event, phase: phase, requested: requested))
+    }
+    .preferredColorScheme(.dark)
+    .environment(schedule)
+    .environment(AppRouter())
+    .environment(\.locale, PreviewEvents.locale(chinese))
+}
+
+#Preview("Event page · trip suggestions") {
+    suggestionsPagePreview { PreviewEvents.trip(in: $0, chinese: false) }
+}
+
+#Preview("Event page · trip suggestions · zh-Hant") {
+    suggestionsPagePreview(chinese: true) { PreviewEvents.trip(in: $0, chinese: true) }
+}
+
+#Preview("Event page · workout suggestions") {
+    suggestionsPagePreview { PreviewEvents.gym(in: $0) }
+}
+
+#Preview("Event page · workout suggestions · zh-Hant") {
+    suggestionsPagePreview(chinese: true) { PreviewEvents.gym(in: $0) }
+}
+
+#Preview("Event page · AI suggestions loading") {
+    suggestionsPagePreview(phase: .loading) { PreviewEvents.trip(in: $0, chinese: false) }
+}
+
+#Preview("Event page · AI suggestions loading · zh-Hant") {
+    suggestionsPagePreview(chinese: true, phase: .loading) { PreviewEvents.trip(in: $0, chinese: true) }
+}
+
+#Preview("Event page · AI suggestions added") {
+    suggestionsPagePreview(phase: .loaded(fromRules: false, added: 3),
+                           requested: PreviewEvents.tripRequested(chinese: false)) {
+        PreviewEvents.trip(in: $0, chinese: false)
+    }
+}
+
+#Preview("Event page · AI suggestions added · zh-Hant") {
+    suggestionsPagePreview(chinese: true, phase: .loaded(fromRules: false, added: 3),
+                           requested: PreviewEvents.tripRequested(chinese: true)) {
+        PreviewEvents.trip(in: $0, chinese: true)
+    }
+}
+
+#Preview("Event page · suggestions from Smart Schedule (demo, offline)") {
+    suggestionsPagePreview(phase: .loaded(fromRules: true, added: 0)) { PreviewEvents.gym(in: $0) }
+}
+
+/// The chat's added-event card for a flight (Gemini's `suggested_notes`, one of them already added) and a Gym series
+/// (Smart Schedule's rules). Nothing is saved from the canvas: a tapped chip ends at "Couldn't add the note.".
+@MainActor
+private func addedEventChipsPreview(chinese: Bool = false) -> some View {
+    let tripNotes = chinese ? "• 日圓現金" : "• Yen cash"
+    let schedule = PreviewEvents.notesSchedule(chinese: chinese, tripNotes: tripNotes)
+    var trip = PreviewEvents.trip(in: schedule, chinese: chinese)
+    trip.suggestedNotes = PreviewEvents.tripSuggestedNotes(chinese: chinese)
+    // As the assistant added it: the series itself, whose next occurrence the calendar shows.
+    var gym = PreviewEvents.gym(in: schedule)
+    gym.id = PreviewEvents.gymSeriesID
+    gym.seriesID = nil
+    let message = ChatViewModel.Message(role: .assistant, text: "", addedEvents: [trip, gym])
+    return ScrollView {
+        AssistantMessageView(message: message, isDemo: true)
+            .padding(16)
+    }
+    .background(Theme.surface)
+    .environment(schedule)
+    .environment(AppRouter())
+    .environment(\.locale, PreviewEvents.locale(chinese))
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Added event · note suggestions") {
+    addedEventChipsPreview()
+}
+
+#Preview("Added event · note suggestions · zh-Hant") {
+    addedEventChipsPreview(chinese: true)
 }
 
 #Preview("Added event · Manage") {

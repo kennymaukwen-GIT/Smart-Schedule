@@ -71,7 +71,7 @@ final class AIConsentStoreTests: XCTestCase {
         XCTAssertEqual(AIConsentDisclosure.title, "Use the AI assistant?")
         XCTAssertEqual(AIConsentDisclosure.items.count, 4)
         XCTAssertTrue(AIConsentDisclosure.items[0].contains("type or say"))
-        XCTAssertTrue(AIConsentDisclosure.items[1].contains("Titles, times and locations"))
+        XCTAssertTrue(AIConsentDisclosure.items[1].contains("Titles, times, locations and notes"))
         XCTAssertTrue(AIConsentDisclosure.items[3].contains("time zone and language"))
         XCTAssertTrue(AIConsentDisclosure.lead.contains("Gemini API"))
         XCTAssertTrue(AIConsentDisclosure.recipient.contains("Google"))

@@ -16,6 +16,19 @@ protocol ScheduleAssisting: Sendable {
     func commitPendingEvents(_ batch: PendingEventBatch) async throws -> ScheduleAssistant.Reply
     /// Drops a pending batch without writing anything.
     func discardPendingEvents(_ batch: PendingEventBatch) async -> ScheduleAssistant.Reply
+    /// "✨ AI suggestions" on the event page: things `event` may need, for its notes. Pass the event as the page
+    /// shows it (`notes` = the text being edited). Returns Smart Schedule's rule suggestions first (`.rules`, the
+    /// ones the page already shows), then what the AI adds (`.ai`), without duplicates or anything the notes hold.
+    /// No `.ai` item means only the rules answered ("Suggestions from Smart Schedule"). Nothing is written.
+    /// - Throws: `GeminiError.consentRequired` without AI consent (nothing sent); `URLError` when offline.
+    func suggestNotes(for event: ScheduleEvent) async throws -> [NoteSuggestion]
+}
+
+extension ScheduleAssisting {
+    /// Smart Schedule's own rules, for an assistant without AI.
+    func suggestNotes(for event: ScheduleEvent) async throws -> [NoteSuggestion] {
+        NoteSuggester.ruleSuggestions(for: event, existingNotes: event.notes, limit: NoteSuggester.requestLimit)
+    }
 }
 
 extension ScheduleAssistant: ScheduleAssisting {}

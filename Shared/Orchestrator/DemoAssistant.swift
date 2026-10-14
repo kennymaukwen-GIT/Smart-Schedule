@@ -142,6 +142,13 @@ actor DemoAssistant: ScheduleAssisting {
         return reply
     }
 
+    /// "AI suggestions" in demo mode: Smart Schedule's rules only, nothing sent anywhere. Up to
+    /// `NoteSuggester.requestLimit`, so the button brings the items the page had no room for.
+    func suggestNotes(for event: ScheduleEvent) async throws -> [NoteSuggestion] {
+        NoteSuggester.ruleSuggestions(for: event, existingNotes: event.notes, limit: NoteSuggester.requestLimit,
+                                      homeTimeZone: clock.timeZone)
+    }
+
     // MARK: - (a) Long-term goal → draft plan
 
     private static func isGoal(_ lower: String) -> Bool {

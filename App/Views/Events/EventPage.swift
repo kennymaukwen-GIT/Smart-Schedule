@@ -8,11 +8,17 @@ import SwiftUI
 /// event shows "Waiting to sync"). An event of a repeating series shows its rule and saves to "This event" or "All
 /// events". The calendar is shown, not changed. In a calendar the account can only read, the page is read-only.
 /// Closing with unsaved changes asks "Discard changes?".
+///
+/// Under the notes, "Suggested" offers what the event may need ("+ Bring passport" for a trip abroad, "+ Bring
+/// water" for the gym): a tap adds "• Bring passport" to the notes, which Save keeps like any other change.
+/// "AI suggestions" asks Gemini for more (after the AI consent; demo mode and offline: Smart Schedule's rules).
 struct EventPage: View {
     /// The cached event; it changes when the cache does (a sync, a change elsewhere).
     let event: ScheduleEvent
 
     @Environment(ScheduleViewModel.self) private var schedule
+    /// Asks for note suggestions with the assistant the chat uses; absent in previews of the page alone.
+    @Environment(ChatViewModel.self) private var chat: ChatViewModel?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @Environment(\.locale) private var locale
@@ -26,6 +32,8 @@ struct EventPage: View {
     @State private var isConfirmingDiscard = false
     @State private var pendingDelete: ScheduleEvent?
     @State private var failure: Failure?
+    /// The "Suggested" row under the notes.
+    @State private var noteSuggestions: NoteSuggestionsModel
     @FocusState private var focus: Field?
     /// About five lines of body text.
     @ScaledMetric(relativeTo: .body) private var notesMinHeight: CGFloat = 120
@@ -47,12 +55,14 @@ struct EventPage: View {
         var message: String
     }
 
-    init(event: ScheduleEvent) {
+    /// `noteSuggestions`: previews pass one in a given state.
+    init(event: ScheduleEvent, noteSuggestions: NoteSuggestionsModel? = nil) {
         self.event = event
         let draft = EventPageDraft(event, clock: WallClock())
         _baseline = State(initialValue: event)
         _original = State(initialValue: draft)
         _draft = State(initialValue: draft)
+        _noteSuggestions = State(initialValue: noteSuggestions ?? NoteSuggestionsModel(event: event))
     }
 
     private var isReadOnly: Bool { schedule.isReadOnly(baseline) }
@@ -97,6 +107,19 @@ struct EventPage: View {
             Button("OK", role: .cancel) {}
         } message: { failure in
             Text(failure.message)
+        }
+        // Over this page, not the root view: the page is a sheet already.
+        .sheet(item: Binding(
+            get: { noteSuggestions.consentPrompt },
+            set: { noteSuggestions.consentPrompt = $0 }
+        )) { _ in
+            AIConsentSheet(onAllow: {
+                noteSuggestions.allowConsent()
+                chat?.refreshConsent()
+            }, onNotNow: {
+                noteSuggestions.declineConsent()
+                chat?.refreshConsent()
+            })
         }
         .onChange(of: scope) { _, scope in
             if scope == .allEvents { draft.keepDays(of: original, clock: clock) }
@@ -273,7 +296,8 @@ struct EventPage: View {
     }
 
     private var notesSection: some View {
-        Section {
+        let chips = isReadOnly ? [] : suggestedChips
+        return Section {
             if isReadOnly {
                 if draft.notes.isEmpty {
                     Text("None")
@@ -299,10 +323,68 @@ struct EventPage: View {
                         }
                     }
                     .accessibilityLabel(Text("Notes"))
+                NoteSuggestionsRow(model: noteSuggestions, chips: chips, onAdd: addSuggestion,
+                                   onRequest: requestSuggestions)
             }
         } header: {
             Text("Notes")
+        } footer: {
+            if !chips.isEmpty {
+                Text("Tap a suggestion to add it to the notes, then Save.")
+            }
         }
+    }
+
+    // MARK: Suggested notes
+
+    /// The event as edited so far: suggestions follow the title, place, time and notes being typed.
+    private var suggestionSubject: ScheduleEvent {
+        var event = baseline
+        let span = draft.span(clock: clock)
+        event.title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        event.location = draft.location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : draft.location
+        event.notes = EventNotes.normalized(draft.notes)
+        event.start = span.start
+        event.end = span.end
+        event.isAllDay = draft.isAllDay
+        return event
+    }
+
+    /// The app's language, for an event whose title says nothing either way.
+    private var prefersChinese: Bool {
+        ReplyFormatter.isChinese(ChatFormat.dateLocale(locale))
+    }
+
+    private var suggestedChips: [NoteSuggestion] {
+        noteSuggestions.chips(for: suggestionSubject, notes: draft.notes, preferChinese: prefersChinese,
+                              homeTimeZone: clock.timeZone)
+    }
+
+    /// A chip: "• item" on a line of its own at the end of the notes; Save keeps it.
+    private func addSuggestion(_ chip: NoteSuggestion) {
+        draft.notes = NoteSuggester.appending(chip.text, to: draft.notes)
+    }
+
+    /// "AI suggestions": through the chat's assistant (the demo one in demo mode), else the mode's own.
+    private func requestSuggestions() {
+        focus = nil
+        let subject = suggestionSubject
+        let chat = chat
+        let isDemo = schedule.isDemo || AppConstants.isDemoMode
+        noteSuggestions.requestSuggestions(
+            for: subject,
+            notes: draft.notes,
+            shown: suggestedChips,
+            preferChinese: prefersChinese,
+            homeTimeZone: clock.timeZone,
+            isDemo: isDemo,
+            isOffline: schedule.isNetworkOffline,
+            fetch: { event in
+                if let chat { return try await chat.suggestNotes(for: event) }
+                let assistant: any ScheduleAssisting = isDemo ? DemoAssistant() : ScheduleAssistant.shared
+                return try await assistant.suggestNotes(for: event)
+            }
+        )
     }
 
     /// Google Meet, Google Calendar and any link written in the notes (where the event came from), as rows to tap.

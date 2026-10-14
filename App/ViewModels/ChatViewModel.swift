@@ -286,6 +286,15 @@ final class ChatViewModel {
         run(text)
     }
 
+    // MARK: Note suggestions
+
+    /// "AI suggestions" on the event page, from the assistant the chat uses: Gemini, or in demo mode Smart Schedule's
+    /// rules. Throws `GeminiError.consentRequired` without AI consent; the page asks with its own consent sheet
+    /// (it is a sheet itself) and calls again after Allow. Nothing is written.
+    func suggestNotes(for event: ScheduleEvent) async throws -> [NoteSuggestion] {
+        try await assistant.suggestNotes(for: event)
+    }
+
     // MARK: Plan review
 
     /// "Add": writes the reviewed draft to the calendar.

@@ -1,0 +1,24 @@
+{
+  "utterance": "EVENT\ntitle: Tokyo trip\nwhen: 2026-10-20 → 2026-10-24 (all day, 5 days)\nlocation: Tokyo\nnotes: (none)\ntime_zone: Europe/London\ntoday: 2026-10-13\nlanguage: en\nALREADY SUGGESTED: Bring passport; Check visa or entry documents; Pack a plug adapter; Get travel insurance",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "event": {
+    "title": "Tokyo trip",
+    "start": "2026-10-20",
+    "end": "2026-10-24",
+    "all_day": true,
+    "location": "Tokyo"
+  },
+  "expected_call": {
+    "name": "suggest_event_notes",
+    "args": {
+      "items": [
+        "Yen cash",
+        "IC transit card",
+        "Visit Japan Web entry QR",
+        "eSIM or pocket Wi-Fi"
+      ],
+      "reason": "Five days in Tokyo: cash, getting around and arrival."
+    }
+  }
+}

@@ -39,6 +39,9 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 - **全部行程**：分成「進行中」「今天」「明天」「這週」「之後」，重複的行程（例如每週六的瑜伽）在「重複行程」裡只佔一列，寫出規則和下一次（「每週六 09:00」「下一次：10月18日（週六）」）。可以搜尋標題、地點和備註；向左滑有「刪除」（重複行程會問只刪除這次或刪除全部）和「編輯」。打開時會確認接下來 12 個月的行程都已載入（`ScheduleViewModel.loadUpcomingEvents`），清單最下面有說明。
 - **自動更新**：清單每分鐘重新整理，結束的行程自動消失；助理、長期計畫、Siri、通知回覆或其他裝置（同步）新增的行程會直接出現，不用手動重新整理。只列出在 Smart Schedule 顯示的行事曆（隱藏的行事曆不列，和日曆一樣），計畫草稿的幽靈行程不列，示範模式列出範例行程。
 - **行程頁**（`App/Views/Events/EventPage.swift`，從月曆、Quick Capture、抽屜、全部行程和對話的「管理」按鈕打開，都是同一頁）：可以改標題、全天、開始和結束、地點、提醒和**備註**（多行，至少顯示 5 行，對應 Google 日曆的「說明」；Google 存的 HTML 會轉成純文字顯示，儲存時送純文字）。重複行程顯示規則，儲存時選「只改這次」或「全部」（「全部」只改時間，日期不變）。行事曆只顯示不能改。Meet、Google 日曆和備註裡的連結是可以點的列。「刪除行程」會先確認。只能檢視的行事曆會顯示「你不能修改這個日曆裡的行程。」；有沒儲存的修改時關閉會問「要捨棄變更嗎？」。儲存走和助理一樣的寫入路徑（`EventEditor` → `CalendarRouter`：If-Match、離線時進待送佇列並顯示待同步）。
+- **備註建議**（`App/Views/Events/NoteSuggestionViews.swift`，規則在 `Shared/Orchestrator/NoteSuggester.swift`、`NoteSuggestionRules.swift`）：行程頁的備註下面有「建議」，依行程的標題、地點和備註判斷可能需要帶什麼、做什麼，例如出國或搭飛機：護照、簽證或入境文件、轉接頭、旅遊保險（國際線再加「提早 2–3 小時到機場」）；高鐵、火車：身分證、車票、行動電源；健身、跑步、重訓：水、毛巾、運動服和運動鞋；另外還有瑜伽、游泳、登山、面試和會議、看醫生、考試、生日和聚會、開車、演唱會和看展、訂位。繁中、簡中、英文的關鍵字都認得（「跑步機維修」這類不算運動），不用網路、馬上出現，最多 4 個。點一下膠囊（「+ 帶護照」）就在備註最後加一行「• 帶護照」，和其他修改一樣按「儲存」才寫入；備註裡已經有的不再建議；「×」把這個行程（重複行程是整個系列）的建議收起來，只記在這支 iPhone，「顯示建議」可以再打開。**建議永遠不會自動寫進備註。**規則和函式的細節在 [`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) §12。
+  - **✨ AI 建議**：請 Gemini 依標題、日期、地點、時長、現有備註和時區，再給 2–4 個貼近這個行程的項目（例如「東京旅遊」：護照、日圓現金、IC 交通卡、Visit Japan Web 入境 QR 碼），用獨立的 `suggest_event_notes` 函式呼叫，不碰行事曆。要先同意 AI 資料分享：還沒同意時會在行程頁上跳出同意說明，按「允許」後自動再試一次。示範模式和離線時改用內建規則，顯示「來自 Smart Schedule 的建議」。建議的語言跟著行程標題，標題看不出來就跟著 App 的語言。
+  - **對話卡片**：助理剛加入的行程，卡片上最多 3 個建議；Gemini 建立行程時可以附上 `suggested_notes`（只存在這支 iPhone，不送到 Google，行程頁也看得到），沒有就用內建規則。點一下馬上寫進那個行程的備註（和行程頁同一條寫入路徑，離線時進待送佇列），膠囊變成「已加入：…」。助理自己不會寫備註，除非使用者要求（「加個備註：帶護照」）。規則表、AI request 和保存方式見 [`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) 第 12 節。
 
 ### 設定、帳號與訂閱
 
@@ -60,7 +63,7 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 平台限制對照表、process 和資料邊界、各介面的框架選型、延遲預算、安全、打破框架的建議 |
 | [`docs/SETTINGS.md`](docs/SETTINGS.md) | 新介面和設定功能的規格：畫面、資料模型、儲存、多帳號同步、`update_preferences`、通知、AI 同意、訂閱、匯出與清除、上架前檢查清單 |
-| [`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) | 8 個函式的 schema 設計理由、request 和 response 範例、Gemini 3 thought signatures |
+| [`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) | 9 個函式的 schema 設計理由（包括備註建議的 `suggest_event_notes` 和 `create_events` 的 `suggested_notes`）、request 和 response 範例、Gemini 3 thought signatures |
 | [`docs/GOOGLE_CALENDAR_SYNC.md`](docs/GOOGLE_CALENDAR_SYNC.md) | OAuth PKCE、欄位對應、時區和 DST、RRULE、提醒（24h／1h／30m）、idempotent 寫入、雙向同步 |
 | [`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md) | Hold-to-spawn 流程、Info.plist、兩條輸入路徑、提醒來源（Smart Schedule／Google／兩者）、緊急程度、安靜時段、每日摘要、每日上限、64 個通知上限、略過提醒的學習 |
 
@@ -69,7 +72,7 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 ```
 App/                    主 App target（SwiftUI、Quick Capture、Google 登入、語音、Siri intents、BG refresh）
   Views/Navigation/     Artboard 5 標頭、行事曆抽屜、行事曆設定
-  Views/Events/         抽屜的「行程」區、全部行程、行程頁（可編輯、備註）
+  Views/Events/         抽屜的「行程」區、全部行程、行程頁（可編輯、備註、備註建議）
   Views/Account/        帳號與訂閱
   Views/Settings/       設定（General）的每一頁
   Views/Chat/           AI 同意說明、同意提示列、設定已更新／學到的建議／先問我卡片
@@ -79,11 +82,11 @@ NotificationContent/    Notification Content Extension：長按通知後原地�
 Shared/
   Core/                 常數、deep link、WallClock（牆上時間和 IANA 時區，跟著設定的時區和每週起始日）
   Models/               ScheduleEvent、GoogleAccount、AppPreferences、偏好紀錄、Gemini 函式參數的 Decodable
-  AI/                   FunctionDeclarations.json、GeminiClient（REST）、AssistantPrompt
+  AI/                   FunctionDeclarations.json、GeminiClient（REST）、AssistantPrompt、NoteSuggestionPrompt（AI 備註建議）
   Calendar/             Google 的資料模型、mapper、RRULE、idempotent ID、client、sync、提醒策略
   Auth/                 GoogleTokenProvider（任何 process 都能 refresh）
-  Orchestrator/         ScheduleAssistant：輸入一句話 → Gemini → Calendar → 回覆；DemoAssistant（離線 Demo）
-  Storage/              SharedStore、AccountStore、PreferencesStore、ChatHistoryStore、AI 同意、跨 process 變更通知
+  Orchestrator/         ScheduleAssistant：輸入一句話 → Gemini → Calendar → 回覆；DemoAssistant（離線 Demo）；NoteSuggester（備註建議規則）
+  Storage/              SharedStore、AccountStore、PreferencesStore、ChatHistoryStore、AI 同意、收起的備註建議、跨 process 變更通知
   Notifications/        Category 註冊、ReminderScheduler（64 個上限的滾動視窗）、每日摘要、略過提醒的學習
   LiveActivity/         ActivityAttributes、4KB 預算的 state builder、manager
   Intents/              SummonScheduleIntent（LiveActivityIntent）
@@ -106,7 +109,7 @@ project.yml             XcodeGen 設定（三個 App target 加一個測試 targ
 | **網頁互動原型**（claude.ai Artifact） | 瀏覽器，手機也可以 | 5 個設計稿的流程、真實的自然語言解析（原型裡用 Claude 代替 Gemini，function schema 相同）、iOS App 會送出的 Google Calendar request |
 | **Xcode Previews** | Mac + Xcode 16 以上 | 每個畫面，包括動態島 expanded／compact／minimal 和鎖定畫面，不用執行 App |
 | **Simulator + Demo 模式** | Mac + Xcode | 完整 App：控制中心按鈕、Live Activity、長按通知回覆、主畫面、Quick Capture。不需要 Google 帳號或 Gemini key |
-| **單元測試** | Xcode 按 ⌘U，或 GitHub Actions 自動跑 | 時區和 DST、RRULE、event ID、mapper、Gemini 回應解析、4 KB 預算、偏好設定與紀錄、多帳號（新增帳號的 email 檢查與比對、移除帳號）、提醒排程、週一開始的月曆 |
+| **單元測試** | Xcode 按 ⌘U，或 GitHub Actions 自動跑 | 時區和 DST、RRULE、event ID、mapper、Gemini 回應解析、4 KB 預算、偏好設定與紀錄、多帳號（新增帳號的 email 檢查與比對、移除帳號）、提醒排程、週一開始的月曆、備註建議的規則（出國、運動、排除「跑步機維修」這類誤判、已經寫在備註裡的不再建議） |
 | **真機 + 真 API** | Apple ID（部分功能需付費開發者帳號）、Google OAuth client、Gemini key | 實際寫入 Google Calendar、Action Button、真正的鎖定畫面互動 |
 
 ### Simulator 步驟
@@ -154,7 +157,7 @@ open SmartSchedule.xcodeproj
 
 | 項目 | 狀態 |
 |---|---|
-| Gemini schema lint（OpenAPI subset，8 個函式）、11 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
+| Gemini schema lint（OpenAPI subset，9 個函式）、15 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
 | Swift 編譯（App、Widgets、Notification extension） | ⏳ 設定、多帳號改動後待 CI 重新編譯（GitHub Actions 的 macOS runner：xcodegen 加 xcodebuild） |
 | 單元測試 | ⏳ 設定、多帳號改動後待 CI 重跑（hostless `SmartScheduleCoreTests`） |
 | 只能在實機上確認的行為（控制中心啟動 Live Activity、通知內 inline TextField、160 pt 高度） | ⏳ 清單在 `docs/ARCHITECTURE.md` 第 7 節 |

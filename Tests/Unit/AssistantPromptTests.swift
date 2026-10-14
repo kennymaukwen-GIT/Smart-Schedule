@@ -347,8 +347,7 @@ final class AssistantPromptTests: XCTestCase {
     func testDeclarationsIncludeUpdatePreferences() throws {
         let url = try XCTUnwrap(Bundle(for: GeminiClient.self).url(forResource: "FunctionDeclarations", withExtension: "json"))
         let declarations = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
-        let update = try XCTUnwrap(declarations.last)
-        XCTAssertEqual(update["name"] as? String, "update_preferences")
+        let update = try XCTUnwrap(declarations.first { $0["name"] as? String == "update_preferences" })
         let parameters = try XCTUnwrap(update["parameters"] as? [String: Any])
         XCTAssertEqual(parameters["required"] as? [String], ["changes", "summary_for_user"])
         let changes = try XCTUnwrap((parameters["properties"] as? [String: Any])?["changes"] as? [String: Any])

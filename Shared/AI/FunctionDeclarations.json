@@ -93,7 +93,13 @@
               },
               "notes": {
                 "type": "string",
-                "description": "Agenda, checklist or context worth saving in the event description."
+                "description": "Agenda, checklist or context the user gave, worth saving in the event description. Never your own suggestions: those go in suggested_notes."
+              },
+              "suggested_notes": {
+                "type": "array",
+                "description": "Optional. Up to 4 short things this event clearly calls for, in the language of the title, e.g. a trip abroad: ['Bring passport', 'Check visa or entry documents']; '健身': ['帶水', '帶毛巾']; an exam: ['Bring admission ticket']. Each a checklist noun or a 2-6 word action, max 40 characters, no bullet. The app offers them as chips the user can tap and never writes them to the calendar. Omit when nothing specific applies. No medical, legal or financial advice; no prices.",
+                "maxItems": 4,
+                "items": { "type": "string" }
               }
             },
             "required": ["title", "start", "kind"]
@@ -350,6 +356,27 @@
         }
       },
       "required": ["changes", "summary_for_user"]
+    }
+  },
+  {
+    "name": "suggest_event_notes",
+    "description": "Suggest what ONE calendar event may need, as short items the user can tap to add to the event's notes: things to bring, prepare or check. Only for the dedicated note-suggestion request that describes one EVENT; never in conversation. Changes nothing in the calendar.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "description": "2-4 items for THIS event, most useful first, in the language of the event title. Each a checklist noun or a 2-6 word action, max 40 characters, no bullet or numbering. Example for 'Tokyo trip': ['Passport', 'Yen cash', 'IC transit card', 'Visit Japan Web entry QR']; for '跑步': ['帶水', '帶毛巾']. Nothing the event's notes or ALREADY SUGGESTED already say. No medical, legal or financial advice; no prices, fees or rules that may be out of date.",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": { "type": "string" }
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional. One short sentence on why these items; not shown to the user."
+        }
+      },
+      "required": ["items"]
     }
   }
 ]

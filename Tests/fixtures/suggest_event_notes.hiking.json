@@ -1,0 +1,24 @@
+{
+  "utterance": "EVENT\ntitle: 合歡山健行\nwhen: 2026-10-17T06:00 → 2026-10-17T15:00 (9 h)\nlocation: 合歡山登山口\nnotes: 跟 Amy 一起，5:30 出發\ntime_zone: Europe/London\ntoday: 2026-10-13\nlanguage: zh-Hant\nALREADY SUGGESTED: 帶水; 帶雨具; 帶行動糧; 帶頭燈",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "event": {
+    "title": "合歡山健行",
+    "start": "2026-10-17T06:00",
+    "end": "2026-10-17T15:00",
+    "location": "合歡山登山口",
+    "notes": "跟 Amy 一起，5:30 出發"
+  },
+  "expected_call": {
+    "name": "suggest_event_notes",
+    "args": {
+      "items": [
+        "保暖外套",
+        "防曬乳和帽子",
+        "登山杖",
+        "垃圾袋"
+      ],
+      "reason": "高山清晨很冷，白天日照強。"
+    }
+  }
+}

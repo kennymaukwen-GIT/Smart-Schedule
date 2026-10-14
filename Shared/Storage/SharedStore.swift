@@ -196,6 +196,26 @@ actor SharedStore {
         mutate { $0.pendingEventBatch = batch }
     }
 
+    /// Note suggestions kept on an event (`ScheduleEvent.suggestedNotes`): local only, never sent to Google. Set on
+    /// the cached copy of `event` and, for a repeating event, on every cached occurrence of its series in the same
+    /// calendar; later listings keep them (`ScheduleEvent.keepingLocalFields`). nil or [] clears them.
+    func setSuggestedNotes(_ notes: [String]?, for event: ScheduleEvent) {
+        let value = notes ?? []
+        let series = event.seriesID ?? event.id
+        update { snapshot in
+            var changed = false
+            for index in snapshot.events.indices {
+                let copy = snapshot.events[index]
+                guard copy.accountID == event.accountID, copy.calendarID == event.calendarID,
+                      copy.id == event.id || copy.id == series || copy.seriesID == series else { continue }
+                if copy.suggestedNotes == value || (value.isEmpty && copy.suggestedNotes == nil) { continue }
+                snapshot.events[index].suggestedNotes = value
+                changed = true
+            }
+            return changed
+        }
+    }
+
     // MARK: Accounts
 
     /// A disconnected account: its cached events and range bookkeeping go, and the morning nudges of plans that
@@ -293,7 +313,10 @@ actor SharedStore {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .secondsSince1970
             var snapshot = (try? Data(contentsOf: url)).flatMap { try? decoder.decode(Snapshot.self, from: $0) } ?? Snapshot()
+            let before = snapshot.events
             guard change(&snapshot) else { return }
+            // Google's copies never carry what Smart Schedule keeps locally (note suggestions): keep it across writes.
+            ScheduleEvent.keepingLocalFields(&snapshot.events, from: before)
             let encoder = JSONEncoder()
             encoder.dateEncodingStrategy = .secondsSince1970
             try? encoder.encode(snapshot).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])

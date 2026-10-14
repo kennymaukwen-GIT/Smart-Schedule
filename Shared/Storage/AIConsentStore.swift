@@ -78,7 +78,7 @@ enum AIConsentDisclosure {
 
     static var items: [String] {
         [String(localized: "What you type or say to the assistant"),
-         String(localized: "Titles, times and locations of your events in the days the request is about (the next two weeks by default)"),
+         String(localized: "Titles, times, locations and notes of your events in the days the request is about (the next two weeks by default)"),
          String(localized: "The names of your calendars and your assistant settings"),
          String(localized: "Your time zone and language")]
     }

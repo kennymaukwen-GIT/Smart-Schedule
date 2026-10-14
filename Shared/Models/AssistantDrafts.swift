@@ -15,6 +15,13 @@ enum AssistantFunction: String, CaseIterable, Sendable {
     case replyToUser = "reply_to_user"
     case confirmPlan = "confirm_plan"
     case updatePreferences = "update_preferences"
+    /// Only in its own request (`ScheduleAssistant.suggestNotes`), never in conversation.
+    case suggestEventNotes = "suggest_event_notes"
+
+    /// What a chat turn may call: every function but `suggest_event_notes`.
+    static var conversational: [AssistantFunction] {
+        allCases.filter { $0 != .suggestEventNotes }
+    }
 }
 
 // MARK: create_events
@@ -36,6 +43,9 @@ struct EventDraft: Codable, Sendable {
     var recurrence: RecurrenceDraft?
     var reminderMinutes: [Int]?
     var notes: String?
+    /// Up to 4 things the event may need ("Bring passport"), offered as chips; never written to Google
+    /// (`ScheduleEvent.suggestedNotes`).
+    var suggestedNotes: [String]? = nil
 }
 
 struct RecurrenceDraft: Codable, Sendable {
@@ -176,4 +186,31 @@ struct UpdatePreferencesArgs: Decodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey { case changes, summaryForUser }
+}
+
+// MARK: suggest_event_notes
+
+/// `suggest_event_notes`: 2-4 items for one event. Tolerant: a missing `items` reads as none, a single string as one.
+struct SuggestEventNotesArgs: Decodable, Sendable {
+    var items: [String]
+    var reason: String?
+
+    init(items: [String], reason: String? = nil) {
+        self.items = items
+        self.reason = reason
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let list = try? c.decodeIfPresent([String].self, forKey: .items) {
+            items = list
+        } else if let single = try? c.decodeIfPresent(String.self, forKey: .items) {
+            items = [single]
+        } else {
+            items = []
+        }
+        reason = try? c.decodeIfPresent(String.self, forKey: .reason)
+    }
+
+    private enum CodingKeys: String, CodingKey { case items, reason }
 }
