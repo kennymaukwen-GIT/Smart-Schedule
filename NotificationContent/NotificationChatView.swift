@@ -135,13 +135,13 @@ struct NotificationChatView: View {
     }
 }
 
-/// The "31" calendar tile from Artboard 1.
+/// Today's date tile (Artboard 1). Neutral grey: the reminder comes from Smart Schedule, not Google Calendar.
 private struct CalendarBadge: View {
     var body: some View {
         Text("\(Calendar.current.component(.day, from: Date()))")
             .font(.system(size: 17, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: 34, height: 34)
-            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color(hex: "#1A73E8")))
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color(hex: "#636366")))
     }
 }
