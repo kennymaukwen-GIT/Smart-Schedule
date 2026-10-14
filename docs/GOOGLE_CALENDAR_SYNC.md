@@ -21,7 +21,7 @@
 |---|---|---|
 | — | `id` | `GoogleEventID.make(seed:)`：取 SHA-256 前 128 bit，轉成 base32hex（`a–v`、`0–9`），前面加 `ss`。**同一個 seed 一定得到同一個 ID，重試時不會重複建立事件** |
 | `title` | `summary` | 計畫事件會加前綴：`Muscle 6M · Upper` |
-| 原始輸入的整句話 | `description` | `由 Smart Schedule 智慧助理自動排程：<原句>`（和 Artboard 5 的詳情頁一樣），後面空一行接 notes、目標、階段說明。整段就是 App 裡的「備註」（純文字，使用者可以改或刪，見第 11 節）；沒有程式會把它解析回來，計畫靠 `ssPlanId` 找 |
+| 原始輸入的整句話 | `description` | `由 Smart Schedule 智慧助理自動排程：<原句>`（和 Artboard 5 的詳情頁一樣），後面空一行接 notes、目標、階段說明。Google 日曆照原樣顯示整段；App 的備註編輯框隱藏來源行、存檔時自動放回，其餘就是 App 裡的「備註」（純文字，使用者可以改或刪，見第 11 節）；沒有程式會把它解析回來，計畫靠 `ssPlanId` 找 |
 | `start` / `end` / `duration_minutes` | `start.dateTime` / `end.dateTime` 加 `timeZone` | 用牆上時間 `2026-10-14T14:00:00` 加 IANA 時區，**不帶 offset** |
 | `all_day` 或只給日期 | `start.date` / `end.date` | `end.date` 是**不包含的那一天**，所以要加 1 天 |
 | `recurrence` | `recurrence: ["RRULE:..."]` | 見第 4 節 |
@@ -367,7 +367,7 @@ Calendar API 本身不收費，但有每日與每分鐘的配額，要依使用�
 
 - **讀**（mapper、outbox 疊加、Google 回傳）：`ScheduleEvent.notes` 一律是純文字。Google 日曆網頁版存的是 HTML：`<br>`、`<p>`、`</div>`、清單、標題、表格列變成換行，`<li>` 變成「• 」，`<a href="x">文字</a>` 變成「文字 (x)」（文字就是網址時只留網址），其他標籤拿掉，`&amp;` `&lt;` `&gt;` `&quot;` `&#39;` `&nbsp;` 和數字實體解碼；沒有標籤的純文字（例如「a < b」）原樣保留。前後空白去掉，連續空行最多留一行。
 - **寫**：行程頁送純文字（換行保留，前後空白去掉）。清空 = 送 `"description": ""`。沒動備註就不送，所以 Google 那邊的 HTML 不會被改寫；改了才會變成純文字。
-- **Smart Schedule 自己寫進 `description` 的東西**：第 2 節的來源行、建立時的 notes、計畫的目標和階段說明。它們就是備註的一部分，行程頁照樣顯示、可以改或刪；沒有程式會解析它們（計畫靠 `ssPlanId`），所以刪掉不影響任何功能。助理的 prompt 不放來源行（第 11.5 節）。
+- **Smart Schedule 自己寫進 `description` 的東西**：第 2 節的來源行、建立時的 notes、計畫的目標和階段說明。Google 日曆照樣顯示（和 Artboard 5 一樣）。行程頁的備註編輯框不顯示來源行（`EventNotes.provenanceLine`），存檔時用 `EventNotes.joining` 放回第一行、空一行再接使用者的備註，所以 Google 那邊不會消失；其餘內容就是備註的一部分，照樣顯示、可以改或刪。想刪來源行要到 Google 日曆刪；沒有程式會解析它們（計畫靠 `ssPlanId`），所以刪掉不影響任何功能。助理的 prompt 不放來源行（第 11.5 節）。
 - 舊版快取裡的 `notes` 可能還是 HTML（這版之前沒轉換），下次完整列出那段日期時就換成純文字；在那之前行程頁顯示時也會先轉一次。
 
 ### 11.3 修改：只送改了的欄位（`CalendarEventMapper.patch(from: EventEdit, existing:)`）

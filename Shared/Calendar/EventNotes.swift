@@ -9,8 +9,10 @@ import Foundation
 ///
 /// What Smart Schedule itself writes into a description stays part of the notes: the provenance line
 /// ("由 Smart Schedule 智慧助理自動排程：<what the user said>"), then the event's notes, and for plan sessions the goal,
-/// the phase and the workout. It is ordinary text the user can read, change or delete; nothing parses it back
-/// (plans are found by `extendedProperties.private.ssPlanId`). See docs/GOOGLE_CALENDAR_SYNC.md §2.
+/// the phase and the workout. Google Calendar shows all of it (as in Artboard 5); the event page keeps the provenance
+/// line out of its editor and writes it back on save (`provenanceLine`, `joining`), the rest is ordinary text the
+/// user can change or delete. Nothing parses it back (plans are found by `extendedProperties.private.ssPlanId`).
+/// See docs/GOOGLE_CALENDAR_SYNC.md §2 and §11.2.
 enum EventNotes {
     // MARK: Google → notes
 
@@ -79,6 +81,23 @@ enum EventNotes {
         guard !collapsed.isEmpty else { return nil }
         guard collapsed.count > limit else { return collapsed }
         return String(collapsed.prefix(max(0, limit - 1))).trimmingCharacters(in: .whitespaces) + "…"
+    }
+
+    /// The leading "由 Smart Schedule 智慧助理自動排程：…" line, when the notes start with it. The event page keeps it
+    /// out of the editor (Google Calendar still shows it, as in Artboard 5) and puts it back on save.
+    static func provenanceLine(_ notes: String?) -> String? {
+        guard let notes = normalized(notes), notes.hasPrefix(CalendarEventMapper.provenancePrefix) else { return nil }
+        guard let lineEnd = notes.firstIndex(of: "\n") else { return notes }
+        return String(notes[..<lineEnd])
+    }
+
+    /// What the user typed on the event page under the kept provenance line, set apart by a blank line as the
+    /// mapper writes it. nil when both are empty.
+    static func joining(provenance: String?, userNotes: String) -> String? {
+        let body = normalized(userNotes)
+        guard let provenance = normalized(provenance) else { return body }
+        guard let body else { return provenance }
+        return provenance + "\n\n" + body
     }
 
     /// Notes without a leading "由 Smart Schedule 智慧助理自動排程：…" line (what `CalendarEventMapper` writes first);

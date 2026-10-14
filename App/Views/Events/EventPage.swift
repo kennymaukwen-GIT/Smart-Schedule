@@ -343,7 +343,7 @@ struct EventPage: View {
         let span = draft.span(clock: clock)
         event.title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         event.location = draft.location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : draft.location
-        event.notes = EventNotes.normalized(draft.notes)
+        event.notes = EventNotes.joining(provenance: draft.provenance, userNotes: draft.notes)
         event.start = span.start
         event.end = span.end
         event.isAllDay = draft.isAllDay
@@ -390,7 +390,8 @@ struct EventPage: View {
     /// Google Meet, Google Calendar and any link written in the notes (where the event came from), as rows to tap.
     @ViewBuilder
     private var linksSection: some View {
-        let noteLinks = EventLinks.urls(in: original.notes).filter { $0 != baseline.meetURL }
+        let noteLinks = EventLinks.urls(in: EventNotes.joining(provenance: original.provenance, userNotes: original.notes) ?? "")
+            .filter { $0 != baseline.meetURL }
         if baseline.meetURL != nil || baseline.htmlLink != nil || baseline.planID != nil || !noteLinks.isEmpty {
             Section {
                 if let meet = baseline.meetURL {
@@ -504,8 +505,11 @@ struct EventPageDraft: Equatable {
     var start: Date
     var end: Date
     var location: String
-    /// Plain text: Google's description as `EventNotes` reads it, saved back as plain text.
+    /// Plain text: Google's description as `EventNotes` reads it, saved back as plain text. Without Smart Schedule's
+    /// provenance line, which is kept apart and written back on save.
     var notes: String
+    /// "由 Smart Schedule 智慧助理自動排程：…": stays in Google Calendar, hidden from the notes editor.
+    var provenance: String?
     /// nil: the kind's default reminders; [] none.
     var reminderMinutes: [Int]?
 
@@ -522,7 +526,9 @@ struct EventPageDraft: Equatable {
         }
         location = event.location ?? ""
         // Already plain text when cached by this version; older caches may still hold Google's HTML.
-        notes = EventNotes.plainText(fromDescription: event.notes) ?? ""
+        let fullNotes = EventNotes.plainText(fromDescription: event.notes)
+        provenance = EventNotes.provenanceLine(fullNotes)
+        notes = EventNotes.withoutProvenance(fullNotes) ?? ""
         reminderMinutes = event.reminderMinutes
     }
 
@@ -639,7 +645,7 @@ struct EventPageDraft: Equatable {
             edit.location = .some(place.isEmpty ? nil : place)
         }
         if notesChanged(from: original) {
-            edit.notes = .some(EventNotes.description(fromPlainText: notes))
+            edit.notes = .some(EventNotes.joining(provenance: provenance, userNotes: notes))
         }
         if reminderMinutes != original.reminderMinutes {
             edit.reminderMinutes = .some(reminderMinutes)

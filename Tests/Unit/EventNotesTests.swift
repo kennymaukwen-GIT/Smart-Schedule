@@ -52,6 +52,27 @@ final class EventNotesTests: XCTestCase {
         XCTAssertEqual(EventNotes.normalized("Gate B\n"), EventNotes.normalized("Gate B"))
     }
 
+    /// The event page hides Smart Schedule's provenance line and writes it back on save, so Google Calendar keeps it.
+    func testProvenanceLineIsKeptApartAndWrittenBack() {
+        let provenance = CalendarEventMapper.provenancePrefix + "週五早上九點飛東京"
+        let full = provenance + "\n\n帶護照\nGate B"
+        XCTAssertEqual(EventNotes.provenanceLine(full), provenance)
+        XCTAssertEqual(EventNotes.withoutProvenance(full), "帶護照\nGate B")
+        // Unchanged notes save back to the same description.
+        XCTAssertEqual(EventNotes.joining(provenance: EventNotes.provenanceLine(full),
+                                          userNotes: EventNotes.withoutProvenance(full) ?? ""), full)
+        // Edited, or cleared: the line stays.
+        XCTAssertEqual(EventNotes.joining(provenance: provenance, userNotes: "  帶護照\n轉接頭 \n"),
+                       provenance + "\n\n帶護照\n轉接頭")
+        XCTAssertEqual(EventNotes.joining(provenance: provenance, userNotes: " \n"), provenance)
+        XCTAssertEqual(EventNotes.provenanceLine(provenance), provenance)
+        // Notes without the line, or with it somewhere else, are the user's own.
+        XCTAssertNil(EventNotes.provenanceLine("Gate B\n" + provenance))
+        XCTAssertNil(EventNotes.provenanceLine(nil))
+        XCTAssertEqual(EventNotes.joining(provenance: nil, userNotes: " Gate B "), "Gate B")
+        XCTAssertNil(EventNotes.joining(provenance: nil, userNotes: ""))
+    }
+
     func testRoundTripThroughTheMapper() throws {
         let google = try JSONDecoder().decode(GCalEvent.self, from: Data(#"""
         {"id": "e1", "summary": "Flight", "description": "Gate <b>B</b><br>Bring &quot;passport&quot;",
