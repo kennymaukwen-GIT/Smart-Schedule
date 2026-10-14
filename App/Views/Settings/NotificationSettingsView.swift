@@ -7,7 +7,7 @@ struct NotificationSettingsView: View {
     /// The stepper's value while the limit is off, so turning it on again starts there.
     @State private var capDraft = 10
 
-    private static let leadChoices: [Int?] = [nil, 15, 30, 60, 120]
+    private static let leadChoices: [Int?] = AppPreferences.liveActivityLeadChoices + [nil]
 
     var body: some View {
         let preferences = model.preferences
@@ -227,7 +227,7 @@ struct NotificationSettingsView: View {
 
     // MARK: Dynamic Island
 
-    /// The five choices, plus a value set elsewhere (by an older build) so the picker can still show it.
+    /// 30 / 15 / 10 / 5 minutes and Off, plus any other stored value so the picker can still show it.
     private static func leadChoices(including current: Int?) -> [Int?] {
         leadChoices.contains(current) ? leadChoices : leadChoices + [current]
     }

@@ -78,6 +78,15 @@ enum ChatRetention: String, Codable, CaseIterable, Sendable {
 struct AppPreferences: Codable, Hashable, Sendable {
     static let currentVersion = 1
 
+    /// The Dynamic Island shows an event only when it is imminent: at most 30 minutes before it starts.
+    static let defaultLiveActivityLeadMinutes = 30
+    static let liveActivityLeadChoices = [30, 15, 10, 5]
+
+    /// The choice at or below `minutes` (an older build offered 1 and 2 hours: read as 30); 5 below that.
+    static func liveActivityLead(_ minutes: Int) -> Int {
+        liveActivityLeadChoices.first { $0 <= minutes } ?? liveActivityLeadChoices[liveActivityLeadChoices.count - 1]
+    }
+
     var version = AppPreferences.currentVersion
 
     // MARK: Notifications
@@ -99,8 +108,9 @@ struct AppPreferences: Codable, Hashable, Sendable {
     var eveningPreview = DailyTime(isEnabled: false, minuteOfDay: 21 * 60)
     /// At most this many reminders per local day (1...50). nil = no limit.
     var dailyReminderCap: Int? = nil
-    /// Start the Live Activity when the app opens if the next timed event starts within this many minutes. nil = never.
-    var liveActivityLeadMinutes: Int? = 30
+    /// Settings › Dynamic Island: how many minutes before a timed event its Live Activity appears. nil = off.
+    /// One of `liveActivityLeadChoices`; see `liveActivityLead(_:)` for values an older build stored.
+    var liveActivityLeadMinutes: Int? = AppPreferences.defaultLiveActivityLeadMinutes
 
     // MARK: Input
     /// nil = automatic (the first account's primary calendar).
@@ -144,7 +154,7 @@ struct AppPreferences: Codable, Hashable, Sendable {
         eveningPreview = c.preferenceValue(.eveningPreview, default: d.eveningPreview)
         dailyReminderCap = c.preferenceOptional(.dailyReminderCap, default: d.dailyReminderCap).map { min(max($0, 1), 50) }
         liveActivityLeadMinutes = c.preferenceOptional(.liveActivityLeadMinutes, default: d.liveActivityLeadMinutes)
-            .map { max($0, 0) }
+            .map(Self.liveActivityLead)
         defaultCalendar = c.preferenceOptional(.defaultCalendar, default: d.defaultCalendar)
         defaultCalendarLabel = defaultCalendar == nil ? nil : c.preferenceOptional(.defaultCalendarLabel, default: nil as String?)
         defaultEventMinutes = min(max(c.preferenceValue(.defaultEventMinutes, default: d.defaultEventMinutes), 5), 480)

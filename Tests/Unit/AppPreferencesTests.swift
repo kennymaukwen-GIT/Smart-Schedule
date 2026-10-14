@@ -167,6 +167,20 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(try decode("{}").liveActivityLeadMinutes, 30)
     }
 
+    func testLiveActivityLeadIsThirtyUnlessSetAndOneOfFourChoices() throws {
+        XCTAssertEqual(AppPreferences().liveActivityLeadMinutes, 30)
+        XCTAssertEqual(try decode("{}").liveActivityLeadMinutes, 30, "never set: 30 minutes")
+        XCTAssertEqual(AppPreferences.liveActivityLeadChoices, [30, 15, 10, 5])
+        for minutes in [30, 15, 10, 5] {
+            XCTAssertEqual(try decode(#"{"liveActivityLeadMinutes":\#(minutes)}"#).liveActivityLeadMinutes, minutes)
+        }
+        // An older build offered 1 and 2 hours: the island never shows an event more than 30 minutes ahead.
+        XCTAssertEqual(try decode(#"{"liveActivityLeadMinutes":60}"#).liveActivityLeadMinutes, 30)
+        XCTAssertEqual(try decode(#"{"liveActivityLeadMinutes":120}"#).liveActivityLeadMinutes, 30)
+        XCTAssertEqual(try decode(#"{"liveActivityLeadMinutes":20}"#).liveActivityLeadMinutes, 15)
+        XCTAssertEqual(try decode(#"{"liveActivityLeadMinutes":0}"#).liveActivityLeadMinutes, 5)
+    }
+
     func testEncodeDecodeRoundTripKeepsNils() throws {
         var preferences = AppPreferences()
         preferences.allDayReminderMinutes = nil
