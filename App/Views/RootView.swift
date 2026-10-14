@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Main view, the calendar drawer, and the Quick Capture overlay that "spawns" from the Dynamic Island position.
-/// Sheets: event detail, accounts (avatar), Settings (drawer › General) and AI consent.
+/// Sheets: event detail, accounts (avatar), Settings (drawer › General), Add Google account and AI consent. A short
+/// confirmation ("Connected …", "Removed …") shows on top of everything but the sheets.
 struct RootView: View {
     @Environment(AppRouter.self) private var router
     @Environment(ScheduleViewModel.self) private var schedule
@@ -35,9 +36,19 @@ struct RootView: View {
                     .transition(.move(edge: .leading))
                     .zIndex(3)
             }
+
+            // The account sheet shows it itself.
+            if let notice = schedule.notice, router.sheet != .accounts {
+                NoticeBanner(notice: notice) { schedule.dismissNotice() }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(4)
+            }
         }
         .animation(.spring(response: 0.42, dampingFraction: 0.82), value: router.quickCapture)
         .animation(.snappy, value: router.isDrawerOpen)
+        .animation(.snappy, value: schedule.notice)
         .sheet(item: Binding(
             get: { router.selectedEventID.flatMap(schedule.event(id:)) },
             set: { router.selectedEventID = $0?.id }
@@ -49,6 +60,7 @@ struct RootView: View {
                 switch sheet {
                 case .accounts: AccountSheet()
                 case .settings: SettingsView()
+                case .addAccount: NavigationStack { AddAccountView(showsCancel: true) }
                 }
             }
             .environment(router)

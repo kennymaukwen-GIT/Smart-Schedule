@@ -35,7 +35,11 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
 
     private var session: ASWebAuthenticationSession?
 
-    /// - Parameter loginHint: the email of the account to reconnect; Google preselects it.
+    /// - Parameter loginHint: the email typed on the add page, or of the account to reconnect: Google goes straight
+    ///   to that account or asks to sign in with it filled in. The user can still pick another account there, so
+    ///   the caller compares the returned email with it. nil shows Google's account chooser.
+    /// - Throws: `SignInError.cancelled` when the user closed Google's page; `GoogleSignInFailure` for an error
+    ///   Google's page sent back or no connection.
     func signIn(loginHint: String? = nil) async throws -> GoogleSignInResult {
         let clientID = AppConstants.googleClientID
         let scheme = AppConstants.googleReversedClientID
@@ -45,24 +49,11 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
         let verifier = Self.randomURLSafe(bytes: 32)
         let challenge = Self.base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
 
-        var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
-        components.queryItems = [
-            URLQueryItem(name: "client_id", value: clientID),
-            URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "scope", value: GoogleTokenProvider.scopes.joined(separator: " ")),
-            URLQueryItem(name: "code_challenge", value: challenge),
-            URLQueryItem(name: "code_challenge_method", value: "S256"),
-            URLQueryItem(name: "access_type", value: "offline"),
-            // select_account: the account chooser even when one Google account is signed in, so a second one can
-            // be added. consent: a refresh token every time.
-            URLQueryItem(name: "prompt", value: "consent select_account"),
-            URLQueryItem(name: "include_granted_scopes", value: "true")
-        ]
-        if let loginHint { components.queryItems?.append(URLQueryItem(name: "login_hint", value: loginHint)) }
+        let authURL = GoogleAuthorization.url(clientID: clientID, redirectURI: redirectURI, codeChallenge: challenge,
+                                              loginHint: loginHint, scopes: GoogleTokenProvider.scopes)
 
         let callback: URL = try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: components.url!, callbackURLScheme: scheme) { url, error in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { url, error in
                 if let url { continuation.resume(returning: url) } else {
                     let cancelled = (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin
                     let failure: Error = cancelled ? SignInError.cancelled : (error ?? SignInError.noCode)
@@ -75,6 +66,9 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
         }
         session = nil
 
+        // Google's page answered with an error instead of a code (an admin's policy, a bad request).
+        if GoogleSignInFailure.isDeclined(callback) { throw SignInError.cancelled }
+        if let failure = GoogleSignInFailure.fromRedirect(callback) { throw failure }
         guard let code = URLComponents(url: callback, resolvingAgainstBaseURL: false)?
             .queryItems?.first(where: { $0.name == "code" })?.value else { throw SignInError.noCode }
         return try await exchange(code: code, verifier: verifier, clientID: clientID, redirectURI: redirectURI)
@@ -91,7 +85,13 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
             "grant_type": "authorization_code",
             "redirect_uri": redirectURI
         ])
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let data: Data
+        do {
+            data = try await URLSession.shared.data(for: request).0
+        } catch {
+            if GoogleSignInFailure.isUnreachable(error) { throw GoogleSignInFailure.unreachable }
+            throw error
+        }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         guard let access = json["access_token"] as? String,
               let refresh = json["refresh_token"] as? String,

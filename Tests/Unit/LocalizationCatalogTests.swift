@@ -59,11 +59,28 @@ final class LocalizationCatalogTests: XCTestCase {
 
     func testSettingsFormatArguments() throws {
         let table = try chineseTable()
-        XCTAssertEqual(String(format: zh("Disconnect %@?", in: table), "example@yourmail.com"),
-                       "要中斷連接 example@yourmail.com 嗎？")
+        XCTAssertEqual(String(format: zh("Remove %@?", in: table), "example@yourmail.com"),
+                       "要移除 example@yourmail.com 嗎？")
         XCTAssertEqual(String(format: zh("At most %lld a day", in: table), 10), "每天最多 10 則")
         XCTAssertEqual(String(format: zh("Adds to %@", in: table), "我的行事曆 · kenny@example.com"),
                        "加入到 我的行事曆 · kenny@example.com")
+    }
+
+    /// The add page and "Remove account" (docs/SETTINGS.md §5.11).
+    func testAddAndRemoveAccountLabels() throws {
+        let table = try chineseTable()
+        XCTAssertEqual(zh("Continue with Google", in: table), "前往 Google 登入")
+        XCTAssertEqual(zh("Choose from Google's account list", in: table), "從 Google 帳號清單選擇")
+        XCTAssertEqual(zh("Enter a full email address, like example@gmail.com", in: table),
+                       "請輸入完整的 email，例如 example@gmail.com")
+        XCTAssertEqual(zh("Remove account", in: table), "移除帳號")
+        XCTAssertEqual(zh("Sync first", in: table), "先同步")
+        XCTAssertEqual(String(format: zh("You signed in as %@, not %@.", in: table), "example@yourmail.com", "example@gmail.com"),
+                       "你登入的是 example@yourmail.com，不是 example@gmail.com。")
+        XCTAssertEqual(String(format: zh("Try again as %@", in: table), "example@gmail.com"), "改用 example@gmail.com 重新登入")
+        XCTAssertEqual(String(format: zh("Removed %@", in: table), "example@gmail.com"), "已移除 example@gmail.com")
+        XCTAssertEqual(String(format: zh("New events now go to “%@”.", in: table), "我的行事曆 · example@yourmail.com"),
+                       "新行程改存到「我的行事曆 · example@yourmail.com」。")
     }
 
     func testFormatArgumentsKeepTheirPositions() throws {

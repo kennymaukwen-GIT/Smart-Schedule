@@ -1,10 +1,11 @@
 import Foundation
 
-/// Connecting, reconnecting and disconnecting Google accounts, the calendar lists, and the one-time move of the
+/// Adding, reconnecting and removing Google accounts, the calendar lists, and the one-time move of the
 /// single-account version's sign-in to per-account storage.
 ///
-/// Smart Schedule has no accounts of its own: disconnecting revokes the Google grant, deletes the token and removes
-/// that account's cached events from this iPhone; nothing is deleted from Google Calendar.
+/// Smart Schedule has no accounts of its own: removing one ("Remove account", `disconnect`) revokes the Google
+/// grant, deletes the token and removes that account's cached events from this iPhone; nothing is deleted from
+/// Google Calendar.
 @MainActor
 final class AccountManager {
     static let shared = AccountManager()
@@ -75,13 +76,65 @@ final class AccountManager {
 
     // MARK: Connect
 
-    /// Signs in and connects the chosen account. Choosing one that is already connected refreshes its tokens and
-    /// scopes (same as reconnecting).
-    @discardableResult
-    func addAccount() async throws -> GoogleAccount {
+    /// How the add page's sign-in ended.
+    enum AddOutcome {
+        /// A new account, stored with its calendars.
+        case connected(GoogleAccount)
+        /// That Google account was connected already: its tokens, scopes and calendars were refreshed.
+        case alreadyConnected(GoogleAccount)
+        /// Google signed in `signedIn`, not the `typed` email. Nothing is stored: "Add <signedIn>" passes `pending`
+        /// to `addPending(_:)`, "Cancel" to `discardPending(_:)`.
+        case mismatch(signedIn: String, typed: String, pending: GoogleSignInResult)
+        /// The user closed Google's page.
+        case cancelled
+    }
+
+    /// The add page: signs in with `email` as Google's login hint (nil: Google's account chooser), then connects the
+    /// account unless Google signed in another one than typed. Choosing one that is already connected refreshes
+    /// its tokens and scopes (same as reconnecting).
+    /// - Throws: `GoogleSignInFailure` (an admin's block, the calendar permission left unticked, no connection) or
+    ///   another sign-in error.
+    func addAccount(email: String? = nil) async throws -> AddOutcome {
         await migrateLegacyAccountIfNeeded()
-        let result = try await GoogleSignInCoordinator().signIn()
-        return await connect(result)
+        let typed = email.map(AccountEmail.trimmed).flatMap { $0.isEmpty ? nil : $0 }
+        let result: GoogleSignInResult
+        do {
+            result = try await GoogleSignInCoordinator().signIn(loginHint: typed)
+        } catch GoogleSignInCoordinator.SignInError.cancelled {
+            return .cancelled
+        }
+        let connectedIDs = await accounts.connectedAccounts().map(\.id)
+        switch AddAccountDecision.decide(typed: typed,
+                                         signedInEmail: result.email,
+                                         signedInAccountID: result.accountID,
+                                         grantedScopes: result.grantedScopes,
+                                         connectedAccountIDs: Set(connectedIDs)) {
+        case .calendarAccessMissing:
+            await discardPending(result)
+            throw GoogleSignInFailure.calendarAccessMissing
+        case let .mismatch(signedIn, typedEmail):
+            return .mismatch(signedIn: signedIn, typed: typedEmail, pending: result)
+        case .alreadyConnected:
+            let account = await connect(result)
+            return .alreadyConnected(account)
+        case .connect:
+            let account = await connect(result)
+            return .connected(account)
+        }
+    }
+
+    /// "Add <signed-in email>" after a mismatch: keeps the sign-in Google returned.
+    func addPending(_ result: GoogleSignInResult) async -> AddOutcome {
+        let wasConnected = await accounts.connectedAccount(id: result.accountID) != nil
+        let account = await connect(result)
+        return wasConnected ? .alreadyConnected(account) : .connected(account)
+    }
+
+    /// A sign-in that is not kept ("Cancel" after a mismatch, the calendar permission left unticked): the grant
+    /// Google just issued is revoked, unless that account is connected here, whose grant it is too.
+    func discardPending(_ result: GoogleSignInResult) async {
+        guard await accounts.connectedAccount(id: result.accountID) == nil else { return }
+        await GoogleTokenProvider.revoke(token: result.tokens.refreshToken)
     }
 
     /// Signs in again for an account whose refresh token stopped working, or to grant the calendar-list scope
@@ -122,10 +175,11 @@ final class AccountManager {
         return await accounts.connectedAccount(id: id) ?? account
     }
 
-    // MARK: Disconnect
+    // MARK: Remove
 
-    /// Revokes the grant, deletes the token and this account's cached events and range bookkeeping, and forgets the
-    /// account. A default calendar or "Ask me first" batch in it is cleared. Google Calendar keeps everything.
+    /// "Remove account": revokes the grant, deletes the token, this account's cached events, range bookkeeping and
+    /// queued changes, and forgets the account (its calendars leave the Focus filter). A default calendar or "Ask me
+    /// first" batch in it is cleared. Google Calendar keeps everything.
     func disconnect(accountID: String) async {
         await tokens.revoke(accountID: accountID)
         await tokens.signOut(accountID: accountID)

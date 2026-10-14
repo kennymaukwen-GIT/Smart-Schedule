@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// The hamburger's drawer (Artboard 5, right): WHAT you see. "General" opens Settings; then one section per
-/// Google account, headed by its email, listing that account's calendars. The colour square shows or hides a
-/// calendar in one tap; the row opens its details (colour on this iPhone, reminders, "Use for new events").
-/// Under the accounts, one line says where sync with Google stands, followed by any change Google refused.
+/// Google account, headed by its email (its "…" menu: "Remove account"), listing that account's
+/// calendars. The colour square shows or hides a calendar in one tap; the row opens its details (colour on this
+/// iPhone, reminders, "Use for new events"). Under the accounts, one line says where sync with Google stands,
+/// followed by any change Google refused; last, "Add Google account" opens the add page.
 ///
 /// Gmail events, Tasks and "Apps from Google" from the artboard are not built.
 struct CalendarDrawer: View {
@@ -13,6 +14,8 @@ struct CalendarDrawer: View {
     @Environment(ChatViewModel.self) private var chat
     @Environment(AppRouter.self) private var router
     @State private var path: [CalendarRef] = []
+    /// The "Remove account" confirmation on screen.
+    @State private var removal: ScheduleViewModel.AccountRemoval?
     /// Horizontal drag so far (negative = towards the edge); the panel follows it.
     @GestureState private var drag: CGFloat = 0
 
@@ -67,6 +70,7 @@ struct CalendarDrawer: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Theme.surface)
+        .removeAccountDialog($removal)
     }
 
     // MARK: Accounts
@@ -98,12 +102,47 @@ struct CalendarDrawer: View {
                                   onOpen: { path.append(calendar.id) })
             }
         } header: {
-            Text(verbatim: account.email)
-                .textCase(nil)
+            accountHeader(account)
         } footer: {
             if missesCalendarList {
                 Text("Smart Schedule needs permission to see your calendar list.")
             }
+        }
+    }
+
+    /// The account's email, with a "…" menu holding "Remove account" (not for the sample accounts).
+    private func accountHeader(_ account: GoogleAccount) -> some View {
+        HStack(spacing: 8) {
+            Text(verbatim: account.email)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            if !account.isDemo {
+                if schedule.syncingBeforeRemoval == account.id {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Menu {
+                        removeButton(account)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 17))
+                            .foregroundStyle(Theme.textSecondary)
+                            .frame(width: 32, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(Text(verbatim: account.email))
+                }
+            }
+        }
+        .textCase(nil)
+    }
+
+    private func removeButton(_ account: GoogleAccount) -> some View {
+        Button(role: .destructive) {
+            Task { removal = await schedule.prepareRemoval(of: account) }
+        } label: {
+            Label("Remove account", systemImage: "person.crop.circle.badge.minus")
         }
     }
 
@@ -138,35 +177,28 @@ struct CalendarDrawer: View {
                     accountIDs: schedule.accounts.filter { !$0.needsReconnect }.map(\.id))
     }
 
-    /// "Add Google account"; in demo mode "Connect Google Calendar" (leaves the demo first); signed out, the two
-    /// ways in.
+    /// "Add Google account"; in demo mode "Connect Google Calendar" (the add page leaves the demo when the user
+    /// continues); signed out, the two ways in. Each opens the add page as a sheet (the drawer closes).
     @ViewBuilder
     private var connectSection: some View {
         Section {
             if schedule.isDemo {
                 Button {
-                    onClose()
-                    chat.disableDemo()
-                    Task {
-                        await schedule.stopDemo()
-                        await schedule.addAccount()
-                    }
+                    router.openSheet(.addAccount)
                 } label: {
                     Label("Connect Google Calendar", systemImage: "plus.circle")
                         .foregroundStyle(.white)
                 }
             } else if schedule.isSignedIn {
                 Button {
-                    onClose()
-                    Task { await schedule.addAccount() }
+                    router.openSheet(.addAccount)
                 } label: {
                     Label("Add Google account", systemImage: "plus.circle")
                         .foregroundStyle(.white)
                 }
             } else {
                 Button {
-                    onClose()
-                    Task { await schedule.addAccount() }
+                    router.openSheet(.addAccount)
                 } label: {
                     Label("Connect Google Calendar", systemImage: "calendar.badge.plus")
                         .foregroundStyle(.white)

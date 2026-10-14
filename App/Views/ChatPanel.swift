@@ -8,6 +8,7 @@ struct ChatPanel: View {
 
     @Environment(ChatViewModel.self) private var chat
     @Environment(ScheduleViewModel.self) private var schedule
+    @Environment(AppRouter.self) private var router
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -15,9 +16,9 @@ struct ChatPanel: View {
 
         VStack(spacing: 10) {
             if !schedule.isSignedIn && !schedule.isDemo {
-                // Welcome: connect, or look around with sample data (App Review guideline 2.1).
+                // Welcome: connect (the add page), or look around with sample data (App Review guideline 2.1).
                 Button {
-                    Task { await schedule.addAccount() }
+                    router.openSheet(.addAccount)
                 } label: {
                     Label("Connect Google Calendar", systemImage: "calendar.badge.plus")
                         .font(.system(size: 15, weight: .semibold))

@@ -35,7 +35,9 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 
 規格在 [`docs/SETTINGS.md`](docs/SETTINGS.md)。分工一句話：**漢堡選單管「看什麼」**（帳號、行事曆、顯示與否），**頭像管「我是誰」**（Google 帳號、Smart Schedule Pro），**General 管「App 怎麼運作」**。
 
-- **多個 Google 帳號**：抽屜每個帳號一區，標題是 email，下面是該帳號的每個行事曆。點色塊一下就隱藏或顯示；點列進入行事曆設定（只在這台 iPhone 的顏色、這個行事曆要不要提醒、「用於新行程」）。最後一列「新增 Google 帳號」。頭像的帳號頁可以重新連接或中斷連接（撤銷 Google 授權、刪除 Keychain 裡的 token、清掉這個帳號的快取行程，Google 日曆裡的資料不會動）。
+- **多個 Google 帳號**：抽屜每個帳號一區，標題是 email，下面是該帳號的每個行事曆。點色塊一下就隱藏或顯示；點列進入行事曆設定（只在這台 iPhone 的顏色、這個行事曆要不要提醒、「用於新行程」）。最後一列「新增 Google 帳號」。
+- **新增 Google 帳號**（`App/Views/Account/AddAccountView.swift`）：抽屜、頭像的帳號頁、歡迎畫面的「新增 Google 帳號」／「連接 Google 日曆」都會打開這一頁。輸入自己的 email（例如 example@gmail.com），格式不完整會直接提示；按「前往 Google 登入」後，這個 email 會當作 Google 登入頁的 `login_hint`（Google 直接選好或填好這個帳號），使用者還是在 Google 自己的頁面登入、同意授權——只靠 email 沒辦法連結帳號，Smart Schedule 也看不到密碼。Google 回來後，App 比對 ID token 裡的 email 和輸入的 email（Gmail 會忽略大小寫、點和 `+標籤`）：相同就存下帳號、抓行事曆清單，顯示「已連接 example@gmail.com」，抽屜馬上出現它的行事曆；不同的話**先不存**，問「你登入的是 X，不是 Y。」，可以選「加入 X」、「改用 Y 重新登入」或「取消」（撤銷剛拿到的授權）；已經連接過的帳號只會更新，不會重複。Gmail、學校或公司的 Google Workspace 帳號都可以；學校或公司不允許時、沒有勾選日曆權限時、沒有網路時，都會用一句話說明怎麼辦。也可以按「從 Google 帳號清單選擇」不輸入 email。示範模式中繼續會先結束示範模式（頁面上有說明）。
+- **移除帳號**：頭像的帳號頁（每列的「⋯」選單或向左滑）和抽屜（帳號標題旁的「⋯」）都有「移除帳號」。確認視窗說明這個帳號的日曆和行程只會從這支 iPhone 的 Smart Schedule 移除，Google 日曆裡的資料不會被刪除；如果這個帳號還有變更沒送到 Google，會寫出「還有 N 項變更尚未同步到 Google，移除後會遺失。」並提供「先同步」。移除會撤銷 Google 授權、刪除 Keychain 裡的 token、清掉這個帳號的快取行程和待送出的變更、把它的行事曆從專注模式過濾條件拿掉；如果新行程原本存到這個帳號，會改回自動並顯示「新行程改存到「X」。」。移除最後一個帳號就回到歡迎畫面。
 - **AI 資料分享同意**（App Store 5.1.2(i)）：第一次送出訊息前先跳出說明，列出會傳給 Google Gemini API 的內容，按「允許」才送出；按「暫時不要」助理就不會呼叫 Gemini，輸入列上方會說明怎麼開啟。設定 › AI 與隱私可以查看和撤回。示範模式不需要同意。
 - **用說的改設定**：「以後 8 點前不要提醒我」「健身提前 2 小時提醒」「以後用學校帳號」會變成設定，對話裡出現「設定已更新」卡片（舊值 → 新值，可以復原），也記在設定 › AI 與隱私 ›「助理記得的事」，每一條都能刪除（回到預設值）。
 - **先問我**：設定 › 助理 › 加入行程選「先問我」時，單一行程會先停在「尚未加入行事曆」卡片，按「加入」才寫入，按「編輯」說要改什麼。
@@ -94,7 +96,7 @@ project.yml             XcodeGen 設定（三個 App target 加一個測試 targ
 | **網頁互動原型**（claude.ai Artifact） | 瀏覽器，手機也可以 | 5 個設計稿的流程、真實的自然語言解析（原型裡用 Claude 代替 Gemini，function schema 相同）、iOS App 會送出的 Google Calendar request |
 | **Xcode Previews** | Mac + Xcode 16 以上 | 每個畫面，包括動態島 expanded／compact／minimal 和鎖定畫面，不用執行 App |
 | **Simulator + Demo 模式** | Mac + Xcode | 完整 App：控制中心按鈕、Live Activity、長按通知回覆、主畫面、Quick Capture。不需要 Google 帳號或 Gemini key |
-| **單元測試** | Xcode 按 ⌘U，或 GitHub Actions 自動跑 | 時區和 DST、RRULE、event ID、mapper、Gemini 回應解析、4 KB 預算、偏好設定與紀錄、多帳號、提醒排程、週一開始的月曆 |
+| **單元測試** | Xcode 按 ⌘U，或 GitHub Actions 自動跑 | 時區和 DST、RRULE、event ID、mapper、Gemini 回應解析、4 KB 預算、偏好設定與紀錄、多帳號（新增帳號的 email 檢查與比對、移除帳號）、提醒排程、週一開始的月曆 |
 | **真機 + 真 API** | Apple ID（部分功能需付費開發者帳號）、Google OAuth client、Gemini key | 實際寫入 Google Calendar、Action Button、真正的鎖定畫面互動 |
 
 ### Simulator 步驟
@@ -134,7 +136,7 @@ open SmartSchedule.xcodeproj
 - [ ] **Google OAuth 驗證**：`calendar.events` 和 `calendar.calendarlist.readonly` 都是敏感 scope。送審 consent screen（App 名稱、logo、首頁、隱私權政策、授權網域）、每個 scope 的用途說明，以及一段示範影片（OAuth 流程、新增行程、抽屜列出行事曆）。consent screen 還在 Testing 時，refresh token 7 天就會失效。
 - [ ] **App Store 隱私標籤**：申報傳給 Google Gemini 的資料（使用者內容，例如「其他使用者內容」，以及跟請求一起送出的行程內容；用途是 App 功能；不用於追蹤）。Google 日曆的資料只在裝置和使用者自己的 Google 帳號之間傳輸。
 - [ ] **StoreKit**：在 App Store Connect 建立訂閱群組「Smart Schedule Pro」和跟 `Config/SmartSchedule.storekit` 相同 ID 的商品（`com.smartschedule.pro.monthly`、`com.smartschedule.pro.yearly`），簽署 Paid Apps 協議，加上各語系的訂閱名稱，用 sandbox 測試。
-- [ ] **App Review**：5.1.2(i) 同意說明在任何個人資料送到 Gemini 之前出現（全新安裝、Siri、通知擴充都要確認）；2.1 在審核備註說明「不登入先試用」，最好附測試用 Google 帳號；5.1.1(v) 說明「中斷連接」（撤銷授權）和「清除這台裝置上的所有資料」。
+- [ ] **App Review**：5.1.2(i) 同意說明在任何個人資料送到 Gemini 之前出現（全新安裝、Siri、通知擴充都要確認）；2.1 在審核備註說明「不登入先試用」，最好附測試用 Google 帳號；5.1.1(v) 說明「移除帳號」（撤銷授權）和「清除這台裝置上的所有資料」。
 - [ ] **實機確認**：Time Sensitive 在專注模式下能穿透、專注模式過濾條件開關時 `perform()` 有執行。
 - [ ] 把 `project.yml` 裡的佔位值 `SSPrivacyURL`、`SSSupportEmail`（必要時 `SSTermsURL`）換成正式的。
 

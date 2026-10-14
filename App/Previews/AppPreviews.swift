@@ -331,6 +331,7 @@ private func quickCapturePreview(_ mode: CalendarScope,
         .background(Theme.canvas)
         .environment(schedule)
         .environment(ChatViewModel.preview(schedule: schedule))
+        .environment(AppRouter())
         .preferredColorScheme(.dark)
 }
 
@@ -343,6 +344,7 @@ private func quickCapturePreview(_ mode: CalendarScope,
         .environment(schedule)
         .environment(ChatViewModel.preview(schedule: schedule, chinese: true))
         .environment(\.locale, Locale(identifier: "zh-Hant"))
+        .environment(AppRouter())
         .preferredColorScheme(.dark)
 }
 
@@ -354,6 +356,7 @@ private func quickCapturePreview(_ mode: CalendarScope,
         .background(Theme.canvas)
         .environment(schedule)
         .environment(ChatViewModel(schedule: schedule, assistant: DemoAssistant()))
+        .environment(AppRouter())
         .preferredColorScheme(.dark)
 }
 
@@ -437,6 +440,7 @@ private struct MonthGridPreview: View {
         .background(Theme.canvas)
         .environment(schedule)
         .environment(ChatViewModel.planPreview(schedule: schedule))
+        .environment(AppRouter())
         .preferredColorScheme(.dark)
 }
 
@@ -732,6 +736,86 @@ private func drawerPreview(_ schedule: ScheduleViewModel, chinese: Bool = false)
         .environment(\.locale, Locale(identifier: "zh-Hant"))
 }
 
+// MARK: - Adding and removing Google accounts
+
+/// Preview-only: what Google's page hands back. Nothing here is stored or sent anywhere.
+@MainActor
+enum PreviewAddAccount {
+    static func signIn(email: String, accountID: String = "preview-signed-in") -> GoogleSignInResult {
+        let scopes = GoogleTokenProvider.scopes
+        let tokens = GoogleTokens(accessToken: "preview", refreshToken: "preview", expiresAt: Date().addingTimeInterval(3600),
+                                  email: email, accountID: accountID, scopes: scopes)
+        return GoogleSignInResult(tokens: tokens, accountID: accountID, email: email, grantedScopes: scopes)
+    }
+
+    /// example@gmail.com was typed; Google signed in example@yourmail.com.
+    static var mismatch: AddAccountView.Mismatch {
+        AddAccountView.Mismatch(signedIn: "example@yourmail.com", typed: "example@gmail.com",
+                                pending: signIn(email: "example@yourmail.com"))
+    }
+
+    static var calendarUnticked: AddAccountView.Problem {
+        AddAccountView.Problem(message: GoogleSignInFailure.calendarAccessMissing.localizedDescription, canRetry: true,
+                               email: "example@gmail.com")
+    }
+}
+
+/// The add page as the drawer and the welcome state open it (a sheet with Cancel).
+@MainActor
+private func addAccountPreview(_ page: AddAccountView, schedule: ScheduleViewModel? = nil,
+                               chinese: Bool = false) -> some View {
+    let schedule = schedule ?? signedInSchedule()
+    return NavigationStack { page }
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule, chinese: chinese))
+        .environment(\.locale, Locale(identifier: chinese ? "zh-Hant" : "en_US"))
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Add account") {
+    addAccountPreview(AddAccountView(showsCancel: true))
+}
+
+#Preview("Add account · invalid email") {
+    addAccountPreview(AddAccountView(showsCancel: true, email: "example@gmail", showsValidation: true))
+}
+
+#Preview("Add account · signed in as another account") {
+    addAccountPreview(AddAccountView(showsCancel: true, email: "example@gmail.com", mismatch: PreviewAddAccount.mismatch))
+}
+
+#Preview("Add account · calendar permission unticked") {
+    addAccountPreview(AddAccountView(showsCancel: true, email: "example@gmail.com",
+                                     problem: PreviewAddAccount.calendarUnticked))
+}
+
+#Preview("Add account · demo · zh-Hant") {
+    addAccountPreview(AddAccountView(showsCancel: true, email: "example@yourmail.com"),
+                      schedule: ScheduleViewModel.preview(), chinese: true)
+}
+
+#Preview("Remove account · changes not synced") {
+    let schedule = signedInSchedule()
+    AccountSheet(removal: ScheduleViewModel.AccountRemoval(account: PreviewAccounts.personal, unsentChanges: 2))
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule))
+}
+
+#Preview("Notices") {
+    VStack(spacing: 12) {
+        NoticeBanner(notice: ScheduleViewModel.Notice(text: "Connected example@gmail.com"))
+        NoticeBanner(notice: ScheduleViewModel.Notice(text: "example@gmail.com is already connected."))
+        NoticeBanner(notice: ScheduleViewModel.Notice(text: "Removed example@gmail.com",
+                                                      detail: "New events now go to “My calendar · example@yourmail.com”."))
+        NoticeBanner(notice: ScheduleViewModel.Notice(text: "已移除 example@gmail.com",
+                                                      detail: "新行程改存到「我的行事曆 · example@yourmail.com」。"))
+    }
+    .padding(16)
+    .frame(maxHeight: .infinity, alignment: .top)
+    .background(Theme.canvas)
+    .preferredColorScheme(.dark)
+}
+
 @MainActor
 private func settingsPreview<Page: View>(chinese: Bool = false, @ViewBuilder page: () -> Page) -> some View {
     let schedule = signedInSchedule()
@@ -810,6 +894,7 @@ private func settingsPreview<Page: View>(chinese: Bool = false, @ViewBuilder pag
         .background(Theme.canvas)
         .environment(schedule)
         .environment(PreviewCards.chat(schedule: schedule, chinese: false))
+        .environment(AppRouter())
         .preferredColorScheme(.dark)
 }
 
@@ -822,6 +907,7 @@ private func settingsPreview<Page: View>(chinese: Bool = false, @ViewBuilder pag
         .environment(schedule)
         .environment(PreviewCards.chat(schedule: schedule, chinese: true))
         .environment(\.locale, Locale(identifier: "zh-Hant"))
+        .environment(AppRouter())
         .preferredColorScheme(.dark)
 }
 

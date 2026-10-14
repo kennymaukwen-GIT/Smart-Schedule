@@ -7,7 +7,7 @@
 1. Google Cloud Console：啟用 **Google Calendar API**。
 2. OAuth consent screen：加入 scope `https://www.googleapis.com/auth/calendar.events` 和 `https://www.googleapis.com/auth/calendar.calendarlist.readonly`，再加上 `openid` 和 `email`。`calendarlist.readonly` 是能列出使用者所有行事曆的最小 scope；`calendar.events` 本來就能讀寫使用者可存取的每個行事曆裡的事件，所以不需要更大的 scope。
 3. Credentials：建立 OAuth client ID，類型選 **iOS**，Bundle ID 填 `com.smartschedule.app`。把 client ID 和 reversed client ID 寫進 `Config/Secrets.xcconfig`。
-4. 登入流程：`ASWebAuthenticationSession` 加 PKCE（S256），redirect 是 `com.googleusercontent.apps.XXX:/oauth2redirect`。iOS 類型的 client **沒有 client secret**。授權網址帶 `prompt=consent select_account`（每次都顯示帳號選擇器，才能加第二個帳號；consent 確保拿得到 refresh token）、`include_granted_scopes=true`，重新連接時再帶 `login_hint=<email>`。
+4. 登入流程：`ASWebAuthenticationSession` 加 PKCE（S256），redirect 是 `com.googleusercontent.apps.XXX:/oauth2redirect`。iOS 類型的 client **沒有 client secret**。授權網址由 `GoogleAuthorization.url(…)` 產生：`include_granted_scopes=true`；有 `login_hint`（新增帳號頁輸入的 email，或重新連接的帳號）時 `prompt=consent`，Google 直接走到那個帳號或填好 email 請使用者登入；沒有時 `prompt=consent select_account`（顯示帳號選擇器，才能加第二個帳號）。consent 確保拿得到 refresh token。email 裡的「+」送成 `%2B`。redirect 帶 `error=`（`access_denied`、`admin_policy_enforced` 等）時轉成 `GoogleSignInFailure`，用一句話告訴使用者（`docs/SETTINGS.md` §5.11）。
 5. 登入後從 token 回應的 `id_token` 解出 `sub` 和 `email`（`IDToken`：只解 payload，不驗簽章，因為 token 是我們自己用授權碼從 Google token endpoint 透過 TLS 換來的）。`scope` 欄位以空白分隔，就是實際授予的 scope。`GoogleSignInCoordinator.signIn(loginHint:)` 只回傳結果，不存任何東西，由 `AccountManager` 決定是新帳號、重新連接，還是選錯帳號。
 6. Token 存在 Keychain 的共享 group，**每個帳號一個 item**：service `com.smartschedule.tokens`、account `google.oauth.<sub>`，屬性是 `AfterFirstUnlock`，所以鎖定畫面上的 notification extension 也能自己 refresh。refresh 只是一個表單 POST 到 `oauth2.googleapis.com/token`，不需要 SDK。
 
@@ -163,7 +163,8 @@ App Group 的 JSON 每次讀寫都是整個檔案，三個 process 都會讀，�
 |---|---|
 | 新增帳號 | 登入 → 如果 `sub` 已經連接過：更新 token、清掉 `needsReconnect`、合併 scope（等於重新連接）→ 否則以 `google.oauth.<sub>` 存 token，`AccountStore.upsert` 一筆帳號（先放一個「主要行事曆」佔位，id 是 email）→ 讀行事曆清單 → 只同步這個帳號的行事曆 → 重排提醒、更新 Live Activity |
 | 重新連接 | 帶 `login_hint` 登入；如果登入的是別的帳號（`sub` 不同），丟出「你登入的是 X，請選擇 Y 重新連接」，**什麼都不存** |
-| 中斷連接 | POST `https://oauth2.googleapis.com/revoke`（表單 `token=<refresh_token>`，10 秒逾時，失敗也繼續）→ 刪 Keychain item → `SharedStore.purge(accountID:)`（這個帳號的事件、範圍記錄、只存在它行事曆裡的計畫提醒）→ `AccountStore.remove` → 如果「新行程的行事曆」設在這個帳號，改回自動 → 如果「先問我」的待加入行程要寫進這個帳號，清掉 → 重排提醒。**Google 日曆裡的東西一律不刪** |
+| 新增帳號 | 帶輸入的 email 當 `login_hint` 登入；沒有勾選日曆權限（grant 裡沒有 `calendar.events`）就撤銷、不存；ID token 的 email 和輸入的不同（Gmail 忽略點和 `+標籤`）時**什麼都不存**，讓使用者選「加入 X」「改用 Y 重新登入」或「取消」（撤銷剛拿到的 token，但那個帳號已經連接的話不撤銷）；`sub` 已經連接過就更新 token 和行事曆清單，不重複 |
+| 移除帳號 | POST `https://oauth2.googleapis.com/revoke`（表單 `token=<refresh_token>`，10 秒逾時，失敗也繼續）→ 刪 Keychain item → `SharedStore.purge(accountID:)`（這個帳號的事件、範圍記錄、只存在它行事曆裡的計畫提醒）→ `AccountStore.remove` → 如果「新行程的行事曆」設在這個帳號，改回自動 → 如果「先問我」的待加入行程要寫進這個帳號，清掉 → 重排提醒。**Google 日曆裡的東西一律不刪** |
 | 清除所有資料 | `disconnectAll(revoke: true)`：撤銷每個 token（含舊版的）→ 清每個帳號的快取 → `KeychainStore.deleteAll()` → 刪 `accounts.json`。提醒和 Live Activity 由呼叫的 `DataEraser` 先移除 |
 | 行事曆清單 | App 回到前景、打開抽屜、背景更新時：有 `calendarlist.readonly` 而且清單超過 6 小時的帳號重讀一次（`force` 時全部重讀）。已知的行事曆保留這台 iPhone 的設定；新的行事曆照 Google 的 `selected` 決定顯示與否（主要行事曆一定顯示），立刻同步；不見的行事曆從快取移除 |
 
@@ -277,7 +278,7 @@ App Group 的 `sync-outbox.json`，App、Siri、通知擴充共用，跟 `Shared
 | 新增的冪等性 | 不變：ID 由 seed 算出（base32hex），409 就 GET 回來。若 409 而且之後有合併進來的修改，再送一次 PATCH（`followUp`） |
 | 授權失敗（refresh 之後仍是 401、`invalid_grant`、沒有 token） | 不丟掉，留在佇列裡；那個帳號標成需要重新連接，重新連接後就會送出。其他帳號照常 |
 | 永久錯誤（400、403 沒有權限、修改時 404、第二次 412） | 移到失敗清單（`SyncStatus.failed`），可以「重試」或「捨棄」。失敗項目不再疊到快取上，下次拉取就回到 Google 的版本 |
-| 帳號中斷連接 | 那個帳號的項目永遠送不出去，送出時直接移除（`AccountManager.disconnect` 也應呼叫 `SyncOutbox.removeAll(accountID:)`） |
+| 帳號被移除 | 那個帳號的項目永遠送不出去：`AccountManager.disconnect` 呼叫 `SyncOutbox.removeAll(accountID:)`。移除前的確認視窗用 `SyncOutbox.unsentCount(accountID:)` 說明會遺失幾項，並提供「先同步」 |
 | 拉取 | 每次列出（完整、增量、依需求載入）之後，outbox 裡還在等待的變更會再疊上去，所以離線改的東西不會閃回 Google 的舊版本 |
 | 跨 process 同時送出 | 沒有鎖：新增是冪等的，重複的修改會遇到 412 然後發現沒有東西要改，重複的刪除會遇到 404。完成時只移除送出那一版（`revision`），送出期間合併進來的修改留到下次 |
 
@@ -335,7 +336,7 @@ App Group 的 `sync-outbox.json`，App、Siri、通知擴充共用，跟 `Shared
 1. **每個行事曆一個 `events.watch` channel**：伺服器用該帳號的 token 呼叫 `POST /calendars/<id>/events/watch`（`type=web_hook`、自訂 `id`、`token`、HTTPS `address`）。Channel 有到期時間（`expiration`，由 Google 決定），要在到期前一天左右建立新的 channel 再 `channels.stop` 舊的；新增或移除行事曆時也要跟著建立或停止。
 2. **Webhook → 增量同步 → APNs**：Google 只通知「有變動」（header `X-Goog-Channel-ID`、`X-Goog-Resource-State` 為 `sync`／`exists`／`not_exists`、`X-Goog-Message-Number`），不帶內容。伺服器收到後在伺服器端做增量同步（伺服器端可以用 `syncToken`，因為它可以保存整個行事曆的狀態），再對裝置發 **background push**（`content-available: 1`、`apns-priority: 5`），App 被叫起來跑 `SyncEngine.sync(.notification)`。iOS 會節流 background push，所以要合併短時間內的多次變動。
 3. **提醒改由伺服器發 alert push**：伺服器知道事件的最新時間，就能在正確時間發提醒（含 category，讓 Content Extension 照樣能長按回覆），即使 App 從來沒開也不會錯。Live Activity 也可以用 push-to-start／update。
-4. **隱私與 OAuth 的影響**：refresh token 要存在伺服器（目前只在 Keychain）。要改用 server-side OAuth（App 取得授權碼後交給伺服器換 token），token 加密存放（KMS）、中斷連接或清除資料時伺服器端撤銷並刪除，隱私權政策要寫明伺服器保存行事曆資料與 token、保存期限和刪除方式。`calendar.events` 是 sensitive scope，伺服器端保存使用者資料會影響 Google 的 App 驗證審查（Limited Use 規範）。Apple 的隱私標籤也要更新。
+4. **隱私與 OAuth 的影響**：refresh token 要存在伺服器（目前只在 Keychain）。要改用 server-side OAuth（App 取得授權碼後交給伺服器換 token），token 加密存放（KMS）、移除帳號或清除資料時伺服器端撤銷並刪除，隱私權政策要寫明伺服器保存行事曆資料與 token、保存期限和刪除方式。`calendar.events` 是 sensitive scope，伺服器端保存使用者資料會影響 Google 的 App 驗證審查（Limited Use 規範）。Apple 的隱私標籤也要更新。
 5. **粗估每月費用（估計值，未含 Gemini proxy，以 2025 年公開價目估算，上線前要重算）**：假設每位使用者 2 個行事曆、每天約 20 次變動、每次 webhook 約 0.2 秒 CPU 和 2–3 次資料庫操作，用 serverless（例如 Cloud Run + Firestore + Cloud Scheduler，APNs 直連免費）：
 
 | 規模 | Webhook 次數／月 | 主要費用 | 粗估 |

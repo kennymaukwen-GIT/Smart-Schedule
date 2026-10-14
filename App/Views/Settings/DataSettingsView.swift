@@ -74,7 +74,7 @@ struct DataSettingsView: View {
             Button("Erase", role: .destructive) { eraseAll() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and disconnects every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected.")
+            Text("This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and removes every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected.")
         }
         .sheet(item: $export) { file in
             ShareSheet(items: [file.url])

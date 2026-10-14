@@ -198,6 +198,12 @@ actor SyncOutbox {
 
     func item(id: UUID) -> OutboxItem? { read().items.first { $0.id == id } }
 
+    /// Changes of this account that Google does not have: waiting ones and refused ones. Removing the account loses
+    /// them, which its confirmation says.
+    func unsentCount(accountID: String) -> Int {
+        read().items.filter { $0.calendar.accountID == accountID }.count
+    }
+
     /// A change of this event (or of the series it names) still waits: later changes queue behind it.
     func hasPending(calendar: CalendarRef, eventID: String) -> Bool {
         read().items.contains { !$0.isFailed && $0.calendar == calendar && $0.eventID == eventID }
@@ -287,7 +293,7 @@ actor SyncOutbox {
         return removed
     }
 
-    /// A disconnected account: its changes can never be sent.
+    /// A removed account: its changes can never be sent.
     func removeAll(accountID: String) {
         mutate { file in
             let before = file.items.count

@@ -31,6 +31,10 @@ final class ScheduleViewModel {
     var syncStatus: SyncStatus = SyncStatusStore.current
     /// The network path is down: shown at once, before a sync has noticed.
     var isNetworkOffline = false
+    /// A short confirmation over the main screen and the account sheet ("Connected …", "Removed …"); clears itself.
+    var notice: Notice?
+    /// The account whose queued changes "Sync first" is sending before it is removed: its row shows progress.
+    private(set) var syncingBeforeRemoval: String?
     /// Failed changes being retried or discarded from the drawer: their rows wait or disappear right away.
     private(set) var retryingChangeIDs: Set<UUID> = []
     private(set) var discardedChangeIDs: Set<UUID> = []
@@ -65,9 +69,25 @@ final class ScheduleViewModel {
     @ObservationIgnored private var accountsTask: Task<Void, Never>?
     @ObservationIgnored private var syncStatusTask: Task<Void, Never>?
     @ObservationIgnored private var foregroundSyncTask: Task<Void, Never>?
+    @ObservationIgnored private var noticeTask: Task<Void, Never>?
     /// Asked for while a sync was running; runs once that one is done.
     @ObservationIgnored private var queuedTrigger: SyncTrigger?
     @ObservationIgnored private let connectivity = ConnectivityMonitor()
+
+    /// "Connected example@gmail.com", "Removed example@gmail.com" with "New events now go to …" under it.
+    struct Notice: Equatable, Identifiable {
+        let id = UUID()
+        var text: String
+        var detail: String?
+    }
+
+    /// The "Remove account" confirmation: the account and how many of its changes have not reached Google.
+    struct AccountRemoval: Equatable, Identifiable {
+        var account: GoogleAccount
+        var unsentChanges: Int
+
+        var id: String { account.id }
+    }
 
     /// A fresh `id` per request, so asking for the same range twice still reaches `onChange` observers.
     struct FocusRequest: Equatable {
@@ -156,18 +176,44 @@ final class ScheduleViewModel {
         isSignedIn = await GoogleTokenProvider.shared.isSignedIn
     }
 
-    /// "Add Google account" / "Connect Google Calendar": signs in and syncs the new account's calendars.
-    func addAccount() async {
+    /// The add page ("Add Google account" / "Connect Google Calendar"): signs in with `email` as Google's login
+    /// hint (nil: Google's account chooser) and syncs the new account's calendars, unless Google signed in another
+    /// account than typed (`.mismatch`: nothing stored yet). Errors are for the page to show.
+    func addAccount(email: String?) async throws -> AccountManager.AddOutcome {
         let wasSignedIn = isSignedIn
-        do {
-            try await AccountManager.shared.addAccount()
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
+        let outcome = try await AccountManager.shared.addAccount(email: email)
+        await finishAdding(outcome, wasSignedIn: wasSignedIn)
+        return outcome
+    }
+
+    /// "Add <signed-in email>" after a mismatch.
+    func addPendingAccount(_ pending: GoogleSignInResult) async -> AccountManager.AddOutcome {
+        let wasSignedIn = isSignedIn
+        let outcome = await AccountManager.shared.addPending(pending)
+        await finishAdding(outcome, wasSignedIn: wasSignedIn)
+        return outcome
+    }
+
+    /// "Cancel" after a mismatch: the sign-in Google returned is revoked, not kept.
+    func discardPendingAccount(_ pending: GoogleSignInResult) async {
+        await AccountManager.shared.discardPending(pending)
+    }
+
+    private func finishAdding(_ outcome: AccountManager.AddOutcome, wasSignedIn: Bool) async {
+        let notice: Notice
+        switch outcome {
+        case let .connected(account):
+            notice = Notice(text: String(localized: "Connected \(account.email)"))
+        case let .alreadyConnected(account):
+            notice = Notice(text: String(localized: "\(account.email) is already connected."))
+        case .mismatch, .cancelled:
             return
         }
+        lastError = nil
         await reloadAccounts()
         await reloadFromCache()
+        // Once its calendars are in the drawer, and before the add page closes.
+        show(notice)
         // The first connection shows the island at once, so it is clear where the next event will appear.
         if !wasSignedIn && !isDemo { try? await LiveActivityManager.shared.summon() }
     }
@@ -183,11 +229,55 @@ final class ScheduleViewModel {
         await reloadFromCache()
     }
 
-    /// Revokes the grant and removes the account and its cached events from this iPhone (Google keeps them).
-    func disconnect(accountID: String) async {
-        await AccountManager.shared.disconnect(accountID: accountID)
+    /// "Remove account": what its confirmation says, counted now (changes Google has not received are lost).
+    func prepareRemoval(of account: GoogleAccount) async -> AccountRemoval {
+        let unsent = await SyncOutbox.shared.unsentCount(accountID: account.id)
+        return AccountRemoval(account: account, unsentChanges: unsent)
+    }
+
+    /// "Sync first": sends what the outbox holds, then counts again for the confirmation that follows. Offline,
+    /// the same changes are still waiting.
+    func syncBeforeRemoving(_ account: GoogleAccount) async -> AccountRemoval {
+        syncingBeforeRemoval = account.id
+        await SyncEngine.shared.flushOutbox()
+        syncStatus = SyncStatusStore.current
+        await reloadFromCache()
+        syncingBeforeRemoval = nil
+        return await prepareRemoval(of: account)
+    }
+
+    /// Revokes the grant and removes the account, its calendars, cached events and queued changes from this iPhone
+    /// (Google keeps everything), then says so, and where new events go now if that changed. Without accounts left,
+    /// the app is back at its welcome state.
+    func removeAccount(_ account: GoogleAccount) async {
+        let store = AccountStore.shared
+        let targetBefore = await store.defaultWriteTarget()
+        await AccountManager.shared.disconnect(accountID: account.id)
         await reloadAccounts()
         await reloadFromCache()
+        syncStatus = SyncStatusStore.current
+        lastError = nil
+        let targetAfter = await store.defaultWriteTarget()
+        let moved = AccountRemovalEffects.newEventsTarget(before: targetBefore, after: targetAfter,
+                                                          removedAccountID: account.id)
+        let detail = moved.map { String(localized: "New events now go to “\(AccountRemovalEffects.label($0))”.") }
+        show(Notice(text: String(localized: "Removed \(account.email)"), detail: detail))
+    }
+
+    /// Shows `notice` for a few seconds (a newer one replaces it).
+    func show(_ notice: Notice) {
+        self.notice = notice
+        noticeTask?.cancel()
+        noticeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            self?.notice = nil
+        }
+    }
+
+    func dismissNotice() {
+        noticeTask?.cancel()
+        notice = nil
     }
 
     /// The drawer's colour square: shows or hides a calendar at once; the store's `.accounts` change then reloads

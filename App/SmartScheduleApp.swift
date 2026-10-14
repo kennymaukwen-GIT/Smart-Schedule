@@ -80,6 +80,9 @@ final class AppRouter {
         case accounts
         /// The drawer's General row.
         case settings
+        /// "Add Google account" / "Connect Google Calendar" from the drawer and the welcome state (the account
+        /// sheet pushes the same page instead).
+        case addAccount
 
         var id: String { rawValue }
     }

@@ -31,7 +31,7 @@ This document is the single source of truth for four builder roles working **in 
 | Assistant | 7 functions | 8th function `update_preferences`; "Ask me first" mode for single events; preferences ledger with undo |
 | Chat | Lost on relaunch | Persisted (last 200 messages, 7 / 30 days / forever) |
 | Subscription | None | StoreKit 2 infrastructure, `isPro` exposed, nothing gated |
-| Data rights | None | Disconnect per account (revokes the token), Export my data, Erase all data on this device |
+| Data rights | None | Remove account per Google account (revokes the token), Export my data, Erase all data on this device |
 
 ---
 
@@ -60,7 +60,7 @@ Smart Schedule                          ← large title, white
 ┌─────────────────────────────────────┐
 │ ⚙︎  General                       ›  │ → presents Settings (§2.5) as a sheet, drawer closes
 └─────────────────────────────────────┘
-example@gmail.com                   ← section header = account email (secondary text)
+example@gmail.com               ⋯   ← section header = account email (secondary text); ⋯ = "Remove account"
 ┌─────────────────────────────────────┐
 │ ■  My calendar                    ›  │  ■ = colour square; tap ■ toggles visibility
 │ ■  Gym                            ›  │  chevron/row → Calendar details (§2.3)
@@ -83,9 +83,10 @@ example@yourmail.com
 - **Tap the row or chevron** → push Calendar details.
 - "Reconnect" (`exclamationmark.circle`, orange) → `AccountManager.reconnect(accountID:)`.
 - "Show all calendars" (`list.bullet`) → `AccountManager.reconnect(accountID:)` (re-consent adds the calendar-list scope). Footnote under the section: "Smart Schedule needs permission to see your calendar list." Shown only for accounts migrated from the single-account version.
-- "Add Google account" → `AccountManager.addAccount()`. Errors show in the existing red error capsule.
-- **Demo mode:** the sections come from `DemoData.accounts` (two sample accounts, §5.10) and behave the same (visibility, colour, notifications work locally). The last row reads "Connect Google Calendar" instead of "Add Google account"; tapping it exits demo (`stopDemo`) then runs `addAccount()`.
-- **Signed out, not demo:** no account sections; rows "Connect Google Calendar" and "Try without signing in".
+- Section header "⋯" menu (SF Symbol `ellipsis.circle`, not on sample accounts) → "Remove account" (`person.crop.circle.badge.minus`, destructive) → the confirmation of §5.11.2. While "Sync first" runs for that account the menu is a small `ProgressView`.
+- "Add Google account" → closes the drawer and opens the Add Google account page (§2.4.1) as a sheet (`AppRouter.Sheet.addAccount`).
+- **Demo mode:** the sections come from `DemoData.accounts` (two sample accounts, §5.10) and behave the same (visibility, colour, notifications work locally). The last row reads "Connect Google Calendar" instead of "Add Google account" and opens the same page, which says that continuing ends demo mode; the demo is left (`stopDemo`) when the user continues.
+- **Signed out, not demo:** no account sections; rows "Connect Google Calendar" (the add page) and "Try without signing in".
 - Drawer appearance triggers `AccountManager.refreshCalendarLists(force: false)` (it refreshes lists older than 6 h).
 - Not built: "Events from Gmail", "Apps from Google", "Tasks", the untitled group.
 
@@ -107,11 +108,11 @@ Pushed inside the drawer. Navigation title = `displayName`.
 `.sheet` with `NavigationStack`, title "Accounts", `.presentationDetents([.medium, .large])`.
 
 **Section "Google accounts"**
-- One row per account: initial circle, email, status text "Connected" or "Reconnect needed" (orange). Row menu / swipe: "Reconnect" (when needed), "Disconnect" (destructive).
-- Disconnect confirmation (`confirmationDialog`): title "Disconnect %@?", message "Smart Schedule will stop using this account's calendars and remove its events from this iPhone. Nothing is deleted from Google Calendar.", buttons "Disconnect" (destructive) / "Cancel". → `AccountManager.disconnect(accountID:)`.
-- Row "Add Google account".
-- Demo mode on: row "Demo mode is on" with trailing button "Exit demo".
-- Signed out and not demo: rows "Connect Google Calendar" and "Try without signing in".
+- One row per account: initial circle, email, status text "Connected" or "Reconnect needed" (orange). Row "⋯" menu and trailing swipe: "Remove account" (destructive), "Reconnect" (when needed).
+- "Remove account" asks first (§5.11.2) and then removes the account; "Removed %@" shows at the bottom of the sheet.
+- Row "Add Google account" pushes the Add Google account page (§2.4.1) inside the sheet (value-based `NavigationLink`, so the page stays when leaving the demo changes the rows). Back on the sheet, the new account is in the list and "Connected %@" shows at the bottom.
+- Demo mode on: row "Demo mode is on" with trailing button "Exit demo", then "Connect Google Calendar" (the add page).
+- Signed out and not demo: rows "Connect Google Calendar" (the add page) and "Try without signing in".
 
 **Section "Smart Schedule Pro"** (StoreKit infrastructure only, nothing is gated)
 - Row "Status": value `SubscriptionStore.statusText` ("Free", "Pro · Monthly", "Pro · Yearly"; when `expirationDate` is known, the second line "Renews %@" or "Expires %@" using `willAutoRenew`).
@@ -120,6 +121,29 @@ Pushed inside the drawer. Navigation title = `displayName`.
 - Links "Terms of Use" (`SSTermsURL`) and "Privacy Policy" (`SSPrivacyURL`).
 - `#if DEBUG` only: a "StoreKit testing" section listing `SubscriptionStore.products` with "Buy" buttons calling `purchase(_:)`. Never in Release.
 - Footnote: "Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period. Manage or cancel them in your Apple Account settings."
+
+### 2.4.1 Add Google account page (UI; `App/Views/Account/AddAccountView.swift`)
+
+Opened by every "Add Google account" / "Connect Google Calendar": pushed in the account sheet; a sheet of its own (with "Cancel") from the drawer and the welcome state. Title "Add Google account". OAuth cannot link an account from an email alone: the typed address becomes Google's `login_hint` (Google goes straight to that account, or asks to sign in with the address filled in), the user still signs in and consents on Google's page, and the app then compares the email in the returned ID token with what was typed (§5.11.1).
+
+```
+Add Google account                         Cancel (sheet only)
+GOOGLE ACCOUNT EMAIL
+┌─────────────────────────────────────┐
+│ example@gmail.com                    │  placeholder; email keyboard, no autocorrect/capitals, return key "continue"
+└─────────────────────────────────────┘
+Gmail, school and work accounts on Google all work. If the address isn't a Google account, Google's page will say so.
+┌─────────────────────────────────────┐
+│          Continue with Google        │  white, disabled until the address is complete
+└─────────────────────────────────────┘
+      Choose from Google's account list       sign-in without a hint (Google's account chooser)
+You sign in on Google's own page. Smart Schedule never sees your password and only gets access to your calendars.
+```
+
+- Inline check (`AccountEmail.isValid`), shown once the field loses focus or on return: "Enter a full email address, like example@gmail.com" (orange, replaces the hint line).
+- Demo mode: an extra line "Continuing ends demo mode and removes the sample data." Continuing runs `chat.disableDemo()` + `stopDemo()` first.
+- While Google's page is open the button shows a spinner and the page cannot be swiped away.
+- Results: connected → the page closes and "Connected %@" shows (main screen top, or the account sheet's bottom); already connected → "%@ is already connected." the same way, nothing duplicated; Google signed in another account → alert "You signed in as %@, not %@." with "Add %@" (keeps it), "Try again as %@" (new sign-in with the typed address) and "Cancel" (revokes the token Google just issued); the user closed Google's page → back on the page, unchanged; an error → a row under the buttons with the message and, unless an admin blocked it, "Try again" (same address).
 
 ### 2.5 Settings (General = HOW the app behaves) (UI; data from PREFS unless noted)
 
@@ -192,7 +216,7 @@ In demo mode the calendar list comes from `DemoData.accounts`, so the page works
 | "Keep chat history" | Picker "7 days" / "30 days" / "Forever" → `chatRetention` | 30 days | "Older messages are deleted automatically. At most the last 200 messages are kept." |
 | "Clear chat history" | Destructive button; confirmation "Clear chat history?" / "Clear" → `ChatHistoryStore.clear()` + `chat.resetConversation()` | – | – |
 | "Export my data" | Button → `DataExporter.makeExport()` then `ShareLink(item: url)` (present a share sheet with the file) | – | "A JSON file with your settings, what the assistant remembers, cached events and chat history. Sign-in tokens are never included." |
-| "Erase all data on this device" | Destructive button; confirmation title "Erase all data on this device?", message "This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and disconnects every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected.", buttons "Erase" / "Cancel" → `DataEraser.eraseAll()`, then UI returns to the signed-out welcome state | – | – |
+| "Erase all data on this device" | Destructive button; confirmation title "Erase all data on this device?", message "This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and removes every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected.", buttons "Erase" / "Cancel" → `DataEraser.eraseAll()`, then UI returns to the signed-out welcome state | – | – |
 
 #### 2.5.6 Shortcuts and Siri (static guide, UI)
 
@@ -224,7 +248,7 @@ All appear in the chat panel and Quick Capture through `AssistantMessageView`, a
 ### 2.7 Welcome state (UI)
 
 When no account is connected and demo is off, the chat panel shows (replacing today's two buttons):
-- "Connect Google Calendar" (white, prominent) → `AccountManager.addAccount()`.
+- "Connect Google Calendar" (white, prominent) → the Add Google account page (§2.4.1) as a sheet.
 - "Try without signing in" (outlined) → `chat.enableDemo()` + `schedule.startDemo()`. (Renames today's "Try demo (no account)"; App Review guideline 2.1.)
 
 ### 2.8 Other surfaces
@@ -251,7 +275,8 @@ When no account is connected and demo is off, the chat panel shows (replacing to
 | Calendars | 行事曆 | My calendar | 我的行事曆 |
 | Google Calendar | Google 日曆 | Accounts | 帳號 |
 | Add Google account | 新增 Google 帳號 | Connect Google Calendar | 連接 Google 日曆 (existing) |
-| Disconnect | 中斷連接 | Reconnect | 重新連接 |
+| Remove account | 移除帳號 | Reconnect | 重新連接 |
+| Continue with Google | 前往 Google 登入 | Sync first | 先同步 |
 | Show all calendars | 顯示所有行事曆 | Try without signing in | 不登入先試用 |
 | Notifications | 通知 | Who sends reminders | 由誰發送提醒 |
 | Smart Schedule only | 只用 Smart Schedule | Google Calendar only | 只用 Google 日曆 |
@@ -895,7 +920,7 @@ Posting duties: `PreferencesStore` posts `.preferences` after every write; `Acco
 `GoogleTokenProvider.scopes = ["openid", "email", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.calendarlist.readonly"]`.
 `calendar.calendarlist.readonly` is the narrowest scope that lists a user's calendars; `calendar.events` already covers reading and writing events on every calendar the user can access, so no broader scope is requested.
 
-`GoogleSignInCoordinator.signIn(loginHint:)` (PKCE as today) adds `prompt=consent select_account` (lets the user pick another account), `include_granted_scopes=true`, and `login_hint` when reconnecting. It no longer stores tokens; it returns:
+`GoogleSignInCoordinator.signIn(loginHint:)` (PKCE as today) builds the request with `GoogleAuthorization.url(…)` (`Shared/Auth/GoogleAuthorization.swift`): `include_granted_scopes=true`, and with a `login_hint` (the address typed on the add page, or the account being reconnected) `prompt=consent`, so Google goes straight to that account; without one `prompt=consent select_account`, so the account chooser shows even when one Google account is signed in. A "+" in the hint is sent as `%2B` (a bare "+" reads as a space). An `error=` in the redirect becomes a `GoogleSignInFailure` (§5.11.1), a failed token request `GoogleSignInFailure.unreachable`. It stores nothing; it returns:
 
 ```swift
 struct GoogleSignInResult: Sendable {
@@ -914,9 +939,10 @@ struct GoogleSignInResult: Sendable {
 
 | Operation | Steps |
 |---|---|
-| `addAccount()` | sign in → if `sub` is already connected: store new tokens, clear `needsReconnect`, merge scopes (same as reconnect) → else store tokens under `google.oauth.<sub>`, `AccountStore.upsert` → `refreshCalendarList` (fallback: primary placeholder) → `CalendarSync(calendars: new account's calendars).refreshWindow()` → `ReminderScheduler.shared.reschedule()` → `LiveActivityManager.shared.refreshIfRunning()`. Returns the account. |
+| `addAccount(email:) -> AddOutcome` | sign in with `loginHint: email` → `AddAccountDecision.decide` (§5.11.1): calendar scope missing → revoke unless connected, throw `GoogleSignInFailure.calendarAccessMissing`; another account than typed → `.mismatch(signedIn:typed:pending:)`, **nothing stored**; closed Google's page → `.cancelled`; else connect: if `sub` is already connected: store new tokens, clear `needsReconnect`, merge scopes (same as reconnect) → `.alreadyConnected(account)`; otherwise store tokens under `google.oauth.<sub>`, `AccountStore.upsert` → `.connected(account)`. Connecting runs `refreshCalendarList` (fallback: primary placeholder) → `CalendarSync(calendars: the account's calendars).refreshWindow()` → `ReminderScheduler.shared.reschedule()` → `LiveActivityManager.shared.refreshIfRunning()`. |
+| `addPending(_:) -> AddOutcome` / `discardPending(_:)` | after a mismatch: "Add X" connects the pending sign-in; "Cancel" / "Try again as Y" revoke its refresh token (`GoogleTokenProvider.revoke(token:)`), except when that account is connected here (revoking ends the account's whole grant to this app). |
 | `reconnect(accountID:)` | sign in with `loginHint: email`; a different `sub` throws `AccountError.differentAccount(expected: email)` ("You signed in as %@. Choose %@ to reconnect.") and stores nothing. |
-| `disconnect(accountID:)` | `GoogleTokenProvider.revoke(accountID:)` (POST `https://oauth2.googleapis.com/revoke`, form `token=<refresh_token>`, best effort, 10 s timeout) → `signOut(accountID:)` (delete Keychain item) → `SharedStore.purge(accountID:)` (events + range bookkeeping of that account) → `AccountStore.remove(accountID:)` → if `PreferencesStore.current().defaultCalendar?.accountID == accountID`: `PreferencesStore.update(source: .settings) { $0.reset(.defaultCalendar) }` → if the pending event batch targets it: `setPendingEventBatch(nil)` → reschedule reminders, refresh the Live Activity. |
+| `disconnect(accountID:)` ("Remove account") | `GoogleTokenProvider.revoke(accountID:)` (POST `https://oauth2.googleapis.com/revoke`, form `token=<refresh_token>`, best effort, 10 s timeout) → `signOut(accountID:)` (delete Keychain item) → `SharedStore.purge(accountID:)` (events + range bookkeeping of that account) → `AccountStore.remove(accountID:)` → if `PreferencesStore.current().defaultCalendar?.accountID == accountID`: `PreferencesStore.update(source: .settings) { $0.reset(.defaultCalendar) }` → if the pending event batch targets it: `setPendingEventBatch(nil)` → `SyncOutbox.removeAll(accountID:)` and the status counts (its `lastSuccess` dropped) → reschedule reminders, refresh the Live Activity. `AccountStore.remove` also drops its calendars from the Focus filter. |
 | `disconnectAll(revoke:)` | the above for every account, then `KeychainStore.deleteAll()` and `AccountStore.eraseAll()` (erase uses it). |
 | `refreshCalendarLists(force:)` | for each account with `canListCalendars` whose list is older than 6 h (or `force`): `GoogleCalendarClient(accountID:).listCalendars()` → `AccountStore.replaceCalendars` (keeps local settings of known calendars; new calendars get `isVisible = selected`, notifications on; removed calendars → `SharedStore.purge(calendar:)`). Called on app active (UI wiring) and when the drawer opens. |
 
@@ -1011,6 +1037,31 @@ struct CalendarRouter: Sendable {
 ### 5.10 Demo accounts (ACCOUNTS, `DemoData`)
 
 `DemoData.accounts: [GoogleAccount]`: `demo-personal` (`example@gmail.com`: "My calendar" `#039BE5` primary, "Gym" `#0B8043`) and `demo-school` (`example@yourmail.com`: "My calendar" `#7986CB` primary). Demo events are stamped: gym and yoga → personal "Gym"; "Weekly team sync" and "Deadline for Plan 5008" → school; everything else → personal primary. `DemoData.defaultCalendar` = personal primary. In demo mode `AccountStore.accounts()` returns these with the stored `demoCalendarSettings` applied; `syncedCalendars()` returns `[]` (nothing is fetched).
+
+### 5.11 Adding an account by email, removing an account
+
+#### 5.11.1 The email check (`Shared/Auth/AccountEmail.swift`, `GoogleAuthorization.swift`; tests `AccountEmailTests`, `GoogleAuthorizationTests`)
+
+- `AccountEmail.isValid`: trimmed; one "@"; a local part of letters, digits and ``.!#$%&'*+/=?^_`{|}~-`` (no leading, trailing or double dot, ≤ 64); a domain of at least two labels (letters, digits, inner hyphens) whose last label has ≥ 2 characters and is not a number. Any Google account works: Gmail, Google Workspace (school, work) and other addresses registered as Google accounts; if the address is not one, Google's page says so.
+- `AccountEmail.normalized`: trimmed, lowercased; for `gmail.com` and `googlemail.com` the local part also loses its dots and "+tag" and the domain becomes `gmail.com` (`Ex.Ample+cal@googlemail.com` = `example@gmail.com`). Other domains keep dots and tags. `sameAccount(typed:returned:)` compares the two.
+- `AddAccountDecision.decide(typed:signedInEmail:signedInAccountID:grantedScopes:connectedAccountIDs:)`, in this order: no `calendar.events` (or full `calendar`) scope in the grant → `.calendarAccessMissing` (the user unticked the calendar box on the consent screen; the calendar-list scope alone is optional); a typed address that is not the same account as the ID token's `email` → `.mismatch`; the `sub` already connected → `.alreadyConnected`; else `.connect`. No typed address (Google's list) or no email in the ID token → nothing to compare.
+- `GoogleSignInFailure` (all with zh-Hant):
+
+| Case | When | Message | "Try again" |
+|---|---|---|---|
+| `blockedByAdmin` | redirect `error` or `error_subtype` = `access_denied`, `admin_policy_enforced`, `org_internal` | "Your school or company doesn't allow this app to use Google Calendar. Ask your admin, or use another account." | no (type another address) |
+| `calendarAccessMissing` | `AddAccountDecision.calendarAccessMissing` | "Smart Schedule needs access to your Google Calendar. Try again and leave the calendar permission ticked on Google's page." | yes |
+| `unreachable` | a `URLError` (not `.cancelled`) from the token request | "Can't reach Google. Check your connection." | yes |
+| `refused(code:)` | any other redirect `error` | "Google sign-in didn't finish (%@). Try again." | yes |
+
+Closing Google's page (`ASWebAuthenticationSessionError.canceledLogin`) is `AddOutcome.cancelled`: no message.
+
+#### 5.11.2 Remove account (`ScheduleViewModel.prepareRemoval(of:)`, `syncBeforeRemoving(_:)`, `removeAccount(_:)`; `App/Views/Account/AccountNotices.swift`)
+
+- Where: the account sheet (row "⋯" menu and trailing swipe) and the drawer (account section header "⋯" menu). Not for the sample accounts.
+- Confirmation (`confirmationDialog`, `RemoveAccountDialog`): title "Remove %@?"; message "Its calendars and events leave Smart Schedule on this iPhone. Nothing is deleted in Google Calendar."; when `SyncOutbox.unsentCount(accountID:)` (that account's waiting and refused changes) is N > 0, a second paragraph "%lld changes haven't reached Google yet and will be lost." (plural; zh "還有 %lld 項變更尚未同步到 Google，移除後會遺失。") and a button "Sync first" (`SyncEngine.flushOutbox()`, then the confirmation again with the new count; offline the same changes are still waiting); buttons "Remove" (destructive), "Cancel".
+- Remove = `AccountManager.disconnect(accountID:)` (§5.2: revoke, Keychain item, cached events, outbox items, `lastSuccess`, default calendar choice, "Ask me first" batch, Focus filter entries; a Focus set up earlier that still names its calendars leaves them out when it turns on, `AccountStore.setFocusFilter`). Then the notice "Removed %@"; when new events went to a calendar of that account (the one picked in Settings, or automatically its primary calendar as the first account), a second line "New events now go to “%@”." naming the new target as "My calendar · example@yourmail.com" (`AccountRemovalEffects.newEventsTarget(before:after:removedAccountID:)`, `label(_:)`). Removing the last account returns to the welcome state (no accounts, `isSignedIn == false`: the chat panel and drawer show "Connect Google Calendar" and "Try without signing in").
+- Notices (`ScheduleViewModel.notice`, `NoticeBanner`): top of the main screen (over the drawer), or the bottom of the account sheet while it is open; tap to close; gone after 5 s.
 
 ---
 
@@ -1266,7 +1317,7 @@ Each file belongs to exactly one role. A role may create new files only at the p
 
 ### ACCOUNTS
 - Edit: `Shared/Auth/GoogleTokenProvider.swift`, `Shared/Storage/KeychainStore.swift`, `Shared/Storage/SharedStore.swift`, `Shared/Models/ScheduleEvent.swift`, `Shared/Calendar/GoogleCalendarClient.swift`, `Shared/Calendar/GoogleCalendarModels.swift`, `Shared/Calendar/GoogleEventID.swift`, `Shared/Calendar/CalendarEventMapper.swift`, `Shared/Calendar/CalendarSync.swift`, `Shared/Calendar/LoadedRanges.swift`, `Shared/Calendar/SharedStore+LoadedRanges.swift`, `Shared/Core/DemoData.swift`, `App/Auth/GoogleSignInCoordinator.swift`, `App/Sync/AppRefresh.swift`, `Tests/Unit/CalendarEventMapperTests.swift`, `Tests/Unit/GoogleEventIDTests.swift`, `Tests/Unit/ScheduleEventTests.swift`, `Tests/Unit/TestSupport.swift`, `Tests/Unit/LoadedRangesTests.swift`, `Tests/Unit/SharedStoreRangeTests.swift`, `Tests/Unit/DemoDataRangeTests.swift`, `docs/GOOGLE_CALENDAR_SYNC.md`.
-- New: `Shared/Auth/IDToken.swift`, `Shared/Models/GoogleAccount.swift`, `Shared/Models/EventVisibility.swift`, `Shared/Storage/AccountStore.swift`, `Shared/Calendar/CalendarRouter.swift`, `App/Auth/AccountManager.swift`, `App/Intents/CalendarFocusFilter.swift`, `Tests/Unit/AccountStoreTests.swift`, `Tests/Unit/EventVisibilityTests.swift`, `Tests/Unit/IDTokenTests.swift`, `Tests/Unit/SharedStoreAccountTests.swift`.
+- New: `Shared/Auth/IDToken.swift`, `Shared/Models/GoogleAccount.swift`, `Shared/Models/EventVisibility.swift`, `Shared/Storage/AccountStore.swift`, `Shared/Calendar/CalendarRouter.swift`, `App/Auth/AccountManager.swift`, `App/Intents/CalendarFocusFilter.swift`, `Tests/Unit/AccountStoreTests.swift`, `Tests/Unit/EventVisibilityTests.swift`, `Tests/Unit/IDTokenTests.swift`, `Tests/Unit/SharedStoreAccountTests.swift`; for §5.11: `Shared/Auth/AccountEmail.swift`, `Shared/Auth/GoogleAuthorization.swift`, `Shared/Models/AccountRemoval.swift`, `Tests/Unit/AccountEmailTests.swift`, `Tests/Unit/GoogleAuthorizationTests.swift`, `Tests/Unit/AccountRemovalTests.swift`.
 
 ### STORE_PRIVACY
 - Edit: `Shared/AI/GeminiClient.swift`, `Shared/AI/AssistantPrompt.swift`, `Shared/AI/FunctionDeclarations.json`, `Shared/Orchestrator/ScheduleAssistant.swift`, `Shared/Orchestrator/ScheduleAssisting.swift`, `Shared/Orchestrator/DemoAssistant.swift`, `Shared/Orchestrator/ReplyFormatter.swift`, `Shared/Models/AssistantDrafts.swift`, `Shared/Models/PlanDraft.swift`, `Shared/Models/AgendaDigest.swift`, `Shared/Calendar/PlanDraftBuilder.swift`, `Shared/Calendar/RecurrenceExpander.swift`, `Shared/Calendar/RecurrenceRule.swift`, `App/Intents/AddPlanIntent.swift`, `scripts/validate_schema.py`, `Tests/fixtures/*` (existing and new), `Tests/Unit/AssistantPromptTests.swift`, `Tests/Unit/DemoAssistantPlanTests.swift`, `Tests/Unit/DemoAssistantReplyTests.swift`, `Tests/Unit/FixtureDecodingTests.swift`, `Tests/Unit/GeminiClientParseTests.swift`, `Tests/Unit/PlanDraftTests.swift`, `Tests/Unit/RecurrenceExpanderTests.swift`, `Tests/Unit/RecurrenceRuleTests.swift`, `Tests/Unit/ReplyFormatterTests.swift`, `docs/GEMINI_FUNCTION_CALLING.md`.
@@ -1274,7 +1325,7 @@ Each file belongs to exactly one role. A role may create new files only at the p
 
 ### UI
 - Edit: `App/SmartScheduleApp.swift` (incl. `AppRouter`, `AppDelegate`), `App/Views/*` (every existing file, including the infinite-calendar ones: AssistantMessageView, CalendarPagerParts, CaptureCalendarParts, CaptureDayPager, CaptureModePicker, ChatPanel, ConversationScrollView, EventDetailSheet, MainView, MonthGridView, MonthScrollCard, PlanPreviewCard, QuickCaptureView, RootView, WeekAgendaCard), `App/ViewModels/ChatViewModel.swift`, `App/ViewModels/ScheduleViewModel.swift`, `App/Voice/SpeechTranscriber.swift`, `App/Previews/AppPreviews.swift`, `App/Resources/**`, `NotificationContent/*`, `Widgets/*`, `Shared/DesignSystem/Theme.swift`, `Shared/Core/CalendarPaging.swift`, `Tests/Unit/CalendarPagingTests.swift`, `Tests/Unit/LocalizationCatalogTests.swift`, `docs/ARCHITECTURE.md`, `README.md`.
-- New files allowed in: `App/Views/Navigation/` (AppHeader, CalendarDrawer, CalendarDetailsView), `App/Views/Account/` (AccountSheet), `App/Views/Settings/` (SettingsView, NotificationSettingsView, ReminderListEditor, CalendarSettingsView, AssistantSettingsView, PrivacySettingsView, DataSettingsView, ShortcutsGuideView, AboutView), `App/Views/Chat/` (AIConsentSheet, ConsentBanner, SettingsUpdatedCard, LearnedSuggestionCard, PendingEventsCard), `App/ViewModels/` (e.g. SettingsModel), `NotificationContent/` (e.g. NotificationPendingEventsCard).
+- New files allowed in: `App/Views/Navigation/` (AppHeader, CalendarDrawer, CalendarDetailsView), `App/Views/Account/` (AccountSheet, AddAccountView, AccountNotices), `App/Views/Settings/` (SettingsView, NotificationSettingsView, ReminderListEditor, CalendarSettingsView, AssistantSettingsView, PrivacySettingsView, DataSettingsView, ShortcutsGuideView, AboutView), `App/Views/Chat/` (AIConsentSheet, ConsentBanner, SettingsUpdatedCard, LearnedSuggestionCard, PendingEventsCard), `App/ViewModels/` (e.g. SettingsModel), `NotificationContent/` (e.g. NotificationPendingEventsCard).
 
 ### Integrator (nobody else)
 `project.yml`, `Shared/Localization/**` (catalog and `zh-Hant.lproj/InfoPlist.strings`), `.github/**`, `Config/Base.xcconfig`, `Config/Secrets.example.xcconfig`, `.gitignore`, `scripts/make_app_icon.py`, `Tests/Unit/.gitkeep`, `docs/SETTINGS.md` (report contract deviations in your result instead of editing it).
@@ -1343,7 +1394,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 | `Shared/Calendar/CalendarEventMapper.swift` | `init(clock: WallClock = WallClock(), policy: ReminderPolicy = ReminderPolicy(), defaultEventMinutes: Int = 60)`; `static func current(clock: WallClock = WallClock()) -> CalendarEventMapper`; `func scheduleEvent(from event: GCalEvent, in calendar: CalendarInfo) -> ScheduleEvent?` | STORE_PRIVACY | §5.9 |
 | `Shared/Calendar/CalendarSync.swift` | `struct CalendarSync { var store: SharedStore = .shared; var accounts: AccountStore = .shared; var tokens: GoogleTokenProvider = .shared; var clock = WallClock(); var calendars: [CalendarRef]? = nil; func refreshWindow(now: Date = Date()) async throws; func load(_ range: DateInterval) async throws }` (the `client` property is removed) | UI (`CalendarSync(clock:)` in ScheduleViewModel), ACCOUNTS | §5.7 |
 | `Shared/Calendar/CalendarRouter.swift` | §5.8 | STORE_PRIVACY | |
-| `App/Auth/AccountManager.swift` | `@MainActor final class AccountManager { static let shared; func migrateLegacyAccountIfNeeded() async; @discardableResult func addAccount() async throws -> GoogleAccount; func reconnect(accountID: String) async throws; func disconnect(accountID: String) async; func disconnectAll(revoke: Bool) async; func refreshCalendarLists(force: Bool = false) async }` | UI, STORE_PRIVACY (erase) | §5.2 |
+| `App/Auth/AccountManager.swift` | `@MainActor final class AccountManager { static let shared; func migrateLegacyAccountIfNeeded() async; func addAccount(email: String? = nil) async throws -> AddOutcome; func addPending(_ result: GoogleSignInResult) async -> AddOutcome; func discardPending(_ result: GoogleSignInResult) async; func reconnect(accountID: String) async throws; func disconnect(accountID: String) async; func disconnectAll(revoke: Bool) async; func refreshCalendarLists(force: Bool = false) async }` (`AddOutcome`: `connected(GoogleAccount)`, `alreadyConnected(GoogleAccount)`, `mismatch(signedIn:typed:pending:)`, `cancelled`) | UI, STORE_PRIVACY (erase) | §5.2 |
 | `App/Auth/GoogleSignInCoordinator.swift` | `func signIn(loginHint: String? = nil) async throws -> GoogleSignInResult` | ACCOUNTS only | stores nothing |
 | `Shared/Core/DemoData.swift` | `static var accounts: [GoogleAccount]`, `static var defaultCalendar: CalendarRef` | ACCOUNTS, STORE_PRIVACY (DemoAssistant), UI (previews) | §5.10 |
 | `App/Intents/CalendarFocusFilter.swift` | `CalendarFocusFilter`, `CalendarEntity`, `CalendarEntityQuery` | system | §7.9 |
@@ -1376,7 +1427,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 
 **UI wiring duties** (calls into other roles): at launch `SubscriptionStore.shared.start()`; `ScheduleViewModel.bootstrap()` runs the migration first; on `.active`: `AccountManager.shared.refreshCalendarLists()`, `LiveActivityManager.shared.summonIfDue()`, append learned suggestion cards; observe `.preferences` (rebuild clock, `ReminderScheduler.reschedule()`, `LiveActivityManager.refreshIfRunning()`), `.accounts` (reload accounts and visible events, reschedule), `.consent` (banner); `AppDelegate` and `NotificationViewController` call `ReminderEngagement.record(response)` for every response; `AppDelegate` handles `GeminiError.consentRequired` and pending batches (§2.8); `ScheduleViewModel.events` comes from `visibleEvents()`; `displayEvents` and `events(on:)` include `pendingEvents.previewEvents` like plan previews; `SpeechTranscriber` builds `SFSpeechRecognizer(locale:)` from `speechLanguage` per recording and sets `requiresOnDeviceRecognition = speechOnDevice && recognizer.supportsOnDeviceRecognition`; every date shown follows `clock.timeZone` (set `Date.FormatStyle.timeZone`, or `.environment(\.timeZone, clock.timeZone)` at the root).
 
-**As built** (choices the contract left open): `MonthGridView` has a `showsTitle` parameter (the main screen hides the grid card's month title because the header names the month); `ChatViewModel.Message` has `date` (for `ChatRecord.date`); `ScheduleViewModel.signIn()` became `addAccount()`, plus `reconnect`, `disconnect`, `setVisible`, `setColorOverride`, `setNotificationsEnabled`, `setDefaultCalendar`, `calendar(_:)`, `defaultWriteTarget`, `avatarInitial`, `clockID` and `reloadPendingEvents()`; "What the assistant remembers" is a section of AI & privacy, not a separate page.
+**As built** (choices the contract left open): `MonthGridView` has a `showsTitle` parameter (the main screen hides the grid card's month title because the header names the month); `ChatViewModel.Message` has `date` (for `ChatRecord.date`); `ScheduleViewModel.signIn()` became `addAccount(email:)` (with `addPendingAccount`, `discardPendingAccount`), plus `reconnect`, `removeAccount` (with `prepareRemoval(of:)`, `syncBeforeRemoving`), `notice`, `setVisible`, `setColorOverride`, `setNotificationsEnabled`, `setDefaultCalendar`, `calendar(_:)`, `defaultWriteTarget`, `avatarInitial`, `clockID` and `reloadPendingEvents()`; "What the assistant remembers" is a section of AI & privacy, not a separate page.
 
 ---
 
@@ -1455,7 +1506,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 - [ ] **App Store privacy labels**: declare data sent to Google Gemini on the developer's behalf (User Content, e.g. "Other User Content", and calendar content sent with requests; purpose App Functionality; not used for tracking). Google Calendar data travels directly between the device and the user's own Google account. Re-check against Apple's definitions, and again if a proxy is added.
 - [ ] **Guideline 5.1.2(i)** (Nov 2025): the consent sheet appears before any personal data reaches Gemini; verify on a clean install, in Siri and in the notification extension.
 - [ ] **Guideline 2.1**: App Review notes explain "Try without signing in" (demo mode) and, if possible, provide a test Google account.
-- [ ] **Guideline 5.1.1(v)**: no app accounts exist; Disconnect (with token revocation) and Erase all data cover data removal. Mention it in review notes.
+- [ ] **Guideline 5.1.1(v)**: no app accounts exist; Remove account (with token revocation) and Erase all data cover data removal. Mention it in review notes.
 - [ ] **Guideline 4.8**: Google sign-in only connects the user's Google Calendar (a client for that service), so Sign in with Apple is not required; say so in review notes if asked.
 - [ ] **StoreKit**: create the subscription group and products in App Store Connect with the same ids, sign the Paid Apps agreement, add localized subscription names, test with sandbox and the `.storekit` file.
 - [ ] **Time Sensitive** entitlement stays enabled; verify Focus break-through on device.

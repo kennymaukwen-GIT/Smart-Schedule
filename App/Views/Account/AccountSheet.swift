@@ -1,20 +1,31 @@
 import StoreKit
 import SwiftUI
 
-/// The avatar's sheet: WHO you are. Connected Google accounts (reconnect, disconnect, add another) and Smart
-/// Schedule Pro (status, restore, manage, terms). Subscriptions are infrastructure only: nothing is gated.
+/// The avatar's sheet: WHO you are. Connected Google accounts (reconnect, remove, add another on a pushed page) and
+/// Smart Schedule Pro (status, restore, manage, terms). Subscriptions are infrastructure only: nothing is gated.
 struct AccountSheet: View {
     @Environment(ScheduleViewModel.self) private var schedule
     @Environment(ChatViewModel.self) private var chat
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
-    @State private var disconnecting: GoogleAccount?
+    /// Pages pushed inside the sheet. Value-based, so the add page stays open when leaving the demo swaps the rows.
+    private enum Page: Hashable {
+        case addAccount
+    }
+
+    /// The "Remove account" confirmation on screen.
+    @State private var removal: ScheduleViewModel.AccountRemoval?
     @State private var isRestoring = false
     @State private var restoreFoundNothing = false
     @State private var showsManageSubscriptions = false
 
     private var subscriptions: SubscriptionStore { .shared }
+
+    /// `removal`: previews open with the confirmation showing.
+    init(removal: ScheduleViewModel.AccountRemoval? = nil) {
+        _removal = State(initialValue: removal)
+    }
 
     var body: some View {
         NavigationStack {
@@ -27,30 +38,30 @@ struct AccountSheet: View {
             }
             .navigationTitle("Accounts")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Page.self) { page in
+                switch page {
+                case .addAccount: AddAccountView()
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
-            .confirmationDialog(disconnectTitle, isPresented: Binding(
-                get: { disconnecting != nil },
-                set: { if !$0 { disconnecting = nil } }
-            ), titleVisibility: .visible, presenting: disconnecting) { account in
-                Button("Disconnect", role: .destructive) {
-                    Task { await schedule.disconnect(accountID: account.id) }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: { _ in
-                Text("Smart Schedule will stop using this account's calendars and remove its events from this iPhone. Nothing is deleted from Google Calendar.")
-            }
+            .removeAccountDialog($removal)
             .manageSubscriptionsSheet(isPresented: $showsManageSubscriptions)
+            .safeAreaInset(edge: .bottom) {
+                if let notice = schedule.notice {
+                    NoticeBanner(notice: notice) { schedule.dismissNotice() }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy, value: schedule.notice)
         }
         .presentationDetents([.medium, .large])
         .preferredColorScheme(.dark)
-    }
-
-    private var disconnectTitle: Text {
-        Text("Disconnect \(disconnecting?.email ?? "")?")
     }
 
     // MARK: Google accounts
@@ -68,11 +79,12 @@ struct AccountSheet: View {
                     }
                     .buttonStyle(.bordered)
                 }
+                // The add page leaves the demo when the user continues.
+                NavigationLink(value: Page.addAccount) {
+                    Label("Connect Google Calendar", systemImage: "calendar.badge.plus")
+                }
             } else if schedule.accounts.isEmpty {
-                Button {
-                    dismiss()
-                    Task { await schedule.addAccount() }
-                } label: {
+                NavigationLink(value: Page.addAccount) {
                     Label("Connect Google Calendar", systemImage: "calendar.badge.plus")
                 }
                 Button {
@@ -86,10 +98,7 @@ struct AccountSheet: View {
                 ForEach(schedule.accounts) { account in
                     accountRow(account)
                 }
-                Button {
-                    dismiss()
-                    Task { await schedule.addAccount() }
-                } label: {
+                NavigationLink(value: Page.addAccount) {
                     Label("Add Google account", systemImage: "plus.circle")
                 }
             }
@@ -116,27 +125,34 @@ struct AccountSheet: View {
                 }
             }
             Spacer(minLength: 8)
-            Menu {
-                accountActions(account)
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
+            if schedule.syncingBeforeRemoval == account.id {
+                ProgressView()
+            } else {
+                Menu {
+                    accountActions(account)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel(Text(verbatim: account.email))
             }
-            .accessibilityLabel(Text(verbatim: account.email))
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            accountActions(account)
+            accountActions(account, inSwipe: true)
         }
     }
 
+    /// In a swipe, "Remove account" is red without the destructive role, which would slide the row away before the
+    /// confirmation is answered.
     @ViewBuilder
-    private func accountActions(_ account: GoogleAccount) -> some View {
-        Button(role: .destructive) {
-            disconnecting = account
+    private func accountActions(_ account: GoogleAccount, inSwipe: Bool = false) -> some View {
+        Button(role: inSwipe ? nil : .destructive) {
+            Task { removal = await schedule.prepareRemoval(of: account) }
         } label: {
-            Label("Disconnect", systemImage: "xmark.circle")
+            Label("Remove account", systemImage: "person.crop.circle.badge.minus")
         }
+        .tint(.red)
         if account.needsReconnect {
             Button {
                 dismiss()

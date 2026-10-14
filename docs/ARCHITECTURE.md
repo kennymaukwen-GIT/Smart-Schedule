@@ -137,7 +137,7 @@ flowchart LR
 
 規格在 [`SETTINGS.md`](SETTINGS.md)；這裡只說資料怎麼流動。
 
-- **帳號**：`AccountManager.addAccount()` 用 `GoogleSignInCoordinator.signIn(loginHint:)` 登入（`prompt=consent select_account`，scope 多了 `calendar.calendarlist.readonly`），從 ID token 取出 `sub` 和 email，token 存成 Keychain 的 `google.oauth.<sub>`，帳號和行事曆清單存進 `AccountStore`（`accounts.json`）。舊版的單一 `google.oauth` 會在 `bootstrap()` 第一步搬過去（`migrateLegacyAccountIfNeeded`）。某個帳號的 refresh token 失效時只把那個帳號標成 `needsReconnect`，其他帳號照常同步。
+- **帳號**：新增帳號頁讓使用者輸入 email，`AccountManager.addAccount(email:)` 把它當 `login_hint` 用 `GoogleSignInCoordinator.signIn(loginHint:)` 登入（沒有輸入時 `prompt=consent select_account`，scope 多了 `calendar.calendarlist.readonly`），登入的帳號和輸入的 email 不同時先不存，從 ID token 取出 `sub` 和 email，token 存成 Keychain 的 `google.oauth.<sub>`，帳號和行事曆清單存進 `AccountStore`（`accounts.json`）。舊版的單一 `google.oauth` 會在 `bootstrap()` 第一步搬過去（`migrateLegacyAccountIfNeeded`）。某個帳號的 refresh token 失效時只把那個帳號標成 `needsReconnect`，其他帳號照常同步。
 - **同步**：`CalendarSync` 對每個帳號的每個行事曆各自重列 −7～+120 天（最多同時 4 個），失敗只影響那個行事曆；快取裡的行程以 `EventRef`（帳號、行事曆、id）區分。畫面、提醒和 Live Activity 都讀 `SharedStore.visibleEvents`，由 `EventVisibility` 套用隱藏的行事曆、關掉提醒的行事曆、專注模式過濾條件和示範模式，並把同一個會議在兩個帳號的副本合成一個（主辦人的副本優先）。
 - **寫入**：所有寫入都經過 `CalendarRouter`。新行程寫到預設行事曆（設定 › 行事曆與新行程，或用說的「以後用學校帳號」），修改和刪除寫到該副本自己的行事曆；唯讀行事曆在送出 request 前就回 `RouterError.readOnly`。
 - **偏好設定**：`PreferencesStore`（`preferences.json`）是唯一來源，`current()` 可以同步讀取，所以 `WallClock()`、`ReminderPolicy(preferences:)`、mapper 都在每次使用時讀最新的值。設定頁經過 `SettingsModel` → `PreferencesStore.update(source: .settings)`；用說的經過 `update_preferences` → `PreferencesStore.apply`（同一套驗證）。兩條路都會在「助理記得的事」留一行（每個 key 最多一行，回到預設值就移除），回傳的 receipt 讓對話卡片可以復原。寫入後發 `.preferences` 變更通知：`ScheduleViewModel` 重建 `WallClock`、`ReminderScheduler.reschedule()`（由 `ReminderPlanner` 決定提醒來源、緊急程度、安靜時段、每日摘要和每日上限）、更新 Live Activity。
@@ -183,7 +183,7 @@ sequenceDiagram
 | API key 外洩 | 正式版改走 proxy。proxy 驗證 App Check／DeviceCheck，並依使用者做 rate limit |
 | Prompt injection（別人寄來的邀請，標題裡寫指令） | 行事曆資料放在 system prompt 的 DATA 區塊，並移除分隔字元；模型只能呼叫 8 個白名單函式；`modify_event`／`delete_events` 的 id 一定要在本地 cache 裡找得到才放行；批次刪除要使用者按確認；`update_preferences` 只接受列舉的 key，值逐一驗證，改了什麼都顯示在卡片上並可復原 |
 | 個人資料送到 Gemini | 第一次使用前說明並取得同意，設定裡可以撤回（見第 1 節）。不宣稱「不用於訓練」：那只在 Gemini 付費層級成立，上線前要開 Cloud Billing |
-| 刪除資料（沒有自己的帳號系統） | 每個 Google 帳號可以「中斷連接」：撤銷授權（`oauth2.googleapis.com/revoke`）、刪除 Keychain token、清掉該帳號的快取行程。「清除這台裝置上的所有資料」再加上設定、對話紀錄、待發通知、Live Activity。訂閱屬於 Apple 帳號，不受影響 |
+| 刪除資料（沒有自己的帳號系統） | 每個 Google 帳號可以「移除帳號」：撤銷授權（`oauth2.googleapis.com/revoke`）、刪除 Keychain token、清掉該帳號的快取行程。「清除這台裝置上的所有資料」再加上設定、對話紀錄、待發通知、Live Activity。訂閱屬於 Apple 帳號，不受影響 |
 | 網路重試造成重複事件 | Event ID 由確定的 seed 算出（base32hex）；伺服器回 409 就當作已經寫過 |
 | Token 過期 | OAuth consent screen 在 Testing 狀態時，refresh token **7 天就失效**。`calendar.events` 屬於 sensitive scope，正式上線要過 Google 的 App 驗證 |
 | 跨 process 同時寫檔 | 用 `NSFileCoordinator` 加 atomic write |

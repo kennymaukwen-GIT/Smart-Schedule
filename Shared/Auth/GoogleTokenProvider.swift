@@ -132,7 +132,9 @@ actor GoogleTokenProvider {
         }
     }
 
-    private static func revoke(token: String) async {
+    /// Revokes one refresh token (best effort, 10 s): also a sign-in that was not kept, such as "Cancel" after
+    /// Google signed in another account than the one typed. Revoking ends the account's whole grant to this app.
+    static func revoke(token: String) async {
         var request = URLRequest(url: revokeEndpoint, timeoutInterval: 10)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")

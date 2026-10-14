@@ -15,7 +15,7 @@ struct CalendarDetailsView: View {
                 form(calendar)
                     .navigationTitle(Text(verbatim: calendar.displayName))
             } else {
-                // Disconnected or removed from Google while open.
+                // Its account was removed, or Google removed it, while open.
                 ContentUnavailableView("Calendar", systemImage: "calendar")
             }
         }

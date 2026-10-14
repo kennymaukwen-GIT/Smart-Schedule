@@ -12,6 +12,17 @@
         }
       }
     },
+    "%@ is already connected." : {
+      "comment" : "Add Google account: that account was connected already",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 已經連接。"
+          }
+        }
+      }
+    },
     "%@ · %lld min" : {
       "comment" : "Session start time and length",
       "localizations" : {
@@ -29,6 +40,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每天 %lld 則"
+          }
+        }
+      }
+    },
+    "%lld changes haven't reached Google yet and will be lost." : {
+      "comment" : "Remove account confirmation: the account's changes not in Google yet",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change hasn't reached Google yet and will be lost."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes haven't reached Google yet and will be lost."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還有 %lld 項變更尚未同步到 Google，移除後會遺失。"
           }
         }
       }
@@ -547,6 +587,17 @@
         }
       }
     },
+    "Add %@" : {
+      "comment" : "Add Google account mismatch: keep the account Google signed in",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入 %@"
+          }
+        }
+      }
+    },
     "Add Google account" : {
       "localizations" : {
         "zh-Hant" : {
@@ -953,6 +1004,17 @@
         }
       }
     },
+    "Can't reach Google. Check your connection." : {
+      "comment" : "Google sign-in: no connection",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法連線到 Google，請檢查網路連線。"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1043,6 +1105,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "檢查 %lld 次"
+          }
+        }
+      }
+    },
+    "Choose from Google's account list" : {
+      "comment" : "Add Google account page: sign in without typing an email",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從 Google 帳號清單選擇"
           }
         }
       }
@@ -1178,12 +1251,45 @@
         }
       }
     },
+    "Connected %@" : {
+      "comment" : "Confirmation after adding a Google account",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已連接 %@"
+          }
+        }
+      }
+    },
     "Contact support" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "聯絡客服"
+          }
+        }
+      }
+    },
+    "Continue with Google" : {
+      "comment" : "Add Google account page: primary button, opens Google's sign-in with the typed email",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前往 Google 登入"
+          }
+        }
+      }
+    },
+    "Continuing ends demo mode and removes the sample data." : {
+      "comment" : "Add Google account page in demo mode",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續後會結束示範模式，並移除範例資料。"
           }
         }
       }
@@ -1570,26 +1676,6 @@
         }
       }
     },
-    "Disconnect" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "中斷連接"
-          }
-        }
-      }
-    },
-    "Disconnect %@?" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要中斷連接 %@ 嗎？"
-          }
-        }
-      }
-    },
     "Done" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1668,6 +1754,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修改 · %@"
+          }
+        }
+      }
+    },
+    "Enter a full email address, like example@gmail.com" : {
+      "comment" : "Add Google account page: inline validation",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請輸入完整的 email，例如 example@gmail.com"
           }
         }
       }
@@ -1884,6 +1981,17 @@
         }
       }
     },
+    "Gmail, school and work accounts on Google all work. If the address isn't a Google account, Google's page will say so." : {
+      "comment" : "Add Google account page: under the email field",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gmail、學校和公司的 Google 帳號都可以使用。如果這個地址不是 Google 帳號，Google 的頁面會告訴你。"
+          }
+        }
+      }
+    },
     "Google Calendar alerts you on all your devices. Smart Schedule sends no reminders, so you can't reply to them." : {
       "localizations" : {
         "zh-Hant" : {
@@ -1915,12 +2023,34 @@
         }
       }
     },
+    "Google account email" : {
+      "comment" : "Add Google account page: label of the email field",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 帳號的 email"
+          }
+        }
+      }
+    },
     "Google accounts" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Google 帳號"
+          }
+        }
+      }
+    },
+    "Google sign-in didn't finish (%@). Try again." : {
+      "comment" : "Google sign-in: another OAuth error code",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 登入沒有完成（%@），請再試一次。"
           }
         }
       }
@@ -2093,6 +2223,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它已在 Google 日曆刪除。"
+          }
+        }
+      }
+    },
+    "Its calendars and events leave Smart Schedule on this iPhone. Nothing is deleted in Google Calendar." : {
+      "comment" : "Remove account confirmation message",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個帳號的日曆和行程會從這支 iPhone 的 Smart Schedule 移除，Google 日曆裡的資料不會被刪除。"
           }
         }
       }
@@ -2349,6 +2490,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "助理新增的行程會加入這個行事曆。"
+          }
+        }
+      }
+    },
+    "New events now go to “%@”." : {
+      "comment" : "After removing the account new events went to (calendar · email)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新行程改存到「%@」。"
           }
         }
       }
@@ -2909,6 +3061,50 @@
         }
       }
     },
+    "Remove" : {
+      "comment" : "Remove account confirmation: destructive button",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
+    },
+    "Remove %@?" : {
+      "comment" : "Remove account confirmation title (email)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除 %@ 嗎？"
+          }
+        }
+      }
+    },
+    "Remove account" : {
+      "comment" : "Account sheet row and drawer account menu",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除帳號"
+          }
+        }
+      }
+    },
+    "Removed %@" : {
+      "comment" : "Confirmation after removing a Google account",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移除 %@"
+          }
+        }
+      }
+    },
     "Renews %@" : {
       "localizations" : {
         "zh-Hant" : {
@@ -3267,6 +3463,17 @@
         }
       }
     },
+    "Smart Schedule needs access to your Google Calendar. Try again and leave the calendar permission ticked on Google's page." : {
+      "comment" : "Google sign-in: the calendar permission was left unticked on the consent screen",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule 需要存取你的 Google 日曆。請再試一次，並在 Google 的頁面保持勾選日曆權限。"
+          }
+        }
+      }
+    },
     "Smart Schedule needs permission to see your calendar list." : {
       "localizations" : {
         "zh-Hant" : {
@@ -3293,16 +3500,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只用 Smart Schedule"
-          }
-        }
-      }
-    },
-    "Smart Schedule will stop using this account's calendars and remove its events from this iPhone. Nothing is deleted from Google Calendar." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smart Schedule 會停止使用這個帳號的行事曆，並從這支 iPhone 移除它的行程。Google 日曆裡的資料不會被刪除。"
           }
         }
       }
@@ -3495,6 +3692,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這個語言支援裝置端辨識"
+          }
+        }
+      }
+    },
+    "Sync first" : {
+      "comment" : "Remove account confirmation: send the account's queued changes before removing it",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先同步"
           }
         }
       }
@@ -3705,12 +3913,12 @@
         }
       }
     },
-    "This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and disconnects every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected." : {
+    "This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and removes every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這會從這支 iPhone 移除你的設定、快取的行程、聊天記錄、登入權杖、已排定的提醒和即時動態，並中斷連接所有 Google 帳號。Google 日曆裡的行程不會被刪除。訂閱屬於你的 Apple 帳號，不受影響。"
+            "value" : "這會從這支 iPhone 移除你的設定、快取的行程、聊天記錄、登入權杖、已排定的提醒和即時動態，並移除所有 Google 帳號。Google 日曆裡的行程不會被刪除。訂閱屬於你的 Apple 帳號，不受影響。"
           }
         }
       }
@@ -3811,6 +4019,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "按住鎖定畫面，點「自訂」› 鎖定畫面，點下方的控制項目，再選擇 Smart Schedule。"
+          }
+        }
+      }
+    },
+    "Try again" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再試一次"
+          }
+        }
+      }
+    },
+    "Try again as %@" : {
+      "comment" : "Add Google account mismatch: sign in again with the typed email",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改用 %@ 重新登入"
           }
         }
       }
@@ -4209,12 +4438,45 @@
         }
       }
     },
+    "You sign in on Google's own page. Smart Schedule never sees your password and only gets access to your calendars." : {
+      "comment" : "Add Google account page: footnote",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入在 Google 的官方頁面完成，Smart Schedule 看不到你的密碼，只會取得你的日曆存取權。"
+          }
+        }
+      }
+    },
+    "You signed in as %@, not %@." : {
+      "comment" : "Add Google account: Google signed in another account than the one typed (signed-in email, typed email)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你登入的是 %1$@，不是 %2$@。"
+          }
+        }
+      }
+    },
     "You signed in as %@. Choose %@ to reconnect." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "你登入的是 %1$@。請選擇 %2$@ 重新連接。"
+          }
+        }
+      }
+    },
+    "Your school or company doesn't allow this app to use Google Calendar. Ask your admin, or use another account." : {
+      "comment" : "Google sign-in error: access_denied / admin_policy_enforced",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的學校或公司不允許這個 App 使用 Google 日曆，請聯絡管理員或改用其他帳號。"
           }
         }
       }

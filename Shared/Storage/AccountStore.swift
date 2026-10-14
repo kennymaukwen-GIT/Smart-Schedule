@@ -162,10 +162,14 @@ actor AccountStore {
         updateLocalSettings(of: calendar) { $0.notificationsEnabled = enabled }
     }
 
-    /// nil or empty clears the filter (the Focus ended).
+    /// nil or empty clears the filter (the Focus ended). Calendars that are not here any more (a Focus set up before
+    /// their account was removed) are left out.
     func setFocusFilter(_ calendars: [CalendarRef]?) {
         mutate { file in
-            let state = calendars.flatMap { $0.isEmpty ? nil : FocusFilterState(calendars: $0, updatedAt: Date()) }
+            // The stored accounts and, in demo mode, the sample ones: a Focus naming real calendars survives a demo.
+            let known = Set((file.accounts + accounts(in: file)).flatMap(\.calendars).map(\.id))
+            let kept = calendars?.filter { known.contains($0) }
+            let state = kept.flatMap { $0.isEmpty ? nil : FocusFilterState(calendars: $0, updatedAt: Date()) }
             guard state?.calendars != file.focusFilter?.calendars else { return false }
             file.focusFilter = state
             return true
