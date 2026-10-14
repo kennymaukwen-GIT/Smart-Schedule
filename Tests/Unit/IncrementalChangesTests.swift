@@ -5,8 +5,8 @@ import XCTest
 final class IncrementalChangesTests: XCTestCase {
     private let mapper = CalendarEventMapper(clock: TestClock.clock)
     private let personal = SampleAccounts.calendar("111", "kenny@example.com", email: "kenny@example.com", primary: true)
-    private let school = SampleAccounts.calendar("222", "student@university.example.edu",
-                                                 email: "student@university.example.edu", primary: true)
+    private let school = SampleAccounts.calendar("222", "example@yourmail.com",
+                                                 email: "example@yourmail.com", primary: true)
     private let horizon = TestClock.local(2027, 2, 10)
 
     /// An entry of `events.list` on Thu 15 Oct (or `day`), an hour long.

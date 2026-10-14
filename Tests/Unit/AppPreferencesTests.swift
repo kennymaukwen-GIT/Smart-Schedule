@@ -172,8 +172,8 @@ final class AppPreferencesTests: XCTestCase {
         preferences.allDayReminderMinutes = nil
         preferences.liveActivityLeadMinutes = nil
         preferences.dailyReminderCap = 12
-        preferences.defaultCalendar = CalendarRef(accountID: "acct", calendarID: "student@university.example.edu")
-        preferences.defaultCalendarLabel = "My calendar | student@university.example.edu"
+        preferences.defaultCalendar = CalendarRef(accountID: "acct", calendarID: "example@yourmail.com")
+        preferences.defaultCalendarLabel = "My calendar | example@yourmail.com"
         preferences.timeZoneIdentifier = "Asia/Taipei"
         preferences.quietHours = QuietHours(isEnabled: true, startMinute: 23 * 60, endMinute: 8 * 60)
         preferences.reminderSource = .smartSchedule
@@ -257,7 +257,7 @@ final class AppPreferencesTests: XCTestCase {
         assertRejected("friday", for: .weekStart)
         assertRejected("fr", for: .replyLanguage)
         assertRejected("maybe", for: .autonomy)
-        assertRejected("My calendar | student@university.example.edu", for: .defaultCalendar)
+        assertRejected("My calendar | example@yourmail.com", for: .defaultCalendar)
     }
 
     func testRejectionReasonsAreReadableEnglish() {
@@ -285,8 +285,8 @@ final class AppPreferencesTests: XCTestCase {
         preferences.morningBriefing = DailyTime(isEnabled: false, minuteOfDay: 8 * 60)
         preferences.eveningPreview = DailyTime(isEnabled: true, minuteOfDay: 20 * 60 + 15)
         preferences.dailyReminderCap = 8
-        preferences.defaultCalendar = CalendarRef(accountID: "demo-school", calendarID: "student@university.example.edu")
-        preferences.defaultCalendarLabel = "My calendar | student@university.example.edu"
+        preferences.defaultCalendar = CalendarRef(accountID: "demo-school", calendarID: "example@yourmail.com")
+        preferences.defaultCalendarLabel = "My calendar | example@yourmail.com"
         preferences.defaultEventMinutes = 45
         preferences.weekStart = .monday
         preferences.replyLanguage = .english
@@ -317,7 +317,7 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(preferences.canonicalValue(for: .quietHours), "off 23:00-06:30")
         XCTAssertEqual(preferences.canonicalValue(for: .morningBriefing), "off 08:00")
         XCTAssertEqual(preferences.canonicalValue(for: .defaultCalendar),
-                       "demo-school/student@university.example.edu|My calendar | student@university.example.edu")
+                       "demo-school/example@yourmail.com|My calendar | example@yourmail.com")
         XCTAssertEqual(AppPreferences().canonicalValue(for: .allDayReminder), "900")
         XCTAssertEqual(AppPreferences().canonicalValue(for: .defaultCalendar), "automatic")
     }
@@ -346,7 +346,7 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(custom.promptValue(for: .deadlineReminders), "none")
         XCTAssertEqual(custom.promptValue(for: .allDayReminder), "none")
         XCTAssertEqual(custom.promptValue(for: .eveningPreview), "20:15")
-        XCTAssertEqual(custom.promptValue(for: .defaultCalendar), "My calendar | student@university.example.edu")
+        XCTAssertEqual(custom.promptValue(for: .defaultCalendar), "My calendar | example@yourmail.com")
         XCTAssertEqual(custom.promptValue(for: .eventUrgency), "time_sensitive")
         var quiet = AppPreferences()
         quiet.quietHours.isEnabled = true
@@ -377,7 +377,7 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(custom.displayValue(for: .deadlineUrgency), "Normal")
         XCTAssertEqual(custom.displayValue(for: .taskUrgency), "Quiet")
         XCTAssertEqual(custom.displayValue(for: .dailyReminderCap), "8 a day")
-        XCTAssertEqual(custom.displayValue(for: .defaultCalendar), "My calendar · student@university.example.edu")
+        XCTAssertEqual(custom.displayValue(for: .defaultCalendar), "My calendar · example@yourmail.com")
         XCTAssertEqual(custom.displayValue(for: .weekStart), "Monday")
         XCTAssertEqual(custom.displayValue(for: .replyLanguage), "English")
         XCTAssertEqual(custom.displayValue(for: .autonomy), "Ask me first")

@@ -186,8 +186,8 @@ event_reminders: 1440,60,30,0
 quiet_hours: off
 …18 行，每個 PreferenceKey 一行…
 # CALENDARS (writable; default_calendar values)
-- My calendar | you@example.com (default)
-- My calendar | student@university.example.edu
+- My calendar | example@gmail.com (default)
+- My calendar | example@yourmail.com
 # PENDING EVENTS (waiting for approval, NOT in the calendar; batch batch-k3p9a0bc)
 Lunch with Andrew | 2026-10-14T13:00 | 2026-10-14T14:00 | event
 ```
@@ -204,7 +204,7 @@ UPCOMING 的 flags 在看得到兩個以上行事曆時多了 `cal=<名稱>`（�
 | `quiet_hours` | `HH:mm-HH:mm`（可跨午夜）、`off`、`on` | `22:00-08:00` |
 | `morning_briefing` `evening_preview` | `HH:mm`、`off`、`on` | `07:30` |
 | `daily_reminder_cap` | 1–50 或 `off` | `10` |
-| `default_calendar` | CALENDARS 裡的一行（原樣）或 `automatic` | `My calendar \| student@university.example.edu` |
+| `default_calendar` | CALENDARS 裡的一行（原樣）或 `automatic` | `My calendar \| example@yourmail.com` |
 | `default_duration` | 5–480 分鐘 | `30` |
 | `week_start` | `sunday` `monday` | |
 | `reply_language` | `match` `zh-Hant` `en` | |

@@ -5,8 +5,8 @@ final class PreferencesStoreTests: XCTestCase {
     private var fileURL: URL!
     private var store: PreferencesStore!
 
-    private let schoolRef = CalendarRef(accountID: "demo-school", calendarID: "student@university.example.edu")
-    private let schoolLabel = "My calendar | student@university.example.edu"
+    private let schoolRef = CalendarRef(accountID: "demo-school", calendarID: "example@yourmail.com")
+    private let schoolLabel = "My calendar | example@yourmail.com"
 
     override func setUpWithError() throws {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("PreferencesStoreTests-\(UUID().uuidString)")
@@ -28,7 +28,7 @@ final class PreferencesStoreTests: XCTestCase {
     private func applyByVoice(_ requests: [PreferenceChangeRequest], said utterance: String = "from now on") async -> PreferenceApplyResult {
         let ref = schoolRef
         return await store.apply(requests, source: .voice(utterance: utterance)) { text in
-            text.localizedCaseInsensitiveContains("university") ? CalendarChoice(ref: ref, label: text) : nil
+            text.localizedCaseInsensitiveContains("yourmail") ? CalendarChoice(ref: ref, label: text) : nil
         }
     }
 
@@ -189,7 +189,7 @@ final class PreferencesStoreTests: XCTestCase {
     func testApplyResolvesTheDefaultCalendar() async throws {
         let result = await applyByVoice([request(.defaultCalendar, schoolLabel)], said: "以後用學校帳號")
         XCTAssertTrue(result.rejected.isEmpty)
-        XCTAssertEqual(result.receipt?.changes.first?.newDisplay, "My calendar · student@university.example.edu")
+        XCTAssertEqual(result.receipt?.changes.first?.newDisplay, "My calendar · example@yourmail.com")
         XCTAssertEqual(store.current().defaultCalendar, schoolRef)
         XCTAssertEqual(store.current().defaultCalendarLabel, schoolLabel)
         XCTAssertEqual(store.current().promptValue(for: .defaultCalendar), schoolLabel)

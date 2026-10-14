@@ -33,8 +33,8 @@ final class AssistantPromptTests: XCTestCase {
     private let personal = SampleAccounts.calendar("acct-a", "kenny@example.com", email: "kenny@example.com", primary: true)
     private let gym = SampleAccounts.calendar("acct-a", "gym-id", email: "kenny@example.com", name: "Gym", role: "writer")
     private let holidays = SampleAccounts.calendar("acct-a", "holidays-id", email: "kenny@example.com", name: "Holidays", role: "reader")
-    private let school = SampleAccounts.calendar("acct-b", "student@university.example.edu",
-                                                 email: "student@university.example.edu", primary: true)
+    private let school = SampleAccounts.calendar("acct-b", "example@yourmail.com",
+                                                 email: "example@yourmail.com", primary: true)
     private var calendars: [CalendarInfo] { [personal, gym, holidays, school] }
 
     /// Revision 2 of the muscle plan (07:00 mornings), as it sits in the store while the user reviews it.
@@ -242,7 +242,7 @@ final class AssistantPromptTests: XCTestCase {
         let lines = try block("# PREFERENCES", in: prompt(preferences: preferences))
         XCTAssertTrue(lines.contains("quiet_hours: 22:00-08:00"), lines.joined(separator: "\n"))
         XCTAssertTrue(lines.contains("routine_reminders: 120"))
-        XCTAssertTrue(lines.contains("default_calendar: My calendar | student@university.example.edu"))
+        XCTAssertTrue(lines.contains("default_calendar: My calendar | example@yourmail.com"))
         XCTAssertTrue(lines.contains("autonomy: ask_first"))
     }
 
@@ -250,7 +250,7 @@ final class AssistantPromptTests: XCTestCase {
         let lines = try block("# CALENDARS", in: prompt(calendars: calendars, defaultTarget: school.id))
         XCTAssertEqual(lines, ["- My calendar | kenny@example.com",
                                "- Gym | kenny@example.com",
-                               "- My calendar | student@university.example.edu (default)"])
+                               "- My calendar | example@yourmail.com (default)"])
         XCTAssertEqual(try block("# CALENDARS", in: prompt()), ["(none)"])
     }
 
@@ -266,7 +266,7 @@ final class AssistantPromptTests: XCTestCase {
         let rows = try block("# UPCOMING", in: prompt(upcoming: [inGym, atSchool, holiday, unscoped], calendars: calendars))
         XCTAssertTrue(rows.contains("g1 | Gym | 2026-10-14T07:00 | 2026-10-14T08:00 | event,cal=Gym"), rows.joined(separator: "\n"))
         // Two accounts' "My calendar" are told apart by their email.
-        XCTAssertTrue(rows.contains("s1 | Lecture | 2026-10-14T10:00 | 2026-10-14T11:00 | event,cal=My calendar (student@university.example.edu)"))
+        XCTAssertTrue(rows.contains("s1 | Lecture | 2026-10-14T10:00 | 2026-10-14T11:00 | event,cal=My calendar (example@yourmail.com)"))
         XCTAssertTrue(rows.contains("h1 | Bank holiday | 2026-10-15 | 2026-10-16 | event,all_day,cal=Holidays,read_only"))
         XCTAssertTrue(rows.contains("u1 | Old | 2026-10-16T09:00 | 2026-10-16T10:00 | event"))
 

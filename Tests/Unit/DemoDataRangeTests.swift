@@ -71,7 +71,7 @@ final class DemoDataRangeTests: XCTestCase {
 
     func testSampleAccountsAndWhereEachSampleEventLives() {
         let accounts = DemoData.accounts
-        XCTAssertEqual(accounts.map(\.email), ["you@example.com", "student@university.example.edu"])
+        XCTAssertEqual(accounts.map(\.email), ["example@gmail.com", "example@yourmail.com"])
         XCTAssertTrue(accounts.allSatisfy { $0.isDemo && $0.canListCalendars && !$0.needsReconnect })
         XCTAssertEqual(accounts[0].calendars.map(\.id), [DemoData.personalCalendar, DemoData.gymCalendar])
         XCTAssertEqual(accounts[0].calendars.map(\.googleColorHex), ["#039BE5", "#0B8043"])
@@ -79,7 +79,7 @@ final class DemoDataRangeTests: XCTestCase {
         XCTAssertEqual(accounts[1].primaryCalendar?.googleColorHex, "#7986CB")
         XCTAssertTrue(accounts.flatMap(\.calendars).allSatisfy { $0.isWritable && $0.isVisible && $0.notificationsEnabled })
         XCTAssertEqual(accounts[0].primaryCalendar?.id, DemoData.defaultCalendar)
-        XCTAssertEqual(accounts[1].calendars.first?.promptLabel, "My calendar | student@university.example.edu")
+        XCTAssertEqual(accounts[1].calendars.first?.promptLabel, "My calendar | example@yourmail.com")
 
         let seed = DemoData.events(now: now, clock: clock)
         XCTAssertTrue(seed.allSatisfy { $0.calendarRef != nil })

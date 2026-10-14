@@ -41,7 +41,7 @@ extension NotificationChatModel {
         coffee.id = "draft-ev-preview0-0" // a draft id, as the assistant gives previews
         let batch = PendingEventBatch(id: "batch-preview0", createdAt: Date(), utterance: "", seed: "preview",
                                       argsJSON: Data("{}".utf8), target: nil,
-                                      targetLabel: "My calendar · kenny@example.com", previewEvents: [coffee])
+                                      targetLabel: "My calendar · example@gmail.com", previewEvents: [coffee])
         model.turns = [
             Turn(role: .user, text: chinese ? "明天早上 9 點跟 Mia 在 Blue Bottle 喝咖啡" : "Coffee with Mia tomorrow 9am at Blue Bottle"),
             Turn(role: .assistant, text: "", pendingEvents: batch)

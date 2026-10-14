@@ -3,11 +3,11 @@
   "now_local": "2026-10-13T10:15",
   "time_zone": "Europe/London",
   "preferences": "default_calendar: automatic\ndefault_duration: 60",
-  "calendars": "- My calendar | you@example.com (default)\n- Gym | you@example.com\n- My calendar | student@university.example.edu",
+  "calendars": "- My calendar | example@gmail.com (default)\n- Gym | example@gmail.com\n- My calendar | example@yourmail.com",
   "expected_call": {
     "name": "update_preferences",
     "args": {
-      "changes": [{ "key": "default_calendar", "value": "My calendar | student@university.example.edu" }],
+      "changes": [{ "key": "default_calendar", "value": "My calendar | example@yourmail.com" }],
       "summary_for_user": "以後新行程會加到學校帳號的行事曆。"
     }
   }

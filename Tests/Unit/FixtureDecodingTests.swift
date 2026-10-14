@@ -148,7 +148,7 @@ final class FixtureDecodingTests: XCTestCase {
         let args = try Fixtures.args(UpdatePreferencesArgs.self, from: name)
         XCTAssertEqual(args.changes.map(\.key), ["default_calendar"])
         let value = try XCTUnwrap(args.changes.first?.value)
-        XCTAssertEqual(value, "My calendar | student@university.example.edu")
+        XCTAssertEqual(value, "My calendar | example@yourmail.com")
         let calendars = try XCTUnwrap(Fixtures.root(name)["calendars"] as? String)
         XCTAssertTrue(calendars.components(separatedBy: "\n").contains("- \(value)"), calendars)
         // The same label the demo's school calendar shows in CALENDARS.

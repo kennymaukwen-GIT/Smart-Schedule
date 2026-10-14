@@ -119,7 +119,7 @@ final class DemoAssistantPreferenceTests: XCTestCase {
     // MARK: Calendar, length, language, autonomy
 
     func testSchoolAccountForNewEvents() async throws {
-        let label = "My calendar | student@university.example.edu"
+        let label = "My calendar | example@yourmail.com"
         for utterance in ["以後用學校帳號", "from now on use my school account"] {
             let (assistant, preferences, store) = make()
             let reply = try await ask(assistant, utterance)

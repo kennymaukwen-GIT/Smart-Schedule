@@ -982,9 +982,10 @@ private struct DemoPreferenceIntent {
         if let email = DemoParser.match(#"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}"#, in: lower)?.group(0) {
             chosen = primaries.first { $0.accountEmail.lowercased() == email }
         } else if DemoParser.match(schoolPattern, in: lower) != nil {
-            chosen = primaries.first { DemoParser.match(schoolPattern, in: $0.accountEmail.lowercased()) != nil }
+            // The sample addresses say nothing about school, so go by the sample account itself.
+            chosen = primaries.first { $0.accountID == DemoData.schoolAccountID }
         } else if DemoParser.match(#"個人|个人|私人|自己的|\bpersonal\b|\bprivate\b|\bhome\b|\bmy own\b"#, in: lower) != nil {
-            chosen = primaries.first { DemoParser.match(schoolPattern, in: $0.accountEmail.lowercased()) == nil }
+            chosen = primaries.first { $0.accountID == DemoData.personalAccountID }
         } else {
             chosen = nil
         }

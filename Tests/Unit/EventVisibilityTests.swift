@@ -5,7 +5,7 @@ import XCTest
 final class EventVisibilityTests: XCTestCase {
     private let personal = CalendarRef(accountID: "111", calendarID: "kenny@example.com")
     private let gym = CalendarRef(accountID: "111", calendarID: "gym@group.calendar.google.com")
-    private let school = CalendarRef(accountID: "222", calendarID: "student@university.example.edu")
+    private let school = CalendarRef(accountID: "222", calendarID: "example@yourmail.com")
     private let shared = CalendarRef(accountID: "222", calendarID: "team@group.calendar.google.com")
 
     private func rules() -> VisibilityRules {

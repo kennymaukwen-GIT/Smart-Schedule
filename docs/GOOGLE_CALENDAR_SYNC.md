@@ -226,7 +226,7 @@ Smart Schedule 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 U
 
 ### 9.8 Demo 帳號
 
-`DemoData.accounts`：`demo-personal`（`you@example.com`：「我的行事曆」`#039BE5`、「Gym」`#0B8043`）和 `demo-school`（`student@university.example.edu`：「我的行事曆」`#7986CB`）。Gym、Yoga 在 Gym 行事曆；Weekly team sync 和 Deadline for Plan 5008 在學校帳號；其他都在個人主要行事曆。Demo 模式下 `AccountStore.accounts()` 回傳這兩個帳號並套用使用者對它們的本機設定（隱藏、顏色、提醒），`syncedCalendars()` 是空的（不抓任何東西）。沒有記錄行事曆的 demo 事件（例如 demo 助理新增的）永遠顯示。
+`DemoData.accounts`：`demo-personal`（`example@gmail.com`：「我的行事曆」`#039BE5`、「Gym」`#0B8043`）和 `demo-school`（`example@yourmail.com`：「我的行事曆」`#7986CB`）。Gym、Yoga 在 Gym 行事曆；Weekly team sync 和 Deadline for Plan 5008 在學校帳號；其他都在個人主要行事曆。Demo 模式下 `AccountStore.accounts()` 回傳這兩個帳號並套用使用者對它們的本機設定（隱藏、顏色、提醒），`syncedCalendars()` 是空的（不抓任何東西）。沒有記錄行事曆的 demo 事件（例如 demo 助理新增的）永遠顯示。
 
 ## 10. 雙向同步的保證（Two-way sync guarantees）
 

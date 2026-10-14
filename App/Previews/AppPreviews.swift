@@ -538,7 +538,7 @@ private func repliesPreview(chinese: Bool) -> some View {
 /// sign-in expired, and one moved over from the single-account version (no calendar-list permission yet).
 enum PreviewAccounts {
     static var personal: GoogleAccount {
-        let email = "kenny@example.com"
+        let email = "example@gmail.com"
         let id = "preview-personal"
         return GoogleAccount(id: id, email: email, connectedAt: Date(),
                              grantedScopes: [GoogleAccount.calendarListScope], needsReconnect: false,
@@ -552,7 +552,7 @@ enum PreviewAccounts {
     }
 
     static var school: GoogleAccount {
-        let email = "student@university.example.edu"
+        let email = "example@yourmail.com"
         let id = "preview-school"
         return GoogleAccount(id: id, email: email, connectedAt: Date(),
                              grantedScopes: [GoogleAccount.calendarListScope], needsReconnect: true,
@@ -610,7 +610,7 @@ enum PreviewCards {
         let previews = [lunch]
         return PendingEventBatch(id: "batch-preview0", createdAt: Date(), utterance: "", seed: "preview",
                                  argsJSON: Data("{}".utf8), target: DemoData.defaultCalendar,
-                                 targetLabel: "My calendar · kenny@example.com", previewEvents: previews)
+                                 targetLabel: "My calendar · example@gmail.com", previewEvents: previews)
     }
 
     static func chat(schedule: ScheduleViewModel, chinese: Bool) -> ChatViewModel {

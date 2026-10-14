@@ -65,7 +65,7 @@ targets:
         # Placeholders shown in Settings › About and the account sheet; replace before submitting.
         SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
         SSPrivacyURL: https://example.com/privacy
-        SSSupportEmail: support@example.com
+        SSSupportEmail: support@smart-schedules.com
     entitlements:
       path: App/SmartSchedule.entitlements
       properties:

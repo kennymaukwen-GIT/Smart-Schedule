@@ -22,8 +22,8 @@ enum DemoData {
 
     static let personalAccountID = idPrefix + "personal"
     static let schoolAccountID = idPrefix + "school"
-    static let personalEmail = "you@example.com"
-    static let schoolEmail = "student@university.example.edu"
+    static let personalEmail = "example@gmail.com"
+    static let schoolEmail = "example@yourmail.com"
     static let personalHex = eventHex   // Peacock
     static let gymHex = routineHex      // Basil
     static let schoolHex = "#7986CB"    // Lavender

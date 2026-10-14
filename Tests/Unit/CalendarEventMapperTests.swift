@@ -511,20 +511,20 @@ final class CalendarEventMapperTests: XCTestCase {
     // MARK: Listings of a connected calendar
 
     func testCalendarListingsAreStampedWithTheirCalendar() throws {
-        let school = SampleAccounts.calendar("222", "student@university.example.edu", primary: true, hex: "#7986CB")
+        let school = SampleAccounts.calendar("222", "example@yourmail.com", primary: true, hex: "#7986CB")
         let plain = try XCTUnwrap(mapper.scheduleEvent(from: gcal(#"""
         {"id": "m1", "iCalUID": "m1@google.com", "summary": "Seminar", "organizer": {"email": "prof@university.example.edu"},
          "start": {"dateTime": "2026-10-14T09:00:00Z"}, "end": {"dateTime": "2026-10-14T10:00:00Z"}}
         """#), in: school))
         XCTAssertEqual(plain.calendarRef, school.id)
-        XCTAssertEqual(plain.ref, EventRef(accountID: "222", calendarID: "student@university.example.edu", eventID: "m1"))
+        XCTAssertEqual(plain.ref, EventRef(accountID: "222", calendarID: "example@yourmail.com", eventID: "m1"))
         XCTAssertEqual(plain.iCalUID, "m1@google.com")
         XCTAssertEqual(plain.isOrganizer, false)
         XCTAssertEqual(plain.usesCalendarColor, true)
         XCTAssertEqual(plain.colorHex, "#7986CB")
 
         let own = try XCTUnwrap(mapper.scheduleEvent(from: gcal(#"""
-        {"id": "g1", "summary": "Gym", "colorId": "10", "organizer": {"email": "student@university.example.edu", "self": true},
+        {"id": "g1", "summary": "Gym", "colorId": "10", "organizer": {"email": "example@yourmail.com", "self": true},
          "start": {"dateTime": "2026-10-14T18:00:00Z"}, "end": {"dateTime": "2026-10-14T19:00:00Z"}}
         """#), in: school))
         XCTAssertEqual(own.isOrganizer, true)

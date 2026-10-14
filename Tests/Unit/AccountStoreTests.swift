@@ -14,7 +14,7 @@ final class AccountStoreTests: XCTestCase {
         SampleAccounts.calendar("111", "holidays@group.v.calendar.google.com", email: "kenny@example.com",
                                 name: "Holidays", role: "reader")
     ])
-    private let student = SampleAccounts.account("222", email: "student@university.example.edu")
+    private let student = SampleAccounts.account("222", email: "example@yourmail.com")
 
     private func makeStore(demo: Bool = false, defaultCalendar: CalendarRef? = nil,
                            url: URL? = nil) -> AccountStore {
@@ -104,7 +104,7 @@ final class AccountStoreTests: XCTestCase {
     // MARK: Where new events go
 
     func testDefaultWriteTargetFallsBackToTheFirstAccountsPrimaryCalendar() async {
-        let schoolPrimary = CalendarRef(accountID: "222", calendarID: "student@university.example.edu")
+        let schoolPrimary = CalendarRef(accountID: "222", calendarID: "example@yourmail.com")
         let chosen = makeStore(defaultCalendar: schoolPrimary)
         await connected(chosen)
         let chosenTarget = await chosen.defaultWriteTarget()
@@ -129,7 +129,7 @@ final class AccountStoreTests: XCTestCase {
         let store = makeStore()
         await connected(store)
         // The CALENDARS line exactly, in either language's "My calendar".
-        let english = await store.resolveWritableCalendar(matching: "My calendar | student@university.example.edu")
+        let english = await store.resolveWritableCalendar(matching: "My calendar | example@yourmail.com")
         XCTAssertEqual(english?.accountID, "222")
         let ownName = await store.resolveWritableCalendar(matching: "gym | KENNY@example.com")
         XCTAssertEqual(ownName?.calendarID, "gym@group.calendar.google.com")
@@ -137,7 +137,7 @@ final class AccountStoreTests: XCTestCase {
         let email = await store.resolveWritableCalendar(matching: "kenny@example.com")
         XCTAssertEqual(email?.calendarID, "kenny@example.com")
         // Part of an email, a domain or a name.
-        let domain = await store.resolveWritableCalendar(matching: "university")
+        let domain = await store.resolveWritableCalendar(matching: "yourmail")
         XCTAssertEqual(domain?.accountID, "222")
         let name = await store.resolveWritableCalendar(matching: "Gym")
         XCTAssertEqual(name?.calendarID, "gym@group.calendar.google.com")
@@ -155,15 +155,15 @@ final class AccountStoreTests: XCTestCase {
         XCTAssertEqual(calendar.promptLabel, "Team Ops Rota | a@example.com")
         calendar.isPrimary = true
         XCTAssertEqual(calendar.promptLabel, "My calendar | a@example.com")
-        XCTAssertEqual(GoogleAccount(id: "1", email: "kennymaukwen@gmail.com", connectedAt: Date()).initial, "K")
-        XCTAssertEqual(GoogleAccount(id: "1", email: "19329167@brookes.ac.uk", connectedAt: Date()).initial, "1")
+        XCTAssertEqual(GoogleAccount(id: "1", email: "example@gmail.com", connectedAt: Date()).initial, "E")
+        XCTAssertEqual(GoogleAccount(id: "1", email: "2026@yourmail.com", connectedAt: Date()).initial, "2")
     }
 
     // MARK: Visibility rules and the Focus filter
 
     func testVisibilityRulesListEveryCalendar() async {
         let gym = CalendarRef(accountID: "111", calendarID: "gym@group.calendar.google.com")
-        let schoolPrimary = CalendarRef(accountID: "222", calendarID: "student@university.example.edu")
+        let schoolPrimary = CalendarRef(accountID: "222", calendarID: "example@yourmail.com")
         let store = makeStore(defaultCalendar: schoolPrimary)
         await connected(store)
         await store.setVisible(false, calendar: gym)
@@ -221,7 +221,7 @@ final class AccountStoreTests: XCTestCase {
         XCTAssertEqual(rules.hidden, [DemoData.gymCalendar.key])
         XCTAssertEqual(rules.calendarColors[DemoData.schoolCalendar.key], "#8E24AA")
 
-        let school = await demo.resolveWritableCalendar(matching: "university")
+        let school = await demo.resolveWritableCalendar(matching: "yourmail")
         XCTAssertEqual(school?.id, DemoData.schoolCalendar)
 
         // The stored account was not touched, and outside demo mode it is what is listed.
@@ -243,7 +243,7 @@ final class AccountStoreTests: XCTestCase {
               {"calendarID": "no-account"}
            ]},
            {"email": "no-id@example.com"},
-           {"id": "222", "email": "student@university.example.edu", "needsReconnect": true}
+           {"id": "222", "email": "example@yourmail.com", "needsReconnect": true}
          ],
          "demoCalendarSettings": {"demo-personal/demo-gym": {"isVisible": false}},
          "focusFilter": {"calendars": [{"accountID": "111", "calendarID": "kenny@example.com"}, {"bad": true}]}}

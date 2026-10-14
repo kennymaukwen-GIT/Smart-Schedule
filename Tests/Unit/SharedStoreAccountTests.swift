@@ -5,7 +5,7 @@ import XCTest
 final class SharedStoreAccountTests: XCTestCase {
     private let files = TemporaryStoreFiles()
     private let personal = CalendarRef(accountID: "111", calendarID: "kenny@example.com")
-    private let school = CalendarRef(accountID: "222", calendarID: "student@university.example.edu")
+    private let school = CalendarRef(accountID: "222", calendarID: "example@yourmail.com")
     /// The rolling window for "now" = Tue 13 Oct 2026 (−7 d … +120 d).
     private let window = DateInterval(start: TestClock.local(2026, 10, 6), end: TestClock.local(2027, 2, 10))
 
@@ -18,7 +18,7 @@ final class SharedStoreAccountTests: XCTestCase {
         let accounts = AccountStore(fileURL: files.url("SharedStoreAccountTests-accounts"),
                                     isDemoMode: { demo }, defaultCalendar: { nil })
         await accounts.upsert(SampleAccounts.account("111", email: "kenny@example.com"))
-        await accounts.upsert(SampleAccounts.account("222", email: "student@university.example.edu"))
+        await accounts.upsert(SampleAccounts.account("222", email: "example@yourmail.com"))
         return (SharedStore(fileURL: files.url("SharedStoreAccountTests-cache"), accounts: accounts), accounts)
     }
 

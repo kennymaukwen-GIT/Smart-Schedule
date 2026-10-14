@@ -17,7 +17,7 @@ struct PendingEventBatch: Codable, Hashable, Identifiable, Sendable {
     var seed: String                // mapping seed: commit produces the same Google event ids (idempotent Add)
     var argsJSON: Data              // the create_events args (Gemini's, or the demo's encoding)
     var target: CalendarRef?        // nil in demo mode
-    var targetLabel: String?        // "My calendar · kennymaukwen@gmail.com"
+    var targetLabel: String?        // "My calendar · example@gmail.com"
     /// Mapped previews with ids "draft-ev-<batch>-<n>" (`isDraft` is true), drawn as ghosts like plan previews.
     var previewEvents: [ScheduleEvent]
 

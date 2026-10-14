@@ -60,12 +60,12 @@ Smart Schedule                          ← large title, white
 ┌─────────────────────────────────────┐
 │ ⚙︎  General                       ›  │ → presents Settings (§2.5) as a sheet, drawer closes
 └─────────────────────────────────────┘
-kennymaukwen@gmail.com                   ← section header = account email (secondary text)
+example@gmail.com                   ← section header = account email (secondary text)
 ┌─────────────────────────────────────┐
 │ ■  My calendar                    ›  │  ■ = colour square; tap ■ toggles visibility
 │ ■  Gym                            ›  │  chevron/row → Calendar details (§2.3)
 └─────────────────────────────────────┘
-19329167@brookes.ac.uk
+example@yourmail.com
 ┌─────────────────────────────────────┐
 │ ⚠︎  Reconnect                         │  only when GoogleAccount.needsReconnect
 │ ☰  Show all calendars                │  only when !GoogleAccount.canListCalendars
@@ -541,7 +541,7 @@ struct PreferenceApplyResult: Sendable {
 /// A resolved default_calendar value.
 struct CalendarChoice: Hashable, Sendable {
     var ref: CalendarRef
-    var label: String               // "My calendar | student@university.example.edu"
+    var label: String               // "My calendar | example@yourmail.com"
 }
 
 struct LearnedSuggestion: Codable, Hashable, Identifiable, Sendable {
@@ -735,7 +735,7 @@ struct PendingEventBatch: Codable, Hashable, Identifiable, Sendable {
     var seed: String                // mapping seed: commit produces the same Google event ids (idempotent Add)
     var argsJSON: Data              // the create_events args (Gemini's, or the demo's encoding)
     var target: CalendarRef?        // nil in demo mode
-    var targetLabel: String?        // "My calendar · kennymaukwen@gmail.com"
+    var targetLabel: String?        // "My calendar · example@gmail.com"
     /// Mapped previews with ids "draft-ev-<batch>-<n>" (`isDraft` is true), drawn as ghosts like plan previews.
     var previewEvents: [ScheduleEvent]
 }
@@ -1010,7 +1010,7 @@ struct CalendarRouter: Sendable {
 
 ### 5.10 Demo accounts (ACCOUNTS, `DemoData`)
 
-`DemoData.accounts: [GoogleAccount]`: `demo-personal` (`you@example.com`: "My calendar" `#039BE5` primary, "Gym" `#0B8043`) and `demo-school` (`student@university.example.edu`: "My calendar" `#7986CB` primary). Demo events are stamped: gym and yoga → personal "Gym"; "Weekly team sync" and "Deadline for Plan 5008" → school; everything else → personal primary. `DemoData.defaultCalendar` = personal primary. In demo mode `AccountStore.accounts()` returns these with the stored `demoCalendarSettings` applied; `syncedCalendars()` returns `[]` (nothing is fetched).
+`DemoData.accounts: [GoogleAccount]`: `demo-personal` (`example@gmail.com`: "My calendar" `#039BE5` primary, "Gym" `#0B8043`) and `demo-school` (`example@yourmail.com`: "My calendar" `#7986CB` primary). Demo events are stamped: gym and yoga → personal "Gym"; "Weekly team sync" and "Deadline for Plan 5008" → school; everything else → personal primary. `DemoData.defaultCalendar` = personal primary. In demo mode `AccountStore.accounts()` returns these with the stored `demoCalendarSettings` applied; `syncedCalendars()` returns `[]` (nothing is fetched).
 
 ---
 
@@ -1066,7 +1066,7 @@ struct CalendarRouter: Sendable {
 | `quiet_hours` | `"22:00-08:00"` · `"off"` · `"on"` | `"on"` = enable with stored times; `"off"` keeps the times | not `HH:mm-HH:mm`; start == end |
 | `morning_briefing`, `evening_preview` | `"07:30"` · `"off"` · `"on"` | as above | not `HH:mm` |
 | `daily_reminder_cap` | `"10"` · `"off"` | int | outside 1…50 |
-| `default_calendar` | `"My calendar \| student@university.example.edu"` · `"automatic"` | resolved by the `resolveCalendar` closure of `PreferencesStore.apply` (§6.4) → `CalendarRef` + label | no writable calendar matches |
+| `default_calendar` | `"My calendar \| example@yourmail.com"` · `"automatic"` | resolved by the `resolveCalendar` closure of `PreferencesStore.apply` (§6.4) → `CalendarRef` + label | no writable calendar matches |
 | `default_duration` | `"30"` | int | outside 5…480 |
 | `week_start` | `sunday` · `monday` | lowercase | other |
 | `reply_language` | `match` · `zh-Hant` · `en` | case-insensitive (`zh-hant`, `zh_TW` → `zh-Hant`) | other |
@@ -1090,8 +1090,8 @@ A change whose normalised value equals the current one is dropped silently (not 
 event_reminders: 1440,60,30,0
 …one line per PreferenceKey.allCases, value = preferences.promptValue(for:)…
 # CALENDARS (writable; default_calendar values)
-- My calendar | kennymaukwen@gmail.com (default)
-- My calendar | 19329167@brookes.ac.uk
+- My calendar | example@gmail.com (default)
+- My calendar | example@yourmail.com
 # PENDING EVENTS (waiting for approval, NOT in the calendar; batch <id>)
 <title> | <start> | <end> | <kind>
 ```
@@ -1131,7 +1131,7 @@ When `preferences.autonomy == .askFirst`, `create_events` maps the drafts (valid
 
 ### 6.7 Fixtures, validator, tests (STORE_PRIVACY)
 
-- Fixtures (`Tests/fixtures/`, same shape as today plus optional `"preferences"` and `"calendars"` context strings): `update_preferences.quiet_hours.json` ("8 點前不要提醒我" → `quiet_hours` `"22:00-08:00"`), `update_preferences.routine_reminders.json` ("以後健身都提前 2 小時提醒我" → `routine_reminders` `"120"`), `update_preferences.default_calendar.json` ("以後用學校帳號" → `default_calendar` `"My calendar | student@university.example.edu"`), and a boundary case `modify_event.one_off_reminder.json` ("remind me an hour before tomorrow's dentist" → `modify_event` `reminder_minutes` `[60]`). Use example.com/example.edu addresses in fixtures, never real ones.
+- Fixtures (`Tests/fixtures/`, same shape as today plus optional `"preferences"` and `"calendars"` context strings): `update_preferences.quiet_hours.json` ("8 點前不要提醒我" → `quiet_hours` `"22:00-08:00"`), `update_preferences.routine_reminders.json` ("以後健身都提前 2 小時提醒我" → `routine_reminders` `"120"`), `update_preferences.default_calendar.json` ("以後用學校帳號" → `default_calendar` `"My calendar | example@yourmail.com"`), and a boundary case `modify_event.one_off_reminder.json` ("remind me an hour before tomorrow's dentist" → `modify_event` `reminder_minutes` `[60]`). Use example.com/example.edu addresses in fixtures, never real ones.
 - `scripts/validate_schema.py`: per-key value checks for `update_preferences` (regexes of §6.2), `summary_for_user` at most 1 sentence and no slash, `default_calendar` values must appear in the fixture's `calendars`; `context_checks` accepts `confirm_plan` when the fixture has `draft_plan` **or** `pending_events`.
 - `FixtureDecodingTests`: add the `.updatePreferences` case (the switch is exhaustive) and a typed test per new fixture.
 - Unit tests: prompt contains PREFERENCES/CALENDARS/PENDING EVENTS blocks and the language line; DemoAssistant phrasings above; ask-first batch round trip with a temp `SharedStore`.

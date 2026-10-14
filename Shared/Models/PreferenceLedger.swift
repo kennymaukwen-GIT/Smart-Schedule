@@ -109,7 +109,7 @@ struct PreferenceApplyResult: Sendable {
 /// A resolved default_calendar value.
 struct CalendarChoice: Hashable, Sendable {
     var ref: CalendarRef
-    var label: String               // "My calendar | student@university.example.edu"
+    var label: String               // "My calendar | example@yourmail.com"
 }
 
 /// "You dismissed the 1-day-before reminder 5 times. Stop sending it?" Offered once per (kind, offset), applied only

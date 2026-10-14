@@ -59,8 +59,8 @@ final class LocalizationCatalogTests: XCTestCase {
 
     func testSettingsFormatArguments() throws {
         let table = try chineseTable()
-        XCTAssertEqual(String(format: zh("Disconnect %@?", in: table), "student@university.example.edu"),
-                       "要中斷連接 student@university.example.edu 嗎？")
+        XCTAssertEqual(String(format: zh("Disconnect %@?", in: table), "example@yourmail.com"),
+                       "要中斷連接 example@yourmail.com 嗎？")
         XCTAssertEqual(String(format: zh("At most %lld a day", in: table), 10), "每天最多 10 則")
         XCTAssertEqual(String(format: zh("Adds to %@", in: table), "我的行事曆 · kenny@example.com"),
                        "加入到 我的行事曆 · kenny@example.com")

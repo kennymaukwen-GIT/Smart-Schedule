@@ -4,7 +4,7 @@ import XCTest
 final class SyncOutboxTests: XCTestCase {
     private let files = TemporaryStoreFiles()
     private let personal = CalendarRef(accountID: "111", calendarID: "kenny@example.com")
-    private let school = CalendarRef(accountID: "222", calendarID: "student@university.example.edu")
+    private let school = CalendarRef(accountID: "222", calendarID: "example@yourmail.com")
     private let created = TestClock.utc(2026, 10, 14, 9, 0)
 
     override func tearDown() {
