@@ -9,7 +9,7 @@ import WidgetKit
 struct ScheduleLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ScheduleActivityAttributes.self) { context in
-            LockScreenScheduleView(state: context.state)
+            LockScreenScheduleView(state: context.state, isStale: context.isStale)
                 .activityBackgroundTint(Color.black.opacity(0.88))
                 .activitySystemActionForegroundColor(.white)
                 .widgetURL(DeepLink.compose)
@@ -28,7 +28,7 @@ struct ScheduleLiveActivity: Widget {
                         .minimumScaleFactor(0.85)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    CountdownCapsule(state: context.state)
+                    CountdownCapsule(state: context.state, isStale: context.isStale)
                         .dynamicIsland(verticalPlacement: .belowIfTooWide)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -45,7 +45,7 @@ struct ScheduleLiveActivity: Widget {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white)
             } compactTrailing: {
-                CompactCountdown(state: context.state)
+                CompactCountdown(state: context.state, isStale: context.isStale)
             } minimal: {
                 Image(systemName: "clock")
                     .foregroundStyle(.white)
@@ -181,15 +181,16 @@ struct IslandClockGlyph: View {
     }
 }
 
-/// "21 MIN" capsule. `Text(timerInterval:)` is the only countdown that ticks without pushes;
-/// the lower bound is the build time so the range is always valid.
+/// "21 MIN" capsule. `Text(timerInterval:)` is the only countdown that ticks without pushes; the range always has
+/// its lower bound at or before the upper. Counts to the start, then (stale once the start passes) to the end.
 struct CountdownCapsule: View {
     let state: ScheduleActivityAttributes.ContentState
+    var isStale = false
 
     var body: some View {
         Group {
-            if let target = state.countdownTarget, target > state.countdownFrom {
-                Text(timerInterval: state.countdownFrom...target, countsDown: true, showsHours: false)
+            if let range = state.countdownRange(isStale: isStale) {
+                Text(timerInterval: range, countsDown: true, showsHours: false)
             } else {
                 Text(state.isInProgress ? "NOW" : "—")
             }
@@ -205,11 +206,12 @@ struct CountdownCapsule: View {
 
 struct CompactCountdown: View {
     let state: ScheduleActivityAttributes.ContentState
+    var isStale = false
 
     var body: some View {
         Group {
-            if let target = state.countdownTarget, target > state.countdownFrom {
-                Text(timerInterval: state.countdownFrom...target, countsDown: true, showsHours: false)
+            if let range = state.countdownRange(isStale: isStale) {
+                Text(timerInterval: range, countsDown: true, showsHours: false)
             } else {
                 Text("now")
             }
@@ -225,6 +227,7 @@ struct CompactCountdown: View {
 
 struct LockScreenScheduleView: View {
     let state: ScheduleActivityAttributes.ContentState
+    var isStale = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -235,7 +238,7 @@ struct LockScreenScheduleView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                CountdownCapsule(state: state)
+                CountdownCapsule(state: state, isStale: isStale)
             }
             IslandWeekStrip(state: state)
             if let line = state.lastAssistantLine {

@@ -83,7 +83,7 @@ struct NotificationSettingsView: View {
             } header: {
                 Text("Dynamic Island")
             } footer: {
-                Text("Smart Schedule can show your next event in the Dynamic Island when you open the app or use its Control Center button. Starting it on its own before every event would need a push server, which Smart Schedule doesn't have.")
+                Text("Each timed event appears in the Dynamic Island this long before it starts and leaves the Lock Screen 10 minutes after it ends. Smart Schedule plans the next two days each time you open it.")
             }
 
             Section {

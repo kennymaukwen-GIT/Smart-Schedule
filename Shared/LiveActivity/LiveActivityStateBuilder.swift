@@ -7,12 +7,29 @@ enum LiveActivityStateBuilder {
                       lastLine: String?,
                       now: Date = Date(),
                       clock: WallClock = WallClock()) -> ScheduleActivityAttributes.ContentState {
-        let calendar = clock.calendar
         let events = events.filter { !$0.isDraft } // previews of plans and "Ask me first" batches are not booked
         let next = events
             .filter { !$0.isAllDay && $0.end > now && !$0.isCompleted }
             .min { $0.start < $1.start }
+        return make(next: next, events: events, lastLine: lastLine, now: now, clock: clock)
+    }
 
+    /// The state of `event`'s own activity as it looks at `asOf`: when a scheduled activity appears (iOS 26) or a
+    /// push starts it (iOS 18), so the week strip's "today" and the countdown are right then, not when it was planned.
+    static func build(for event: ScheduleEvent,
+                      events: [ScheduleEvent],
+                      lastLine: String?,
+                      asOf: Date,
+                      clock: WallClock = WallClock()) -> ScheduleActivityAttributes.ContentState {
+        make(next: event, events: events.filter { !$0.isDraft }, lastLine: lastLine, now: asOf, clock: clock)
+    }
+
+    private static func make(next: ScheduleEvent?,
+                             events: [ScheduleEvent],
+                             lastLine: String?,
+                             now: Date,
+                             clock: WallClock) -> ScheduleActivityAttributes.ContentState {
+        let calendar = clock.calendar
         let weekStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? calendar.startOfDay(for: now)
         let todayIndex = calendar.dateComponents([.day], from: weekStart, to: calendar.startOfDay(for: now)).day ?? 0
 
@@ -27,7 +44,9 @@ enum LiveActivityStateBuilder {
             todayIndex: min(max(todayIndex, 0), 6),
             days: [],
             lastAssistantLine: lastLine.map { String($0.prefix(60)) },
-            firstWeekday: calendar.firstWeekday
+            firstWeekday: calendar.firstWeekday,
+            eventStart: next?.start ?? now,
+            eventEnd: next?.end
         )
 
         for (chipsPerDay, titleLength) in [(2, 10), (1, 8), (1, 5)] {
@@ -49,7 +68,7 @@ enum LiveActivityStateBuilder {
     }
 
     /// Settings › Dynamic Island "Show next event": true when the next visible timed event is in progress or starts
-    /// within `leadMinutes`. nil lead = never on its own (the Control Center button still summons it).
+    /// within `leadMinutes`. nil lead = never.
     static func isNextEventDue(events: [ScheduleEvent], leadMinutes: Int?, now: Date = Date()) -> Bool {
         guard let leadMinutes else { return false }
         let horizon = now.addingTimeInterval(TimeInterval(leadMinutes) * 60)

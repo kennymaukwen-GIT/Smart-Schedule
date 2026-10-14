@@ -13,7 +13,7 @@
 |---|---|---|
 | 從控制中心按時鐘圖示（Artboard 3 紅圈） | 直接打開 App 的快速輸入（鍵盤已叫出）。`ControlWidgetButton` 綁 `OpenQuickCaptureIntent`（`openAppWhenRun = true`），`perform()` 在 App process 把 `DeepLink.compose` 交給 `AppRouter`（`DeepLinkRequests`）。不再叫出動態島：沒有近期行程時那會是一個空白常駐的動態島，違反 Live Activity 只代表「即將發生或進行中」事件的規範 | `Shared/Intents/OpenQuickCaptureIntent.swift`、`Shared/Core/DeepLinkRequests.swift`、`Widgets/SmartScheduleControl.swift` |
 | 動態島展開後有 TextField、麥克風、送出（Artboard 3） | Live Activity 只支援 `Button`、`Toggle`（App Intent）和 `Link`。不能放 TextField、叫不出鍵盤、不能捲動。Expanded 和 Lock Screen 的高度上限都是 160 pt | 輸入列做成「看起來像輸入框的 deep link 膠囊」。點下去開啟 **Quick Capture**（Artboard 4）：一張外形像動態島、鍵盤已彈出的卡片，從島的位置放大出現。完全不開 App 的輸入改走 Siri、Action Button、Spotlight（`AddPlanIntent`） |
-| 動態島常駐 | 一個 Live Activity 最多活躍 8 小時，之後在鎖定畫面再留最多 4 小時。從背景啟動只有兩條路：`LiveActivityIntent`，或 APNs push-to-start（iOS 17.2 起） | 有後端時：用 push-to-start 自動續命（`LiveActivityManager.observePushTokens`）。沒有後端時：每次開 App、按控制中心、問 Siri 都重建一次 |
+| 動態島不常駐 | Live Activity 只能代表「即將發生或進行中」的事件（HIG、Guideline 4.2）；一個最多活躍 8 小時，之後在鎖定畫面再留最多 4 小時 | 一個行程一個 activity，開始前 30／15／10／5 分鐘出現、結束後 10 分鐘消失（`ActivityScheduler`，見 docs/NOTIFICATIONS.md §8） |
 | 動態島顯示一週日曆 | ActivityKit 的內容（static 加 dynamic）不能超過 4 KB。畫面渲染時不能連網 | `LiveActivityStateBuilder` 先壓縮：每天最多 2 個 chip、標題截短，超過預算就自動降一級 |
 | 「21 MIN」倒數 | 不靠推播也會自己跳動的文字，只有 `Text(timerInterval:)` 和日期樣式 | `countdownFrom`／`countdownTarget`，由 builder 保證範圍永遠合法 |
 | 長按 Google 日曆送來的通知，原地展開（Artboard 1） | **App 不能擴充別的 App 的通知。** Google Calendar App 的推播，Smart Schedule 碰不到 | 改由 Smart Schedule 自己發提醒（本地通知或 APNs），並把 category 綁到 Content Extension。建議使用者關掉 Google Calendar iOS App 的通知（網頁和桌機上的 Google 彈窗照常保留） |
@@ -24,7 +24,7 @@
 | Gemini 模型版本 | 2.5 系列已經過了公告的最早關機日（2026-10-16）；3.x 的模型 ID 換得很快 | `GEMINI_MODEL_ID` 由 xcconfig 注入，預設 `gemini-3.5-flash`。**上線前務必到 deprecations 頁確認** |
 | Gemini 3 多輪 function calling | 要把 thought signature 原樣傳回，否則回 400 | `GeminiTurn` 把模型回傳的 content 以 raw JSON 原封保存（`Shared/AI/GeminiClient.swift`） |
 | 把個人資料傳給第三方 AI 前要先說明並取得同意（App Store 5.1.2(i)，2025 年 11 月） | 審核會在乾淨安裝、Siri、通知擴充裡各試一次 | `GeminiClient.generate` 在組 request 之前先檢查 `AIConsentStore.current.isGranted`，沒有同意就丟 `GeminiError.consentRequired`，一個閘門蓋住所有入口。App 顯示同意說明（`App/Views/Chat/AIConsentSheet.swift`），Siri 和通知改成告訴使用者到設定開啟。Demo 模式不呼叫 Gemini |
-| 動態島「在每個行程開始前自動出現」 | 沒有前景互動時，只能靠伺服器的 APNs push-to-start 啟動 Live Activity | 沒有後端，所以改成開 App 或按控制中心時，下一個行程在設定的時間內就啟動（`LiveActivityManager.summonIfDue`）。設定頁的註腳說明這個限制 |
+| 動態島「在每個行程開始前自動出現」 | App 在背景不能 `Activity.request()` | iOS 26：`Activity.request(…, start:)` 排程啟動；iOS 18：APNs push-to-start（`PushToStartRegistrar` 準備好整份資料，伺服器在觸發時間送出） |
 | 從 App 打開系統的專注模式設定 | 沒有公開的 URL 可以直接開到「專注模式」 | 提供 `SetFocusFilterIntent`（`App/Intents/CalendarFocusFilter.swift`），設定頁用文字說明路徑：設定 › 專注模式 › 選一個 › 加入過濾條件 › Smart Schedule |
 | App 介面語言 | iOS 自己管理每個 App 的語言，App 不能自行切換 | 設定 › 語言打開 `UIApplication.openSettingsURLString`（系統設定裡這個 App 的頁面） |
 | 控制中心、Action Button、鎖定畫面控制項、Siri 片語 | 只有使用者自己能加入，App 無法代勞 | 設定 › 捷徑與 Siri 寫出每一種的步驟（`ShortcutsGuideView`） |

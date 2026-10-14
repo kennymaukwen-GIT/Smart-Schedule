@@ -115,8 +115,14 @@ iOS 每個 App 最多保留 64 個待發本地通知，超過的會被默默丟�
 ## 8. 動態島（Dynamic Island）
 
 - 設定 › 通知 › 動態島「顯示下一個行程」：30 分鐘前（預設）、15 分鐘前、10 分鐘前、5 分鐘前、關閉。舊版存的 1 小時、2 小時讀成 30 分鐘。
-- App 回到前景時呼叫 `LiveActivityManager.summonIfDue()`：已在顯示就更新；沒有的話，若下一個有時間的行程正在進行或在設定的時間內開始，就啟動。控制中心按鈕不再啟動動態島，改為打開快速輸入（`OpenQuickCaptureIntent`）。
-- **App 關著時自動在每個行程前出現，需要 APNs push-to-start，也就是需要推播伺服器**；本專案沒有，所以設定頁註腳照實說明。日後加了伺服器，可以把 `AppConstants.liveActivityPushEnabled` 打開並上傳 `pushToStartTokenUpdates`。
+- **一個行程一個 Live Activity**，只代表「即將開始或進行中」的行程：開始前「提前量」出現，行程結束後從鎖定畫面消失前再留 10 分鐘。沒有行程時動態島不出現；控制中心按鈕改為打開快速輸入（`OpenQuickCaptureIntent`）。
+- `ActivityScheduler.reconcile()`（`Shared/LiveActivity/ActivityScheduler.swift`）在 App 回到前景（`LiveActivityManager.summonIfDue`）、每次寫入或同步後、以及 BGAppRefresh（`refreshIfRunning`）時執行：
+  - 規劃（`ActivityPlanner`，純函式、有單元測試）：未來 48 小時內開始、有時間、未完成、不是草稿的行程，最近的優先，最多 `ActivityPlanner.maxPending`（8，待真機測試回填）。觸發時間 = 開始 − 提前量；結束時間 = min(行程結束, 觸發 + 8 小時)，超過 8 小時的行程直接截斷。
+  - **iOS 26 起**：`Activity.request(…, style: .standard, alertConfiguration:, start: 觸發時間)` 排程啟動（狀態 `.pending`），App 關著也會準時出現。系統規定排程啟動一定要附提醒（標題 = 行程名稱，內文「%lld 分鐘後開始」）。
+  - **iOS 18**：App 不能排程，也不能在背景啟動；`PushToStartRegistrar.sync(token:upcomingEvents:)` 把 48 小時內的行程（ID、標題、開始時間、提前量、觸發時間，加上用預設 `JSONEncoder` 編好的 attributes 與 content-state）整份寫進 App Group 的 `push-to-start.json`，由伺服器在觸發時間送 push-to-start。上傳伺服器是 Part B。
+  - 兩者共用：已在提前量內的行程，App 在前景時立刻啟動；行程改了（標題、時間、提前量）→ 排程中的 activity `end(nil, .immediate)` 後重排，已顯示中的直接更新內容（移到更晚則結束後重排）；行程刪除、完成、或動態島關閉 → 立即結束；行程結束 → `end(最後內容, .after(結束 + 10 分鐘))`。使用者滑掉的 activity 不會被同一個觸發時間再叫出來；排程中但在出現前就消失的（例如重開機）會重排。
+  - 倒數：內容在開始時過期（`staleDate` = 開始時間），畫面用 `context.isStale` 自動改成倒數到結束，不需要任何更新推播。
+- 限制：App 在行程結束時沒有執行的話，iOS 26 的 activity 要等系統 8 小時上限才結束（iOS 18 由伺服器以 `input-push-token` 取得更新 token 後送 `end` 可以解決，見 Part B）。
 - 週列的星期順序跟著「每週起始日」：`ContentState.firstWeekday`（舊的 payload 沒有這個欄位時當作星期日）。
 - 隱藏的行事曆與專注模式過濾掉的行事曆不會出現在動態島。
 
