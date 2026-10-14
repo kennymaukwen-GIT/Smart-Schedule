@@ -139,7 +139,7 @@ actor GoogleTokenProvider {
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = formEncoded(["token": token])
-        _ = try? await URLSession.shared.data(for: request)
+        _ = try? await NetworkSession.data(for: request)
     }
 
     private static func refresh(_ tokens: GoogleTokens, key: String) async throws -> String {
@@ -151,7 +151,7 @@ actor GoogleTokenProvider {
             "grant_type": "refresh_token",
             "refresh_token": tokens.refreshToken
         ])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkSession.data(for: request)
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         guard (response as? HTTPURLResponse)?.statusCode == 200,
               let access = json["access_token"] as? String,

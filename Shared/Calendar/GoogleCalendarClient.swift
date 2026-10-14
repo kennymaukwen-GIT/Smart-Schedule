@@ -28,7 +28,7 @@ struct GoogleTransport: CalendarTransport {
     }
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await URLSession.shared.data(for: request)
+        try await NetworkSession.data(for: request)
     }
 }
 

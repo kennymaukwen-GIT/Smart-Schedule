@@ -112,6 +112,7 @@ flowchart LR
 
 ### 3.3 通知：UserNotificationsUI Content Extension
 - 細節見 [`NOTIFICATIONS.md`](NOTIFICATIONS.md)。
+- 長按通知後的對話、改時間、紅色確認刪除，都在 extension 裡直接呼叫 Gemini 與 Google Calendar 完成（不丟給 BGTask：系統可能數小時後才執行）。Extension 的網路走 `NetworkSession`（`Shared/Core/NetworkSession.swift`）：`.ephemeral`（不寫磁碟快取、cookie、憑證），每個 request 最多等 30 秒；主 App 仍用 `URLSession.shared`。兩次小型 JSON 請求遠低於 extension 的記憶體上限。
 - 如果改用遠端推播，可以另加 Notification Service Extension（`mutable-content: 1`），在送達前補上 category 和最新資料。
 
 ### 3.4 主 App：SwiftUI 加 Observation（`@Observable`）

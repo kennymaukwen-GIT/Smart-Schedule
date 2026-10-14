@@ -98,7 +98,7 @@ final class GeminiClient: Sendable {
 
     /// - Parameter consentCheck: whether the user allowed AI data sharing. Unit tests inject it.
     init(config: GeminiConfig = .fromBundle,
-         session: URLSession = .shared,
+         session: URLSession = NetworkSession.shared,
          consentCheck: @escaping @Sendable () -> Bool = { AIConsentStore.current.isGranted }) {
         self.config = config
         self.session = session
