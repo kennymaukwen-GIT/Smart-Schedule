@@ -31,6 +31,57 @@ jobs:
       - name: Validate declarations and fixtures
         run: python -I scripts/validate_schema.py --print-payloads
 
+  worker:
+    name: Worker typecheck + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"   # >= 22.12: tests run TypeScript through Node's type stripping
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      # The only trust anchor for App Attest must be Apple's own certificate, byte for byte. Until it is embedded
+      # (npm run embed-root-ca), this prints Apple's current PEM and fingerprint; afterwards it fails on any
+      # difference, so a swapped or edited certificate cannot pass CI.
+      - name: Apple App Attestation Root CA matches Apple's
+        run: |
+          set -eu
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 -o /tmp/apple.pem \
+            https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem
+          openssl x509 -in /tmp/apple.pem -noout -subject -issuer -enddate -fingerprint -sha256
+          node -e '
+            const s = require("fs").readFileSync("src/apple-root-ca.ts", "utf8");
+            const m = /APPLE_APP_ATTESTATION_ROOT_CA_PEM\s*=\s*`([^`]*)`/.exec(s);
+            require("fs").writeFileSync("/tmp/embedded.pem", m ? m[1] : "");
+          '
+          if ! grep -q "BEGIN CERTIFICATE" /tmp/embedded.pem; then
+            echo "::warning::The Apple App Attestation Root CA is not embedded yet; Apple's current certificate:"
+            cat /tmp/apple.pem
+            exit 0
+          fi
+          APPLE=$(openssl x509 -in /tmp/apple.pem -outform DER | sha256sum | cut -d' ' -f1)
+          EMBEDDED=$(openssl x509 -in /tmp/embedded.pem -outform DER | sha256sum | cut -d' ' -f1)
+          echo "Apple:    $APPLE"
+          echo "Embedded: $EMBEDDED"
+          if [ "$APPLE" != "$EMBEDDED" ]; then
+            echo "::error::src/apple-root-ca.ts does not hold Apple's App Attestation Root CA"
+            exit 1
+          fi
+
   ios:
     name: Build + unit tests (simulator)
     runs-on: macos-15

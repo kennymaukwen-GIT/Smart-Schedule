@@ -1,0 +1,45 @@
+# Smart Schedule Worker — deploy steps in README.md. No secrets or account-specific values in this file.
+name = "smart-schedule-worker"
+main = "src/index.ts"
+compatibility_date = "2026-09-15"
+
+# Every minute: send the Live Activity push-to-start notifications that are due.
+[triggers]
+crons = ["* * * * *"]
+
+# One KV namespace for everything (key prefixes chal:, key:, rl:, p2s:, due:, sent:, apns:).
+# Create it with:   npx wrangler kv namespace create SS_KV
+# then paste the printed id here. Deploys fail while it is empty.
+[[kv_namespaces]]
+binding = "SS_KV"
+id = ""
+
+# Worker logs (console.log JSON lines, e.g. the reason an attestation was rejected).
+[observability]
+enabled = true
+
+[vars]
+# Your Apple Developer Team ID (10 characters, developer.apple.com › Membership details). Required: the App ID
+# checked during attestation is "<APPLE_TEAM_ID>.<bundleId>".
+APPLE_TEAM_ID = ""
+# Bundle IDs allowed to attest (comma-separated).
+BUNDLE_IDS = "com.smartschedule.app,com.smartschedule.app.notification-content"
+# Must match the app's com.apple.developer.devicecheck.appattest-environment entitlement:
+#   "production"  → App Store / TestFlight builds (aaguid "appattest" + 7 zero bytes)
+#   "development" → Xcode-installed builds        (aaguid "appattestdevelop")
+APP_ATTEST_ENV = "production"
+# "true" ONLY on a development deployment: then X-Dev-Token (= the SS_DEV_TOKEN secret) bypasses App Attest.
+ALLOW_DEV_TOKEN = "false"
+# Requests per identity (attested key, "dev", or client IP for /attest*) per UTC minute.
+RATE_LIMIT_PER_MIN = "30"
+# APNs token-based auth: the .p8 key's Key ID and the Team ID that owns it (the key itself is a secret).
+APNS_KEY_ID = ""
+APNS_TEAM_ID = ""
+APNS_BUNDLE_ID = "com.smartschedule.app"
+# Must match the app build's aps-environment: "sandbox" (Xcode builds) or "production" (TestFlight / App Store).
+APNS_ENV = "production"
+
+# Secrets — never in this file:
+#   npx wrangler secret put GEMINI_API_KEY
+#   npx wrangler secret put SS_DEV_TOKEN        (only needed where ALLOW_DEV_TOKEN = "true")
+#   npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8

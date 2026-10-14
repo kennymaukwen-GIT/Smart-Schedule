@@ -1,0 +1,8 @@
+{
+  // Type-checks the tests (Node's test runner, node:crypto) together with the Worker source they import.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types", "node"]
+  },
+  "include": ["../src/**/*.ts", "./**/*.ts"]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "smart-schedule-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart Schedule server: App Attest-gated Gemini proxy and Live Activity push-to-start scheduler (Cloudflare Worker). No runtime dependencies.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json",
+    "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test \"test/**/*.test.ts\"",
+    "dev": "wrangler dev",
+    "embed-root-ca": "sh scripts/embed-apple-root-ca.sh",
+    "check-root-ca": "node scripts/check-root-ca.mjs",
+    "deploy": "node scripts/check-root-ca.mjs && wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261001.1",
+    "@peculiar/x509": "1.14.3",
+    "@types/node": "22.20.4",
+    "cborg": "6.1.2",
+    "typescript": "5.9.3",
+    "wrangler": "4.146.0"
+  }
+}
