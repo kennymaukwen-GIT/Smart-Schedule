@@ -61,6 +61,12 @@ actor ScheduleAssistant {
         /// update_preferences applied something: the "Settings updated" card with Undo.
         var preferenceReceipt: PreferenceChangeReceipt?
         var rejectedPreferences: [PreferenceRejection] = []
+        /// New events went to a calendar this iPhone hides (the default calendar for new events). Google has them
+        /// either way; the confirmation offers Show. Nothing is redirected to another calendar.
+        var savedToHiddenCalendar: CalendarRef? = nil
+        var savedToHiddenCalendarName: String? = nil
+        /// Some change could not reach Google and waits in the outbox (shown at once, marked waiting to sync).
+        var waitingToSync = false
 
         mutating func append(_ line: String?) {
             guard let line, !line.isEmpty else { return }
@@ -166,6 +172,7 @@ actor ScheduleAssistant {
         remember(exchange)
 
         if reply.text.isEmpty { reply.text = response.text ?? String(localized: "Done.") }
+        if reply.waitingToSync { reply.append(Self.waitingToSyncNote) }
         if reply.changed { await ReminderScheduler.shared.reschedule(store: store) }
         await store.setLastAssistantLine(reply.text)
         return reply
@@ -177,11 +184,15 @@ actor ScheduleAssistant {
         let refs = pending.refs.isEmpty
             ? pending.eventIDs.map { EventRef(accountID: nil, calendarID: nil, eventID: $0) }
             : pending.refs
-        try await ctx.router.delete(refs)
+        let queued = try await ctx.router.delete(refs, now: Date())
         if let planID = pending.planID { await store.removeNudges(planID: planID) }
         await ReminderScheduler.shared.reschedule(store: store)
         var reply = Reply(changed: true)
         reply.append(String(localized: "Deleted \(pending.eventIDs.count) items from Google Calendar."))
+        if queued {
+            reply.waitingToSync = true
+            reply.append(Self.waitingToSyncNote)
+        }
         return reply
     }
 
@@ -213,7 +224,7 @@ actor ScheduleAssistant {
         let args = try PlanDraftBuilder.decodeArgs(draft.argsJSON)
         let mapped = try ctx.mapper.events(fromPlan: args, planID: draft.id, utterance: draft.utterance)
         let target = try await ctx.router.defaultTarget()
-        _ = try await ctx.router.insert(mapped, into: target, mapper: ctx.mapper, now: now)
+        let saved = try await ctx.router.insert(mapped, into: target, mapper: ctx.mapper, now: now)
         if let nudge = ctx.mapper.nudge(from: args, planID: draft.id) { await store.addNudge(nudge) }
         await clearPendingPlan(id: draft.id)
 
@@ -221,6 +232,11 @@ actor ScheduleAssistant {
         reply.committedPlanID = draft.id
         reply.showRange = firstWeek(of: draft, clock: ctx.clock)
         reply.append(ReplyFormatter.planAdded(draft.title))
+        Self.noteHidden(target, in: &reply)
+        if saved.contains(where: \.isWaitingToSync) {
+            reply.waitingToSync = true
+            reply.append(Self.waitingToSyncNote)
+        }
         return reply
     }
 
@@ -240,7 +256,7 @@ actor ScheduleAssistant {
     /// an idempotent 409, not a duplicate.
     func commitPendingEvents(_ batch: PendingEventBatch) async throws -> Reply {
         let ctx = context()
-        let events = try await writeBatch(batch, ctx: ctx, now: Date())
+        let (events, target) = try await writeBatch(batch, ctx: ctx, now: Date())
         remember([.user("[app] The user tapped Add; the pending events are now in the calendar.")])
         if lastProposal == .events { lastProposal = nil }
         await ReminderScheduler.shared.reschedule(store: store)
@@ -251,6 +267,11 @@ actor ScheduleAssistant {
         reply.committedEventBatchID = batch.id
         reply.showRange = Self.dayRange(of: events, clock: ctx.clock)
         reply.append(ReplyFormatter.pendingEventsAdded(events.count))
+        Self.noteHidden(target, in: &reply)
+        if events.contains(where: \.isWaitingToSync) {
+            reply.waitingToSync = true
+            reply.append(Self.waitingToSyncNote)
+        }
         await store.setLastAssistantLine(reply.text)
         return reply
     }
@@ -266,7 +287,7 @@ actor ScheduleAssistant {
         return reply
     }
 
-    private func writeBatch(_ batch: PendingEventBatch, ctx: Context, now: Date) async throws -> [ScheduleEvent] {
+    private func writeBatch(_ batch: PendingEventBatch, ctx: Context, now: Date) async throws -> (events: [ScheduleEvent], target: CalendarInfo) {
         let args = try Self.decodeCreateArgs(batch.argsJSON)
         let mapped = try args.events.prefix(20).enumerated().map { index, draft in
             try ctx.mapper.event(from: draft, seed: "\(batch.seed)|\(index)", utterance: batch.utterance)
@@ -279,7 +300,7 @@ actor ScheduleAssistant {
         }
         let events = try await ctx.router.insert(mapped, into: target, mapper: ctx.mapper, now: now)
         await clearPendingBatch(id: batch.id)
-        return events
+        return (events, target)
     }
 
     /// Mapped but not written: previews with draft ids, the args kept verbatim for Add.
@@ -363,6 +384,8 @@ actor ScheduleAssistant {
             reply.changed = true
             reply.append(ReplyFormatter.confirmation(for: events, clock: clock))
             reply.append(ReplyFormatter.conflicts(events, against: upcoming))
+            Self.noteHidden(target, in: &reply)
+            if events.contains(where: \.isWaitingToSync) { reply.waitingToSync = true }
             return ["ok": true, "created": events.map { ["id": $0.id, "title": $0.title,
                                                          "start": clock.promptDateTimeString($0.start)] }]
 
@@ -400,7 +423,7 @@ actor ScheduleAssistant {
             if decidesEvents, let batch {
                 switch decision {
                 case "add":
-                    let events = try await writeBatch(batch, ctx: ctx, now: now)
+                    let (events, target) = try await writeBatch(batch, ctx: ctx, now: now)
                     if lastProposal == .events { lastProposal = nil }
                     reply.changed = true
                     reply.created += events
@@ -408,6 +431,8 @@ actor ScheduleAssistant {
                     reply.committedEventBatchID = batch.id
                     reply.showRange = Self.dayRange(of: events, clock: clock)
                     reply.append(ReplyFormatter.confirmation(for: events, clock: clock))
+                    Self.noteHidden(target, in: &reply)
+                    if events.contains(where: \.isWaitingToSync) { reply.waitingToSync = true }
                     return ["ok": true, "status": "added_to_calendar", "batch_id": batch.id, "count": events.count]
                 case "discard":
                     await clearPendingBatch(id: batch.id)
@@ -422,11 +447,19 @@ actor ScheduleAssistant {
             guard let draft else { throw AssistantError.noPendingPlan }
             switch decision {
             case "add":
-                let done = try await writePlan(draft, ctx: ctx, now: now)
+                var done = try await writePlan(draft, ctx: ctx, now: now)
                 if lastProposal == .plan { lastProposal = nil }
                 reply.changed = true
                 reply.committedPlanID = draft.id
                 reply.showRange = done.showRange
+                reply.savedToHiddenCalendar = done.savedToHiddenCalendar ?? reply.savedToHiddenCalendar
+                reply.savedToHiddenCalendarName = done.savedToHiddenCalendarName ?? reply.savedToHiddenCalendarName
+                if done.waitingToSync {
+                    // handle() adds the note once for the whole turn.
+                    done.text = done.text.replacingOccurrences(of: Self.waitingToSyncNote, with: "")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    reply.waitingToSync = true
+                }
                 reply.append(done.text)
                 return ["ok": true, "status": "added_to_calendar", "plan_id": draft.id]
             case "discard":
@@ -444,19 +477,18 @@ actor ScheduleAssistant {
             guard let existing = upcoming.first(where: { $0.id == args.eventId }) else {
                 throw AssistantError.unknownEvent(args.eventId) // blocks hallucinated ids from touching real events
             }
-            var patch = ctx.mapper.patch(from: args.changes, existing: existing)
+            let patch = ctx.mapper.patch(from: args.changes, existing: existing)
             if args.scope == "all_occurrences", existing.seriesID != nil {
-                if let newStart = args.changes.start.flatMap(clock.dateTime) {
-                    let master = try await ctx.router.master(of: existing)
-                    let duration = args.changes.durationMinutes.map { TimeInterval($0) * 60 } ?? existing.duration
-                    let shifted = ctx.mapper.seriesTimePatch(master: master, newStart: newStart, duration: duration)
-                    patch.start = shifted?.start
-                    patch.end = shifted?.end
-                }
-                try await ctx.router.patchSeries(of: existing, body: patch, now: now)
+                // A new start moves every occurrence to its time of day, worked out against the series master.
+                let newStart = args.changes.start.flatMap(clock.dateTime)
+                let duration = args.changes.durationMinutes.map { TimeInterval($0) * 60 } ?? existing.duration
+                let queued = try await ctx.router.patchSeries(of: existing, body: patch, newStart: newStart,
+                                                              duration: duration, mapper: ctx.mapper, now: now)
+                if queued { reply.waitingToSync = true }
                 reply.append(ReplyFormatter.updated(nil, clock: clock))
             } else {
-                let updated = try await ctx.router.patch(existing, body: patch, mapper: ctx.mapper)
+                let updated = try await ctx.router.patch(existing, body: patch, mapper: ctx.mapper, now: now)
+                if updated?.isWaitingToSync == true { reply.waitingToSync = true }
                 reply.append(ReplyFormatter.updated(updated, clock: clock))
             }
             reply.changed = true
@@ -485,7 +517,12 @@ actor ScheduleAssistant {
                                                                   : titles.prefix(3).joined(separator: ", "),
                                           refs: refs)
             if ids.count == 1, args.planId == nil, args.scope != "all_occurrences" {
-                let done = try await confirm(pending) // single, explicit, reversible in Google's Trash
+                var done = try await confirm(pending) // single, explicit, reversible in Google's Trash
+                if done.waitingToSync {
+                    done.text = done.text.replacingOccurrences(of: Self.waitingToSyncNote, with: "")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    reply.waitingToSync = true
+                }
                 reply.append(done.text)
                 reply.changed = true
                 return ["ok": true, "deleted": ids]
@@ -545,6 +582,24 @@ actor ScheduleAssistant {
         case nil:
             return ["ok": false, "error": "unknown function \(call.name)"]
         }
+    }
+
+    /// Said when a change could not reach Google: it is on this iPhone and goes out from the outbox.
+    static var waitingToSyncNote: String {
+        String(localized: "Saved on this iPhone. It will sync to Google Calendar as soon as Google can be reached.")
+    }
+
+    /// "Saved to «Gym» (hidden in Smart Schedule)": for Siri and other text-only surfaces; the chat shows a card
+    /// with Show instead.
+    static func hiddenCalendarNote(_ name: String) -> String {
+        String(localized: "Saved to «\(name)» (hidden in Smart Schedule)")
+    }
+
+    /// Marks the reply when new events went to a calendar this iPhone hides (its local visibility setting).
+    static func noteHidden(_ target: CalendarInfo, in reply: inout Reply) {
+        guard !target.isVisible, !target.accountID.isEmpty else { return }
+        reply.savedToHiddenCalendar = target.id
+        reply.savedToHiddenCalendarName = target.displayName
     }
 
     /// Reminders, urgency, quiet hours, briefings and the daily limit change what is scheduled; the calendar for new

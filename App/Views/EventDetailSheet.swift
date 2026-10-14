@@ -17,6 +17,11 @@ struct EventDetailSheet: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(event.title).font(.title3.weight(.semibold))
                             Text(timeLine).font(.subheadline).foregroundStyle(.secondary)
+                            if event.isWaitingToSync {
+                                Label("Waiting to sync", systemImage: "arrow.triangle.2.circlepath")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }

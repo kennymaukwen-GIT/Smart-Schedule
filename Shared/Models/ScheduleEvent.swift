@@ -33,6 +33,12 @@ struct ScheduleEvent: Codable, Hashable, Identifiable, Sendable {
     var isOrganizer: Bool? = nil
     /// No colorId of its own: drawn in its calendar's colour, so a local colour override applies.
     var usesCalendarColor: Bool? = nil
+    /// Google's version of this copy, sent as If-Match so an edit never lands on a newer Google edit unseen.
+    var etag: String? = nil
+    /// Changed on this iPhone and waiting in the outbox for Google (offline, or Google unreachable).
+    var isPendingSync: Bool? = nil
+
+    var isWaitingToSync: Bool { isPendingSync == true }
 
     /// Cache identity: the same Google id can be cached once per calendar.
     var ref: EventRef { EventRef(accountID: accountID, calendarID: calendarID, eventID: id) }

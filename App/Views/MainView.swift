@@ -15,7 +15,12 @@ struct MainView: View {
                       calendar: schedule.clock.calendar,
                       avatarInitial: schedule.avatarInitial,
                       onMenu: { withAnimation(.snappy) { router.isDrawerOpen = true } },
-                      onAvatar: { router.openSheet(.accounts) })
+                      onAvatar: { router.openSheet(.accounts) },
+                      syncIndicator: SyncHeaderIndicator(status: schedule.syncStatus,
+                                                         failedCount: schedule.failedChanges.count,
+                                                         isDemo: schedule.isDemo,
+                                                         isNetworkOffline: schedule.isNetworkOffline),
+                      onSyncIndicator: { withAnimation(.snappy) { router.isDrawerOpen = true } })
                 .padding(.top, 4)
 
             MonthPickerBar(selection: $schedule.displayedMonth)
@@ -45,7 +50,7 @@ struct MainView: View {
         }
         .padding(.horizontal, 12)
         .background(Theme.canvas.ignoresSafeArea())
-        .refreshable { await schedule.refresh() }
+        .refreshable { await schedule.refresh(.pull) }
         .onChange(of: schedule.displayedMonth, initial: true) { _, month in
             // Every week the grid draws, however far from today.
             schedule.ensureEvents(covering: CalendarPaging.monthGridInterval(containing: month,

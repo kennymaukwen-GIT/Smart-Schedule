@@ -1,6 +1,6 @@
 # Google Calendar 整合：從 Gemini JSON 寫進行事曆，再同步回來
 
-程式碼位置：`Shared/Calendar/`（mapper、RRULE、client、sync、`CalendarRouter`）、`Shared/Auth/GoogleTokenProvider.swift`、`Shared/Auth/IDToken.swift`、`Shared/Storage/AccountStore.swift`、`Shared/Models/GoogleAccount.swift`、`Shared/Models/EventVisibility.swift`、`App/Auth/GoogleSignInCoordinator.swift`、`App/Auth/AccountManager.swift`、`App/Intents/CalendarFocusFilter.swift`
+程式碼位置：`Shared/Calendar/`（mapper、RRULE、client、sync、`CalendarRouter`、`SyncEngine`、`SyncOutbox`、`SyncMerge`）、`Shared/Storage/SyncStatusStore.swift`、`Shared/Auth/GoogleTokenProvider.swift`、`Shared/Auth/IDToken.swift`、`Shared/Storage/AccountStore.swift`、`Shared/Models/GoogleAccount.swift`、`Shared/Models/EventVisibility.swift`、`App/Auth/GoogleSignInCoordinator.swift`、`App/Auth/AccountManager.swift`、`App/Intents/CalendarFocusFilter.swift`
 
 ## 1. OAuth 設定
 
@@ -116,6 +116,8 @@ Google 的限制：`overrides` **最多 5 個**，每個 `minutes` 介於 **0 �
 | 403 rateLimitExceeded、429、5xx | 指數退避加隨機抖動，最多重試 3 次。**一般的 403（權限不足）不重試** |
 | 404 或 410（刪除時） | 視為已經刪除 |
 | 部分失敗 | 因為 ID 是確定的，使用者再說一次「再試一次」只會補寫缺少的那幾筆 |
+| 連不到 Google（沒有網路、逾時、重試後仍是 5xx） | 寫進 outbox，畫面上立刻顯示並標成「等待同步」，之後依序送出（第 10.3 節） |
+| 412 Precondition Failed（PATCH／DELETE 帶的 If-Match 過期） | 重新 GET，只把使用者改的欄位套到 Google 目前的版本上，再送一次（第 10.2 節） |
 
 修改整個 series（`modify_event`，scope 設 `all_occurrences`）：先 GET 取得 master，保留 master 的第一天，只套用新的時刻，然後 PATCH master。
 
@@ -123,11 +125,10 @@ Google 的限制：`overrides` **最多 5 個**，每個 `minutes` 介於 **0 �
 
 | 方向 | 方式 |
 |---|---|
-| App 寫到 Google | 上面的 insert、patch、delete，寫完後立刻 upsert 到本地 cache |
-| Google 回到 App（拉取） | `CalendarSync.refreshWindow()`：**每個帳號的每個行事曆**各抓 −7 到 +120 天、`singleEvents=true`（重複事件展開成個別 instance）、`orderBy=startTime`、每頁 250 筆，然後**整段取代** cache 裡那個行事曆的部分。觸發時機：開到前景、寫入之後、BGAppRefresh。這種做法不需要保存狀態，結果永遠正確。視窗以外的日期在畫面捲到時才載入，見第 8 節；多帳號的細節見第 9 節 |
-| Google 回到 App（即時） | 需要後端：`events.watch` 註冊 webhook，事件有變動時發 APNs silent push 或 Live Activity push，App 收到後再跑 `refreshWindow`。channel 會過期，要排程續約 |
-| 規模變大之後 | 改用 `syncToken` 增量同步；收到 410 Gone 就全量重抓 |
-| 其他人在 Google 那邊改了事件 | 下次 refresh 時，Google 的版本覆蓋本地。Google 是唯一的事實來源，App 只是 cache |
+| App 寫到 Google | 上面的 insert、patch、delete（PATCH／DELETE 帶 If-Match），寫完後立刻 upsert 到本地 cache。連不到 Google 時進 outbox（第 10.3 節） |
+| Google 回到 App（拉取） | 兩種：**完整列出**（`CalendarSync.refreshWindow()`：**每個帳號的每個行事曆**各抓 −7 到 +120 天、`singleEvents=true`（重複事件展開成個別 instance）、`orderBy=startTime`、每頁 250 筆，然後**整段取代** cache 裡那個行事曆的部分，不需要保存狀態，結果永遠正確），和**變更增量**（`updatedMin` 加 `showDeleted`，只問上次之後改了什麼）。由 `SyncEngine` 依觸發來源決定，見第 10 節。視窗以外的日期在畫面捲到時才載入，見第 8 節；多帳號的細節見第 9 節 |
+| Google 回到 App（即時） | 需要後端，見第 10.8 節 |
+| 其他人在 Google 那邊改了事件 | 下次同步時，Google 的版本覆蓋本地（還在 outbox 裡等待的本機變更會再疊上去）。Google 是唯一的事實來源，App 只是 cache |
 
 ## 8. 依需求載入任意日期（無限捲動的行事曆）
 
@@ -226,3 +227,120 @@ Smart Schedule 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 U
 ### 9.8 Demo 帳號
 
 `DemoData.accounts`：`demo-personal`（`you@example.com`：「我的行事曆」`#039BE5`、「Gym」`#0B8043`）和 `demo-school`（`student@university.example.edu`：「我的行事曆」`#7986CB`）。Gym、Yoga 在 Gym 行事曆；Weekly team sync 和 Deadline for Plan 5008 在學校帳號；其他都在個人主要行事曆。Demo 模式下 `AccountStore.accounts()` 回傳這兩個帳號並套用使用者對它們的本機設定（隱藏、顏色、提醒），`syncedCalendars()` 是空的（不抓任何東西）。沒有記錄行事曆的 demo 事件（例如 demo 助理新增的）永遠顯示。
+
+## 10. 雙向同步的保證（Two-way sync guarantees）
+
+使用者的要求：「Google 日曆出現哪些更改，這裡也要出現；這邊出現任何更改，Google 日曆也要出現。」這一節說明目前（沒有伺服器）能保證到什麼程度。程式碼：`Shared/Calendar/SyncEngine.swift`（觸發與流程）、`SyncOutbox.swift`（待送佇列）、`SyncMerge.swift`（衝突合併、增量套用、待送變更疊加，純函式並有單元測試）、`CalendarRouter.swift`（寫入）、`CalendarSync.swift`（拉取）、`Shared/Storage/SyncStatusStore.swift`（狀態）。
+
+### 10.1 什麼會同步、什麼時候
+
+| 方向 | 內容 | 時機 |
+|---|---|---|
+| App → Google | 助理新增、修改、刪除的行程，計畫的「加入」，「先問我」的「加入」 | 立刻送出。連不到 Google 時進 outbox，之後在下一列的每個時機依序送出 |
+| Google → App | 每個同步中的行事曆（包括在 App 裡隱藏的）的新增、修改、刪除，含重複事件的單一 instance | 見下表 |
+
+`SyncEngine.sync(_ trigger:)` 每次都是：先送 outbox → 再拉取 → 拉取成功而且 outbox 在這期間又有新項目時再送一次。同時進來的呼叫共用同一次執行（比較徹底的呼叫會等目前這次跑完再跑自己的）。
+
+| 觸發（`SyncTrigger`） | 誰呼叫 | 拉取方式 |
+|---|---|---|
+| `pull` | 下拉重新整理、狀態列的「點一下重試」 | 一定完整列出 |
+| `background` | BGAppRefresh（`earliestBeginDate` 15 分鐘，實際時間由 iOS 決定） | 一定完整列出 |
+| `foreground` | App 回到前景、啟動 | 上次完整列出超過 15 分鐘才完整列出，否則變更增量 |
+| `timer` | App 在前景而且看得到時每 60 秒 | 變更增量；上次完整列出超過 30 分鐘就完整列出 |
+| `network` | `NWPathMonitor` 從離線變回連線 | 同 `timer` |
+| `outbox` | outbox 送出了東西之後、失敗項目按「重試」 | 同 `timer` |
+| `notification` | 通知內容擴充開啟提醒時（另外用 `events.get` 抓那一個事件） | 同 `timer` |
+| `summon` | 控制中心／動態島叫出時（`SyncRequests.request("summon")`） | 同 `timer` |
+
+同步改變了 cache 時：重排提醒、更新 Live Activity（App 在啟動時用 `AppRefresh.installSyncHooks()` 掛上），並發出 `SharedChange.syncStatus`，其他 process 收到後重新讀取。
+
+### 10.2 衝突規則
+
+- 每個快取的事件都記著 Google 給的 `etag`（`ScheduleEvent.etag`，來自 list、insert、patch、get 的回應）。PATCH 和 DELETE 都帶 `If-Match: <etag>`。Google 的錯誤說明：412 `conditionNotMet` 表示 If-Match 的 etag 已經不是目前的版本，建議「重新取得、重新套用變更」。
+- **412 時**：GET 目前的版本 → `ConflictMerge.rebase` 只保留使用者這次改的欄位、而且跟 Google 現在不同的欄位（標題、時間、地點、提醒、`ssReminders` 等）→ 用新的 etag 再 PATCH 一次。使用者沒改的欄位不會送出，所以 Google 那邊較新的修改不會被舊值蓋掉。使用者只是把行程移到別的時間（長度沒變），而 Google 那邊同時改了長度時，新的結束時間沿用 Google 的長度。只改開始時間時，結束時間跟著移動。
+- 第二次又是 412：不再重試，即時寫入時回「「X」同時在 Google 日曆被修改了，請再試一次。」；outbox 裡的則進失敗清單。
+- GET 回 404／410 或 `status = cancelled`（事件在 Google 已被刪除）：這個修改不再有意義，丟掉，快取移除那份副本，並說「「X」已在 Google 日曆刪除，所以這項變更沒有儲存。」（outbox 裡的進失敗清單，理由「它已在 Google 日曆刪除。」）。
+- 刪除遇到 412：使用者要刪的就是這個事件，所以不帶 If-Match 再刪一次。
+- 整個系列的時間修改（`all_occurrences`）在送出當下才 GET master、算出新的時間，並用 master 的 etag 當 If-Match。
+
+### 10.3 離線規則（outbox）
+
+App Group 的 `sync-outbox.json`，App、Siri、通知擴充共用，跟 `SharedStore` 一樣用 `NSFileCoordinator` 讀寫。
+
+| 狀況 | 處理 |
+|---|---|
+| 連不到 Google（`URLError` 沒有網路、DNS 失敗、逾時、連線中斷；client 重試 3 次後仍是 5xx／429／rate limit） | 寫進 outbox，並立刻套到快取（`isPendingSync = true`，畫面上有「等待同步」小圖示）。回覆加一句「已存在這支 iPhone 上，能連線到 Google 時就會同步到 Google 日曆。」 |
+| 同一個事件已經有項目在等 | 新的修改直接排在後面（合併），不先送，保持順序 |
+| 合併規則 | 新增後修改 → 新增（body 是新的，另外記在 `followUp`）；修改後修改 → 一個修改（保留第一個 etag 和原本的樣子，後面的欄位優先）；任何操作後刪除 → 刪除；**還沒送出的新增後刪除 → 兩個都丟掉**；刪除後的修改 → 丟掉。被拒絕的項目不合併 |
+| 新增是否可能已經到達 Google | 請求根本沒離開手機（沒有網路）就不算；逾時、5xx 算「可能已到達」。可能已到達的新增再被刪除時，改送 DELETE（404 也當成功） |
+| 送出順序 | 依第一次排入的順序。遇到連線失敗就停在那裡，後面的都等 |
+| 新增的冪等性 | 不變：ID 由 seed 算出（base32hex），409 就 GET 回來。若 409 而且之後有合併進來的修改，再送一次 PATCH（`followUp`） |
+| 授權失敗（refresh 之後仍是 401、`invalid_grant`、沒有 token） | 不丟掉，留在佇列裡；那個帳號標成需要重新連接，重新連接後就會送出。其他帳號照常 |
+| 永久錯誤（400、403 沒有權限、修改時 404、第二次 412） | 移到失敗清單（`SyncStatus.failed`），可以「重試」或「捨棄」。失敗項目不再疊到快取上，下次拉取就回到 Google 的版本 |
+| 帳號中斷連接 | 那個帳號的項目永遠送不出去，送出時直接移除（`AccountManager.disconnect` 也應呼叫 `SyncOutbox.removeAll(accountID:)`） |
+| 拉取 | 每次列出（完整、增量、依需求載入）之後，outbox 裡還在等待的變更會再疊上去，所以離線改的東西不會閃回 Google 的舊版本 |
+| 跨 process 同時送出 | 沒有鎖：新增是冪等的，重複的修改會遇到 412 然後發現沒有東西要改，重複的刪除會遇到 404。完成時只移除送出那一版（`revision`），送出期間合併進來的修改留到下次 |
+
+### 10.4 Google → App 的增量：為什麼用 `updatedMin` 而不是 `syncToken`
+
+官方文件的事實（2026-10-14 整理；這個環境連不到 developers.google.com，內容取自同一份 discovery 文件產生的 client library 參考，以及官方指南的搜尋摘要，上線前請再對照 [events.list](https://developers.google.com/workspace/calendar/api/v3/reference/events/list)、[同步指南](https://developers.google.com/workspace/calendar/api/guides/sync)、[錯誤處理](https://developers.google.com/workspace/calendar/api/guides/errors)、[版本與 ETag](https://developers.google.com/workspace/calendar/api/guides/version-resources)）：
+
+- `syncToken`：取自上一次 list **最後一頁**的 `nextSyncToken`，只回傳之後有變動的項目；**刪除的項目一定會回傳**，`showDeleted` 不能設成 false。**不能和 `iCalUID`、`orderBy`、`privateExtendedProperty`、`q`、`sharedExtendedProperty`、`timeMin`、`timeMax`、`updatedMin` 一起用**；其他參數要和第一次完整同步相同。token 過期時回 **410 Gone**（reason `fullSyncRequired`），要清掉本地資料、不帶 token 重新完整同步。增量同步也可能分頁。
+- `updatedMin`：最後修改時間的下限；**有設定時，那之後刪除的項目一定會回傳，不管 `showDeleted`**。可以和 `timeMin`／`timeMax` 一起用。太久以前會回 410（reason `updatedMinTooLongAgo`）。
+- `showDeleted` 和 `singleEvents` 都是 true 時，只回傳被刪除的單一 instance，不回傳底層的重複事件。
+- `timeMin` 是**結束時間**的下限（不含），`timeMax` 是**開始時間**的上限（不含）。
+
+選擇 `updatedMin` 的理由：
+
+1. Smart Schedule 的快取只有滾動視窗（−7 到 +120 天）加上畫面捲到的範圍，而且上限 2000 筆。`syncToken` 不能帶 `timeMin`／`timeMax`，token 的基準等於整個行事曆：`singleEvents=true` 時沒有結束日的重複事件會展開成大量 instance，`singleEvents=false` 則要在本地完整實作 RRULE、EXDATE 和例外（`RecurrenceExpander` 只處理計畫用的每週規則）。
+2. 滾動視窗的邊界每天移動，新進入視窗的日子本來就不在任何 token 的基準裡，還是要完整列出。
+3. `updatedMin` 可以限定在已經快取的範圍（每個行事曆的 coverage，通常一段），平常的回應是 0 筆，一個請求。
+
+做法（`CalendarSync.pull`）：每個行事曆記一個 `SyncMark`（`SharedStore.Snapshot.syncMarks`）：上次完整列出的時間，以及 `changesSince` = 上次請求時 Google 的時鐘（第一頁回應的 HTTP `Date` header）減 60 秒，下一次就從這裡問，兩次之間不會漏。請求：`updatedMin=<changesSince>&showDeleted=true&singleEvents=true&timeMin=<範圍開始>&timeMax=<範圍結束>&maxResults=250`，最多 2 頁。套用（`IncrementalChanges.apply`）：`status=cancelled` → 移除那份副本（以及取消的系列的所有 instance）；其他 → 取代同一個 `EventRef` 的副本或新增；行事曆已經不在帳號清單裡就忽略；其他行事曆的副本不動。以下情況改成完整列出：沒有 `SyncMark`、上次完整列出太久（前景 15 分鐘，其他 30 分鐘）、`changesSince` 超過 7 天、超過 2 頁、410，以及出現已快取系列的**新** instance id（`IncrementalChanges.reshapesSeries`：系列在 Google 改了時間或延長時，instance id 帶著原始開始時間所以會換掉，舊的 instance 不會以 cancelled 回傳）。
+
+已知限制：被移到快取範圍**以外**的事件，在有範圍限制的增量請求裡不會出現（它的新時間不在範圍內），舊的那份會留到下一次完整列出（使用中最多 15／30 分鐘；下拉重新整理和背景更新一定完整列出）。這就是「完整列出是定期的事實來源」的意思。
+
+### 10.5 刻意只存在這支 iPhone 上的東西
+
+| 項目 | 原因 |
+|---|---|
+| 行事曆的顯示／隱藏、本機顏色、提醒開關、專注模式過濾條件 | 每台裝置各自的顯示偏好。**隱藏只是不顯示**，資料照常雙向同步 |
+| 設定（偏好、預設提醒、安靜時段、新行程的行事曆等）、「助理記得的事」、學到的建議 | App 自己的設定，Google 日曆沒有對應的欄位 |
+| 對話紀錄、AI 同意、計畫的每日提醒（nudge）、「先問我」還沒加入的行程、計畫草稿 | 還不是行事曆資料；按「加入」之後才寫進 Google |
+| Smart Schedule 自己的提醒 | 依據 Google 的事件和 `ssReminders` 在本機排程；「只用 Smart Schedule」模式下 Google 那邊不跳通知 |
+
+**新行程寫進被隱藏的行事曆：** 新增的行程（助理的 create_events、計畫的「加入」、「先問我」的「加入」）一律寫進設定的預設行事曆，不會改寫到別的行事曆，所以 Google 一定有。那個行事曆在 App 裡被隱藏時，回覆帶 `Reply.savedToHiddenCalendar`（和名稱），確認卡片顯示「已存到「X」（目前在 Smart Schedule 隱藏）」和「顯示」按鈕，按下就把那個行事曆設成顯示。Demo 模式的範例行事曆也一樣。
+
+### 10.6 Demo 模式
+
+完全不連 Google：`SyncEngine` 的 `sync`、`flushOutbox`、`freshEvent`、`retry`、`discard` 在 demo 模式都不發出任何網路請求（有單元測試，用替身 transport 確認沒有請求）。狀態是 `isDemo = true`，狀態列顯示「示範 · 不同步」。Demo 助理的寫入本來就只存在本機快取。outbox 裡屬於真實帳號的項目保留，離開 demo 模式後才送出。
+
+### 10.7 同步狀態
+
+`SyncStatusStore`（App Group UserDefaults `SSSyncStatus`，可以同步讀取，改變時發 `SharedChange.syncStatus`）：
+
+| 欄位 | 意義 |
+|---|---|
+| `lastSuccess[accountID]` | 那個帳號的每個行事曆都成功拉取的時間 |
+| `pendingCount` | outbox 裡還在等待的項目（不含失敗的） |
+| `failed` | 失敗清單（`FailedChange`：標題、做了什麼、時間、原因），`SyncEngine.retry(id)`／`discard(id)` |
+| `isOffline` | 上一次連網路都沒有（請求沒離開手機） |
+| `lastError` | 上一次同步的其他問題（Google 沒回應、5xx、拒絕）；需要重新連接的帳號不算，抽屜另外顯示 |
+| `isDemo` | Demo 模式 |
+
+### 10.8 下一步：伺服器推播
+
+沒有伺服器時，Google 那邊的修改要等 App 被叫起來（前景、計時器、背景更新）才會進來；App 從來沒開的話，提醒用的是上一次同步的資料。要做到即時：
+
+1. **每個行事曆一個 `events.watch` channel**：伺服器用該帳號的 token 呼叫 `POST /calendars/<id>/events/watch`（`type=web_hook`、自訂 `id`、`token`、HTTPS `address`）。Channel 有到期時間（`expiration`，由 Google 決定），要在到期前一天左右建立新的 channel 再 `channels.stop` 舊的；新增或移除行事曆時也要跟著建立或停止。
+2. **Webhook → 增量同步 → APNs**：Google 只通知「有變動」（header `X-Goog-Channel-ID`、`X-Goog-Resource-State` 為 `sync`／`exists`／`not_exists`、`X-Goog-Message-Number`），不帶內容。伺服器收到後在伺服器端做增量同步（伺服器端可以用 `syncToken`，因為它可以保存整個行事曆的狀態），再對裝置發 **background push**（`content-available: 1`、`apns-priority: 5`），App 被叫起來跑 `SyncEngine.sync(.notification)`。iOS 會節流 background push，所以要合併短時間內的多次變動。
+3. **提醒改由伺服器發 alert push**：伺服器知道事件的最新時間，就能在正確時間發提醒（含 category，讓 Content Extension 照樣能長按回覆），即使 App 從來沒開也不會錯。Live Activity 也可以用 push-to-start／update。
+4. **隱私與 OAuth 的影響**：refresh token 要存在伺服器（目前只在 Keychain）。要改用 server-side OAuth（App 取得授權碼後交給伺服器換 token），token 加密存放（KMS）、中斷連接或清除資料時伺服器端撤銷並刪除，隱私權政策要寫明伺服器保存行事曆資料與 token、保存期限和刪除方式。`calendar.events` 是 sensitive scope，伺服器端保存使用者資料會影響 Google 的 App 驗證審查（Limited Use 規範）。Apple 的隱私標籤也要更新。
+5. **粗估每月費用（估計值，未含 Gemini proxy，以 2025 年公開價目估算，上線前要重算）**：假設每位使用者 2 個行事曆、每天約 20 次變動、每次 webhook 約 0.2 秒 CPU 和 2–3 次資料庫操作，用 serverless（例如 Cloud Run + Firestore + Cloud Scheduler，APNs 直連免費）：
+
+| 規模 | Webhook 次數／月 | 主要費用 | 粗估 |
+|---|---|---|---|
+| 1,000 位使用者 | 約 60 萬 | 多半在免費額度內；Firestore 讀寫、記錄、KMS | 約 US$5–15／月 |
+| 10,000 位使用者 | 約 600 萬 | Cloud Run CPU 約 US$25、Firestore 約 US$20、記錄與監控 | 約 US$50–120／月 |
+
+Calendar API 本身不收費，但有每日與每分鐘的配額，要依使用量申請提高。

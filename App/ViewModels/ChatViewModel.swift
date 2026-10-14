@@ -29,6 +29,9 @@ final class ChatViewModel {
         /// "Ask me first": single events waiting for Add.
         var pendingEvents: PendingEventBatch?
         var pendingEventsStatus: PendingEventsStatus = .pending
+        /// The new events went to the default calendar, which this iPhone hides: the card offers Show. Not saved
+        /// with the history (the drawer shows hidden calendars anyway).
+        var savedToHiddenCalendar: CalendarRef?
 
         var hasOpenPlan: Bool { planDraft != nil && planStatus == .pending }
         var hasOpenPendingEvents: Bool { pendingEvents != nil && pendingEventsStatus == .pending }
@@ -298,6 +301,7 @@ final class ChatViewModel {
             do {
                 let reply = try await assistant.commitPlan(plan)
                 setPlanStatus(.added(demo: usesDemoAssistant), messageID: message.id)
+                setSavedToHiddenCalendar(reply.savedToHiddenCalendar, messageID: message.id)
                 messages.append(Message(role: .assistant, text: reply.text, suggestions: reply.suggestions))
                 if let range = reply.showRange { schedule.focus(range) }
                 await afterWrite()
@@ -358,6 +362,7 @@ final class ChatViewModel {
             do {
                 let reply = try await assistant.commitPendingEvents(batch)
                 setPendingEventsStatus(.added(demo: usesDemoAssistant), messageID: message.id)
+                setSavedToHiddenCalendar(reply.savedToHiddenCalendar, messageID: message.id)
                 // The card now reads "Added to Google Calendar" and lists the events: only extra lines are shown.
                 let text = Self.shownText(of: reply, clock: schedule.clock)
                 if !text.isEmpty || !reply.suggestions.isEmpty {
@@ -461,7 +466,8 @@ final class ChatViewModel {
                                 pendingDeletion: reply.pendingDeletion, planDraft: reply.planDraft,
                                 addedEvents: reply.addedEvents, agenda: reply.agenda,
                                 preferenceReceipt: reply.preferenceReceipt,
-                                pendingEvents: reply.pendingEvents))
+                                pendingEvents: reply.pendingEvents,
+                                savedToHiddenCalendar: reply.savedToHiddenCalendar))
 
         if let plan = reply.planDraft {
             // Quick Capture opens WEEK on the plan's first week, where its ghost sessions are.
@@ -559,6 +565,12 @@ final class ChatViewModel {
         for index in messages.indices where messages[index].hasOpenPendingEvents {
             messages[index].pendingEventsStatus = .replaced
         }
+    }
+
+    /// On the card that was added (plan or "Ask me first"), under its "Added" line.
+    private func setSavedToHiddenCalendar(_ ref: CalendarRef?, messageID: Message.ID) {
+        guard let ref, let index = messages.firstIndex(where: { $0.id == messageID }) else { return }
+        messages[index].savedToHiddenCalendar = ref
     }
 
     private func setSuggestionStatus(_ status: LearnedSuggestion.Status, messageID: Message.ID) {

@@ -14,6 +14,8 @@ struct SummonScheduleIntent: LiveActivityIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         try await LiveActivityManager.shared.summon()
+        // Then ask Google for changes; the app's sync hook refreshes the island if anything moved.
+        Task { await SyncRequests.request("summon") }
         return .result()
     }
 }

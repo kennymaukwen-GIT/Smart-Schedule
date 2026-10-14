@@ -58,6 +58,9 @@ struct AssistantMessageView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.textSecondary)
             }
+            if let ref = message.savedToHiddenCalendar {
+                HiddenCalendarNoticeRow(ref: ref)
+            }
             if message.pendingDeletion != nil {
                 Button("Confirm", role: .destructive, action: onConfirmDelete)
                     .buttonStyle(.borderedProminent)
@@ -198,24 +201,31 @@ extension AssistantText {
 // MARK: - Added events
 
 /// What a reply put in the calendar, as rows instead of a sentence: a checkmark eyebrow, then each event's title,
-/// day and time, and place. `Reply.text` keeps the sentence for Siri and notifications.
+/// day and time, and place. `Reply.text` keeps the sentence for Siri and notifications. Events Google has not
+/// confirmed yet (offline, Google unreachable) say so instead.
 struct EventAddedRows: View {
     let events: [ScheduleEvent]
     var isDemo = false
 
     @Environment(\.locale) private var environmentLocale
+    /// Absent in previews of the rows alone.
+    @Environment(ScheduleViewModel.self) private var schedule: ScheduleViewModel?
     private let clock = WallClock()
 
     var body: some View {
+        let allWaiting = !isDemo && !events.isEmpty && events.allSatisfy(isWaiting)
+
         VStack(alignment: .leading, spacing: 10) {
             Label {
                 if isDemo {
                     Text("Added (demo)")
+                } else if allWaiting {
+                    Text("Saved · waiting to sync")
                 } else {
                     Text("Added to Google Calendar")
                 }
             } icon: {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: allWaiting ? "arrow.triangle.2.circlepath" : "checkmark.circle.fill")
             }
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(Theme.textSecondary)
@@ -232,12 +242,24 @@ struct EventAddedRows: View {
         .chatCardBackground()
     }
 
+    /// The cached copy says whether Google has it yet: a saved reply can be older than the sync that confirmed it.
+    private func isWaiting(_ event: ScheduleEvent) -> Bool {
+        guard let schedule else { return event.isWaitingToSync }
+        if let live = schedule.event(id: event.id) { return live.isWaitingToSync }
+        return event.isWaitingToSync && schedule.syncStatus.pendingCount > 0
+    }
+
     private func row(_ event: ScheduleEvent) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(event.title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-                .lineLimit(2)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(event.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                if !isDemo && isWaiting(event) {
+                    PendingSyncGlyph(size: 11, color: Theme.textSecondary)
+                }
+            }
             Text(ReplyFormatter.when(event, clock: clock, locale: ChatFormat.dateLocale(environmentLocale)))
                 .font(.system(size: 14).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.75))

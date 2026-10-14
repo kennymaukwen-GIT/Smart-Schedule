@@ -52,13 +52,20 @@ struct NotificationChatView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
+                    .strikethrough(model.reminderChange == .cancelled)
                 Text(model.headerBody.uppercased())
                     .font(.system(size: 10))
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
+                    .strikethrough(model.reminderChange != nil) // the time the reminder was set for
+                if let change = model.reminderChange {
+                    NotificationReminderChangeLine(change: change)
+                        .transition(.opacity)
+                }
             }
             Spacer()
         }
+        .animation(.snappy, value: model.reminderChange)
     }
 
     private var conversation: some View {
@@ -70,7 +77,8 @@ struct NotificationChatView: View {
                                         onAddPlan: { model.addPlan(turn.id) },
                                         onKeepEditing: { model.keepEditing(turn.id) },
                                         onAddPendingEvents: { model.addPendingEvents(turn.id) },
-                                        onEditPendingEvents: { model.editPendingEvents(turn.id) })
+                                        onEditPendingEvents: { model.editPendingEvents(turn.id) },
+                                        onShowHiddenCalendar: { model.showHiddenCalendar(turn.id) })
                         .id(turn.id)
                 }
                 if model.isThinking {

@@ -21,9 +21,24 @@ final class NotificationChatModel {
         /// "Ask me first": single events waiting for Add.
         var pendingEvents: PendingEventBatch?
         var pendingEventsStatus: PendingEventsStatus = .pending
+        /// The new events went to the default calendar, which this iPhone hides: the card offers Show.
+        var hiddenCalendar: HiddenCalendar?
 
         var hasOpenPlan: Bool { planDraft != nil && planStatus == .pending }
         var hasOpenPendingEvents: Bool { pendingEvents != nil && pendingEventsStatus == .pending }
+    }
+
+    /// A calendar hidden in Smart Schedule that just received new events.
+    struct HiddenCalendar: Equatable {
+        let ref: CalendarRef
+        let name: String
+    }
+
+    /// The reminder's event as Google has it now, when that differs from the notification.
+    enum ReminderChange: Equatable {
+        /// "Thu, Oct 16 · 15:00–16:00": the event's new day and time.
+        case moved(String)
+        case cancelled
     }
 
     /// Where a pending events card stands. Only `.pending` offers Add and Edit.
@@ -72,6 +87,8 @@ final class NotificationChatModel {
 
     var headerTitle = ""
     var headerBody = ""
+    /// Set once Google says the reminder's event moved or was cancelled since the reminder was scheduled.
+    var reminderChange: ReminderChange?
     /// The whole conversation in this card, plan cards included, oldest first.
     var turns: [Turn] = []
     var draft = ""
@@ -110,6 +127,10 @@ final class NotificationChatModel {
         headerBody = [content.subtitle, content.body].filter { !$0.isEmpty }.joined(separator: " · ")
         focusEventID = content.userInfo[NotificationIDs.UserInfo.eventID] as? String
 
+        if content.categoryIdentifier == NotificationIDs.Category.eventReminder, let focusEventID {
+            checkReminderEvent(id: focusEventID)
+        }
+
         // A follow-up that presented a draft plan: show its card while that draft is still the pending one.
         // (Plan nudges carry the planID of a plan already in the calendar, so they never match.)
         if let planID = content.userInfo[NotificationIDs.UserInfo.planID] as? String {
@@ -146,7 +167,8 @@ final class NotificationChatModel {
         Task {
             do {
                 let reply = try await assistant.handle(text, focusEventID: focusEventID, now: Date())
-                apply(reply)
+                let hidden = await Self.hiddenCalendar(reply.savedToHiddenCalendar)
+                apply(reply, hiddenCalendar: hidden)
             } catch GeminiError.consentRequired {
                 // Asking for consent needs the app; nothing was sent.
                 turns.append(Turn(role: .assistant,
@@ -182,6 +204,8 @@ final class NotificationChatModel {
             do {
                 let reply = try await assistant.commitPlan(plan)
                 setPlanStatus(.added(demo: isDemo), turnID: turnID)
+                let hidden = await Self.hiddenCalendar(reply.savedToHiddenCalendar)
+                setHiddenCalendar(hidden, turnID: turnID)
                 turns.append(Turn(role: .assistant, text: reply.text))
             } catch {
                 setPlanStatus(.pending, turnID: turnID)
@@ -213,6 +237,8 @@ final class NotificationChatModel {
             do {
                 let reply = try await assistant.commitPendingEvents(batch)
                 setPendingEventsStatus(.added(demo: isDemo), turnID: turnID)
+                let hidden = await Self.hiddenCalendar(reply.savedToHiddenCalendar)
+                setHiddenCalendar(hidden, turnID: turnID)
                 let text = Self.shownText(of: reply, clock: clock)
                 if !text.isEmpty { turns.append(Turn(role: .assistant, text: text)) }
             } catch {
@@ -230,9 +256,58 @@ final class NotificationChatModel {
         inputFocusRequest += 1
     }
 
+    // MARK: Hidden calendar
+
+    /// "Show": the calendar becomes visible on this iPhone (the app and its reminders follow through `.accounts`).
+    func showHiddenCalendar(_ turnID: Turn.ID) {
+        guard let index = turns.firstIndex(where: { $0.id == turnID }),
+              let hidden = turns[index].hiddenCalendar else { return }
+        turns[index].hiddenCalendar = nil
+        Task { await AccountStore.shared.setVisible(true, calendar: hidden.ref) }
+    }
+
+    /// The calendar's name while it is hidden in Smart Schedule; nil when it is visible (or not one of ours).
+    private static func hiddenCalendar(_ ref: CalendarRef?) async -> HiddenCalendar? {
+        guard let ref, let calendar = await AccountStore.shared.calendar(ref), !calendar.isVisible else { return nil }
+        return HiddenCalendar(ref: ref, name: calendar.displayName)
+    }
+
+    private func setHiddenCalendar(_ hidden: HiddenCalendar?, turnID: Turn.ID) {
+        guard let hidden, let index = turns.firstIndex(where: { $0.id == turnID }) else { return }
+        turns[index].hiddenCalendar = hidden
+    }
+
+    // MARK: Reminder freshness
+
+    /// The reminder was scheduled from the cache, possibly hours ago: ask Google for the event as it is now
+    /// (one `events.get`) and say so when it moved or was cancelled. The card shows at once; this only adds a line.
+    /// The app reschedules the reminders on its next sync.
+    private func checkReminderEvent(id: String) {
+        guard !AppConstants.isDemoMode else { return } // demo events never reach Google
+        Task {
+            guard let cached = await SharedStore.shared.event(id: id) else { return }
+            let fresh = await SyncEngine.shared.freshEvent(cached.ref)
+            apply(fresh)
+        }
+    }
+
+    private func apply(_ fresh: FreshEvent) {
+        switch fresh {
+        case let .current(event):
+            if !event.title.isEmpty { headerTitle = event.title }
+        case let .moved(event):
+            if !event.title.isEmpty { headerTitle = event.title }
+            reminderChange = .moved(ReplyFormatter.when(event, clock: clock))
+        case .cancelled:
+            reminderChange = .cancelled
+        case .unavailable:
+            break // offline or not allowed: the notification's own text stands
+        }
+    }
+
     // MARK: Private
 
-    private func apply(_ reply: ScheduleAssistant.Reply) {
+    private func apply(_ reply: ScheduleAssistant.Reply, hiddenCalendar: HiddenCalendar?) {
         pendingDeletion = reply.pendingDeletion
         suggestions = reply.suggestions
         // Typed approval ("looks good", "加入") or abandonment ("cancel the plan") settles the open card.
@@ -250,7 +325,8 @@ final class NotificationChatModel {
                         addedEvents: reply.addedEvents,
                         agenda: reply.agenda,
                         planDraft: reply.planDraft,
-                        pendingEvents: reply.pendingEvents)
+                        pendingEvents: reply.pendingEvents,
+                        hiddenCalendar: hiddenCalendar)
         if !turn.text.isEmpty || !turn.addedEvents.isEmpty || turn.agenda != nil || turn.planDraft != nil
             || turn.pendingEvents != nil {
             turns.append(turn)

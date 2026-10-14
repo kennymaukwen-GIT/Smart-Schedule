@@ -48,6 +48,44 @@ extension NotificationChatModel {
         ]
         return model
     }
+
+    /// Preview-only: the reminder was set for 15:30, but the meeting moved in Google Calendar since (or was
+    /// cancelled); the card says so under the title.
+    static func reminderChangedPreview(chinese: Bool = false, cancelled: Bool = false) -> NotificationChatModel {
+        let model = NotificationChatModel(assistant: DemoAssistant())
+        model.headerTitle = chinese ? "跟 Joe 開線上會議" : "Online meeting with Joe"
+        model.headerBody = chinese ? "30 分鐘後 · 15:30 · Google Meet" : "In 30 min · 15:30 · Google Meet"
+        if cancelled {
+            model.reminderChange = .cancelled
+        } else {
+            let clock = WallClock()
+            let tomorrow = clock.calendar.date(byAdding: .day, value: 1, to: clock.calendar.startOfDay(for: Date())) ?? Date()
+            let start = clock.combine(day: tomorrow, time: (hour: 16, minute: 0)) ?? tomorrow
+            var moved = NotificationPreviewSamples().coffee(chinese: chinese)
+            moved.start = start
+            moved.end = start.addingTimeInterval(3600)
+            let locale = Locale(identifier: chinese ? "zh-Hant" : "en_US")
+            model.reminderChange = .moved(ReplyFormatter.when(moved, clock: clock, locale: locale))
+        }
+        return model
+    }
+
+    /// Preview-only: "Ask me first" added the session to "Gym", which this iPhone hides.
+    static func hiddenCalendarPreview(chinese: Bool = false) -> NotificationChatModel {
+        let model = NotificationChatModel(assistant: DemoAssistant())
+        model.headerTitle = "Smart Schedule"
+        model.headerBody = chinese ? "長按回覆" : "Hold to reply"
+        var session = NotificationPreviewSamples().coffee(chinese: chinese)
+        session.title = chinese ? "健身" : "Gym"
+        session.location = nil
+        let gym = HiddenCalendar(ref: CalendarRef(accountID: "preview-personal", calendarID: "gym"),
+                                 name: chinese ? "健身" : "Gym")
+        model.turns = [
+            Turn(role: .user, text: chinese ? "明天早上 9 點健身" : "Gym tomorrow 9am"),
+            Turn(role: .assistant, text: "", addedEvents: [session], hiddenCalendar: gym)
+        ]
+        return model
+    }
 }
 
 /// Sample rows for the previews: events around today, nothing read from the App Group.
@@ -144,6 +182,22 @@ private func previewPlanDraft(chinese: Bool = false) -> PlanDraft {
     NotificationChatView(model: NotificationChatModel.pendingEventsPreview(chinese: true))
         .frame(height: NotificationChatModel.planHeight)
         .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
+
+#Preview("Hold to reply · reminder moved") {
+    NotificationChatView(model: NotificationChatModel.reminderChangedPreview())
+        .frame(height: NotificationChatModel.collapsedHeight)
+}
+
+#Preview("Hold to reply · reminder cancelled · zh-Hant") {
+    NotificationChatView(model: NotificationChatModel.reminderChangedPreview(chinese: true, cancelled: true))
+        .frame(height: NotificationChatModel.collapsedHeight)
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
+
+#Preview("Hold to reply · saved to a hidden calendar") {
+    NotificationChatView(model: NotificationChatModel.hiddenCalendarPreview())
+        .frame(height: NotificationChatModel.expandedHeight)
 }
 
 #Preview("Hold to reply · zh-Hant") {

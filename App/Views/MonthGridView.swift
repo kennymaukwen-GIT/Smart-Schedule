@@ -245,6 +245,9 @@ private struct EventChip: View {
             } else if !segment.isMultiDay {
                 RoundedRectangle(cornerRadius: 1).fill(tint).frame(width: 2)
             }
+            if event.isWaitingToSync && segment.isStart {
+                PendingSyncGlyph(size: 6)
+            }
             Text(segment.isStart ? event.title : " ")
                 .font(.system(size: 8.5, weight: .medium))
                 .foregroundStyle(.white)

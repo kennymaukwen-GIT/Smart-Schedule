@@ -477,14 +477,20 @@ private struct TimelinePill: View {
     var body: some View {
         // A draft is outlined rather than filled: a dashed edge would vanish against the white pill.
         let fill = event.kind == .deadline ? Theme.deadline : Color.white
-        Text(event.title)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(event.isDraft ? Color.white : Color.black)
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Capsule().fill(event.isDraft ? fill.opacity(0.18) : fill))
-            .draftGhost(event.isDraft, shape: Capsule(), tint: fill)
-            .contentShape(Capsule())
+        let ink = event.isDraft ? Color.white : Color.black
+        HStack(spacing: 4) {
+            if event.isWaitingToSync {
+                PendingSyncGlyph(size: 9, color: ink.opacity(0.6))
+            }
+            Text(event.title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ink)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(event.isDraft ? fill.opacity(0.18) : fill))
+        .draftGhost(event.isDraft, shape: Capsule(), tint: fill)
+        .contentShape(Capsule())
     }
 }

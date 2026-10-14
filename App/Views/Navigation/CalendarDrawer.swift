@@ -3,6 +3,7 @@ import SwiftUI
 /// The hamburger's drawer (Artboard 5, right): WHAT you see. "General" opens Settings; then one section per
 /// Google account, headed by its email, listing that account's calendars. The colour square shows or hides a
 /// calendar in one tap; the row opens its details (colour on this iPhone, reminders, "Use for new events").
+/// Under the accounts, one line says where sync with Google stands, followed by any change Google refused.
 ///
 /// Gmail events, Tasks and "Apps from Google" from the artboard are not built.
 struct CalendarDrawer: View {
@@ -59,6 +60,8 @@ struct CalendarDrawer: View {
                 accountSection(account)
             }
 
+            syncSection
+
             connectSection
         }
         .listStyle(.insetGrouped)
@@ -102,6 +105,37 @@ struct CalendarDrawer: View {
                 Text("Smart Schedule needs permission to see your calendar list.")
             }
         }
+    }
+
+    // MARK: Sync
+
+    /// The status line ("Synced · just now", "Offline · 3 changes waiting") as the section's header, then one row
+    /// per change Google refused, with Retry and Discard. Tapping the line syncs now.
+    @ViewBuilder
+    private var syncSection: some View {
+        if schedule.isDemo || !schedule.accounts.isEmpty {
+            Section {
+                ForEach(schedule.failedChanges, id: \.id) { change in
+                    FailedChangeRow(change: change,
+                                    isRetrying: schedule.retryingChangeIDs.contains(change.id),
+                                    onRetry: { schedule.retryFailedChange(change.id) },
+                                    onDiscard: { withAnimation(.snappy) { schedule.discardFailedChange(change.id) } })
+                }
+            } header: {
+                SyncStatusLine(summary: syncSummary) {
+                    Task { await schedule.refresh(.pull) }
+                }
+                .textCase(nil)
+            }
+        }
+    }
+
+    private var syncSummary: SyncSummary {
+        SyncSummary(status: schedule.syncStatus,
+                    isDemo: schedule.isDemo,
+                    isNetworkOffline: schedule.isNetworkOffline,
+                    isSyncing: schedule.isRefreshing,
+                    accountIDs: schedule.accounts.filter { !$0.needsReconnect }.map(\.id))
     }
 
     /// "Add Google account"; in demo mode "Connect Google Calendar" (leaves the demo first); signed out, the two

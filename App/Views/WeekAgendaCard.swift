@@ -267,15 +267,20 @@ private struct WeekEventChip: View {
                     .padding(.top, 1)
             }
             VStack(alignment: .leading, spacing: 0) {
-                Group {
-                    if event.isAllDay {
-                        Text("All day")
-                    } else {
-                        Text(event.start, format: .dateTime.hour().minute())
+                HStack(spacing: 2) {
+                    Group {
+                        if event.isAllDay {
+                            Text("All day")
+                        } else {
+                            Text(event.start, format: .dateTime.hour().minute())
+                        }
+                    }
+                    .font(.system(size: 6, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    if event.isWaitingToSync {
+                        PendingSyncGlyph(size: 5)
                     }
                 }
-                .font(.system(size: 6, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.7))
                 Text(event.title)
                     .font(.system(size: 7, weight: .semibold))
                     .foregroundStyle(.white)

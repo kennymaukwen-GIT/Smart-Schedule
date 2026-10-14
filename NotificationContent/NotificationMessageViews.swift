@@ -12,6 +12,7 @@ struct NotificationTurnRow: View {
     var onKeepEditing: () -> Void = {}
     var onAddPendingEvents: () -> Void = {}
     var onEditPendingEvents: () -> Void = {}
+    var onShowHiddenCalendar: () -> Void = {}
 
     var body: some View {
         switch turn.role {
@@ -43,8 +44,70 @@ struct NotificationTurnRow: View {
                     NotificationPendingEventsCard(batch: batch, status: turn.pendingEventsStatus, isDemo: isDemo,
                                                  onAdd: onAddPendingEvents, onEdit: onEditPendingEvents)
                 }
+                if let hidden = turn.hiddenCalendar {
+                    NotificationHiddenCalendarNotice(calendarName: hidden.name, onShow: onShowHiddenCalendar)
+                }
             }
         }
+    }
+}
+
+// MARK: - Sync notices
+
+/// Under the reminder's title: Google says the event moved ("Moved to Thu, Oct 16 · 15:00–16:00") or was
+/// cancelled since the reminder was scheduled.
+struct NotificationReminderChangeLine: View {
+    let change: NotificationChatModel.ReminderChange
+
+    var body: some View {
+        Group {
+            switch change {
+            case let .moved(when):
+                Label {
+                    Text("Moved to \(when)")
+                } icon: {
+                    Image(systemName: "arrow.right.circle.fill")
+                }
+            case .cancelled:
+                Label("Cancelled in Google Calendar", systemImage: "xmark.circle.fill")
+            }
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(.orange)
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+    }
+}
+
+/// "Saved to «Gym» (hidden in Smart Schedule)" with Show (the app's `HiddenCalendarNotice`).
+struct NotificationHiddenCalendarNotice: View {
+    let calendarName: String
+    var onShow: () -> Void = {}
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "eye.slash")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+            Text("Saved to «\(calendarName)» (hidden in Smart Schedule)")
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button(action: onShow) {
+                Text("Show")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 26)
+                    .background(Capsule().fill(Color.white))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .notificationCardBackground()
     }
 }
 
@@ -131,7 +194,8 @@ struct NotificationReplyText: View {
 
 // MARK: - Added events
 
-/// "Added to Google Calendar", then each event's title, day and time, and place.
+/// "Added to Google Calendar", then each event's title, day and time, and place. Events Google has not confirmed
+/// yet (offline, Google unreachable) are "Saved · waiting to sync" instead.
 struct NotificationEventRows: View {
     let events: [ScheduleEvent]
     var isDemo = false
@@ -140,15 +204,19 @@ struct NotificationEventRows: View {
     private let clock = WallClock()
 
     var body: some View {
+        let allWaiting = !isDemo && !events.isEmpty && events.allSatisfy(\.isWaitingToSync)
+
         VStack(alignment: .leading, spacing: 8) {
             Label {
                 if isDemo {
                     Text("Added (demo)")
+                } else if allWaiting {
+                    Text("Saved · waiting to sync")
                 } else {
                     Text("Added to Google Calendar")
                 }
             } icon: {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: allWaiting ? "arrow.triangle.2.circlepath" : "checkmark.circle.fill")
             }
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(Theme.textSecondary)

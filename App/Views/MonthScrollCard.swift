@@ -300,6 +300,9 @@ private struct MonthEventChip: View {
                     .font(.system(size: 5.5, weight: .bold))
                     .foregroundStyle(tint)
             }
+            if event.isWaitingToSync {
+                PendingSyncGlyph(size: 5)
+            }
             Text(event.title)
                 .font(.system(size: 6.5, weight: .semibold))
                 .foregroundStyle(.white)

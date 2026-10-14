@@ -43,14 +43,18 @@ struct SmartScheduleApp: App {
                     await schedule.reloadFromCache()
                     chat.refreshConsent()
                     await chat.appendLearnedSuggestions()
-                    await schedule.refresh()
+                    await schedule.refresh(.foreground)
                     await LiveActivityManager.shared.summonIfDue()
                 }
                 Task {
                     // Lists older than 6 h; new calendars show up through the `.accounts` change.
                     await AccountManager.shared.refreshCalendarLists()
                 }
-            case .background: AppRefresh.schedule()
+                // Changes made in Google show up within a minute while the app is in front.
+                schedule.startForegroundSync()
+            case .background:
+                schedule.stopForegroundSync()
+                AppRefresh.schedule()
             default: break
             }
         }
@@ -116,6 +120,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         NotificationIDs.registerCategories()
+        // Every sync that changes the cache reschedules reminders and refreshes the Live Activity, and the Control
+        // Center summon (shared with the widget, which cannot see SyncEngine) asks for a sync through `SyncRequests`.
+        AppRefresh.installSyncHooks()
         // Finishes transactions that arrived while the app was closed and keeps `isPro` current.
         Task { @MainActor in SubscriptionStore.shared.start() }
         Task {

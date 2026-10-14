@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Artboard 5's header: the hamburger opens the calendar drawer (what you see), the title names the month on
-/// screen ("2027 October" / "2027年10月"), and the avatar opens accounts and subscription (who you are).
+/// screen ("2027 October" / "2027年10月"), and the avatar opens accounts and subscription (who you are). A tiny
+/// sync mark follows the title only while changes wait for Google or Google refused one.
 struct AppHeader: View {
     let month: Date
     let calendar: Calendar
@@ -9,6 +10,10 @@ struct AppHeader: View {
     let avatarInitial: String?
     var onMenu: () -> Void = {}
     var onAvatar: () -> Void = {}
+    /// nil: everything is in Google (the usual case), so nothing is drawn.
+    var syncIndicator: SyncHeaderIndicator? = nil
+    /// Opens the drawer, where the status line and any failed changes are.
+    var onSyncIndicator: () -> Void = {}
 
     @Environment(\.locale) private var environmentLocale
 
@@ -34,6 +39,11 @@ struct AppHeader: View {
                 .contentTransition(.numericText())
                 .accessibilityAddTraits(.isHeader)
 
+            if let syncIndicator {
+                SyncHeaderIndicatorView(indicator: syncIndicator, action: onSyncIndicator)
+                    .padding(.leading, -6)
+            }
+
             Spacer(minLength: 8)
 
             Button(action: onAvatar) {
@@ -43,6 +53,7 @@ struct AppHeader: View {
             .accessibilityLabel("Accounts and subscription")
         }
         .frame(minHeight: 44)
+        .animation(.snappy, value: syncIndicator)
     }
 }
 

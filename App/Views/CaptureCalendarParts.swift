@@ -56,23 +56,28 @@ struct CaptureSpanBar: View {
 
     var body: some View {
         let radius: CGFloat = 3
-        Text(span.event.title)
-            .font(.system(size: fontSize, weight: .semibold))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .padding(.horizontal, 4)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background(
-                UnevenRoundedRectangle(cornerRadii: .init(
-                    topLeading: span.continuesBefore ? 0 : radius,
-                    bottomLeading: span.continuesBefore ? 0 : radius,
-                    bottomTrailing: span.continuesAfter ? 0 : radius,
-                    topTrailing: span.continuesAfter ? 0 : radius
-                ))
-                .fill(Color(hex: span.event.colorHex).opacity(0.9))
-            )
-            .draftGhost(span.event.isDraft, shape: RoundedRectangle(cornerRadius: radius),
-                        tint: Color(hex: span.event.colorHex))
+        HStack(spacing: 2) {
+            if span.event.isWaitingToSync && !span.continuesBefore {
+                PendingSyncGlyph(size: fontSize - 1, color: .white.opacity(0.85))
+            }
+            Text(span.event.title)
+                .font(.system(size: fontSize, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(
+            UnevenRoundedRectangle(cornerRadii: .init(
+                topLeading: span.continuesBefore ? 0 : radius,
+                bottomLeading: span.continuesBefore ? 0 : radius,
+                bottomTrailing: span.continuesAfter ? 0 : radius,
+                topTrailing: span.continuesAfter ? 0 : radius
+            ))
+            .fill(Color(hex: span.event.colorHex).opacity(0.9))
+        )
+        .draftGhost(span.event.isDraft, shape: RoundedRectangle(cornerRadius: radius),
+                    tint: Color(hex: span.event.colorHex))
     }
 }
 

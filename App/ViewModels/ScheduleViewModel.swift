@@ -23,7 +23,17 @@ final class ScheduleViewModel {
     var isSignedIn = false
     var isRefreshing = false
     var isDemo = false
+    /// Account and connection problems shown over the calendar (Add account, Reconnect). Sync problems are on the
+    /// drawer's status line instead (`syncStatus`), so a 60 s tick while offline never pops anything up.
     var lastError: String?
+    /// Outbox, failures and the last successful sync per account: the drawer's status line, its failed list and the
+    /// header's indicator. Written by `SyncEngine` in any process.
+    var syncStatus: SyncStatus = SyncStatusStore.current
+    /// The network path is down: shown at once, before a sync has noticed.
+    var isNetworkOffline = false
+    /// Failed changes being retried or discarded from the drawer: their rows wait or disappear right away.
+    private(set) var retryingChangeIDs: Set<UUID> = []
+    private(set) var discardedChangeIDs: Set<UUID> = []
     /// True while `ensureEvents(covering:)` is loading a range the cache did not hold (a subtle progress hint).
     private(set) var isLoadingRange = false
 
@@ -42,6 +52,8 @@ final class ScheduleViewModel {
     private static let loadsRangesOnDemand = !isPreview
     /// Settings changes (a stepper, a run of toggles) and account edits arrive in bursts: react once they settle.
     private static let changeDebounce: Duration = .milliseconds(400)
+    /// While the app is in front, Google is asked for changes this often (`SyncTrigger.timer`).
+    static let foregroundSyncInterval: Duration = .seconds(60)
 
     @ObservationIgnored private var rangeDebounceTask: Task<Void, Never>?
     @ObservationIgnored private var pendingRanges: [DateInterval] = []
@@ -51,6 +63,11 @@ final class ScheduleViewModel {
     @ObservationIgnored private var observations: [SharedChangeObservation] = []
     @ObservationIgnored private var preferencesTask: Task<Void, Never>?
     @ObservationIgnored private var accountsTask: Task<Void, Never>?
+    @ObservationIgnored private var syncStatusTask: Task<Void, Never>?
+    @ObservationIgnored private var foregroundSyncTask: Task<Void, Never>?
+    /// Asked for while a sync was running; runs once that one is done.
+    @ObservationIgnored private var queuedTrigger: SyncTrigger?
+    @ObservationIgnored private let connectivity = ConnectivityMonitor()
 
     /// A fresh `id` per request, so asking for the same range twice still reaches `onChange` observers.
     struct FocusRequest: Equatable {
@@ -75,7 +92,7 @@ final class ScheduleViewModel {
         }
         await reloadAccounts()
         await reloadFromCache()
-        await refresh()
+        await refresh(.foreground)
     }
 
     /// Calendar events plus the ghost previews of the pending plan and of "Ask me first" events, for the WEEK and
@@ -233,8 +250,17 @@ final class ScheduleViewModel {
             },
             SharedChangeNotifier.observe(.accounts) { [weak self] in
                 Task { @MainActor [weak self] in self?.accountsChanged() }
+            },
+            // The outbox drained or filled (here, in Siri or in the notification extension).
+            SharedChangeNotifier.observe(.syncStatus) { [weak self] in
+                Task { @MainActor [weak self] in self?.syncStatusChanged() }
             }
         ]
+        connectivity.start { [weak self] isOnline, cameBack in
+            guard let self else { return }
+            self.isNetworkOffline = !isOnline
+            if cameBack { Task { await self.refresh(.network) } }
+        }
     }
 
     private func preferencesChanged() {
@@ -254,6 +280,17 @@ final class ScheduleViewModel {
         }
     }
 
+    /// Pending glyphs come and go with the outbox, so the events are read again too.
+    private func syncStatusChanged() {
+        syncStatusTask?.cancel()
+        syncStatusTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.changeDebounce)
+            guard !Task.isCancelled, let self else { return }
+            self.syncStatus = SyncStatusStore.current
+            await self.reloadEvents()
+        }
+    }
+
     private func accountsChanged() {
         accountsTask?.cancel()
         accountsTask = Task { [weak self] in
@@ -266,26 +303,85 @@ final class ScheduleViewModel {
         }
     }
 
-    func refresh() async {
+    // MARK: Sync with Google
+
+    /// Sends what the outbox holds and brings in what changed in Google (`SyncEngine`), then shows the cache.
+    /// When the cache changed, the engine's change handler (`AppRefresh.installSyncHooks`) has already rescheduled
+    /// reminders and refreshed the Live Activity; foreground and pull-to-refresh do it regardless.
+    /// Demo mode has no Google: the seeded data is shown again instead (timer and network ticks do nothing).
+    func refresh(_ trigger: SyncTrigger = .pull) async {
         if isDemo || AppConstants.isDemoMode {
+            guard trigger != .timer, trigger != .network else { return }
             await refreshDemo(reseed: false)
             return
         }
-        guard isSignedIn, !isRefreshing else { return }
+        guard isSignedIn else { return }
+        guard !isRefreshing else {
+            // A tick can wait for the next one; anything else (back online, pull, retry) runs right after.
+            if trigger != .timer { queuedTrigger = trigger }
+            return
+        }
         isRefreshing = true
-        defer { isRefreshing = false }
-        do {
-            try await CalendarSync(clock: clock).refreshWindow()
-            await reloadFromCache()
+        let report = await SyncEngine.shared.sync(trigger, now: Date())
+        syncStatus = SyncStatusStore.current
+        await reloadFromCache()
+        if trigger == .foreground || trigger == .pull {
             await ReminderScheduler.shared.reschedule()
             await LiveActivityManager.shared.refreshIfRunning()
-            lastError = nil
-        } catch {
-            lastError = error.localizedDescription
-            // One account's expired sign-in marks only that account (the drawer offers Reconnect); the others
-            // keep syncing. Reloading picks up which accounts need it, and signs out only when none is left.
-            if error is AuthError { await reloadAccounts() }
         }
+        // One account's expired sign-in marks only that account (the drawer offers Reconnect); the others keep
+        // syncing. Reloading picks up which accounts need it, and signs out only when none is left.
+        if !report.errors.isEmpty { await reloadAccounts() }
+        isRefreshing = false
+        if let next = queuedTrigger {
+            queuedTrigger = nil
+            await refresh(next)
+        }
+    }
+
+    /// The scene came to the front: Google is asked again every `foregroundSyncInterval` until it leaves.
+    func startForegroundSync() {
+        guard foregroundSyncTask == nil, !Self.isPreview else { return }
+        foregroundSyncTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.foregroundSyncInterval)
+                guard !Task.isCancelled, let self else { return }
+                await self.refresh(.timer)
+            }
+        }
+    }
+
+    func stopForegroundSync() {
+        foregroundSyncTask?.cancel()
+        foregroundSyncTask = nil
+    }
+
+    /// "Retry" on a change Google refused.
+    func retryFailedChange(_ id: UUID) {
+        guard !retryingChangeIDs.contains(id) else { return }
+        retryingChangeIDs.insert(id)
+        Task {
+            await SyncEngine.shared.retry(id)
+            retryingChangeIDs.remove(id)
+            syncStatus = SyncStatusStore.current
+            await reloadFromCache()
+        }
+    }
+
+    /// "Discard": the change is dropped and its calendar listed again, so Google's version replaces it here.
+    func discardFailedChange(_ id: UUID) {
+        discardedChangeIDs.insert(id)
+        Task {
+            await SyncEngine.shared.discard(id)
+            syncStatus = SyncStatusStore.current
+            discardedChangeIDs.remove(id)
+            await reloadFromCache()
+        }
+    }
+
+    /// The drawer's failed list, without rows already discarded.
+    var failedChanges: [FailedChange] {
+        syncStatus.failed.filter { !discardedChangeIDs.contains($0.id) }
     }
 
     /// "Try without signing in": sample data and accounts, offline assistant, Live Activity, no Google or Gemini.
@@ -317,7 +413,7 @@ final class ScheduleViewModel {
         await ReminderScheduler.shared.reschedule()
         await LiveActivityManager.shared.refreshIfRunning()
         // Seeding replaced the cached Google window.
-        if isSignedIn { await refresh() }
+        if isSignedIn { await refresh(.foreground) }
     }
 
     /// After Settings › Data › "Erase all data on this device": back to the signed-out welcome state.
@@ -330,6 +426,10 @@ final class ScheduleViewModel {
         pendingPlan = nil
         pendingEvents = nil
         lastError = nil
+        syncStatus = SyncStatusStore.current
+        retryingChangeIDs = []
+        discardedChangeIDs = []
+        queuedTrigger = nil
         rangesInFlight = LoadedRanges()
         lastRequestedRange = nil
         clock = WallClock()

@@ -33,6 +33,35 @@
         }
       }
     },
+    "%lld changes waiting to sync" : {
+      "comment" : "Drawer sync status / header indicator: changes not in Google yet",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change waiting to sync"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes waiting to sync"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 項變更待同步"
+          }
+        }
+      }
+    },
     "%lld days" : {
       "localizations" : {
         "en" : {
@@ -913,12 +942,34 @@
         }
       }
     },
+    "Can't reach Google · tap to retry" : {
+      "comment" : "Drawer sync status after a failed sync",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法連線到 Google · 點一下重試"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消"
+          }
+        }
+      }
+    },
+    "Cancelled in Google Calendar" : {
+      "comment" : "Reminder card: the event was cancelled in Google Calendar",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在 Google 日曆取消"
           }
         }
       }
@@ -1330,6 +1381,17 @@
         }
       }
     },
+    "Delete · %@" : {
+      "comment" : "Failed change in the drawer: what it was and when the event is",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除 · %@"
+          }
+        }
+      }
+    },
     "Deleted %lld items from Google Calendar." : {
       "localizations" : {
         "en" : {
@@ -1446,6 +1508,17 @@
         }
       }
     },
+    "Demo · not synced" : {
+      "comment" : "Drawer sync status in demo mode",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範 · 不同步"
+          }
+        }
+      }
+    },
     "Describe an event or a goal; Smart Schedule writes it to Google Calendar. Long-term plans wait in the app until you review them and tap Add." : {
       "localizations" : {
         "zh-Hant" : {
@@ -1462,6 +1535,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "聽寫"
+          }
+        }
+      }
+    },
+    "Discard" : {
+      "comment" : "Failed change in the drawer: drop it and keep Google's version",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捨棄"
           }
         }
       }
@@ -1562,6 +1646,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "編輯"
+          }
+        }
+      }
+    },
+    "Edit every occurrence" : {
+      "comment" : "Failed change in the drawer: an edit to a whole recurring series",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改所有重複的行程"
+          }
+        }
+      }
+    },
+    "Edit · %@" : {
+      "comment" : "Failed change in the drawer: what it was and when the event is",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修改 · %@"
           }
         }
       }
@@ -1798,6 +1904,17 @@
         }
       }
     },
+    "Google Calendar refused this change (error %lld)." : {
+      "comment" : "Why a change failed: HTTP status",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Google 日曆拒絕了這項變更（錯誤 %lld）。"
+          }
+        }
+      }
+    },
     "Google accounts" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1954,6 +2071,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 分鐘後"
+          }
+        }
+      }
+    },
+    "It was changed in Google Calendar at the same time." : {
+      "comment" : "Why a change failed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它同時在 Google 日曆被修改了。"
+          }
+        }
+      }
+    },
+    "It was deleted in Google Calendar." : {
+      "comment" : "Why a change failed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它已在 Google 日曆刪除。"
           }
         }
       }
@@ -2142,6 +2281,17 @@
         }
       }
     },
+    "Moved to %@" : {
+      "comment" : "Reminder card: the event moved in Google Calendar; day and 24-hour time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移到 %@"
+          }
+        }
+      }
+    },
     "My calendar" : {
       "localizations" : {
         "zh-Hant" : {
@@ -2158,6 +2308,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在"
+          }
+        }
+      }
+    },
+    "New event · %@" : {
+      "comment" : "Failed change in the drawer: what it was and when the event is",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新行程 · %@"
           }
         }
       }
@@ -2293,6 +2454,17 @@
         }
       }
     },
+    "Not synced yet" : {
+      "comment" : "Drawer sync status before the first sync",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未同步"
+          }
+        }
+      }
+    },
     "Nothing is added until you tap Add." : {
       "localizations" : {
         "zh-Hant" : {
@@ -2390,6 +2562,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "關閉：Smart Schedule 不會為這個行事曆裡的行程發送提醒。"
+          }
+        }
+      }
+    },
+    "Offline" : {
+      "comment" : "Drawer sync status: no network, nothing waiting",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離線"
+          }
+        }
+      }
+    },
+    "Offline · %lld changes waiting" : {
+      "comment" : "Drawer sync status: no network, changes made on this iPhone wait for Google",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Offline · %lld change waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Offline · %lld changes waiting"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "離線 · %lld 項變更待同步"
           }
         }
       }
@@ -2767,6 +2979,17 @@
         }
       }
     },
+    "Retry" : {
+      "comment" : "Failed change in the drawer: send it to Google again",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重試"
+          }
+        }
+      }
+    },
     "Review" : {
       "localizations" : {
         "zh-Hant" : {
@@ -2837,6 +3060,39 @@
         }
       }
     },
+    "Saved on this iPhone. It will sync to Google Calendar as soon as Google can be reached." : {
+      "comment" : "A change could not reach Google and waits in the outbox",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存在這支 iPhone 上，能連線到 Google 時就會同步到 Google 日曆。"
+          }
+        }
+      }
+    },
+    "Saved to «%@» (hidden in Smart Schedule)" : {
+      "comment" : "A new event went to the default calendar, which is hidden in the app",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存到「%@」（目前在 Smart Schedule 隱藏）"
+          }
+        }
+      }
+    },
+    "Saved · waiting to sync" : {
+      "comment" : "Added-event card when Google has not confirmed the events yet",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已儲存 · 待同步"
+          }
+        }
+      }
+    },
     "Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Show my schedule in Smart Schedule”." : {
       "localizations" : {
         "zh-Hant" : {
@@ -2897,6 +3153,17 @@
         }
       }
     },
+    "Show" : {
+      "comment" : "Makes a hidden calendar visible again",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示"
+          }
+        }
+      }
+    },
     "Show %@" : {
       "localizations" : {
         "zh-Hant" : {
@@ -2944,6 +3211,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示下一個行程"
+          }
+        }
+      }
+    },
+    "Shows the sync status" : {
+      "comment" : "Header sync indicator, accessibility hint",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示同步狀態"
           }
         }
       }
@@ -3055,6 +3333,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已延後 %lld 分鐘"
+          }
+        }
+      }
+    },
+    "Some changes couldn't sync" : {
+      "comment" : "Header sync indicator, accessibility",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有變更無法同步"
           }
         }
       }
@@ -3206,6 +3495,61 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這個語言支援裝置端辨識"
+          }
+        }
+      }
+    },
+    "Synced · %@" : {
+      "comment" : "Drawer sync status: day and 24-hour time of the last successful sync",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已同步 · %@"
+          }
+        }
+      }
+    },
+    "Synced · %lld h ago" : {
+      "comment" : "Drawer sync status: hours since the last successful sync",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已同步 · %lld 小時前"
+          }
+        }
+      }
+    },
+    "Synced · %lld min ago" : {
+      "comment" : "Drawer sync status: minutes since the last successful sync",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已同步 · %lld 分鐘前"
+          }
+        }
+      }
+    },
+    "Synced · just now" : {
+      "comment" : "Drawer sync status",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已同步 · 剛剛"
+          }
+        }
+      }
+    },
+    "Syncing…" : {
+      "comment" : "Drawer sync status while changes are being sent",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步中…"
           }
         }
       }
@@ -3683,6 +4027,17 @@
         }
       }
     },
+    "Waiting to sync" : {
+      "comment" : "Event changed on this iPhone, not confirmed by Google yet",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待同步"
+          }
+        }
+      }
+    },
     "Week starts on" : {
       "localizations" : {
         "zh-Hant" : {
@@ -3999,6 +4354,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這個計畫（%lld 個項目）"
+          }
+        }
+      }
+    },
+    "“%@” was changed in Google Calendar at the same time. Try again." : {
+      "comment" : "Edit conflict: Google has a newer version of the event",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」同時在 Google 日曆被修改了，請再試一次。"
+          }
+        }
+      }
+    },
+    "“%@” was deleted in Google Calendar, so the change wasn't saved." : {
+      "comment" : "A change to an event someone deleted in Google Calendar meanwhile",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」已在 Google 日曆刪除，所以這項變更沒有儲存。"
           }
         }
       }

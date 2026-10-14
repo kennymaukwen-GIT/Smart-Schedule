@@ -29,6 +29,9 @@ actor SharedStore {
         var coverageByCalendar: [String: [DateInterval]] = [:]
         /// "Ask me first": single events waiting for Add, shared with Siri and the notification extension.
         var pendingEventBatch: PendingEventBatch?
+        /// Per synced calendar (`CalendarRef.key`): when it was last listed in full and since when Google's changes
+        /// have been applied (`SyncEngine`'s "changed since" pass).
+        var syncMarks: [String: SyncMark] = [:]
 
         /// The rolling sync window (`windowStart ..< windowEnd`), when a sync or the demo seed has set one.
         var window: DateInterval? {
@@ -140,13 +143,18 @@ actor SharedStore {
             snapshot.lastRefresh = Date()
             snapshot.loadedRanges = []
             snapshot.coverageByCalendar = [:]
+            snapshot.syncMarks = [:]
         }
     }
 
     /// One calendar's rolling window: replaces that calendar's events inside `interval` (and older copies of listed
     /// events elsewhere in it), leaves every other calendar alone, and sets that calendar's coverage to the window,
     /// forgetting its on-demand ranges like the calendar-less version.
-    func replaceWindow(_ interval: DateInterval, calendar: CalendarRef, with events: [ScheduleEvent]) {
+    ///
+    /// - Parameter listedAt: Google's clock when the listing started (less a safety margin): Google changes after it
+    ///   are what the next "changed since" pass asks for. nil: two minutes before now on this iPhone's clock.
+    func replaceWindow(_ interval: DateInterval, calendar: CalendarRef, with events: [ScheduleEvent],
+                       listedAt: Date? = nil) {
         mutate { snapshot in
             let stamped = events.map { Self.stamped($0, calendar: calendar) }
             let incoming = Dictionary(stamped.map { ($0.ref, $0) }, uniquingKeysWith: { _, new in new })
@@ -158,6 +166,8 @@ actor SharedStore {
             snapshot.windowEnd = interval.end
             snapshot.lastRefresh = Date()
             snapshot.coverageByCalendar[calendar.key] = [interval]
+            snapshot.syncMarks[calendar.key] = SyncMark(fullListAt: Date(),
+                                                        changesSince: listedAt ?? Date().addingTimeInterval(-120))
         }
     }
 
@@ -225,7 +235,10 @@ actor SharedStore {
             let coverageKeys = snapshot.coverageByCalendar.keys.filter(coverage)
             guard !purged.isEmpty || !coverageKeys.isEmpty else { return false }
             snapshot.events.removeAll(where: matches)
-            for key in coverageKeys { snapshot.coverageByCalendar[key] = nil }
+            for key in coverageKeys {
+                snapshot.coverageByCalendar[key] = nil
+                snapshot.syncMarks[key] = nil
+            }
             let remainingPlans = Set(snapshot.events.compactMap(\.planID))
             let orphaned = Set(purged.compactMap(\.planID)).subtracting(remainingPlans)
             snapshot.nudges.removeAll { orphaned.contains($0.planID) }
@@ -305,5 +318,15 @@ extension SharedStore.Snapshot {
         // Missing before multiple accounts: every calendar loads its ranges again.
         coverageByCalendar = (try? container.decodeIfPresent([String: [DateInterval]].self, forKey: .coverageByCalendar)) ?? [:]
         pendingEventBatch = try? container.decodeIfPresent(PendingEventBatch.self, forKey: .pendingEventBatch)
+        // Missing before two-way sync: the next sync lists every calendar in full.
+        syncMarks = (try? container.decodeIfPresent([String: SyncMark].self, forKey: .syncMarks)) ?? [:]
     }
+}
+
+/// One synced calendar's place in the Google → iPhone direction.
+struct SyncMark: Codable, Hashable, Sendable {
+    /// Its rolling window was last listed in full (this iPhone's clock).
+    var fullListAt: Date?
+    /// Google's changes up to here are in the cache (Google's clock, with a margin): the next `updatedMin`.
+    var changesSince: Date?
 }

@@ -842,4 +842,180 @@ private func settingsPreview<Page: View>(chinese: Bool = false, @ViewBuilder pag
     .background(Theme.surface)
     .preferredColorScheme(.dark)
 }
+
+// MARK: - Two-way sync
+
+/// Preview-only sync states. The only place previews build `SyncStatus`, `FailedChange` and pending events.
+@MainActor
+enum PreviewSync {
+    /// Two changes Google refused: an edit in a calendar shared read-only, and a new event it rejected.
+    static func failed(chinese: Bool) -> [FailedChange] {
+        func text(_ english: String, _ chineseText: String) -> String { chinese ? chineseText : english }
+        return [
+            FailedChange(id: UUID(), title: text("Team offsite", "團隊外訓"),
+                         summary: text("Move to Fri, Oct 16 · 13:00–17:00", "改到 10月16日（週五）13:00–17:00"),
+                         failedAt: Date().addingTimeInterval(-600),
+                         reason: text("You can't change events in “Holidays in Hong Kong”.",
+                                      "你無法修改「Holidays in Hong Kong」裡的行程。")),
+            FailedChange(id: UUID(), title: text("Coffee with Mia", "跟 Mia 喝咖啡"),
+                         summary: text("New event · Thu, Oct 15 · 09:00–10:00", "新行程 · 10月15日（週四）09:00–10:00"),
+                         failedAt: Date().addingTimeInterval(-120),
+                         reason: text("Google Calendar rejected the change.", "Google 日曆拒絕了這項變更。"))
+        ]
+    }
+
+    /// `syncedAgo`: seconds since every account last synced; nil = never.
+    static func status(pending: Int = 0, offline: Bool = false, failed: [FailedChange] = [],
+                       syncedAgo: TimeInterval? = 300,
+                       accounts: [GoogleAccount] = PreviewAccounts.all) -> SyncStatus {
+        var status = SyncStatusStore.current
+        status.pendingCount = pending
+        status.isOffline = offline
+        status.failed = failed
+        status.lastSuccess = [:]
+        if let syncedAgo {
+            for account in accounts { status.lastSuccess[account.id] = Date().addingTimeInterval(-syncedAgo) }
+        }
+        return status
+    }
+
+    /// A copy made on this iPhone that Google has not confirmed yet.
+    static func waiting(_ event: ScheduleEvent) -> ScheduleEvent {
+        var copy = event
+        copy.isPendingSync = true
+        return copy
+    }
+
+    /// Signed in with two changes waiting and two refused; the first few events of the month wait too.
+    static func schedule(offline: Bool = false, chinese: Bool = false) -> ScheduleViewModel {
+        let schedule = signedInSchedule()
+        let refused = offline ? [] : Self.failed(chinese: chinese)
+        schedule.syncStatus = status(pending: offline ? 3 : 2, offline: offline, failed: refused)
+        schedule.isNetworkOffline = offline
+        // From today on: chips on screen in the month grid and Quick Capture.
+        let today = schedule.clock.calendar.startOfDay(for: Date())
+        var marked = 0
+        schedule.events = schedule.events.map { event in
+            guard marked < 4, event.start >= today, !event.isAllDay else { return event }
+            marked += 1
+            return waiting(event)
+        }
+        return schedule
+    }
+
+    /// "Gym" is hidden on this iPhone and just received a new session.
+    static func hiddenGymSchedule() -> ScheduleViewModel {
+        var personal = PreviewAccounts.personal
+        if let index = personal.calendars.firstIndex(where: { $0.calendarID == "gym" }) {
+            personal.calendars[index].isVisible = false
+        }
+        return ScheduleViewModel.preview(isDemo: false, accounts: [personal, PreviewAccounts.school])
+    }
+
+    static var gymRef: CalendarRef { CalendarRef(accountID: PreviewAccounts.personal.id, calendarID: "gym") }
+}
+
+#Preview("Drawer · waiting and failed changes") {
+    drawerPreview(PreviewSync.schedule())
+}
+
+#Preview("Drawer · offline · zh-Hant") {
+    drawerPreview(PreviewSync.schedule(offline: true, chinese: true), chinese: true)
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
+
+#Preview("Sync status lines") {
+    let summaries: [SyncSummary] = [
+        .synced(Date()), .synced(Date().addingTimeInterval(-5 * 60)), .synced(Date().addingTimeInterval(-3 * 3600)),
+        .synced(Date().addingTimeInterval(-2 * 86_400)), .waiting(pending: 1), .waiting(pending: 4), .syncing,
+        .offline(pending: 0), .offline(pending: 3), .unreachable, .demo, .notSynced
+    ]
+    List {
+        ForEach(Array(summaries.enumerated()), id: \.offset) { _, summary in
+            SyncStatusLine(summary: summary)
+        }
+        FailedChangeRow(change: PreviewSync.failed(chinese: false)[0])
+        FailedChangeRow(change: PreviewSync.failed(chinese: false)[1], isRetrying: true)
+    }
+    .listStyle(.insetGrouped)
+    .scrollContentBackground(.hidden)
+    .background(Theme.surface)
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Header · sync indicators · offline") {
+    let schedule = PreviewSync.schedule(offline: true)
+    VStack(spacing: 20) {
+        // Offline with three changes waiting (what the main screen shows below).
+        AppHeader(month: Date(), calendar: WallClock().calendar, avatarInitial: "K",
+                  syncIndicator: .pending(count: 3, offline: true))
+        AppHeader(month: Date(), calendar: WallClock().calendar, avatarInitial: "K",
+                  syncIndicator: .pending(count: 2, offline: false))
+        AppHeader(month: Date(), calendar: WallClock().calendar, avatarInitial: "K",
+                  syncIndicator: .failing(count: 1))
+        AppHeader(month: Date(), calendar: WallClock().calendar, avatarInitial: "K")
+        MonthGridView(month: .constant(Date()), today: Date(), showsTitle: false,
+                      eventsOnDay: schedule.events(on:), onSelect: { _ in })
+            .frame(height: 420)
+    }
+    .padding(12)
+    .background(Theme.canvas)
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Main · waiting to sync") {
+    let schedule = PreviewSync.schedule()
+    MainView()
+        .environment(schedule)
+        .environment(ChatViewModel.preview(schedule: schedule))
+        .environment(AppRouter())
+        .preferredColorScheme(.dark)
+}
+
+#Preview("Quick Capture · Week · waiting to sync") {
+    let schedule = PreviewSync.schedule()
+    ZStack(alignment: .top) {
+        Color.black.ignoresSafeArea()
+        QuickCaptureView(startsWithVoice: false, initialMode: .week, onClose: {})
+    }
+    .environment(schedule)
+    .environment(ChatViewModel.preview(schedule: schedule))
+    .environment(AppRouter())
+    .preferredColorScheme(.dark)
+}
+
+/// A new session went to "Gym", which this iPhone hides: the added card offers Show (tap it to see the notice go).
+@MainActor
+private func hiddenCalendarPreview(chinese: Bool) -> some View {
+    let schedule = PreviewSync.hiddenGymSchedule()
+    schedule.syncStatus = PreviewSync.status(pending: 1)
+    let samples = PreviewChat(schedule: schedule, chinese: chinese)
+    var session = samples.lunch
+    session.title = samples.text("Gym", "健身")
+    session.accountID = PreviewAccounts.personal.id
+    session.calendarID = "gym"
+    let added = ChatViewModel.Message(role: .assistant, text: "", addedEvents: [session],
+                                      savedToHiddenCalendar: PreviewSync.gymRef)
+    let offline = ChatViewModel.Message(role: .assistant, text: "", addedEvents: [PreviewSync.waiting(samples.meeting)])
+    return ScrollView {
+        VStack(alignment: .leading, spacing: 20) {
+            AssistantMessageView(message: added)
+            AssistantMessageView(message: offline)
+            HiddenCalendarNotice(calendarName: samples.text("Gym", "健身"))
+        }
+        .padding(16)
+    }
+    .background(Theme.surface)
+    .environment(schedule)
+    .preferredColorScheme(.dark)
+}
+
+#Preview("Saved to a hidden calendar") {
+    hiddenCalendarPreview(chinese: false)
+}
+
+#Preview("Saved to a hidden calendar · zh-Hant") {
+    hiddenCalendarPreview(chinese: true)
+        .environment(\.locale, Locale(identifier: "zh-Hant"))
+}
 #endif

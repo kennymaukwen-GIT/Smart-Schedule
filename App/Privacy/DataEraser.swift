@@ -13,6 +13,9 @@ enum DataEraser {
         // Revokes every token at Google, deletes them (legacy item included) and the accounts file.
         await AccountManager.shared.disconnectAll(revoke: true)
         await SharedStore.shared.eraseAll()
+        // Queued changes hold event details and must never go out after a later sign-in.
+        await SyncOutbox.shared.eraseAll()
+        SyncStatusStore.reset()
         await PreferencesStore.shared.eraseAll()
         await ChatHistoryStore.shared.eraseAll()
         removeExportCopies()

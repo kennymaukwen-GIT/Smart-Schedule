@@ -132,6 +132,14 @@ final class AccountManager {
         await store.purge(accountID: accountID)
         await accounts.remove(accountID: accountID)
         await forgetChoices { $0 == accountID }
+        // Its queued changes can never be sent; the status line stops counting them.
+        await SyncOutbox.shared.removeAll(accountID: accountID)
+        let queued = await SyncOutbox.shared.items()
+        SyncStatusStore.update { status in
+            status.pendingCount = queued.filter { !$0.isFailed }.count
+            status.failed = queued.compactMap(\.failedChange)
+            status.lastSuccess[accountID] = nil
+        }
         await ReminderScheduler.shared.reschedule()
         await LiveActivityManager.shared.refreshIfRunning()
     }

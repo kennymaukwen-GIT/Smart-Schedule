@@ -278,7 +278,8 @@ struct CalendarEventMapper: Sendable {
             notes: event.description,
             reminderMinutes: Self.reminderMinutes(of: event),
             planID: props[SSProperty.planID],
-            htmlLink: event.htmlLink.flatMap(URL.init(string:))
+            htmlLink: event.htmlLink.flatMap(URL.init(string:)),
+            etag: event.etag
         )
     }
 

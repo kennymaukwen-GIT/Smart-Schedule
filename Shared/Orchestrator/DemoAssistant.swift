@@ -613,6 +613,7 @@ actor DemoAssistant: ScheduleAssisting {
         reply.append(ReplyFormatter.confirmation(for: [event], clock: clock))
         reply.append(ReplyFormatter.conflicts([event], against: sameDay))
         reply.append(Self.demoNote)
+        await noteHiddenTarget(Self.demoTarget(for: settings), in: &reply)
         return reply
     }
 
@@ -658,6 +659,13 @@ actor DemoAssistant: ScheduleAssisting {
 
     private static var demoWritableCalendars: [CalendarInfo] {
         DemoData.accounts.flatMap(\.calendars).filter(\.isWritable)
+    }
+
+    /// Sample calendars can be hidden in the drawer too: the confirmation then says where the event went, with
+    /// Show. Nothing is redirected. Without an account store (unit tests) every calendar counts as shown.
+    private func noteHiddenTarget(_ target: CalendarRef, in reply: inout Reply) async {
+        guard let calendar = await store.accounts?.calendar(target) else { return }
+        ScheduleAssistant.noteHidden(calendar, in: &reply)
     }
 
     // MARK: - "Ask me first": pending events
@@ -714,6 +722,7 @@ actor DemoAssistant: ScheduleAssisting {
         reply.showRange = ScheduleAssistant.dayRange(of: events, clock: clock)
         reply.append(ReplyFormatter.confirmation(for: events, clock: clock))
         reply.append(Self.demoNote)
+        await noteHiddenTarget(Self.demoTarget(for: settings), in: &reply)
         return reply
     }
 

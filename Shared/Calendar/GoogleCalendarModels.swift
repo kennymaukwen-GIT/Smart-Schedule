@@ -3,7 +3,7 @@ import Foundation
 // Subset of the Calendar API v3 Event resource that Smart Schedule reads and writes.
 // Synthesized Codable skips nil optionals, which is exactly what PATCH semantics need.
 
-struct GCalEvent: Codable, Sendable {
+struct GCalEvent: Codable, Equatable, Sendable {
     var id: String?
     var status: String?
     var summary: String?
@@ -23,9 +23,13 @@ struct GCalEvent: Codable, Sendable {
     /// Same in every attendee's calendar and for every instance of a series (read only).
     var iCalUID: String?
     var organizer: GCalPerson?
+    /// The resource's version (read only, quotes included): sent back as If-Match on PATCH and DELETE.
+    var etag: String?
+    /// Last modification time, RFC3339 (read only).
+    var updated: String?
 }
 
-struct GCalPerson: Codable, Sendable {
+struct GCalPerson: Codable, Equatable, Sendable {
     var email: String?
     var isSelf: Bool?
 
@@ -35,14 +39,14 @@ struct GCalPerson: Codable, Sendable {
     }
 }
 
-struct GCalDateTime: Codable, Sendable {
+struct GCalDateTime: Codable, Equatable, Sendable {
     var date: String?        // all-day: "2026-10-15" (end is exclusive)
     var dateTime: String?    // "2026-10-14T14:00:00" (+ timeZone) or RFC3339 with offset
     var timeZone: String?    // IANA, required for recurring events
 }
 
-struct GCalReminders: Codable, Sendable {
-    struct Override: Codable, Sendable {
+struct GCalReminders: Codable, Equatable, Sendable {
+    struct Override: Codable, Equatable, Sendable {
         var method: String   // "popup" | "email"
         var minutes: Int     // 0...40320
     }
@@ -50,17 +54,17 @@ struct GCalReminders: Codable, Sendable {
     var overrides: [Override]?
 }
 
-struct GCalAttendee: Codable, Sendable {
+struct GCalAttendee: Codable, Equatable, Sendable {
     var email: String
 }
 
-struct GCalConferenceData: Codable, Sendable {
-    struct CreateRequest: Codable, Sendable {
-        struct SolutionKey: Codable, Sendable { var type: String }
+struct GCalConferenceData: Codable, Equatable, Sendable {
+    struct CreateRequest: Codable, Equatable, Sendable {
+        struct SolutionKey: Codable, Equatable, Sendable { var type: String }
         var requestId: String
         var conferenceSolutionKey: SolutionKey
     }
-    struct EntryPoint: Codable, Sendable {
+    struct EntryPoint: Codable, Equatable, Sendable {
         var entryPointType: String?
         var uri: String?
     }
@@ -72,7 +76,7 @@ struct GCalConferenceData: Codable, Sendable {
     }
 }
 
-struct GCalExtendedProperties: Codable, Sendable {
+struct GCalExtendedProperties: Codable, Equatable, Sendable {
     var `private`: [String: String]?
     var shared: [String: String]?
 }
