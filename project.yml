@@ -16,6 +16,13 @@ configFiles:
   Release: Config/Base.xcconfig
 
 settings:
+  configs:
+    # Push environment per configuration. Signing also sets it from the provisioning profile: development profiles
+    # use development, distribution profiles and TestFlight production (Apple: APS Environment Entitlement).
+    Debug:
+      APS_ENVIRONMENT: development
+    Release:
+      APS_ENVIRONMENT: production
   base:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "0.1.0"
@@ -32,7 +39,11 @@ targets:
     type: application
     platform: iOS
     sources:
-      - App
+      # The privacy manifest is listed on its own so it is certainly a bundle resource.
+      - path: App
+        excludes: [PrivacyInfo.xcprivacy]
+      - path: App/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - Shared
     settings:
       base:
@@ -72,7 +83,7 @@ targets:
         com.apple.security.application-groups: [group.com.smartschedule.shared]
         keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]
         com.apple.developer.usernotifications.time-sensitive: true
-        aps-environment: development
+        aps-environment: $(APS_ENVIRONMENT)
     dependencies:
       - target: SmartScheduleWidgets
       - target: SmartScheduleNotificationContent
@@ -87,7 +98,10 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - Widgets
+      - path: Widgets
+        excludes: [PrivacyInfo.xcprivacy]
+      - path: Widgets/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - Shared/Core
       - Shared/Models
       - Shared/Storage
@@ -117,7 +131,10 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - NotificationContent
+      - path: NotificationContent
+        excludes: [PrivacyInfo.xcprivacy]
+      - path: NotificationContent/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - Shared/Core
       - Shared/Models
       - Shared/Storage

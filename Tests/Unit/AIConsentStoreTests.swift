@@ -67,10 +67,17 @@ final class AIConsentStoreTests: XCTestCase {
         XCTAssertFalse(AIConsentStore.current(in: nil).isGranted)
     }
 
-    func testDisclosureSaysWhatIsSentAndToWhom() {
+    func testDisclosureSaysWhatIsSentAndToWhom() throws {
         XCTAssertEqual(AIConsentDisclosure.title, "Use the AI assistant?")
         XCTAssertEqual(AIConsentDisclosure.items.count, 4)
         XCTAssertTrue(AIConsentDisclosure.items[0].contains("type or say"))
+        XCTAssertTrue(AIConsentDisclosure.items[0].contains("spoken requests as text"))
+        // iOS 18 only: event titles and times kept on the server for the Dynamic Island; never notes or places.
+        let note = try XCTUnwrap(AIConsentDisclosure.serverNote(beforeIOS26: true))
+        XCTAssertTrue(note.contains("titles and start times") && note.contains("server") && note.contains("iOS 18"), note)
+        XCTAssertTrue(note.contains("Notes and places are not stored"), note)
+        XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: false))
+        XCTAssertEqual(AIConsent.disclosureVersion, 2, "everyone is asked again for the new disclosure")
         XCTAssertTrue(AIConsentDisclosure.items[1].contains("Titles, times, locations and notes"))
         XCTAssertTrue(AIConsentDisclosure.items[3].contains("time zone and language"))
         XCTAssertTrue(AIConsentDisclosure.lead.contains("Gemini API"))
@@ -79,7 +86,7 @@ final class AIConsentStoreTests: XCTestCase {
         XCTAssertTrue(AIConsentDisclosure.footnote.contains("Demo mode"))
         // Only Gemini's paid tier keeps prompts out of training: the app must never promise it.
         let all = ([AIConsentDisclosure.title, AIConsentDisclosure.lead, AIConsentDisclosure.recipient,
-                    AIConsentDisclosure.footnote] + AIConsentDisclosure.items).joined(separator: " ").lowercased()
+                    AIConsentDisclosure.footnote, note] + AIConsentDisclosure.items).joined(separator: " ").lowercased()
         XCTAssertFalse(all.contains("train"), all)
     }
 }

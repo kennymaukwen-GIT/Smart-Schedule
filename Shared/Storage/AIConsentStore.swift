@@ -5,7 +5,8 @@ import Foundation
 struct AIConsent: Codable, Hashable, Sendable {
     enum Status: String, Codable, Sendable { case notAsked, granted, declined, revoked }
     /// Bump when the disclosure (`AIConsentDisclosure`) changes materially: everyone is asked again.
-    static let disclosureVersion = 1
+    /// 2: names the transcript of spoken requests, and on iOS 18 the event titles and times kept on the server.
+    static let disclosureVersion = 2
 
     var status: Status = .notAsked
     var version = 0                 // disclosure version the decision applies to
@@ -77,13 +78,24 @@ enum AIConsentDisclosure {
     }
 
     static var items: [String] {
-        [String(localized: "What you type or say to the assistant"),
+        [String(localized: "What you type or say to the assistant (spoken requests as text)"),
          String(localized: "Titles, times, locations and notes of your events in the days the request is about (the next two weeks by default)"),
          String(localized: "The names of your calendars and your assistant settings"),
          String(localized: "Your time zone and language")]
     }
 
     static var recipient: String { String(localized: "Recipient: Google, through the Gemini API.") }
+
+    /// iOS 18 cannot start a Live Activity on its own, so a server does it; on iOS 26 the iPhone schedules them itself.
+    static var serverNote: String? {
+        if #available(iOS 26.0, *) { return serverNote(beforeIOS26: false) }
+        return serverNote(beforeIOS26: true)
+    }
+
+    static func serverNote(beforeIOS26: Bool) -> String? {
+        guard beforeIOS26 else { return nil }
+        return String(localized: "On iOS 18, the titles and start times of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
+    }
 
     static var footnote: String {
         String(localized: "Nothing is sent until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode works without sharing anything.")

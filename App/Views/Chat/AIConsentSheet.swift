@@ -81,6 +81,15 @@ struct AIConsentDisclosureText: View {
             }
             .font(.system(size: 15, weight: .medium))
             .foregroundStyle(.white)
+            if let note = AIConsentDisclosure.serverNote {
+                Label {
+                    Text(verbatim: note)
+                } icon: {
+                    Image(systemName: "server.rack")
+                }
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.92))
+            }
             Text(verbatim: AIConsentDisclosure.footnote)
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.textSecondary)

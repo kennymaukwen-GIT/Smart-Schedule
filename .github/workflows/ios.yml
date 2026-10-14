@@ -111,6 +111,20 @@ jobs:
             -destination "id=$SIM_UDID" \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log
 
+      - name: Check privacy manifests are bundled
+        run: |
+          set -euo pipefail
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -type d -path "*/Build/Products/Debug-iphonesimulator/SmartSchedule.app" | head -1)
+          test -n "$APP"
+          for f in "$APP/PrivacyInfo.xcprivacy" \
+                   "$APP/PlugIns/SmartScheduleWidgets.appex/PrivacyInfo.xcprivacy" \
+                   "$APP/PlugIns/SmartScheduleNotificationContent.appex/PrivacyInfo.xcprivacy"; do
+            test -f "$f" || { echo "::error::missing ${f#$APP/}"; exit 1; }
+            plutil -lint "$f"
+            grep -q "1C8F.1" "$f" || { echo "::error::${f#$APP/} does not declare the App Group UserDefaults reason"; exit 1; }
+            echo "bundled: ${f#$APP/}"
+          done
+
       - name: Run unit tests
         run: |
           set -o pipefail

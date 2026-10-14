@@ -3227,6 +3227,16 @@
         }
       }
     },
+    "On iOS 18, the titles and start times of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 iOS 18 上，接下來兩天行程的標題與開始時間也會暫存在 Smart Schedule 的伺服器，讓每個行程在開始前出現在動態島。備註與地點不會儲存。"
+          }
+        }
+      }
+    },
     "On iPhone 15 Pro and later: open the Settings app › Action Button, swipe to Shortcut, then choose Add to Smart Schedule." : {
       "localizations" : {
         "zh-Hant" : {
@@ -5017,12 +5027,12 @@
         }
       }
     },
-    "What you type or say to the assistant" : {
+    "What you type or say to the assistant (spoken requests as text)" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你對助理輸入或說出的內容"
+            "value" : "你對助理輸入或說出的內容（語音先轉成文字）"
           }
         }
       }
