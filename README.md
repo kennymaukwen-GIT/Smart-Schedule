@@ -131,13 +131,13 @@ xcodegen generate && open SmartSchedule.xcodeproj
 
 ```bash
 brew install xcodegen
-cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig   # 填入 Team、Google iOS client ID、開發用的 Gemini key
+cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig   # 填入 Team、Google iOS client ID、伺服器網址（GEMINI_BASE_URL）、開發用的 SS_DEV_TOKEN
 xcodegen generate
 open SmartSchedule.xcodeproj
 ```
 1. 在 Apple Developer 後台建立 App Group `group.com.smartschedule.shared`，三個 target 都勾選。如果要改 bundle ID 前綴，記得同步改 `AppConstants.appGroupID`。
 2. Google Cloud：啟用 Calendar API，OAuth consent screen 加入 `calendar.events` 和 `calendar.calendarlist.readonly`（抽屜列出每個行事曆要用），建立 **iOS** 類型的 OAuth client。
-3. Gemini：開發階段可以直接用 API key；**正式版**要把 `GEMINI_BASE_URL` 指向你的 proxy，並把 `GEMINI_API_KEY` 留空。上線前替 Gemini API 的專案開啟 Cloud Billing（付費層級）：免費層級下 Google 可能用請求內容改善產品，App 裡不會也不能宣稱「不用於訓練」。
+3. Gemini：App 裡**沒有** API key。key 只放在 Smart Schedule 的伺服器（`server/worker/`，Cloudflare Worker 的 secret），App 以 App Attest 證明自己後經由伺服器呼叫 Gemini。`GEMINI_BASE_URL` 指向伺服器（`https://<worker 網域>/v1beta`）；模擬器沒有 App Attest，Debug 版改送 `SS_DEV_TOKEN`（Release 一律為空）。上線前替 Gemini API 的專案開啟 Cloud Billing（付費層級）：免費層級下 Google 可能用請求內容改善產品，App 裡不會也不能宣稱「不用於訓練」。
 4. 訂閱：Scheme 的 StoreKit Configuration 用 `Config/SmartSchedule.storekit` 在模擬器測試；上架前在 App Store Connect 建立同樣 ID 的訂閱群組和商品。
 5. 實機執行，到控制中心加入「Smart Schedule」控制項（設定 › 捷徑與 Siri 有步驟說明）。
 
@@ -145,7 +145,7 @@ open SmartSchedule.xcodeproj
 
 完整清單和待決定事項（價格、Pro 要鎖什麼、隱私權政策網址）在 [`docs/SETTINGS.md`](docs/SETTINGS.md) 第 16 節。
 
-- [ ] **Gemini 付費層級**：替 Gemini API 的 Google Cloud 專案開啟 Cloud Billing。免費層級下 Google 可能用請求內容改善產品；App 和隱私權政策都不能宣稱「不用於訓練」。正式版改走自己的 proxy，不把 API key 放進 App（加了 proxy，同意說明和隱私標籤也要寫進去）。
+- [ ] **Gemini 付費層級**：替 Gemini API 的 Google Cloud 專案開啟 Cloud Billing。免費層級下 Google 可能用請求內容改善產品；App 和隱私權政策都不能宣稱「不用於訓練」。App 經由 `server/worker/` 呼叫 Gemini，API key 不在 App 裡。
 - [ ] **Google OAuth 驗證**：`calendar.events` 和 `calendar.calendarlist.readonly` 都是敏感 scope。送審 consent screen（App 名稱、logo、首頁、隱私權政策、授權網域）、每個 scope 的用途說明，以及一段示範影片（OAuth 流程、新增行程、抽屜列出行事曆）。consent screen 還在 Testing 時，refresh token 7 天就會失效。
 - [ ] **App Store 隱私標籤**：申報傳給 Google Gemini 的資料（使用者內容，例如「其他使用者內容」，以及跟請求一起送出的行程內容；用途是 App 功能；不用於追蹤）。Google 日曆的資料只在裝置和使用者自己的 Google 帳號之間傳輸。
 - [ ] **StoreKit**：在 App Store Connect 建立訂閱群組「Smart Schedule Pro」和跟 `Config/SmartSchedule.storekit` 相同 ID 的商品（`com.smartschedule.pro.monthly`、`com.smartschedule.pro.yearly`），簽署 Paid Apps 協議，加上各語系的訂閱名稱，用 sandbox 測試。

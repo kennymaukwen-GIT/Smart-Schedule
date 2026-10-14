@@ -19,10 +19,15 @@ settings:
   configs:
     # Push environment per configuration. Signing also sets it from the provisioning profile: development profiles
     # use development, distribution profiles and TestFlight production (Apple: APS Environment Entitlement).
+    # App Attest: development uses Apple's sandbox; TestFlight and App Store builds always use production.
+    # SS_DEV_TOKEN (Config/Secrets.xcconfig) only reaches Debug builds: Release forces it empty.
     Debug:
       APS_ENVIRONMENT: development
+      APP_ATTEST_ENVIRONMENT: development
     Release:
       APS_ENVIRONMENT: production
+      APP_ATTEST_ENVIRONMENT: production
+      SS_DEV_TOKEN: ""
   base:
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "0.1.0"
@@ -72,7 +77,8 @@ targets:
         SSGoogleReversedClientID: $(GOOGLE_REVERSED_CLIENT_ID)
         SSGeminiBaseURL: $(GEMINI_BASE_URL)
         SSGeminiModelID: $(GEMINI_MODEL_ID)
-        SSGeminiAPIKey: $(GEMINI_API_KEY)
+        # Debug only: lets the simulator (no App Attest) call the server. Empty in Release.
+        SSDevToken: $(SS_DEV_TOKEN)
         # Placeholders shown in Settings › About and the account sheet; replace before submitting.
         SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
         SSPrivacyURL: https://example.com/privacy
@@ -84,6 +90,7 @@ targets:
         keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]
         com.apple.developer.usernotifications.time-sensitive: true
         aps-environment: $(APS_ENVIRONMENT)
+        com.apple.developer.devicecheck.appattest-environment: $(APP_ATTEST_ENVIRONMENT)
     dependencies:
       - target: SmartScheduleWidgets
       - target: SmartScheduleNotificationContent
@@ -165,12 +172,14 @@ targets:
         SSGoogleClientID: $(GOOGLE_IOS_CLIENT_ID)
         SSGeminiBaseURL: $(GEMINI_BASE_URL)
         SSGeminiModelID: $(GEMINI_MODEL_ID)
-        SSGeminiAPIKey: $(GEMINI_API_KEY)
+        SSDevToken: $(SS_DEV_TOKEN)
     entitlements:
       path: NotificationContent/SmartScheduleNotificationContent.entitlements
       properties:
         com.apple.security.application-groups: [group.com.smartschedule.shared]
         keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]
+        # The extension calls the server itself (long-press replies), so it attests with its own key.
+        com.apple.developer.devicecheck.appattest-environment: $(APP_ATTEST_ENVIRONMENT)
 
   # ───────────── Hostless unit tests: pure logic in Shared/, compiled straight into the bundle ─────────────
   # No TEST_HOST, so tests run without launching the app. Shared/Intents (the app/widget App Intents) is left

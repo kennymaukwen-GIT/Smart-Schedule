@@ -1,11 +1,15 @@
-// Shared build settings for every target. Secrets live in Secrets.xcconfig (git-ignored).
+// Shared build settings for every target. Secrets live in Secrets.xcconfig (git-ignored), included at the end so
+// its values win over the empty defaults here (a later definition overrides an earlier one in an xcconfig).
 // NOTE: "//" starts a comment in xcconfig, so URLs use the https:/$()/ escape.
 
-GEMINI_BASE_URL = https:/$()/generativelanguage.googleapis.com/v1beta
+// Smart Schedule's server (server/worker): it adds the Gemini key, so no key is in the app. Set it in
+// Secrets.xcconfig, e.g. GEMINI_BASE_URL = https:/$()/<your worker host>/v1beta
+GEMINI_BASE_URL =
 // Model IDs churn fast (2.5 family is past its announced shutdown window).
 // Check https://ai.google.dev/gemini-api/docs/deprecations before shipping.
 GEMINI_MODEL_ID = gemini-3.5-flash
-GEMINI_API_KEY =
+// Debug only (project.yml empties it for Release): lets the simulator, which has no App Attest, call the server.
+SS_DEV_TOKEN =
 GOOGLE_IOS_CLIENT_ID =
 GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.placeholder
 DEVELOPMENT_TEAM =
