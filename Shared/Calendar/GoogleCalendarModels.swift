@@ -149,7 +149,8 @@ enum SSProperty {
     static let localReminders = "ssReminders"
 }
 
-/// Google Calendar event colorIds (fixed palette) → hex used for chips.
+/// Google Calendar's fixed event colorIds → the colour Google Calendar shows for each, so an event keeps the colour
+/// the user picked there. Only for colours that come from (or go to) Google; app-chosen colours live in Theme.
 enum GoogleColor {
     static let palette: [String: String] = [
         "1": "#7986CB", "2": "#33B679", "3": "#8E24AA", "4": "#E67C73",

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// "CLICK TO VIEW PLAN" (Artboard 5, right) — mirrors Google Calendar's event detail.
+/// "CLICK TO VIEW PLAN" (Artboard 5, right): time, place, reminders and the plan an event belongs to.
 struct EventDetailSheet: View {
     let event: ScheduleEvent
     @Environment(\.openURL) private var openURL

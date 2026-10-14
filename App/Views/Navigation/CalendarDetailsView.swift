@@ -7,8 +7,7 @@ struct CalendarDetailsView: View {
 
     @Environment(ScheduleViewModel.self) private var schedule
 
-    /// The 11 colours Google Calendar offers for events, in its own order.
-    private static let palette: [String] = (1...11).compactMap { GoogleColor.palette[String($0)] }
+    private static let palette = Theme.calendarColorChoices
 
     var body: some View {
         Group {

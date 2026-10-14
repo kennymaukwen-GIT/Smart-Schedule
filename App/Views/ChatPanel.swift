@@ -109,7 +109,7 @@ private struct DemoBadge: View {
                     .foregroundStyle(.black)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(Capsule().fill(Color(hex: DemoData.taskHex)))
+                    .background(Capsule().fill(Theme.demoBadge))
             }
             Text("Sample data · nothing is sent to Google")
                 .font(.system(size: 11))

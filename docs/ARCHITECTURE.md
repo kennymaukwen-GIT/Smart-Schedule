@@ -19,7 +19,7 @@
 | 長按 Google 日曆送來的通知，原地展開（Artboard 1） | **App 不能擴充別的 App 的通知。** Google Calendar App 的推播，Smart Schedule 碰不到 | 改由 Smart Schedule 自己發提醒（本地通知或 APNs），並把 category 綁到 Content Extension。建議使用者關掉 Google Calendar iOS App 的通知（網頁和桌機上的 Google 彈窗照常保留） |
 | 在通知裡直接輸入 | Content Extension 加上 `UNNotificationExtensionUserInteractionEnabled`，再用 `UNTextInputNotificationAction` 讓使用者打字。文字送出後，extension 內的 `didReceive(_:completionHandler:)` 直接處理，回傳 `.doNotDismiss` 讓卡片保持展開 | `NotificationContent/NotificationViewController.swift` |
 | 前一天、24 小時、1 小時、30 分鐘前提醒 | 每個 App 最多只能有 64 個待發的本地通知，超過的會被**默默丟掉** | `ReminderScheduler` 採滾動視窗：只排最近的觸發點，留 2 格給貪睡。Routine 預設只提醒一次 |
-| 和 Google 雙向同步 | BGAppRefresh 什麼時候跑由系統決定，不是即時通道 | 拉取：開到前景、每次寫入後、BG refresh 時都重抓。要即時：後端 `events.watch`（webhook），再發 silent push 或更新 Live Activity |
+| 和 Google 雙向同步 | BGAppRefresh 什麼時候跑由系統決定，不是即時通道 | `SyncEngine`：寫入失敗先進 App Group 待送佇列（連線、前景、BG refresh 時依序補送），修改帶 If-Match 防覆蓋；App 開著時每 60 秒抓「之後有變動的」，下拉、BG refresh（最早 15 分鐘）時整段重抓。要即時：後端 `events.watch`（webhook），再發 silent push 或遠端提醒（見 GOOGLE_CALENDAR_SYNC.md §10） |
 | 在 App 內呼叫 Gemini | 打包進 IPA 的 API key 幾分鐘就能被挖出來 | 正式版改走 proxy（Cloud Run，或 Firebase AI Logic 加 App Check）。程式裡 `GEMINI_BASE_URL` 一行就能切換 |
 | Gemini 模型版本 | 2.5 系列已經過了公告的最早關機日（2026-10-16）；3.x 的模型 ID 換得很快 | `GEMINI_MODEL_ID` 由 xcconfig 注入，預設 `gemini-3.5-flash`。**上線前務必到 deprecations 頁確認** |
 | Gemini 3 多輪 function calling | 要把 thought signature 原樣傳回，否則回 400 | `GeminiTurn` 把模型回傳的 content 以 raw JSON 原封保存（`Shared/AI/GeminiClient.swift`） |
