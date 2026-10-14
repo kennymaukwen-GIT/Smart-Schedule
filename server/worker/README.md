@@ -21,7 +21,7 @@ Smart Schedule 的伺服器端（Cloudflare Worker，TypeScript，**零 runtime 
 （`src/apple-root-ca.ts`）。
 
 - 來源：<https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem>
-- **SHA-256 fingerprint：尚未記錄** ← 執行下面的 `npm run embed-root-ca` 後，把輸出的 fingerprint 填在這裡。
+- **SHA-256 fingerprint：`1C:B9:82:3B:A2:8B:A6:AD:2D:33:A0:06:94:1D:E2:AE:4F:51:3E:F1:D4:E8:31:B9:F7:E0:FA:7B:62:42:C9:32`**（notAfter 2045-03-15）。由 GitHub Actions runner 從上面的 Apple 網址下載（寫這個 Worker 的環境連不到 apple.com），在本機以 OpenSSL 驗證 subject 與 self-signature 後用 `PEM_FILE=… EXPECTED_SHA256=… npm run embed-root-ca` 嵌入。CI 的「Apple App Attestation Root CA matches Apple's」步驟每次都重新從 Apple 下載並逐位元組比對，不同就失敗。建議在自己的 Mac 上再核對一次：`curl -s https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem | openssl x509 -noout -fingerprint -sha256`。
 
 撰寫這個 Worker 的環境無法連到 `www.apple.com`（egress policy 拒絕連線），因此憑證**尚未嵌入**；我們不會手打或從第三方複製憑證。
 在嵌入之前，`POST /attest` 一律 fail closed（`500 server_misconfigured`，不接受任何 attestation），`npm run deploy` 也會拒絕部署。

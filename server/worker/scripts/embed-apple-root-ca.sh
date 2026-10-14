@@ -3,6 +3,9 @@
 #
 #   npm run embed-root-ca
 #   EXPECTED_SHA256=AA:BB:… npm run embed-root-ca     # also require this fingerprint (recommended)
+#   PEM_FILE=apple.pem npm run embed-root-ca           # a copy already downloaded from Apple (e.g. by CI)
+#
+# CI downloads Apple's file on every run and fails if the embedded certificate differs from it.
 #
 # Never edit the certificate by hand and never take it from anywhere but Apple.
 set -eu
@@ -13,7 +16,13 @@ OUT="$ROOT_DIR/src/apple-root-ca.ts"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 -o "$TMP/download.pem" "$URL"
+if [ -n "${PEM_FILE:-}" ]; then
+  cp "$PEM_FILE" "$TMP/download.pem"
+  ORIGIN="$URL (downloaded by CI, embedded from $(basename "$PEM_FILE"))"
+else
+  curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 -o "$TMP/download.pem" "$URL"
+  ORIGIN="$URL"
+fi
 
 if [ "$(grep -c -- '-----BEGIN CERTIFICATE-----' "$TMP/download.pem")" != "1" ]; then
   echo "error: expected exactly one PEM certificate from $URL" >&2
@@ -44,7 +53,7 @@ fi
 {
   echo "// Apple App Attestation Root CA — the only trust anchor for POST /attest."
   echo "//"
-  echo "// Source: $URL"
+  echo "// Source: $ORIGIN"
   echo "// Downloaded: $(date -u +%Y-%m-%dT%H:%M:%SZ) by scripts/embed-apple-root-ca.sh"
   echo "// ${SUBJECT}"
   echo "// notAfter: ${NOT_AFTER}"

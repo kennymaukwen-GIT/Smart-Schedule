@@ -1,13 +1,23 @@
 // Apple App Attestation Root CA — the only trust anchor for POST /attest.
 //
-// Source: https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem
-//
-// NOT YET EMBEDDED. The build environment that wrote this Worker could not reach www.apple.com (egress policy
-// denied the connection), and the certificate must never be typed in or copied from a third party. Until
-// `npm run embed-root-ca` (scripts/embed-apple-root-ca.sh) has downloaded it from Apple and rewritten this file,
-// the constant below is empty and POST /attest fails closed (500 server_misconfigured) — no attestation is
-// accepted. `npm run deploy` refuses to deploy while it is empty.
-//
-// SHA-256 fingerprint: (filled in by scripts/embed-apple-root-ca.sh; also record it in README.md)
+// Source: https://www.apple.com/certificateauthority/Apple_App_Attestation_Root_CA.pem (downloaded by CI, embedded from apple.pem)
+// Downloaded: 2026-10-14T23:53:24Z by scripts/embed-apple-root-ca.sh
+// subject=CN = Apple App Attestation Root CA, O = Apple Inc., ST = California
+// notAfter: Mar 15 00:00:00 2045 GMT
+// SHA-256 fingerprint: 1C:B9:82:3B:A2:8B:A6:AD:2D:33:A0:06:94:1D:E2:AE:4F:51:3E:F1:D4:E8:31:B9:F7:E0:FA:7B:62:42:C9:32
 
-export const APPLE_APP_ATTESTATION_ROOT_CA_PEM = "";
+export const APPLE_APP_ATTESTATION_ROOT_CA_PEM = `-----BEGIN CERTIFICATE-----
+MIICITCCAaegAwIBAgIQC/O+DvHN0uD7jG5yH2IXmDAKBggqhkjOPQQDAzBSMSYw
+JAYDVQQDDB1BcHBsZSBBcHAgQXR0ZXN0YXRpb24gUm9vdCBDQTETMBEGA1UECgwK
+QXBwbGUgSW5jLjETMBEGA1UECAwKQ2FsaWZvcm5pYTAeFw0yMDAzMTgxODMyNTNa
+Fw00NTAzMTUwMDAwMDBaMFIxJjAkBgNVBAMMHUFwcGxlIEFwcCBBdHRlc3RhdGlv
+biBSb290IENBMRMwEQYDVQQKDApBcHBsZSBJbmMuMRMwEQYDVQQIDApDYWxpZm9y
+bmlhMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAERTHhmLW07ATaFQIEVwTtT4dyctdh
+NbJhFs/Ii2FdCgAHGbpphY3+d8qjuDngIN3WVhQUBHAoMeQ/cLiP1sOUtgjqK9au
+Yen1mMEvRq9Sk3Jm5X8U62H+xTD3FE9TgS41o0IwQDAPBgNVHRMBAf8EBTADAQH/
+MB0GA1UdDgQWBBSskRBTM72+aEH/pwyp5frq5eWKoTAOBgNVHQ8BAf8EBAMCAQYw
+CgYIKoZIzj0EAwMDaAAwZQIwQgFGnByvsiVbpTKwSga0kP0e8EeDS4+sQmTvb7vn
+53O5+FRXgeLhpJ06ysC5PrOyAjEAp5U4xDgEgllF7En3VcE3iexZZtKeYnpqtijV
+oyFraWVIyd/dganmrduC1bmTBGwD
+-----END CERTIFICATE-----
+`;
