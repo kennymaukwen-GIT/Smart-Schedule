@@ -43,6 +43,39 @@ struct GCalDateTime: Codable, Equatable, Sendable {
     var date: String?        // all-day: "2026-10-15" (end is exclusive)
     var dateTime: String?    // "2026-10-14T14:00:00" (+ timeZone) or RFC3339 with offset
     var timeZone: String?    // IANA, required for recurring events
+    /// PATCH only, when an event switches between all-day and timed: also sends the other form as `null`
+    /// (`{"date": "2026-10-15", "dateTime": null}`). Google merges a PATCH's objects field by field and deletes a
+    /// field only when it is sent as null, so without it the old form would stay next to the new one. Read back
+    /// from JSON (the outbox file) when such a null is there.
+    var clearsOtherForm = false
+
+    private enum CodingKeys: String, CodingKey {
+        case date, dateTime, timeZone
+    }
+}
+
+// In an extension so the memberwise initializer stays available.
+extension GCalDateTime {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = try c.decodeIfPresent(String.self, forKey: .date)
+        dateTime = try c.decodeIfPresent(String.self, forKey: .dateTime)
+        timeZone = try c.decodeIfPresent(String.self, forKey: .timeZone)
+        let nullDate = c.contains(.date) ? ((try? c.decodeNil(forKey: .date)) ?? false) : false
+        let nullDateTime = c.contains(.dateTime) ? ((try? c.decodeNil(forKey: .dateTime)) ?? false) : false
+        clearsOtherForm = nullDate || nullDateTime
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(date, forKey: .date)
+        try c.encodeIfPresent(dateTime, forKey: .dateTime)
+        try c.encodeIfPresent(timeZone, forKey: .timeZone)
+        if clearsOtherForm {
+            if date == nil { try c.encodeNil(forKey: .date) }
+            if dateTime == nil { try c.encodeNil(forKey: .dateTime) }
+        }
+    }
 }
 
 struct GCalReminders: Codable, Equatable, Sendable {

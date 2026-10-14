@@ -361,8 +361,9 @@ private func quickCapturePreview(_ mode: CalendarScope,
 }
 
 #Preview("Event detail") {
-    let events = DemoData.events()
-    EventDetailSheet(event: events.first(where: { $0.id == DemoData.meetingID }) ?? events[0])
+    let schedule = ScheduleViewModel.preview()
+    EventDetailSheet(event: schedule.events.first(where: { $0.id == DemoData.meetingID }) ?? schedule.events[0])
+        .environment(schedule)
 }
 
 #Preview("Month grid") {

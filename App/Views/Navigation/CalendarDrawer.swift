@@ -1,10 +1,14 @@
 import SwiftUI
 
-/// The hamburger's drawer (Artboard 5, right): WHAT you see. "General" opens Settings; then one section per
-/// Google account, headed by its email (its "…" menu: "Remove account"), listing that account's
-/// calendars. The colour square shows or hides a calendar in one tap; the row opens its details (colour on this
-/// iPhone, reminders, "Use for new events"). Under the accounts, one line says where sync with Google stands,
-/// followed by any change Google refused; last, "Add Google account" opens the add page.
+/// The hamburger's drawer (Artboard 5, right): WHAT you see. "General" opens Settings; then "Events", what is on
+/// now and next with "All events (N)" pushing the full list (every event still to come, each opening the event
+/// page); then one section per Google account, headed by its email (its "…" menu: "Remove account"), listing that
+/// account's calendars. The colour square shows or hides a calendar in one tap; the row opens its details (colour
+/// on this iPhone, reminders, "Use for new events"). Under the accounts, one line says where sync with Google
+/// stands, followed by any change Google refused; last, "Add Google account" opens the add page.
+///
+/// Events sit above the accounts: they are what the drawer is opened to manage day to day, and with several
+/// accounts the calendars would push them below the fold.
 ///
 /// Gmail events, Tasks and "Apps from Google" from the artboard are not built.
 struct CalendarDrawer: View {
@@ -13,7 +17,7 @@ struct CalendarDrawer: View {
     @Environment(ScheduleViewModel.self) private var schedule
     @Environment(ChatViewModel.self) private var chat
     @Environment(AppRouter.self) private var router
-    @State private var path: [CalendarRef] = []
+    @State private var path: [DrawerRoute] = []
     /// The "Remove account" confirmation on screen.
     @State private var removal: ScheduleViewModel.AccountRemoval?
     /// Horizontal drag so far (negative = towards the edge); the panel follows it.
@@ -22,17 +26,24 @@ struct CalendarDrawer: View {
     var body: some View {
         GeometryReader { geo in
             NavigationStack(path: $path) {
-                list
-                    .navigationTitle("Smart Schedule")
-                    .navigationBarTitleDisplayMode(.large)
-                    .navigationDestination(for: CalendarRef.self) { ref in
-                        CalendarDetailsView(ref: ref)
+                // Every minute, so an event leaves the Events section once it has ended.
+                TimelineView(.everyMinute) { context in
+                    list(now: context.date)
+                }
+                .navigationTitle("Smart Schedule")
+                .navigationBarTitleDisplayMode(.large)
+                .navigationDestination(for: DrawerRoute.self) { route in
+                    switch route {
+                    case let .calendar(ref): CalendarDetailsView(ref: ref)
+                    case .events: AllEventsView()
                     }
+                }
             }
             .frame(width: min(340, geo.size.width * 0.84))
             .background(Theme.surface.ignoresSafeArea())
             .offset(x: min(0, drag))
-            .simultaneousGesture(closeGesture)
+            // Only on the drawer's first page: rows of the events list swipe left for Delete and Edit.
+            .simultaneousGesture(closeGesture, including: path.isEmpty ? .all : .subviews)
         }
         .task {
             // Lists older than 6 h are fetched again; the `.accounts` change then reloads the drawer.
@@ -41,8 +52,10 @@ struct CalendarDrawer: View {
         }
     }
 
-    private var list: some View {
-        List {
+    private func list(now: Date) -> some View {
+        let rows = schedule.managedRows(now: now)
+
+        return List {
             Section {
                 Button {
                     router.openSheet(.settings)
@@ -57,6 +70,16 @@ struct CalendarDrawer: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+            }
+
+            // Signed out (not demo) there is nothing to manage yet: the connect rows below say how to start.
+            if schedule.isDemo || !schedule.accounts.isEmpty {
+                EventsDrawerSection(rows: rows,
+                                    upcoming: schedule.upcomingRows(rows, limit: EventsDrawerSection.rowLimit),
+                                    now: now,
+                                    clock: schedule.clock,
+                                    onOpen: { event in router.selectedEventID = event.id },
+                                    onShowAll: { path.append(.events) })
             }
 
             ForEach(schedule.accounts) { account in
@@ -99,7 +122,7 @@ struct CalendarDrawer: View {
             ForEach(account.calendars) { calendar in
                 DrawerCalendarRow(calendar: calendar,
                                   onToggle: { schedule.setVisible(!calendar.isVisible, calendar: calendar.id) },
-                                  onOpen: { path.append(calendar.id) })
+                                  onOpen: { path.append(.calendar(calendar.id)) })
             }
         } header: {
             accountHeader(account)
@@ -232,6 +255,12 @@ struct CalendarDrawer: View {
                 if value.translation.width < -80 || value.predictedEndTranslation.width < -200 { onClose() }
             }
     }
+}
+
+/// What the drawer pushes: a calendar's details, or every event still to come.
+enum DrawerRoute: Hashable {
+    case calendar(CalendarRef)
+    case events
 }
 
 /// One calendar in the drawer: its colour square (a toggle), its name, a chevron to its details.

@@ -1,8 +1,8 @@
 import Foundation
 
 /// Offline stand-in for `ScheduleAssistant` in demo mode: no Google account, no Gemini key, no network.
-/// Keyword heuristics cover the artboard flows (long-term plan, "push it 30 min", delete, agenda, and
-/// "title + day + time" capture). Every write goes to the local `SharedStore` only.
+/// Keyword heuristics cover the artboard flows (long-term plan, "push it 30 min", delete, agenda,
+/// "title + day + time" capture, and "加個備註：…" notes). Every write goes to the local `SharedStore` only.
 ///
 /// Plans follow the same review loop as the real assistant: a goal produces a `PlanDraft` (nothing written);
 /// while it is pending, approval words add it, abandonment words drop it and anything else is read as a
@@ -27,6 +27,8 @@ actor DemoAssistant: ScheduleAssisting {
     private var pendingDraft: (title: String, day: Date?)?
     /// Which proposal was shown last, so "好" approves the newer of a draft plan and pending events.
     private var lastProposal: Proposal?
+    /// The event this conversation last added, moved or noted: "加個備註：帶護照" without naming one goes there.
+    private var lastEventID: String?
 
     /// - Parameters:
     ///   - clock: nil = Settings › Time zone and "Week starts on", read per request.
@@ -72,12 +74,15 @@ actor DemoAssistant: ScheduleAssisting {
         let pending = pendingDraft
         pendingDraft = nil
 
-        // "From now on…" goes first, so "8 點前不要提醒我" never becomes an 08:00 event.
+        // "加個備註：…" goes first: the note itself may say anything ("以後都要帶護照", "move the meeting to 3pm").
+        // "From now on…" comes next, so "8 點前不要提醒我" never becomes an 08:00 event.
         // A pending draft plan gets first look after that; it hands back anything clearly about other events.
         // Shift runs next: it only claims an utterance with a move word plus an amount (or a time and a focus
         // event), so "push the gym routine 30 min" is not mistaken for a new plan.
         let reply: Reply
-        if let changed = await preferenceChange(text, lower: lower, language: language, parser: parser) {
+        if let noted = await addNote(text, focusEventID: focusEventID, language: language, parser: parser) {
+            reply = noted
+        } else if let changed = await preferenceChange(text, lower: lower, language: language, parser: parser) {
             reply = changed
         } else if let decided = try await reviewPendingEvents(text, lower: lower, focusEventID: focusEventID, parser: parser) {
             reply = decided
@@ -433,6 +438,7 @@ actor DemoAssistant: ScheduleAssisting {
         }
         updated.end = updated.start.addingTimeInterval(event.duration)
         await store.upsert([updated])
+        lastEventID = updated.id
 
         var reply = Reply()
         reply.changed = true
@@ -605,6 +611,7 @@ actor DemoAssistant: ScheduleAssisting {
         let event = makeEvent(id: DemoData.idPrefix + "chat-" + UUID().uuidString.prefix(8).lowercased(),
                               title: title, start: start, minutes: minutes, kind: kind, utterance: text)
         await store.upsert([event])
+        lastEventID = event.id
 
         reply.changed = true
         reply.created = [event]
@@ -712,6 +719,7 @@ actor DemoAssistant: ScheduleAssisting {
                                     kind: kind, utterance: batch.utterance))
         }
         await store.upsert(events)
+        if let last = events.last { lastEventID = last.id }
         if await store.pendingEventBatch()?.id == batch.id { await store.setPendingEventBatch(nil) }
         if lastProposal == .events { lastProposal = nil }
 
@@ -750,6 +758,74 @@ actor DemoAssistant: ScheduleAssisting {
         let abandonment: Set<String> = ["no", "nope", "discard", "cancel", "never mind", "nevermind", "don't add",
                                         "dont add", "forget it", "不要", "不要了", "算了", "取消", "不用了"]
         if abandonment.contains(bare) { return await discardBatch(batch) }
+        return nil
+    }
+}
+
+// MARK: - (g) "加個備註：帶護照" / "add a note: bring passport"
+
+extension DemoAssistant {
+    /// Adds a note below an event's notes: the event the reminder is about, else the one the words before the
+    /// note name ("add a note to the dentist: …", "看牙醫加個備註：…"), else the one this conversation last added,
+    /// moved or noted. nil when the utterance is not a note request.
+    fileprivate func addNote(_ text: String, focusEventID: String?, language: DemoLanguage,
+                             parser: DemoParser) async -> Reply? {
+        guard let request = Self.noteRequest(text) else { return nil }
+        // "明天 3 點開會，備註：帶簡報" describes a new event rather than a note on an existing one.
+        guard !parser.containsTime(request.target) else { return nil }
+        let now = parser.now
+        guard let event = await noteTarget(request.target.lowercased(), focusEventID: focusEventID, now: now) else {
+            var reply = Reply()
+            reply.needsClarification = true
+            reply.append(language == .chinese ? "要把備註加到哪個行程？例如「看牙醫加個備註：帶健保卡」。"
+                                              : "Which event is the note for? Try “add a note to the dentist: bring the forms”.")
+            return reply
+        }
+        var updated = event
+        updated.notes = EventNotes.appending(request.note, to: event.notes)
+        await store.upsert([updated])
+        lastEventID = updated.id
+
+        var reply = Reply()
+        reply.changed = true
+        reply.showRange = DateInterval(start: clock.calendar.startOfDay(for: updated.start), duration: 86_400)
+        reply.append(language == .chinese ? "已在「\(updated.title)」加上備註：\(request.note)"
+                                          : "Added a note to “\(updated.title)”: \(request.note)")
+        reply.append(Self.demoNote)
+        return reply
+    }
+
+    private func noteTarget(_ words: String, focusEventID: String?, now: Date) async -> ScheduleEvent? {
+        if let focusEventID, let event = await store.event(id: focusEventID), !event.isDraft { return event }
+        let upcoming = await store.events(in: DateInterval(start: now, duration: 60 * 86_400))
+            .filter { !$0.isDraft && $0.end > now }
+        if !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let named = upcoming.first(where: { Self.mentions(words, $0.title) }) {
+            return named
+        }
+        if let lastEventID, let event = await store.event(id: lastEventID), !event.isDraft, event.end > now { return event }
+        return nil
+    }
+
+    /// The note and the words before it that may name the event, from "加個備註：帶護照", "看牙醫加備註 帶健保卡",
+    /// "備註：帶護照", "add a note: bring passport", "add a note to the dentist: bring the forms",
+    /// "add a note saying bring passport" or "note: bring passport".
+    static func noteRequest(_ text: String) -> (note: String, target: String)? {
+        let patterns = [
+            #"^(.*?)(?:加|新增|寫|写|補|补|記|记)(?:個|个|一個|一个|一下|上|條|条|一條|一条)?\s*(?:備註|备注)\s*[：:，,]?\s*(.+)$"#,
+            #"^(.*?)(?:備註|备注)\s*[：:]\s*(.+)$"#,
+            #"^(?:please\s+)?(?:add|write|put|leave)\s+(?:a\s+)?note(?:\s+(?:to|on|for)\s+(.+?))?\s*[:：]\s*(.+)$"#,
+            #"^(?:please\s+)?(?:add|write|put|leave)\s+(?:a\s+)?note(?:\s+(?:to|on|for)\s+(.+?))?\s+(?:saying|that says|that)\s+(.+)$"#,
+            #"^()\s*notes?\s*[:：]\s*(.+)$"#
+        ]
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        for pattern in patterns {
+            guard let match = DemoParser.match(pattern, in: trimmed) else { continue }
+            let note = (match.group(2) ?? "").trimmingCharacters(in: CharacterSet.whitespacesAndNewlines
+                .union(CharacterSet(charactersIn: "。．.!！「」“”\"")))
+            guard !note.isEmpty else { continue }
+            return (note, match.group(1) ?? "")
+        }
         return nil
     }
 }

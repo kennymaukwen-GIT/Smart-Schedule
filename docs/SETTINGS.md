@@ -60,6 +60,16 @@ Smart Schedule                          ← large title, white
 ┌─────────────────────────────────────┐
 │ ⚙︎  General                       ›  │ → presents Settings (§2.5) as a sheet, drawer closes
 └─────────────────────────────────────┘
+EVENTS                                  ← §2.2.1; not shown when signed out (not demo)
+┌─────────────────────────────────────┐
+│ ◉ Design review                      │  ◉ = calendar colour dot, ringed while under way
+│   Now · until 15:00                  │
+│ ● Online meeting with Joe            │  → the event page (§2.2.2)
+│   Today 14:00                        │
+│ ● Yoga ↻                             │  ↻ = repeating series; ⟳ = waiting to sync
+│   Sat, Oct 18 09:00                  │
+│ All events (12)                   ›  │ → pushes the events list (§2.2.1)
+└─────────────────────────────────────┘
 example@gmail.com               ⋯   ← section header = account email (secondary text); ⋯ = "Remove account"
 ┌─────────────────────────────────────┐
 │ ■  My calendar                    ›  │  ■ = colour square; tap ■ toggles visibility
@@ -89,6 +99,81 @@ example@yourmail.com
 - **Signed out, not demo:** no account sections; rows "Connect Google Calendar" (the add page) and "Try without signing in".
 - Drawer appearance triggers `AccountManager.refreshCalendarLists(force: false)` (it refreshes lists older than 6 h).
 - Not built: "Events from Gmail", "Apps from Google", "Tasks", the untitled group.
+
+#### 2.2.1 Events section and the events list (UI; `App/Views/Events/EventsDrawerSection.swift`, `AllEventsView.swift`; data `Shared/Models/EventDigest.swift`)
+
+Every event the calendars show can be managed from the drawer: what has not ended yet, newest additions included.
+The section sits between General and the accounts: it is what the drawer is opened for day to day, and with several
+accounts the calendar rows would push it below the fold.
+
+- **Which events.** `ScheduleViewModel.managedRows(now:)`: `events` (= `SharedStore.visibleEvents`: hidden calendars
+  and the Focus filter left out, one copy per meeting, demo events only in demo mode) minus plan / "Ask me first"
+  ghosts (`isDraft`), minus calendars hidden a moment ago (before the cache reloads), ending after `now` and starting
+  within 12 months. `EventDigest.rows` makes one row per one-off event and one per repeating series (`seriesID`),
+  showing the occurrence under way or the next one.
+- **Always current.** The drawer and the list are drawn inside `TimelineView(.everyMinute)`, so an ended event
+  leaves within a minute; they read the observable `events`, so whatever the assistant, a plan, Siri, the
+  notification extension or a sync adds or deletes appears or leaves at once. Nothing is refreshed by hand.
+- **Section header "Events"** (「行程」). Rows: `EventDigest.upcoming(rows, limit: 6)` (under way first, then the
+  soonest). Each row: the event's colour as a 9 pt dot (ringed while under way), the title (one line), a ↻ glyph
+  (`repeat`, accessibility "Repeating") for a series, the waiting-to-sync glyph (`PendingSyncGlyph`), and under it the
+  compact time (`EventWhenText`, 24-hour, Settings › Time zone):
+
+  | Case | en | zh-Hant |
+  |---|---|---|
+  | Under way, ends today | `Now · until 15:00` | `進行中 · 到 15:00` |
+  | Under way, ends another day | `Now · until Tomorrow 01:00` / `Now · until Fri, Oct 16 18:00` | `進行中 · 到 明天 01:00` |
+  | Starts today / tomorrow | `Today 14:00` / `Tomorrow 09:00` | `今天 14:00` / `明天 09:00` |
+  | Later | `Wed, Oct 16 09:00` (the display locale's day label) | `10月16日（週三）09:00` |
+  | All-day | `Today · All day`; spanning days while under way `Now · until Fri, Oct 16` | `今天 · 全天` |
+
+  Tapping a row opens the event page (§2.2.2) as a sheet over the drawer (`AppRouter.selectedEventID`); closing it
+  returns to the drawer. Empty: "Nothing coming up" (「接下來沒有行程」). Last row: "All events (N)" (「全部行程（N）」,
+  N = rows of the full list) pushes the list inside the drawer (`DrawerRoute.events`).
+- **The events list** ("Events", inline title). Sections in this order, empty ones left out (`EventDigest.sections`):
+  "Now" 「進行中」 (anything under way, a series occurrence too), "Today" 「今天」 (all-day events covering today
+  included), "Tomorrow" 「明天」, "This week" 「這週」 (to the end of the week, Settings › Week starts on), "Later" 「之後」,
+  "Repeating" 「重複行程」 (one row per series not under way: its rule, `EventDigest.repeatSummary`, e.g. "Every Sat
+  09:00" 「每週六 09:00」, and "Next: Sat, Oct 18" 「下一次：10月18日（週六）」). Other rows show the compact time and the
+  place.
+- **Search** (`.searchable`, always visible, prompt "Search events" 「搜尋行程」): every word must appear in the title,
+  the place or the notes (case-, accent- and width-insensitive). No match: the system "No Results" view.
+- **Swipe left** (no full swipe): "Delete" (red; not offered in read-only calendars) and "Edit" (blue, opens the event
+  page). Delete asks first: title "Delete “%@”?" 「要刪除「%@」嗎？」; a one-off event "Delete event" 「刪除行程」; an event of
+  a series "Delete this event" 「只刪除這次」 / "Delete all events" 「刪除全部」 with the message "This is a repeating
+  event." 「這是重複行程。」. A failure shows "Couldn't delete" with the reason.
+- **12 months.** Opening the list calls `ScheduleViewModel.loadUpcomingEvents()` (`ensureEvents(covering:)` from today
+  for 12 months: only months the cache lacks are listed, per calendar). While it loads, a last row shows a small
+  spinner and "Loading events". Footnote: "Shows events in the next 12 months." 「列出接下來 12 個月內的行程。」
+- The drawer's drag-to-close only works on its first page, so rows of the list can swipe left.
+
+#### 2.2.2 The event page (UI; `App/Views/Events/EventPage.swift` in `EventDetailSheet`; writes `Shared/Calendar/EventEditor.swift`)
+
+One page shows and edits an event, whichever way it is opened: a chip in the month grid or Quick Capture's DAY /
+WEEK / MONTH, the drawer's Events section, the events list, the chat's added-event card ("Manage" 「管理」, shown while
+the cache still has the event; a repeating event opens its next occurrence), a tapped reminder or
+`smartschedule://event?id=`. Sheet with its own `NavigationStack`, title "Event" 「行程」; "Close" (no changes) or
+"Cancel" (changes: asks "Discard changes?" 「要捨棄變更嗎？」 with "Discard changes" 「捨棄變更」 / "Keep editing"
+「繼續修改」; swiping the sheet down is blocked meanwhile) and "Save" 「儲存」 (enabled once something changed and the
+times are valid).
+
+| Section | Content |
+|---|---|
+| (read-only only) | 🔒 "You can't change events in this calendar." 「你不能修改這個日曆裡的行程。」 (`accessRole` reader / freeBusyReader, `EventEditor.canEdit`); every field is shown but not editable; no Save, no Delete |
+| Title | Text field "Title" 「標題」; "Waiting to sync" under it while the outbox holds a change |
+| Time | "All day" toggle; "Starts" 「開始」 / "Ends" 「結束」 date pickers (date only when all day; 24-hour; the end cannot be set before the start; moving the start moves the end with it). Footer in red when the end is not after the start: "The end must be after the start." |
+| Repeat (series only) | "Repeat" 「重複」 with the rule (`EventDigest.repeatSummary`); "Save changes to" 「變更套用到」 segmented "This event" 「只改這次」 / "All events" 「全部」. "All events" edits the series master (`CalendarRouter.patchSeries`): the pickers show the time only and All day is off-limits, footnote "A new time applies to every event in the series. Their dates stay the same." |
+| Calendar, place | "Calendar" 「行事曆」: colour square, name, account email (read-only; moving an event to another calendar is not offered). "Location" 「地點」 field |
+| Reminders | The event's reminders, or the defaults of Settings › Notifications for its kind (footnote "Default reminders from Settings › Notifications."); swipe a row to delete (none left = no reminders); "Add reminder" menu (at most 5; all-day choices count back from 00:00 of the day); "Use default reminders" 「使用預設提醒」 when it has its own |
+| Notes | "Notes" 「備註」: multi-line `TextEditor`, at least about 5 lines, grows with the text, placeholder "Add details…" 「新增備註…」. It is the Google event's `description`, two-way and plain text: HTML from Google's web editor is shown as text (`EventNotes.plainText(fromDescription:)`: `<br>` → line break, tags dropped, entities decoded); Save sends plain text (`EventNotes.description(fromPlainText:)`; empty clears it) |
+| Links | "Join Google Meet", every web link written in the notes (up to 5, as `host/path`), "Open in Google Calendar", "Part of a long-term plan" |
+| Delete | "Delete event" 「刪除行程」 with the same confirmation as the list (series: this event / all events) |
+
+Save builds an `EventEdit` with only what changed and calls `ScheduleViewModel.updateEvent` → `EventEditor.update`
+(the event's own calendar, If-Match with its etag, the outbox while Google cannot be reached: the event shows the
+waiting glyph everywhere), then reloads the cache so the list and the calendars update at once, and closes. Errors
+(`RouterError`, `EventEditError`) show as "Couldn't save" with the reason. While a change from elsewhere arrives
+(a sync) and nothing is being edited, the page shows the new version.
 
 ### 2.3 Calendar details (UI; data from ACCOUNTS and PREFS)
 

@@ -15,8 +15,8 @@
 | Artboard 2 | 動態島 compact 狀態「⏰ Online meeting in 21 MIN」 | `Widgets/ScheduleLiveActivity.swift`（`compactLeading`／`compactTrailing`） |
 | Artboard 3 | 控制中心時鐘按鈕 → 動態島就緒；展開後顯示一週微型日曆和輸入列 | `Widgets/SmartScheduleControl.swift`、`Shared/Intents/SummonScheduleIntent.swift`、`Widgets/ScheduleLiveActivity.swift`（`ExpandedIslandView`） |
 | Artboard 4（04 Quick Capture） | 點了動態島之後出現的 Quick Capture：DAY／WEEK／MONTH 切換（記住上次的選擇）、24 小時制時間軸、可左右翻頁的週卡、可上下捲動的連續月曆、對話面板、建議膠囊 | `App/Views/QuickCaptureView.swift`、`CaptureModePicker.swift`、`WeekAgendaCard.swift`、`MonthScrollCard.swift`、`CaptureCalendarParts.swift`、`Shared/Core/CalendarPaging.swift`（日期運算）、`RootView.swift`（從島的位置放大出現的動畫） |
-| Artboard 5 | 主畫面：標頭（漢堡選單 ·「2027 October」· 頭像）、月份選擇、月曆格（multi-day bar、task、+N）、AI 對話區、事件詳情 | `App/Views/MainView.swift`、`Navigation/AppHeader.swift`、`MonthGridView.swift`、`ChatPanel.swift`、`EventDetailSheet.swift` |
-| Artboard 5（側邊選單） | 漢堡選單打開的抽屜：General、每個 Google 帳號一區、列出該帳號的行事曆；點色塊顯示或隱藏，點列進入行事曆設定 | `App/Views/Navigation/CalendarDrawer.swift`、`CalendarDetailsView.swift` |
+| Artboard 5 | 主畫面：標頭（漢堡選單 ·「2027 October」· 頭像）、月份選擇、月曆格（multi-day bar、task、+N）、AI 對話區、行程頁（點行程打開，可直接修改，含備註） | `App/Views/MainView.swift`、`Navigation/AppHeader.swift`、`MonthGridView.swift`、`ChatPanel.swift`、`EventDetailSheet.swift`、`Events/EventPage.swift` |
+| Artboard 5（側邊選單） | 漢堡選單打開的抽屜：General、「行程」區（進行中和接下來的行程、全部行程）、每個 Google 帳號一區、列出該帳號的行事曆；點色塊顯示或隱藏，點列進入行事曆設定 | `App/Views/Navigation/CalendarDrawer.swift`、`CalendarDetailsView.swift`、`App/Views/Events/*` |
 | 頭像、General | 帳號與訂閱（頭像）；設定（General）：通知、行事曆與新行程、助理、AI 與隱私、資料、捷徑與 Siri、語言、示範模式、關於 | `App/Views/Account/AccountSheet.swift`、`App/Views/Settings/*`、`App/ViewModels/SettingsModel.swift` |
 | Artboard 5（6 個月健身計畫） | 長期目標拆成 phases 和 RRULE series | `Shared/AI/FunctionDeclarations.json`（`create_long_term_plan`）、`Shared/Calendar/CalendarEventMapper.swift` |
 
@@ -30,6 +30,15 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 - **回覆不再是一整段文字**：`App/Views/AssistantMessageView.swift` 依照回覆帶的資料分別呈現。文字依空行分段，「• 」「- 」「1. 」開頭的行顯示成縮排清單，支援 **粗體**，15 pt、行距 4。新增的行程顯示成「已加入 Google 日曆」列（標題、日期時間、地點或 Meet）；查詢行程顯示成對齊的時間表（「12:30  午餐」）；長期計畫卡片是一張表：每個階段一個小標題，每堂課一列（星期幾 · 時間 · 時長 · 名稱），再加上提醒、檢查點，假設預設收合。模型的 `summary_for_user` 只寫一兩句目標和每週負荷，日期時間只出現在表格裡，不會重複。
 - `Reply.text` 仍然是完整的文字版本，給 Siri、通知內文和 Live Activity 使用；對話裡只顯示表格和列沒有涵蓋的部分（例如修改了什麼、時間重疊的提醒）。
 - **語言**：介面字串在 `Shared/Localization/Localizable.xcstrings`（英文為 key，附繁體中文），裝置語言是中文時顯示中文。日期用語系格式（「10月14日（週三）」），時間一律 24 小時制。Previews 裡有 zh-Hant 版本（`.environment(\.locale, …)`），日期、星期和 `Text` 標籤會跟著切換；要看 `String(localized:)` 產生的字串也變中文，請在 Scheme 的 App Language 選繁體中文再執行。
+
+### 行程管理（抽屜 › 行程）
+
+日曆裡看得到的每個行程，都能在抽屜裡管理（規格：[`docs/SETTINGS.md`](docs/SETTINGS.md) §2.2.1、§2.2.2）。
+
+- **抽屜的「行程」區**（在「一般」和帳號之間）：列出正在進行和接下來的行程，最多 6 列，每列是行事曆顏色的圓點、標題和時間（「進行中 · 到 15:00」「今天 14:00」「明天 09:00」「10月16日（週三）09:00」），重複行程有 ↻，還沒同步到 Google 的有同步符號。點一下打開行程頁；下面「全部行程（N）」打開完整清單；沒有行程時寫「接下來沒有行程」。
+- **全部行程**：分成「進行中」「今天」「明天」「這週」「之後」，重複的行程（例如每週六的瑜伽）在「重複行程」裡只佔一列，寫出規則和下一次（「每週六 09:00」「下一次：10月18日（週六）」）。可以搜尋標題、地點和備註；向左滑有「刪除」（重複行程會問只刪除這次或刪除全部）和「編輯」。打開時會確認接下來 12 個月的行程都已載入（`ScheduleViewModel.loadUpcomingEvents`），清單最下面有說明。
+- **自動更新**：清單每分鐘重新整理，結束的行程自動消失；助理、長期計畫、Siri、通知回覆或其他裝置（同步）新增的行程會直接出現，不用手動重新整理。只列出在 Smart Schedule 顯示的行事曆（隱藏的行事曆不列，和日曆一樣），計畫草稿的幽靈行程不列，示範模式列出範例行程。
+- **行程頁**（`App/Views/Events/EventPage.swift`，從月曆、Quick Capture、抽屜、全部行程和對話的「管理」按鈕打開，都是同一頁）：可以改標題、全天、開始和結束、地點、提醒和**備註**（多行，至少顯示 5 行，對應 Google 日曆的「說明」；Google 存的 HTML 會轉成純文字顯示，儲存時送純文字）。重複行程顯示規則，儲存時選「只改這次」或「全部」（「全部」只改時間，日期不變）。行事曆只顯示不能改。Meet、Google 日曆和備註裡的連結是可以點的列。「刪除行程」會先確認。只能檢視的行事曆會顯示「你不能修改這個日曆裡的行程。」；有沒儲存的修改時關閉會問「要捨棄變更嗎？」。儲存走和助理一樣的寫入路徑（`EventEditor` → `CalendarRouter`：If-Match、離線時進待送佇列並顯示待同步）。
 
 ### 設定、帳號與訂閱
 
@@ -60,6 +69,7 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 ```
 App/                    主 App target（SwiftUI、Quick Capture、Google 登入、語音、Siri intents、BG refresh）
   Views/Navigation/     Artboard 5 標頭、行事曆抽屜、行事曆設定
+  Views/Events/         抽屜的「行程」區、全部行程、行程頁（可編輯、備註）
   Views/Account/        帳號與訂閱
   Views/Settings/       設定（General）的每一頁
   Views/Chat/           AI 同意說明、同意提示列、設定已更新／學到的建議／先問我卡片

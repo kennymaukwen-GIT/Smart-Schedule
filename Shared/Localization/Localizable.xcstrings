@@ -496,6 +496,17 @@
         }
       }
     },
+    "A new time applies to every event in the series. Their dates stay the same." : {
+      "comment" : "Event page footnote when saving to all events of a series",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新的時間會套用到這個重複行程的每一次，日期不變。"
+          }
+        }
+      }
+    },
     "A summary of the day's events, prepared ahead and refreshed whenever your calendar changes. The evening preview covers tomorrow." : {
       "localizations" : {
         "zh-Hant" : {
@@ -614,6 +625,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新增計畫"
+          }
+        }
+      }
+    },
+    "Add details…" : {
+      "comment" : "Event page: notes placeholder",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增備註…"
           }
         }
       }
@@ -777,6 +799,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全天"
+          }
+        }
+      }
+    },
+    "All events" : {
+      "comment" : "Event page: save changes to every occurrence of the series",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部"
+          }
+        }
+      }
+    },
+    "All events (%lld)" : {
+      "comment" : "Drawer Events section: opens the full list; number of rows",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部行程（%lld）"
           }
         }
       }
@@ -1314,12 +1358,34 @@
         }
       }
     },
+    "Couldn't delete" : {
+      "comment" : "Alert title when deleting an event failed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法刪除"
+          }
+        }
+      }
+    },
     "Couldn't delete. Try again from the app." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除失敗，請到 App 再試一次。"
+          }
+        }
+      }
+    },
+    "Couldn't save" : {
+      "comment" : "Alert title when saving an event failed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法儲存"
           }
         }
       }
@@ -1477,12 +1543,67 @@
         }
       }
     },
+    "Default reminders from Settings › Notifications." : {
+      "comment" : "Event page footnote: the event uses the default reminders",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用「設定 › 通知」裡的預設提醒。"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "comment" : "Swipe action on an events list row",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除"
+          }
+        }
+      }
+    },
     "Delete %@? Tap Confirm." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "要刪除 %@ 嗎？請點「確認」。"
+          }
+        }
+      }
+    },
+    "Delete all events" : {
+      "comment" : "Delete confirmation for a repeating event: the whole series",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除全部"
+          }
+        }
+      }
+    },
+    "Delete event" : {
+      "comment" : "Event page / delete confirmation: delete a one-off event",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除行程"
+          }
+        }
+      }
+    },
+    "Delete this event" : {
+      "comment" : "Delete confirmation for a repeating event: only this occurrence",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只刪除這次"
           }
         }
       }
@@ -1494,6 +1615,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除 · %@"
+          }
+        }
+      }
+    },
+    "Delete “%@”?" : {
+      "comment" : "Delete confirmation title; event title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要刪除「%@」嗎？"
           }
         }
       }
@@ -1656,6 +1788,28 @@
         }
       }
     },
+    "Discard changes" : {
+      "comment" : "Event page: close without saving",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "捨棄變更"
+          }
+        }
+      }
+    },
+    "Discard changes?" : {
+      "comment" : "Event page: closing with unsaved changes",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要捨棄變更嗎？"
+          }
+        }
+      }
+    },
     "Discarded" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1758,6 +1912,17 @@
         }
       }
     },
+    "Ends" : {
+      "comment" : "Event page: end date and time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束"
+          }
+        }
+      }
+    },
     "Enter a full email address, like example@gmail.com" : {
       "comment" : "Add Google account page: inline validation",
       "localizations" : {
@@ -1809,6 +1974,17 @@
         }
       }
     },
+    "Event" : {
+      "comment" : "Event page title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行程"
+          }
+        }
+      }
+    },
     "Event reminders" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1839,12 +2015,78 @@
         }
       }
     },
+    "Every %@" : {
+      "comment" : "Repeat summary: weekday names, e.g. Every Sat / 每週六",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每%@"
+          }
+        }
+      }
+    },
+    "Every %lld days" : {
+      "comment" : "Repeat summary: every N days",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %lld 天"
+          }
+        }
+      }
+    },
+    "Every %lld weeks on %@" : {
+      "comment" : "Repeat summary: every N weeks on weekday names",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每 %1$lld 週的%2$@"
+          }
+        }
+      }
+    },
     "Every day" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "每天"
+          }
+        }
+      }
+    },
+    "Every month on day %lld" : {
+      "comment" : "Repeat summary: monthly on a day of the month",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每月 %lld 日"
+          }
+        }
+      }
+    },
+    "Every weekday" : {
+      "comment" : "Repeat summary: Monday to Friday",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每個工作日"
+          }
+        }
+      }
+    },
+    "Every year" : {
+      "comment" : "Repeat summary: yearly",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每年"
           }
         }
       }
@@ -2298,6 +2540,17 @@
         }
       }
     },
+    "Later" : {
+      "comment" : "Events list section: after this week",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "之後"
+          }
+        }
+      }
+    },
     "Learned from your habits" : {
       "localizations" : {
         "zh-Hant" : {
@@ -2325,6 +2578,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在載入行程"
+          }
+        }
+      }
+    },
+    "Location" : {
+      "comment" : "Event page: location field placeholder",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地點"
           }
         }
       }
@@ -2368,6 +2632,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "縮短時長"
+          }
+        }
+      }
+    },
+    "Manage" : {
+      "comment" : "Added-event card: opens the event page",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理"
+          }
+        }
+      }
+    },
+    "Manage %@" : {
+      "comment" : "Added-event card: accessibility label of Manage; event title",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理「%@」"
           }
         }
       }
@@ -2526,6 +2812,17 @@
         }
       }
     },
+    "Next: %@" : {
+      "comment" : "Repeating series row: day of its next occurrence",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一次：%@"
+          }
+        }
+      }
+    },
     "No purchases to restore." : {
       "localizations" : {
         "zh-Hant" : {
@@ -2617,6 +2914,28 @@
         }
       }
     },
+    "Notes" : {
+      "comment" : "Event page: notes section (Google Calendar description)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "備註"
+          }
+        }
+      }
+    },
+    "Nothing coming up" : {
+      "comment" : "Drawer Events section / events list: no event still to come",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接下來沒有行程"
+          }
+        }
+      }
+    },
     "Nothing is added until you tap Add." : {
       "localizations" : {
         "zh-Hant" : {
@@ -2674,6 +2993,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "通知"
+          }
+        }
+      }
+    },
+    "Now" : {
+      "comment" : "Events list section: events under way",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "進行中"
+          }
+        }
+      }
+    },
+    "Now · until %@" : {
+      "comment" : "Event row: under way, ends at a time (15:00) or a day",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "進行中 · 到 %@"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好"
           }
         }
       }
@@ -3115,6 +3466,39 @@
         }
       }
     },
+    "Repeat" : {
+      "comment" : "Event page: label of the repeat rule of a series",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重複"
+          }
+        }
+      }
+    },
+    "Repeating" : {
+      "comment" : "Events list section, one row per repeating series; also the repeat glyph's label",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重複行程"
+          }
+        }
+      }
+    },
+    "Repeats" : {
+      "comment" : "Repeat summary when the pattern cannot be told",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自訂重複"
+          }
+        }
+      }
+    },
     "Replaced by a newer plan" : {
       "localizations" : {
         "zh-Hant" : {
@@ -3256,6 +3640,27 @@
         }
       }
     },
+    "Save" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存"
+          }
+        }
+      }
+    },
+    "Save changes to" : {
+      "comment" : "Event page: which occurrences of a series a save changes",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "變更套用到"
+          }
+        }
+      }
+    },
     "Saved on this iPhone. It will sync to Google Calendar as soon as Google can be reached." : {
       "comment" : "A change could not reach Google and waits in the outbox",
       "localizations" : {
@@ -3295,6 +3700,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "對 Siri 說「Add a plan in Smart Schedule」、「Schedule something with Smart Schedule」或「Show my schedule in Smart Schedule」。"
+          }
+        }
+      }
+    },
+    "Search events" : {
+      "comment" : "Events list search field placeholder",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜尋行程"
           }
         }
       }
@@ -3407,6 +3823,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示下一個行程"
+          }
+        }
+      }
+    },
+    "Shows events in the next 12 months." : {
+      "comment" : "Events list footnote",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列出接下來 12 個月內的行程。"
           }
         }
       }
@@ -3572,6 +3999,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在開始"
+          }
+        }
+      }
+    },
+    "Starts" : {
+      "comment" : "Event page: start date and time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始"
           }
         }
       }
@@ -3873,6 +4311,17 @@
         }
       }
     },
+    "The end must be after the start." : {
+      "comment" : "Event page: end before start",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束時間必須晚於開始時間。"
+          }
+        }
+      }
+    },
     "The generated plan had no schedulable sessions." : {
       "localizations" : {
         "zh-Hant" : {
@@ -3903,6 +4352,28 @@
         }
       }
     },
+    "This event" : {
+      "comment" : "Event page: save changes to this occurrence only",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只改這次"
+          }
+        }
+      }
+    },
+    "This is a repeating event." : {
+      "comment" : "Delete confirmation message for a repeating event",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這是重複行程。"
+          }
+        }
+      }
+    },
     "This plan is waiting for your review." : {
       "localizations" : {
         "zh-Hant" : {
@@ -3928,7 +4399,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本週"
+            "value" : "這週"
           }
         }
       }
@@ -3963,6 +4434,17 @@
         }
       }
     },
+    "Title" : {
+      "comment" : "Event page: title field placeholder",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標題"
+          }
+        }
+      }
+    },
     "Titles, times and locations of your events in the days the request is about (the next two weeks by default)" : {
       "localizations" : {
         "zh-Hant" : {
@@ -3979,6 +4461,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "結束"
+          }
+        }
+      }
+    },
+    "To make every event all-day or timed, change it in Google Calendar." : {
+      "comment" : "Saving All events of a series switched all-day",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要把每一次都改成全天或指定時間，請在 Google 日曆修改。"
+          }
+        }
+      }
+    },
+    "To move every event to another day, change it in Google Calendar." : {
+      "comment" : "Saving All events of a series moved to another day",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要把每一次都移到別天，請在 Google 日曆修改。"
           }
         }
       }
@@ -4003,12 +4507,34 @@
         }
       }
     },
+    "Today %@" : {
+      "comment" : "Event row: starts today at a 24-hour time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天 %@"
+          }
+        }
+      }
+    },
     "Tomorrow" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "明天"
+          }
+        }
+      }
+    },
+    "Tomorrow %@" : {
+      "comment" : "Event row: starts tomorrow at a 24-hour time",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "明天 %@"
           }
         }
       }
@@ -4171,6 +4697,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "緊急程度"
+          }
+        }
+      }
+    },
+    "Use default reminders" : {
+      "comment" : "Event page: back to the kind's default reminders",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用預設提醒"
           }
         }
       }
@@ -4394,6 +4931,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你無法在這個行事曆新增行程。"
+          }
+        }
+      }
+    },
+    "You can't change events in this calendar." : {
+      "comment" : "Event page in a read-only calendar",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你不能修改這個日曆裡的行程。"
           }
         }
       }

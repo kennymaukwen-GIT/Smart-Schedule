@@ -1,6 +1,6 @@
 # Google Calendar 整合：從 Gemini JSON 寫進行事曆，再同步回來
 
-程式碼位置：`Shared/Calendar/`（mapper、RRULE、client、sync、`CalendarRouter`、`SyncEngine`、`SyncOutbox`、`SyncMerge`）、`Shared/Storage/SyncStatusStore.swift`、`Shared/Auth/GoogleTokenProvider.swift`、`Shared/Auth/IDToken.swift`、`Shared/Storage/AccountStore.swift`、`Shared/Models/GoogleAccount.swift`、`Shared/Models/EventVisibility.swift`、`App/Auth/GoogleSignInCoordinator.swift`、`App/Auth/AccountManager.swift`、`App/Intents/CalendarFocusFilter.swift`
+程式碼位置：`Shared/Calendar/`（mapper、RRULE、client、sync、`CalendarRouter`、`SyncEngine`、`SyncOutbox`、`SyncMerge`、`EventEditor`、`EventNotes`）、`Shared/Models/EventDigest.swift`、`Shared/Storage/SyncStatusStore.swift`、`Shared/Auth/GoogleTokenProvider.swift`、`Shared/Auth/IDToken.swift`、`Shared/Storage/AccountStore.swift`、`Shared/Models/GoogleAccount.swift`、`Shared/Models/EventVisibility.swift`、`App/Auth/GoogleSignInCoordinator.swift`、`App/Auth/AccountManager.swift`、`App/Intents/CalendarFocusFilter.swift`
 
 ## 1. OAuth 設定
 
@@ -21,7 +21,7 @@
 |---|---|---|
 | — | `id` | `GoogleEventID.make(seed:)`：取 SHA-256 前 128 bit，轉成 base32hex（`a–v`、`0–9`），前面加 `ss`。**同一個 seed 一定得到同一個 ID，重試時不會重複建立事件** |
 | `title` | `summary` | 計畫事件會加前綴：`Muscle 6M · Upper` |
-| 原始輸入的整句話 | `description` | `由 Smart Schedule 智慧助理自動排程：<原句>`（和 Artboard 5 的詳情頁一樣），後面接 notes、目標、階段說明 |
+| 原始輸入的整句話 | `description` | `由 Smart Schedule 智慧助理自動排程：<原句>`（和 Artboard 5 的詳情頁一樣），後面空一行接 notes、目標、階段說明。整段就是 App 裡的「備註」（純文字，使用者可以改或刪，見第 11 節）；沒有程式會把它解析回來，計畫靠 `ssPlanId` 找 |
 | `start` / `end` / `duration_minutes` | `start.dateTime` / `end.dateTime` 加 `timeZone` | 用牆上時間 `2026-10-14T14:00:00` 加 IANA 時區，**不帶 offset** |
 | `all_day` 或只給日期 | `start.date` / `end.date` | `end.date` 是**不包含的那一天**，所以要加 1 天 |
 | `recurrence` | `recurrence: ["RRULE:..."]` | 見第 4 節 |
@@ -104,7 +104,7 @@ Google 的限制：`overrides` **最多 5 個**，每個 `minutes` 介於 **0 �
 
 切換模式不會改寫既有事件，只影響之後新增或修改的事件。
 
-**`ssReminders`：** 因為「只用 Smart Schedule」時 Google 那邊是空的，Smart Schedule 把自己要發的提醒另外記在 `extendedProperties.private.ssReminders`：用的是該類型的預設值就寫 `"default"`，使用者指定的就寫分鐘數 `"60,10"`。每次建立事件、或修改提醒時都會寫（PATCH 只送這一個 key，Google 會合併 private 裡的其他 key）。讀回來時：`"default"` → `reminderMinutes = nil`（排提醒時用當下的預設值）；分鐘數 → 那些分鐘；沒有這個 property 的事件（使用者在 Google 建立的）：`useDefault == true` → nil，有 overrides → 那些分鐘，`useDefault == false` 而且沒有 overrides → `[]`（使用者在 Google 關掉了提醒）。
+**`ssReminders`：** 因為「只用 Smart Schedule」時 Google 那邊是空的，Smart Schedule 把自己要發的提醒另外記在 `extendedProperties.private.ssReminders`：用的是該類型的預設值就寫 `"default"`，使用者指定的就寫分鐘數 `"60,10"`，在行程頁把提醒全部關掉就寫 `"none"`（Google 那邊同時送 `useDefault: false`、`overrides: []`）。每次建立事件、或修改提醒時都會寫（PATCH 只送這一個 key，Google 會合併 private 裡的其他 key）。讀回來時：`"default"` → `reminderMinutes = nil`（排提醒時用當下的預設值）；`"none"` → `[]`；分鐘數 → 那些分鐘；沒有這個 property 的事件（使用者在 Google 建立的）：`useDefault == true` → nil，有 overrides → 那些分鐘，`useDefault == false` 而且沒有 overrides → `[]`（使用者在 Google 關掉了提醒）。
 
 ## 6. 寫入策略與錯誤處理（`GoogleCalendarClient.swift`）
 
@@ -237,7 +237,7 @@ Smart Schedule 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 U
 
 | 方向 | 內容 | 時機 |
 |---|---|---|
-| App → Google | 助理新增、修改、刪除的行程，計畫的「加入」，「先問我」的「加入」 | 立刻送出。連不到 Google 時進 outbox，之後在下一列的每個時機依序送出 |
+| App → Google | 助理新增、修改、刪除的行程，計畫的「加入」，「先問我」的「加入」，行程頁（抽屜的「行程」、行程清單、日曆上的行程、對話卡的「管理」）的修改和刪除（第 11 節） | 立刻送出。連不到 Google 時進 outbox，之後在下一列的每個時機依序送出 |
 | Google → App | 每個同步中的行事曆（包括在 App 裡隱藏的）的新增、修改、刪除，含重複事件的單一 instance | 見下表 |
 
 `SyncEngine.sync(_ trigger:)` 每次都是：先送 outbox → 再拉取 → 拉取成功而且 outbox 在這期間又有新項目時再送一次。同時進來的呼叫共用同一次執行（比較徹底的呼叫會等目前這次跑完再跑自己的）。
@@ -345,3 +345,57 @@ App Group 的 `sync-outbox.json`，App、Siri、通知擴充共用，跟 `Shared
 | 10,000 位使用者 | 約 600 萬 | Cloud Run CPU 約 US$25、Firestore 約 US$20、記錄與監控 | 約 US$50–120／月 |
 
 Calendar API 本身不收費，但有每日與每分鐘的配額，要依使用量申請提高。
+
+## 11. 行程管理：抽屜的「行程」、行程清單、行程頁與備註
+
+使用者的要求：日曆裡的每個行程都能在抽屜裡管理（例如只出現在日曆上的「瑜伽」），已結束的自動消失，新加的行程也會出現；行程頁要有「備註」欄位。程式碼：`Shared/Models/EventDigest.swift`（清單，純函式）、`Shared/Calendar/EventNotes.swift`（備註 ⇄ `description`）、`Shared/Calendar/EventEditor.swift`（修改與刪除）；畫面在 `App/Views/Events/`。
+
+### 11.1 清單裡有什麼（`EventDigest`）
+
+| 項目 | 做法 |
+|---|---|
+| 來源 | 日曆畫面用的同一份 `ScheduleViewModel.events`（`SharedStore.visibleEvents`）：隱藏的行事曆、專注模式過濾掉的不算，同一場會議只有一份，demo 模式只有 demo 行程。計畫和「先問我」的預覽（`isDraft`）不列 |
+| 什麼算「正在進行或還沒開始」 | `end > now`。進行中的（`start <= now < end`，全天行程不算「進行中」，歸到「今天」）也列。清單每分鐘、以及快取每次變動（同步、助理、計畫、Siri、通知擴充、別台裝置經同步）都重新算，所以結束的行程自己消失、新的自己出現 |
+| 重複行程 | 同一個 `seriesID` 只有一列，顯示正在進行的那一次，否則下一次；`occurrenceCount` 是快取裡還沒結束的次數 |
+| 分區 | 進行中（重複行程也算）→ 今天 → 明天 → 這週（依「每週起始日」）→ 之後；其他重複行程在「重複行程」。用日曆天計算，所以 25 小時的夏令時間切換日（倫敦 2026-10-25）仍是一天 |
+| 抽屜的短清單 | 進行中的先，然後依開始時間，最多 6 列 |
+| 搜尋 | 標題、地點、備註；每個詞都要出現；不分大小寫、全形半形、重音 |
+| 範圍 | 打開清單時呼叫 `ensureEvents(covering:)` 載入接下來 12 個月（第 8 節），註腳說明清單涵蓋 12 個月 |
+| 重複規則的說明 | 快取裡是 Google 展開的單次（`singleEvents=true`），**沒有 RRULE**，所以由日期推回來：每天、每個工作日、每週幾（「Every Sat 09:00」「每週六 09:00」）、每 N 週、每 N 天、每月幾號、每年；停一兩週也還算每週；看不出來時顯示 `Repeats` 的翻譯。週幾的名稱跟著語言（`locale`），句型來自 String Catalog |
+
+### 11.2 備註 ⇄ `description`（`EventNotes`）
+
+- **讀**（mapper、outbox 疊加、Google 回傳）：`ScheduleEvent.notes` 一律是純文字。Google 日曆網頁版存的是 HTML：`<br>`、`<p>`、`</div>`、清單、標題、表格列變成換行，`<li>` 變成「• 」，`<a href="x">文字</a>` 變成「文字 (x)」（文字就是網址時只留網址），其他標籤拿掉，`&amp;` `&lt;` `&gt;` `&quot;` `&#39;` `&nbsp;` 和數字實體解碼；沒有標籤的純文字（例如「a < b」）原樣保留。前後空白去掉，連續空行最多留一行。
+- **寫**：行程頁送純文字（換行保留，前後空白去掉）。清空 = 送 `"description": ""`。沒動備註就不送，所以 Google 那邊的 HTML 不會被改寫；改了才會變成純文字。
+- **Smart Schedule 自己寫進 `description` 的東西**：第 2 節的來源行、建立時的 notes、計畫的目標和階段說明。它們就是備註的一部分，行程頁照樣顯示、可以改或刪；沒有程式會解析它們（計畫靠 `ssPlanId`），所以刪掉不影響任何功能。助理的 prompt 不放來源行（第 11.5 節）。
+- 舊版快取裡的 `notes` 可能還是 HTML（這版之前沒轉換），下次完整列出那段日期時就換成純文字；在那之前行程頁顯示時也會先轉一次。
+
+### 11.3 修改：只送改了的欄位（`CalendarEventMapper.patch(from: EventEdit, existing:)`）
+
+`EventEdit` 的每個欄位 nil 表示沒動；`location`、`notes` 給 `""` 或 `.some(nil)` 表示清空，`reminderMinutes` 給 `.some(nil)` 表示回到預設、`.some([])` 表示不提醒。行程頁用 `EventEdit.changes(from:to:)` 或自己比較草稿產生。
+
+| 欄位 | PATCH body |
+|---|---|
+| 標題 | 空白的不送；和原本一樣不送 |
+| 地點、備註 | 和原本（去掉前後空白後）一樣不送；清空送 `""` |
+| 時間 | 只改開始時，長度不變；結束不晚於開始 → `EventEditError.endBeforeStart`。全天行程的 `end` 跟 `ScheduleEvent` 一樣是最後一天的隔天 00:00（`EventEdit.allDayEnd(lastDay:calendar:)`／`lastDay(ofAllDayEnd:start:calendar:)` 給日期選擇器用），只改開始時天數不變（用日曆天，跨夏令時間也對） |
+| 全天 ⇄ 指定時間 | Google 的 PATCH 會**逐欄合併**物件，刪欄位要送 `null`，所以另一種格式送成 `null`：`"start": {"date": "2026-10-15", "dateTime": null}`（`GCalDateTime.clearsOtherForm`；寫進 outbox 檔案時也保留這個 null，讀回來仍然有效）。改成指定時間又沒給結束時，長度用「預設長度」。用的是預設提醒時，同時送新格式的預設提醒（全天的從當天 00:00 往前算） |
+| 提醒 | 指定分鐘數、`[]`（`overrides: []` + `ssReminders: "none"`）、回到預設（預設 overrides + `"default"`）；只送 `ssReminders` 這一個 private key |
+
+### 11.4 寫入的路徑（`EventEditor`）
+
+| 項目 | 做法 |
+|---|---|
+| 入口 | `EventEditor.shared.update(_:with:scope:)`、`delete(_:scope:)`。先從快取拿最新的那份（最新 etag、是否還在等同步） |
+| 「只改這次」 | PATCH 那一次（Google 存成這個系列的例外），經 `CalendarRouter.patch`：If-Match、412 時 `ConflictMerge` 重送、連不到就進 outbox |
+| 「全部」 | `CalendarRouter.patchSeries`：標題、地點、備註、提醒送到 series master；新的時刻和長度在送出當下套在 master 自己的第一天（第 10.2 節）。改到別天或切換全天會改變重複規則本身 → `EventEditError.seriesDayChange`／`seriesAllDayChange`，請使用者到 Google 日曆改。完成後重抓那個行事曆的滾動視窗；時間改了的話 Google 的單次 id 會換（id 帶著原本的開始時間），回傳同一天的那一次 |
+| 刪除 | 「只刪這次」刪那一次；「全部」刪 series master（快取裡這個系列的每一次一起拿掉）。Google 會放進垃圾桶 |
+| 唯讀 | `CalendarInfo.isWritable`（owner、writer）。reader、freeBusyReader 的行程 `EventEditor.canEdit` 是 false，行程頁只能看（「你不能修改這個日曆裡的行程。」）；硬寫也會在送出前丟 `RouterError.readOnly`。不認得的行事曆交給 Google 判斷。預覽（`isDraft`）不能改 |
+| 離線 | 進 outbox，畫面立刻顯示並標「等待同步」；`SyncStatus.pendingCount` 立刻更新 |
+| 之後 | 重排提醒，發 `SharedChange.syncStatus`（日曆、清單和其他 process 重新讀快取）；App 另外更新 Live Activity |
+| Demo 模式 | 只改快取裡的範例行程，不連網路（有單元測試）。「全部」改的是快取裡這個系列的每一次；之後才載入的日期範圍由 `DemoData` 產生，仍是原本的樣子；刪掉的範例系列在範圍重新載入（重新開始示範）後會回來 |
+| 不做的 | 把行程搬到別的行事曆（Google 的 `events.move`）、改重複規則、邀請對象。行程頁把行事曆顯示成唯讀 |
+
+### 11.5 助理也看得到備註
+
+UPCOMING 和 FOCUS 的每一列在有備註時多一欄 `| notes: …`（一行、最多 300 字、不含來源行），所以「明天的飛機要帶什麼？」答得出來。`modify_event` 的 `changes.notes` 是**要加上的那一句**，App 接在原本備註的下一行（`EventNotes.appending`），不會因為模型只看到截短的備註而刪掉內容。Demo 助理認「加個備註：帶護照」「add a note: bring passport」。細節見 [`GEMINI_FUNCTION_CALLING.md`](GEMINI_FUNCTION_CALLING.md) 第 4.4 節。

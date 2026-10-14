@@ -202,7 +202,8 @@ extension AssistantText {
 
 /// What a reply put in the calendar, as rows instead of a sentence: a checkmark eyebrow, then each event's title,
 /// day and time, and place. `Reply.text` keeps the sentence for Siri and notifications. Events Google has not
-/// confirmed yet (offline, Google unreachable) say so instead.
+/// confirmed yet (offline, Google unreachable) say so instead. "Manage" opens the event page while the calendar
+/// still has the event.
 struct EventAddedRows: View {
     let events: [ScheduleEvent]
     var isDemo = false
@@ -210,6 +211,7 @@ struct EventAddedRows: View {
     @Environment(\.locale) private var environmentLocale
     /// Absent in previews of the rows alone.
     @Environment(ScheduleViewModel.self) private var schedule: ScheduleViewModel?
+    @Environment(AppRouter.self) private var router: AppRouter?
     private let clock = WallClock()
 
     var body: some View {
@@ -250,40 +252,65 @@ struct EventAddedRows: View {
     }
 
     private func row(_ event: ScheduleEvent) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(event.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                if !isDemo && isWaiting(event) {
-                    PendingSyncGlyph(size: 11, color: Theme.textSecondary)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(event.title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    if !isDemo && isWaiting(event) {
+                        PendingSyncGlyph(size: 11, color: Theme.textSecondary)
+                    }
                 }
-            }
-            Text(ReplyFormatter.when(event, clock: clock, locale: ChatFormat.dateLocale(environmentLocale)))
-                .font(.system(size: 14).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.75))
-            if let location = event.location, !location.isEmpty {
-                Label(location, systemImage: "mappin.and.ellipse")
+                Text(ReplyFormatter.when(event, clock: clock, locale: ChatFormat.dateLocale(environmentLocale)))
+                    .font(.system(size: 14).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.75))
+                if let location = event.location, !location.isEmpty {
+                    Label(location, systemImage: "mappin.and.ellipse")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+                if event.meetURL != nil {
+                    Label {
+                        Text(verbatim: "Google Meet")
+                    } icon: {
+                        Image(systemName: "video")
+                    }
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(1)
-            }
-            if event.meetURL != nil {
-                Label {
-                    Text(verbatim: "Google Meet")
-                } icon: {
-                    Image(systemName: "video")
                 }
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.textSecondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+
+            manageButton(event)
         }
         .padding(.leading, 11)
         .background(alignment: .leading) {
             Capsule().fill(Color(hex: event.colorHex)).frame(width: 3)
         }
-        .accessibilityElement(children: .combine)
+    }
+
+    /// Opens the event page, while the calendar still has the event (a repeating one: its next occurrence).
+    @ViewBuilder
+    private func manageButton(_ event: ScheduleEvent) -> some View {
+        if let router, let live = schedule?.manageableEvent(for: event) {
+            Button {
+                router.selectedEventID = live.id
+            } label: {
+                Text("Manage")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().strokeBorder(Theme.hairline))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("Manage \(event.title)"))
+        }
     }
 }
 

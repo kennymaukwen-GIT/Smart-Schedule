@@ -67,7 +67,9 @@ enum AssistantPrompt {
         4. Plans: 2–4 phases with progressive overload or difficulty; sessions ≤ 90 min unless asked; schedule \
         around BUSY; one milestone per month; write summary_for_user as described in # Writing style.
         5. modify_event / delete_events: use ids from UPCOMING or FOCUS only. Never invent ids. If several \
-        events match, call reply_to_user with needs_clarification=true and suggested_replies.
+        events match, call reply_to_user with needs_clarification=true and suggested_replies. To add a note to an \
+        event ('add a note: bring passport', '加個備註：帶護照'), call modify_event with changes.notes set to the new \
+        text only; the app adds it below the event's notes. A row's notes (after "notes:") are its details.
         6. Requests to see the schedule → query_schedule.
         7. If a required time cannot be reasonably inferred → reply_to_user with needs_clarification=true.
         8. Omit reminder_minutes unless the user asks for reminders on this event; the user's defaults are in \
@@ -146,7 +148,7 @@ enum AssistantPrompt {
         }
 
         let labels = calendarLabels(calendars)
-        lines.append("\n# UPCOMING / BUSY (id | title | start | end | flags)")
+        lines.append("\n# UPCOMING / BUSY (id | title | start | end | flags | notes: … when the event has notes)")
         if upcoming.isEmpty {
             lines.append("(none)")
         } else {
@@ -239,6 +241,12 @@ enum AssistantPrompt {
             if let name = calendar.name { flags.append("cal=\(name)") }
             if !calendar.isWritable { flags.append("read_only") }
         }
-        return "\(event.id) | \(safeTitle) | \(start) | \(end) | \(flags.joined(separator: ","))"
+        let line = "\(event.id) | \(safeTitle) | \(start) | \(end) | \(flags.joined(separator: ","))"
+        // The event's details, shortened to one line (the provenance line Smart Schedule writes is left out).
+        guard let notes = EventNotes.promptLine(event.notes, limit: notesLimit) else { return line }
+        return line + " | notes: " + notes
     }
+
+    /// Characters of an event's notes in UPCOMING and FOCUS: enough for "bring passport", short enough for 40 rows.
+    static let notesLimit = 300
 }

@@ -11,7 +11,7 @@
 |---|---|---|
 | `create_events` | 一句話裡有 1 到 20 個具體事件，也可以帶簡單的重複規則 | `events[]` 陣列，一句話寫入多筆 |
 | `create_long_term_plan` | 跨度超過 2 週的目標：「半年變壯」「三月前考到 IELTS 7.5」 | 分階段 `phases` 和 `sessions` 樣板，加上 `daily_nudge`、`milestones`。只產生**草稿**給使用者審閱；修改時再呼叫一次，帶上**完整**的修訂版（見第 5 節） |
-| `modify_event` | 「延後 30 分鐘」「改到四點」 | `event_id` 只能取自 UPCOMING 或 FOCUS |
+| `modify_event` | 「延後 30 分鐘」「改到四點」「加個備註：帶護照」 | `event_id` 只能取自 UPCOMING 或 FOCUS；`changes.notes` 只放**新加的**那句備註，App 接在原本的備註下面（見第 4.4 節） |
 | `delete_events` | 取消事件或整個計畫 | 支援 `plan_id`；批次刪除由 App 要求使用者確認 |
 | `query_schedule` | 「Show me my schedule for today」（Artboard 4） | 只讀，回傳區間讓 UI 跳轉 |
 | `confirm_plan` | 使用者對畫面上的草稿計畫或「等你確認的行程」說「好」「looks good」或「不要了」 | `decision`：`add` 或 `discard`。只有 prompt 裡有 DRAFT PLAN 或 PENDING EVENTS 區塊時才能呼叫；兩個都有時，套用在比較新的那個 |
@@ -34,7 +34,7 @@
 | `create_events` 的確認由 client 產生 | 同上。聊天裡顯示成確認列（`Reply.addedEvents`），文字版是「Added: 標題 · 日期 時間」，給 Siri、通知和 VoiceOver 用 |
 | `reminder_minutes` 「省略就用預設值」 | 只有使用者對**這一個**行程要求提醒時才填。預設值是使用者的設定（prompt 的 PREFERENCES 區塊），由 `ReminderPolicy(preferences:)` 套用 |
 | `assumptions[]` | 把模型做的假設（「假設你是初學者」「假設平日晚上有空」）攤開給使用者看，讓他能修正 |
-| UPCOMING 區塊（`id \| title \| start \| end \| flags`） | 一次提供三種資訊：衝突偵測、`modify` 和 `delete` 要用的 id 來源、`plan=` 對照。標題裡的 `\|` 和換行會先移除，防止 prompt injection |
+| UPCOMING 區塊（`id \| title \| start \| end \| flags`，有備註時再加 `\| notes: …`） | 一次提供四種資訊：衝突偵測、`modify` 和 `delete` 要用的 id 來源、`plan=` 對照，以及行程的備註（使用者問「護照帶了沒」「那個會要準備什麼」時看得到）。標題和備註裡的 `\|` 和換行會先移除，防止 prompt injection；備註縮成一行、最多 300 字（`AssistantPrompt.notesLimit`），Smart Schedule 自己寫的來源行（「由 Smart Schedule 智慧助理自動排程：…」）不放進去 |
 
 ## 3. 實際送出的 request（簡化版）
 
@@ -44,7 +44,7 @@ x-goog-api-key: <dev only — production goes through proxy>
 ```
 ```json
 {
-  "systemInstruction": { "parts": [{ "text": "You are Smart Schedule ...\n# Clock\nnow_local: 2026-10-13T10:15 (Tuesday)\ntime_zone: Europe/London (currently UTC+1.0)\n...\n# UPCOMING / BUSY (id | title | start | end | flags)\nss0k3p | Online meeting with Joe | 2026-10-13T15:30 | 2026-10-13T16:30 | event" }] },
+  "systemInstruction": { "parts": [{ "text": "You are Smart Schedule ...\n# Clock\nnow_local: 2026-10-13T10:15 (Tuesday)\ntime_zone: Europe/London (currently UTC+1.0)\n...\n# UPCOMING / BUSY (id | title | start | end | flags | notes: … when the event has notes)\nss0k3p | Online meeting with Joe | 2026-10-13T15:30 | 2026-10-13T16:30 | event | notes: Product quality review" }] },
   "contents": [
     { "role": "user", "parts": [{ "text": "I want to be muscular in 6 month design me a daily routine" }] }
   ],
@@ -90,6 +90,23 @@ validator 會印出實際的 Google payload，例如：
 
 ### 4.3 在通知裡回「延後 30 分鐘」
 Fixture：[`Tests/fixtures/modify_event.push.json`](../Tests/fixtures/modify_event.push.json)。FOCUS 區塊已經告訴模型「it」指的是哪個事件，所以使用者不用說出事件名稱。
+
+### 4.4 「加個備註：帶護照」
+Fixture：[`Tests/fixtures/modify_event.add_note.json`](../Tests/fixtures/modify_event.add_note.json)。
+```json
+{ "name": "modify_event", "args": { "event_id": "ssfl1ght", "changes": { "notes": "帶護照" } } }
+```
+行程的「備註」就是 Google 行程的 `description`（純文字，見 [`GOOGLE_CALENDAR_SYNC.md`](GOOGLE_CALENDAR_SYNC.md) 第 11 節），使用者在行程頁可以直接編輯。助理這邊的規則：
+
+| 項目 | 做法 |
+|---|---|
+| 模型看到什麼 | UPCOMING 和 FOCUS 的每一列在有備註時多一欄 `notes: …`：一行、最多 300 字（太長以「…」結尾），換行變成 ` / `，`\|` 變成 `/`，Smart Schedule 寫的來源行不放 |
+| `changes.notes` 的意思 | **只放新加的那句**（schema 的 description 寫明）。App（`CalendarEventMapper.patch(from:existing:)`）把它接在原本備註的下一行（`EventNotes.appending`；同一句已經有了就不重複），PATCH 送出整段 `description` |
+| 為什麼不讓模型送「整段新的備註」 | 模型只看到截短的一行，要它重寫整段一定會弄丟 300 字以後的內容和原本的換行。用「追加」就不可能誤刪；要改寫或清空備註，使用者在行程頁直接編輯 |
+| 衝突 | 跟其他欄位一樣：PATCH 帶 If-Match，412 時 `ConflictMerge` 只重送使用者這次改的欄位 |
+| Schema | `modify_event.changes.notes` 原本就有，沒有新增欄位，只補上 description；validator 和 fixture 照常通過 |
+
+Demo 模式（`DemoAssistant`）不經過 Gemini，自己認「加個備註：…」「備註：…」「看牙醫加備註 帶健保卡」「add a note: …」「add a note to the dentist: …」「note: …」：加到通知提醒的那個行程（FOCUS），否則是句子裡點名的行程，否則是這段對話剛新增、移動或加過備註的行程；都沒有就問「要把備註加到哪個行程？」。「明天下午 3 點開會，備註：帶簡報」這種前面有時間的句子仍然是新增行程。
 
 ## 5. 長期計畫先審閱再寫入：草稿 → Add / Keep editing
 
@@ -251,5 +268,5 @@ python3 -I scripts/validate_schema.py --print-payloads
 - 草稿預覽的參考展開（`--print-payloads` 會印出每個計畫 fixture 的預覽數量），並 assert 18:30 在兩次夏令時間切換前後都不變。
 - `confirm_plan` 的 fixture 必須帶 `draft_plan`；帶 `revises` 的 fixture 必須是 `create_long_term_plan`，而且保留原本的 `plan_title`。
 - 回覆寫法：fixture 的 `summary_for_user` 最多 2 句、不列時間、不用斜線（第 6 節）；`update_preferences` 的 `summary_for_user` 只能 1 句。
-- `update_preferences`：每個 key 只能出現一次，`value` 符合該 key 的編碼（第 10 節表格）；`default_calendar` 的值必須是 fixture `calendars` 裡的一行。`confirm_plan` 的 fixture 要有 `draft_plan` 或 `pending_events`；`modify_event` 的 `event_id` 必須出現在 fixture 的 `upcoming` 或 `focus_event`。
+- `update_preferences`：每個 key 只能出現一次，`value` 符合該 key 的編碼（第 10 節表格）；`default_calendar` 的值必須是 fixture `calendars` 裡的一行。`confirm_plan` 的 fixture 要有 `draft_plan` 或 `pending_events`；`modify_event` 的 `event_id` 必須出現在 fixture 的 `upcoming` 或 `focus_event`（列裡的 `| notes: …` 不影響比對，例如 `modify_event.add_note.json`）。
 - String Catalog：每個 key 都有 zh-Hant 翻譯、格式參數一致，原始碼裡的每個 `String(localized:)` 都在 catalog 裡。

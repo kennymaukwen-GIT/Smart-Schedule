@@ -219,7 +219,7 @@
   },
   {
     "name": "modify_event",
-    "description": "Change an existing event: reschedule, rename, move, change reminders. event_id MUST come from the UPCOMING list or the FOCUS event. Never invent ids.",
+    "description": "Change an existing event: reschedule, rename, move, change reminders, add a note. event_id MUST come from the UPCOMING list or the FOCUS event. Never invent ids.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -243,7 +243,10 @@
               "maxItems": 5,
               "items": { "type": "integer", "minimum": 0, "maximum": 40320 }
             },
-            "notes": { "type": "string" }
+            "notes": {
+              "type": "string",
+              "description": "Only the NEW note to add, in the user's words, e.g. 'Bring passport' for 'add a note: bring passport' or '帶護照' for '加個備註：帶護照'. The app adds it on its own line below the event's notes (the event's description in Google Calendar). Never repeat the existing notes."
+            }
           }
         }
       },

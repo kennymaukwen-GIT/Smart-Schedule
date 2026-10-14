@@ -1,0 +1,11 @@
+{
+  "utterance": "加個備註：帶護照",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "upcoming": "ssfl1ght | Flight to Tokyo | 2026-10-16T09:00 | 2026-10-16T21:00 | event | notes: Terminal 2",
+  "focus_event": "ssfl1ght | Flight to Tokyo | 2026-10-16T09:00 | 2026-10-16T21:00 | event | notes: Terminal 2",
+  "expected_call": {
+    "name": "modify_event",
+    "args": { "event_id": "ssfl1ght", "changes": { "notes": "帶護照" } }
+  }
+}

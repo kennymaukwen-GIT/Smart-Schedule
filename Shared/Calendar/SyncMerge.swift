@@ -91,7 +91,7 @@ enum OutboxOverlay {
         var event = event
         if let summary = patch.summary { event.title = summary }
         if let location = patch.location { event.location = location.isEmpty ? nil : location }
-        if let description = patch.description { event.notes = description }
+        if let description = patch.description { event.notes = EventNotes.plainText(fromDescription: description) }
         if let colorID = patch.colorId, let hex = GoogleColor.palette[colorID] {
             event.colorHex = hex
             event.usesCalendarColor = false
@@ -136,7 +136,9 @@ enum OutboxOverlay {
         }
     }
 
-    private static func move(_ event: inout ScheduleEvent, to time: OutboxItem.SeriesTime, clock: WallClock) {
+    /// An occurrence of a series moved to `time`'s time of day on its own date, `time.duration` long (all-day
+    /// occurrences stay as they are).
+    static func move(_ event: inout ScheduleEvent, to time: OutboxItem.SeriesTime, clock: WallClock) {
         guard !event.isAllDay else { return }
         let calendar = clock.calendar
         let parts = calendar.dateComponents([.hour, .minute], from: time.newStart)

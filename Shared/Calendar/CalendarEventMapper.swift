@@ -32,6 +32,8 @@ struct CalendarEventMapper: Sendable {
     static let allDayReminder = [900]
     /// `SSProperty.localReminders` value for "the kind's defaults".
     static let defaultRemindersMarker = "default"
+    /// `SSProperty.localReminders` value for "no reminders" (set on the event page).
+    static let noRemindersMarker = "none"
 
     init(clock: WallClock = WallClock(), policy: ReminderPolicy = ReminderPolicy(), defaultEventMinutes: Int = 60) {
         self.clock = clock
@@ -183,7 +185,9 @@ struct CalendarEventMapper: Sendable {
         var body = GCalEvent()
         body.summary = changes.title.nonBlank
         body.location = changes.location
-        if let notes = changes.notes.nonBlank { body.description = notes }
+        // "Add a note": the new text goes on a line of its own below the notes the event has (the assistant only
+        // sees them shortened, so it never rewrites them). Plain text, like the event page saves.
+        if let note = changes.notes.nonBlank { body.description = EventNotes.appending(note, to: existing?.notes) }
 
         let duration = changes.durationMinutes.map { TimeInterval($0) * 60 } ?? existing?.duration ?? 3600
         if let newStart = changes.start.flatMap(clock.dateTime) {
@@ -275,7 +279,7 @@ struct CalendarEventMapper: Sendable {
             colorHex: event.colorId.flatMap { GoogleColor.palette[$0] } ?? fallbackColorHex,
             location: event.location,
             meetURL: meet.flatMap(URL.init(string:)),
-            notes: event.description,
+            notes: EventNotes.plainText(fromDescription: event.description),
             reminderMinutes: Self.reminderMinutes(of: event),
             planID: props[SSProperty.planID],
             htmlLink: event.htmlLink.flatMap(URL.init(string:)),
@@ -302,11 +306,12 @@ struct CalendarEventMapper: Sendable {
 
     /// What `ScheduleEvent.reminderMinutes` means: nil = the kind's defaults (from preferences when reminding),
     /// [] = none, otherwise these minutes. Smart Schedule's own marker wins over Google's pop-ups, which are empty
-    /// in "Smart Schedule only" mode. Without it: Google's defaults → nil; overrides → their minutes;
-    /// `useDefault == false` with no overrides → [] (reminders turned off in Google).
+    /// in "Smart Schedule only" mode ("none" = no reminders). Without it: Google's defaults → nil; overrides →
+    /// their minutes; `useDefault == false` with no overrides → [] (reminders turned off in Google).
     static func reminderMinutes(of event: GCalEvent) -> [Int]? {
         if let marker = event.extendedProperties?.private?[SSProperty.localReminders] {
             if marker == defaultRemindersMarker { return nil }
+            if marker == noRemindersMarker { return [] }
             let parts = marker.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
             let minutes = parts.compactMap(Int.init)
             if minutes.count == parts.count { return minutes }
