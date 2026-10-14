@@ -50,8 +50,8 @@ enum SyncStatusStore {
 }
 
 /// Lets code that is compiled without Shared/Calendar (the widget target, so Shared/Intents and Shared/LiveActivity)
-/// ask for a sync: the app installs the handler at launch (`AppRefresh.installSyncHooks()`), and the Control Center
-/// summon, which iOS runs in the app process, calls `request("summon")`. Without a handler it does nothing.
+/// ask for a sync: the app installs the handler at launch (`AppRefresh.installSyncHooks()`). Without a handler it
+/// does nothing. Nothing calls it since the Control Center button opens Quick Capture instead of the island.
 enum SyncRequests {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var handler: (@Sendable (String) async -> Void)?

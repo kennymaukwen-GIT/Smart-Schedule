@@ -29,8 +29,7 @@ enum AppRefresh {
     }
 
     /// Call once at launch: a sync that changes the cache also refreshes the Live Activity (the engine reschedules
-    /// reminders itself), and the Control Center summon, which iOS runs in this process, syncs before it shows the
-    /// island (`SyncRequests.request("summon")`).
+    /// reminders itself), and code without SyncEngine can ask for a sync (`SyncRequests`).
     static func installSyncHooks() {
         Task {
             await SyncEngine.shared.setChangeHandler {

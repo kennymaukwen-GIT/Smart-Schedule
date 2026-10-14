@@ -1,12 +1,12 @@
 import ActivityKit
 import Foundation
 
-/// Starts / refreshes / ends the "ready" Live Activity that keeps Smart Schedule in the Dynamic Island.
+/// Starts / refreshes / ends the Live Activity that shows the next event in the Dynamic Island.
 ///
 /// Lifetime facts (ActivityKit): an activity runs ≤ 8 h, then lingers on the Lock Screen ≤ 4 h.
-/// Starting from the background is only allowed via a `LiveActivityIntent` (Control Center button,
-/// widget/island button, Siri) or APNs push-to-start (iOS 17.2+). A truly always-on island therefore
-/// needs a server that push-to-starts a fresh activity when the previous one expires.
+/// Starting from the background is only allowed via a `LiveActivityIntent` or APNs push-to-start (iOS 17.2+).
+/// It is started only for an event about to start (`summonIfDue`); the Control Center button opens Quick Capture
+/// instead (`OpenQuickCaptureIntent`).
 @MainActor
 final class LiveActivityManager {
     static let shared = LiveActivityManager()
@@ -18,8 +18,8 @@ final class LiveActivityManager {
         ScheduleActivity.activities.first { $0.activityState == .active || $0.activityState == .stale }
     }
 
-    /// Called by the Control Center button (via `SummonScheduleIntent`): always starts or updates the activity.
-    func summon() async throws {
+    /// Starts the activity, or updates the running one.
+    private func start() async throws {
         let content = await makeContent()
         if let current {
             await current.update(content)
@@ -39,7 +39,7 @@ final class LiveActivityManager {
     }
 
     /// When the app becomes active: refreshes a running activity, otherwise starts one if Settings › Dynamic Island
-    /// "Show next event" is on and the next timed event is in progress or starts within that lead time.
+    /// "Show next event" is on and the next timed event is in progress or starts within that lead time (≤ 30 min).
     ///
     /// Starting it on its own before every event, with the app closed, would need APNs push-to-start from a
     /// server, which Smart Schedule does not have.
@@ -52,7 +52,7 @@ final class LiveActivityManager {
         guard lead != nil, isAvailable else { return }
         let events = await SharedStore.shared.visibleEvents(audience: .display)
         guard LiveActivityStateBuilder.isNextEventDue(events: events, leadMinutes: lead, now: now) else { return }
-        try? await summon()
+        try? await start()
     }
 
     func dismiss() async {

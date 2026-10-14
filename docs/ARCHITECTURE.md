@@ -11,7 +11,7 @@
 
 | 設計需求 | iOS 實際行為 | 本專案對策（檔案） |
 |---|---|---|
-| 從控制中心按時鐘圖示後，不開 App 就讓動態島就緒（Artboard 3 紅圈） | iOS 18 的 `ControlWidgetButton` 可以執行 `LiveActivityIntent`。系統會在背景啟動 App process 來跑 `perform()`，不會把 App 開到前景，所以可以在這裡直接 `Activity.request` | `Shared/Intents/SummonScheduleIntent.swift`、`Widgets/SmartScheduleControl.swift` |
+| 從控制中心按時鐘圖示（Artboard 3 紅圈） | 直接打開 App 的快速輸入（鍵盤已叫出）。`ControlWidgetButton` 綁 `OpenQuickCaptureIntent`（`openAppWhenRun = true`），`perform()` 在 App process 把 `DeepLink.compose` 交給 `AppRouter`（`DeepLinkRequests`）。不再叫出動態島：沒有近期行程時那會是一個空白常駐的動態島，違反 Live Activity 只代表「即將發生或進行中」事件的規範 | `Shared/Intents/OpenQuickCaptureIntent.swift`、`Shared/Core/DeepLinkRequests.swift`、`Widgets/SmartScheduleControl.swift` |
 | 動態島展開後有 TextField、麥克風、送出（Artboard 3） | Live Activity 只支援 `Button`、`Toggle`（App Intent）和 `Link`。不能放 TextField、叫不出鍵盤、不能捲動。Expanded 和 Lock Screen 的高度上限都是 160 pt | 輸入列做成「看起來像輸入框的 deep link 膠囊」。點下去開啟 **Quick Capture**（Artboard 4）：一張外形像動態島、鍵盤已彈出的卡片，從島的位置放大出現。完全不開 App 的輸入改走 Siri、Action Button、Spotlight（`AddPlanIntent`） |
 | 動態島常駐 | 一個 Live Activity 最多活躍 8 小時，之後在鎖定畫面再留最多 4 小時。從背景啟動只有兩條路：`LiveActivityIntent`，或 APNs push-to-start（iOS 17.2 起） | 有後端時：用 push-to-start 自動續命（`LiveActivityManager.observePushTokens`）。沒有後端時：每次開 App、按控制中心、問 Siri 都重建一次 |
 | 動態島顯示一週日曆 | ActivityKit 的內容（static 加 dynamic）不能超過 4 KB。畫面渲染時不能連網 | `LiveActivityStateBuilder` 先壓縮：每天最多 2 個 chip、標題截短，超過預算就自動降一級 |
@@ -97,7 +97,7 @@ flowchart LR
 ## 3. 各介面的框架選型
 
 ### 3.1 控制中心：WidgetKit `ControlWidget`（iOS 18+）
-- `StaticControlConfiguration` 搭配 `ControlWidgetButton(action: SummonScheduleIntent())`。
+- `StaticControlConfiguration` 搭配 `ControlWidgetButton(action: OpenQuickCaptureIntent())`：打開 App 停在快速輸入。沒有 `openAppWhenRun = true` 的 intent 在控制中心只會在背景默默執行。
 - 控制項只能顯示 SF Symbol 或自訂 symbol（`.symbolset`）。要和 App icon 的時鐘一模一樣，得把它匯出成 custom symbol。
 - 同一個控制項可以放進控制中心、鎖定畫面左下和右下的按鈕位，以及 Action Button。
 - 開發者論壇上有人回報「從 widget 或 control 觸發的 intent 沒能啟動 Live Activity」，可能和 Xcode 16.0 時期的版本有關。**要在實機上驗證。**

@@ -114,8 +114,8 @@ iOS 每個 App 最多保留 64 個待發本地通知，超過的會被默默丟�
 
 ## 8. 動態島（Dynamic Island）
 
-- 設定 › 通知 › 動態島「顯示下一個行程」：關閉、15 分鐘前、30 分鐘前（預設）、1 小時前、2 小時前。
-- App 回到前景時呼叫 `LiveActivityManager.summonIfDue()`：已在顯示就更新；沒有的話，若下一個有時間的行程正在進行或在設定的時間內開始，就啟動。控制中心按鈕（`SummonScheduleIntent`）則一律啟動。
+- 設定 › 通知 › 動態島「顯示下一個行程」：30 分鐘前（預設）、15 分鐘前、10 分鐘前、5 分鐘前、關閉。舊版存的 1 小時、2 小時讀成 30 分鐘。
+- App 回到前景時呼叫 `LiveActivityManager.summonIfDue()`：已在顯示就更新；沒有的話，若下一個有時間的行程正在進行或在設定的時間內開始，就啟動。控制中心按鈕不再啟動動態島，改為打開快速輸入（`OpenQuickCaptureIntent`）。
 - **App 關著時自動在每個行程前出現，需要 APNs push-to-start，也就是需要推播伺服器**；本專案沒有，所以設定頁註腳照實說明。日後加了伺服器，可以把 `AppConstants.liveActivityPushEnabled` 打開並上傳 `pushToStartTokenUpdates`。
 - 週列的星期順序跟著「每週起始日」：`ContentState.firstWeekday`（舊的 payload 沒有這個欄位時當作星期日）。
 - 隱藏的行事曆與專注模式過濾掉的行事曆不會出現在動態島。

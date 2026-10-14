@@ -3268,6 +3268,16 @@
         }
       }
     },
+    "Open Quick Capture" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開快速輸入"
+          }
+        }
+      }
+    },
     "Open Smart Schedule to review it and tap Add." : {
       "localizations" : {
         "zh-Hant" : {
@@ -3284,6 +3294,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Google 日曆中開啟"
+          }
+        }
+      }
+    },
+    "Opens Smart Schedule ready to type a plan." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開 Smart Schedule，直接輸入行程。"
           }
         }
       }
@@ -3396,6 +3416,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下一個行程延後 30 分鐘"
+          }
+        }
+      }
+    },
+    "Quick Capture" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快速輸入"
           }
         }
       }
@@ -3782,12 +3812,12 @@
         }
       }
     },
-    "Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Show my schedule in Smart Schedule”." : {
+    "Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Open Quick Capture in Smart Schedule”." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "對 Siri 說「Add a plan in Smart Schedule」、「Schedule something with Smart Schedule」或「Show my schedule in Smart Schedule」。"
+            "value" : "對 Siri 說「Add a plan in Smart Schedule」、「Schedule something with Smart Schedule」或「Open Quick Capture in Smart Schedule」。"
           }
         }
       }
@@ -3944,16 +3974,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示同步狀態"
-          }
-        }
-      }
-    },
-    "Shows your next event and this week in the Dynamic Island." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在動態島顯示下一個行程和本週行程。"
           }
         }
       }
@@ -4221,16 +4241,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "叫出"
-          }
-        }
-      }
-    },
-    "Summon Smart Schedule" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "叫出 Smart Schedule"
           }
         }
       }

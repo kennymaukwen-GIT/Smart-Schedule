@@ -13,7 +13,7 @@ struct ShortcutsGuideView: View {
                   "Touch and hold the Lock Screen, tap Customize › Lock Screen, tap a control at the bottom and choose Smart Schedule.")
             Section {
                 Label {
-                    Text("Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Show my schedule in Smart Schedule”.")
+                    Text("Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Open Quick Capture in Smart Schedule”.")
                 } icon: {
                     Image(systemName: "mic")
                 }

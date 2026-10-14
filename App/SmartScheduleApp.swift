@@ -10,6 +10,8 @@ struct SmartScheduleApp: App {
     @State private var chat: ChatViewModel
 
     init() {
+        // The Control Center button's intent runs in this process and opens Quick Capture through the router.
+        DeepLinkRequests.install { AppRouter.shared.handle($0) }
         let schedule = ScheduleViewModel()
         _schedule = State(initialValue: schedule)
         _chat = State(initialValue: ChatViewModel(schedule: schedule))
@@ -36,6 +38,8 @@ struct SmartScheduleApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
+                // A Quick Capture request the intent could only leave in the App Group.
+                if let url = DeepLinkRequests.takePending() { router.handle(url) }
                 Task {
                     // Events before the draft (reloadFromCache's order): a plan added from Siri or a notification
                     // must already be in `events` when its card is settled. refresh() skips this while signed out.
@@ -123,8 +127,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         NotificationIDs.registerCategories()
-        // Every sync that changes the cache reschedules reminders and refreshes the Live Activity, and the Control
-        // Center summon (shared with the widget, which cannot see SyncEngine) asks for a sync through `SyncRequests`.
+        // Every sync that changes the cache reschedules reminders and refreshes the Live Activity.
         AppRefresh.installSyncHooks()
         // Finishes transactions that arrived while the app was closed and keeps `isPro` current.
         Task { @MainActor in SubscriptionStore.shared.start() }

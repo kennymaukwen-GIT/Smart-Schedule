@@ -56,10 +56,10 @@ struct SmartScheduleShortcuts: AppShortcutsProvider {
             systemImageName: "calendar.badge.plus"
         )
         AppShortcut(
-            intent: SummonScheduleIntent(),
-            phrases: ["Show my schedule in \(.applicationName)"],
-            shortTitle: "Summon",
-            systemImageName: "clock"
+            intent: OpenQuickCaptureIntent(),
+            phrases: ["Open Quick Capture in \(.applicationName)"],
+            shortTitle: "Quick Capture",
+            systemImageName: "square.and.pencil"
         )
     }
 }

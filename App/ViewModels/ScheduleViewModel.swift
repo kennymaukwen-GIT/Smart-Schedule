@@ -214,8 +214,8 @@ final class ScheduleViewModel {
         await reloadFromCache()
         // Once its calendars are in the drawer, and before the add page closes.
         show(notice)
-        // The first connection shows the island at once, so it is clear where the next event will appear.
-        if !wasSignedIn && !isDemo { try? await LiveActivityManager.shared.summon() }
+        // The first connection shows the island at once when an event is about to start (within the lead time).
+        if !wasSignedIn && !isDemo { await LiveActivityManager.shared.summonIfDue() }
     }
 
     func reconnect(accountID: String) async {
@@ -482,7 +482,7 @@ final class ScheduleViewModel {
         await SharedStore.shared.setPendingEventBatch(nil)
         await reloadAccounts() // the sample accounts
         await refreshDemo(reseed: true)
-        try? await LiveActivityManager.shared.summon()
+        await LiveActivityManager.shared.summonIfDue()
     }
 
     func stopDemo() async {
