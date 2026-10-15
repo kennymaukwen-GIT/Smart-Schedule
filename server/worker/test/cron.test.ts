@@ -73,7 +73,7 @@ describe("cron push-to-start", () => {
     assert.equal(marker, `sent:${DEVICE}:${hash}:${at("2026-10-15T08:30:00Z") / 1000}`);
     assert.equal(await h.kv.get(marker), "1");
     assert.equal(h.kv.writes.find((w) => w.key === marker)?.expirationTtl, 3 * 86400);
-    assert.equal(h.kv.writes.find((w) => w.key.startsWith("claim:"))?.expirationTtl, 120);
+    assert.equal(h.kv.writes.find((w) => w.key.startsWith("claim:"))?.expirationTtl, 300);
     assert.deepEqual(h.kv.keysWithPrefix("claim:"), []);
     for (const t of ["2026-10-15T08:30:30Z", "2026-10-15T08:31:10Z", "2026-10-15T08:32:10Z"]) {
       assert.equal((await cronAt(h, t)).length, 0, t);
@@ -255,13 +255,14 @@ describe("cron push-to-start", () => {
     assert.equal((await cronAt(h, "2026-10-15T08:32:05Z")).length, 0);
   });
 
-  it("skips an event another run has claimed until the claim expires", async () => {
+  it("skips an event another run has claimed, for the whole window (a run that died after claiming: at most once)", async () => {
     const h = setup();
     await register(h, [event()]);
     h.clock.now = at("2026-10-15T08:30:05Z");
-    await h.kv.put(claimKey(DEVICE, await eventHash("ev1"), at("2026-10-15T08:30:00Z")), "1", { expirationTtl: 120 });
-    assert.equal((await cronAt(h, "2026-10-15T08:30:10Z")).length, 0, "an overlapping run is sending it");
-    assert.equal((await cronAt(h, "2026-10-15T08:32:06Z")).length, 1, "claim expired: retried");
+    await h.kv.put(claimKey(DEVICE, await eventHash("ev1"), at("2026-10-15T08:30:00Z")), "1", { expirationTtl: 300 });
+    for (const t of ["2026-10-15T08:30:10Z", "2026-10-15T08:31:10Z", "2026-10-15T08:32:10Z", "2026-10-15T08:33:10Z"]) {
+      assert.equal((await cronAt(h, t)).length, 0, t);
+    }
   });
 
   it("keeps the claim when the sent marker cannot be written after a 200", async () => {
@@ -271,7 +272,8 @@ describe("cron push-to-start", () => {
     assert.equal((await cronAt(h, "2026-10-15T08:30:05Z")).length, 1);
     h.kv.failPut = null;
     assert.equal(h.kv.keysWithPrefix("claim:").length, 1);
-    assert.equal((await cronAt(h, "2026-10-15T08:31:05Z")).length, 0, "the claim still blocks a resend");
+    assert.equal((await cronAt(h, "2026-10-15T08:31:05Z")).length, 0, "the claim still blocks a resend at m + 1");
+    assert.equal((await cronAt(h, "2026-10-15T08:32:05Z")).length, 0, "and at m + 2, the last run that re-checks minute m");
   });
 
   it("isolates failures: a KV error on one event does not stop the others", async () => {

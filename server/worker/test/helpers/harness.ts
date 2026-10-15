@@ -1,10 +1,32 @@
 // A Worker wired to an in-memory KV, a controllable clock and a recording fetch mock.
 
-import type { Env } from "../../src/env.ts";
+import type { Env, RateLimiter } from "../../src/env.ts";
 import type { Worker } from "../../src/index.ts";
 import { createWorker } from "../../src/index.ts";
 import { MemoryKV } from "./memory-kv.ts";
 import { TEAM_ID } from "./app-attest.ts";
+
+/** Stand-in for Cloudflare's Rate Limiting binding: an atomic fixed window per key and minute. */
+export class FakeRateLimiter implements RateLimiter {
+  readonly calls: string[] = [];
+  readonly counts = new Map<string, number>();
+  readonly perMinute: number;
+  readonly clock: () => number;
+
+  constructor(perMinute: number, clock: () => number) {
+    this.perMinute = perMinute;
+    this.clock = clock;
+  }
+
+  async limit({ key }: { key: string }): Promise<{ success: boolean }> {
+    // Counted before any await: concurrent calls cannot all see the same count.
+    const window = `${key}@${Math.floor(this.clock() / 60_000)}`;
+    const n = (this.counts.get(window) ?? 0) + 1;
+    this.counts.set(window, n);
+    this.calls.push(key);
+    return { success: n <= this.perMinute };
+  }
+}
 
 export interface FetchCall {
   url: string;
@@ -18,6 +40,8 @@ export type FetchResponder = (call: FetchCall) => Response | Promise<Response>;
 export interface Harness {
   clock: { now: number };
   kv: MemoryKV;
+  /** The fake SS_RATE_LIMITER binding (null when the harness was made with rateLimiter: false). */
+  limiter: FakeRateLimiter | null;
   env: Env;
   worker: Worker;
   calls: FetchCall[];
@@ -29,9 +53,13 @@ export interface Harness {
 
 export const START = Date.UTC(2026, 9, 15, 8, 0, 0); // 2026-10-15T08:00:00Z
 
-export function makeHarness(options: { rootCaPem?: string; env?: Partial<Env>; now?: number; sleep?: (ms: number) => Promise<void> } = {}): Harness {
+export function makeHarness(
+  options: { rootCaPem?: string; env?: Partial<Env>; now?: number; sleep?: (ms: number) => Promise<void>; rateLimiter?: boolean } = {},
+): Harness {
   const clock = { now: options.now ?? START };
   const kv = new MemoryKV(() => clock.now);
+  // Like production, the Rate Limiting binding is bound by default, with simple.limit = RATE_LIMIT_PER_MIN.
+  const limiter = options.rateLimiter === false ? null : new FakeRateLimiter(Number(options.env?.RATE_LIMIT_PER_MIN ?? "30"), () => clock.now);
   const env: Env = {
     SS_KV: kv,
     GEMINI_API_KEY: "test-gemini-key",
@@ -47,10 +75,12 @@ export function makeHarness(options: { rootCaPem?: string; env?: Partial<Env>; n
     APNS_ENV: "sandbox",
     ...options.env,
   };
+  if (limiter) env.SS_RATE_LIMITER = limiter;
   const calls: FetchCall[] = [];
   const harness: Harness = {
     clock,
     kv,
+    limiter,
     env,
     calls,
     respond: () => new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),

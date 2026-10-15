@@ -3,9 +3,12 @@
 // For each minute m in [now − 2 min, now] the `due:<m>:` index is listed; each entry is re-checked against the
 // device's current registration (the index may be stale: events get moved or deleted), so only an event that still
 // exists with a triggerAt inside minute m, and at or before now, is sent. Per (eventID, triggerAt):
-//   sent:  exists → never again;  claim: exists → another run is sending it right now.
-// The claim (TTL 120 s) is written before calling APNs, becomes the sent marker on 200, and is deleted on any
-// other outcome so the next minute retries until minute m leaves the window. A token APNs rejects (410, or 400
+//   sent:  exists → never again;  claim: exists → another run is sending it (or did, see below).
+// The claim (TTL 300 s: longer than the whole window, which ends with the run at m + 2) is written before calling
+// APNs, becomes the sent marker on 200, and is deleted on any other outcome so the next minute retries until minute m
+// leaves the window. If the sent marker cannot be written after a 200, the claim alone keeps the event from being sent
+// again. A run that dies after writing the claim (or whose claim delete fails) is therefore not retried within the
+// window: at most once, by design. A token APNs rejects (410, or 400
 // BadDeviceToken) is recorded in `p2sdead:<deviceID>`; the cron never rewrites the registration itself, so it
 // cannot overwrite a newer upload, and a registration whose token equals the dead one is skipped.
 //
@@ -31,7 +34,8 @@ import {
 } from "./registration.ts";
 
 export const SEND_CONCURRENCY = 10;
-const CLAIM_TTL_SECONDS = 120;
+/** Outlives the last re-check of a minute (the run at m + 2, ~120 s later, plus run time and cron jitter). */
+const CLAIM_TTL_SECONDS = 300;
 const VALID_TOKEN = /^[0-9A-Fa-f]{1,200}$/;
 
 export interface CronSummary {

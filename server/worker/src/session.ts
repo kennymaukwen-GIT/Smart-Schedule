@@ -1,9 +1,10 @@
 // POST /session — short-lived bearer tokens for the notification content extension.
 //
 // App Attest does not work in iOS app extensions (DCAppAttestService.generateKey fails there), so the app, which
-// can attest, asks for a session token and shares it with its extension. The token is accepted only on /v1beta/*
-// (`Authorization: Session <token>`), is rate-limited with the identity that requested it, and is stored only as a
-// SHA-256 hash:  sess:<hex SHA-256 of the token> = { id, appId, expiresAt }  (KV TTL = lifetime).
+// can attest, asks for a session token and shares it with its extension. The device's owner can read the token (the
+// app does not pin TLS), so it is scoped to what the extension does: POST /v1beta/models/<SESSION_MODELS>:generateContent
+// with a body of at most 512 KB, rate-limited with the identity that requested it. Stored only as a SHA-256 hash:
+//   sess:<hex SHA-256 of the token> = { id, appId, expiresAt, devKey? }  (KV TTL = lifetime)
 
 import type { Identity } from "./auth.ts";
 import { b64urlEncode, hex, sha256, utf8 } from "./encoding.ts";
@@ -22,6 +23,13 @@ export interface SessionRecord {
   appId: string | null;
   /** ISO 8601 UTC, whole seconds. */
   expiresAt: string;
+  /** Dev sessions only: fingerprint of the SS_DEV_TOKEN that minted it, so rotating or removing the token ends them. */
+  devKey?: string;
+}
+
+/** First 16 hex digits of SHA-256(SS_DEV_TOKEN). */
+export async function devKeyOf(devToken: string): Promise<string> {
+  return hex(await sha256(utf8(devToken))).slice(0, 16);
 }
 
 export async function sessionKey(token: string): Promise<string> {
@@ -41,6 +49,10 @@ export async function handleSession(body: Uint8Array, identity: Identity, env: E
   const token = b64urlEncode(crypto.getRandomValues(new Uint8Array(32)));
   const expiresAt = isoSeconds((Math.floor(deps.now() / 1000) + ttl) * 1000);
   const record: SessionRecord = { id: identity.id, appId: identity.appId, expiresAt };
+  if (identity.id === "dev") {
+    if (!env.SS_DEV_TOKEN) throw new HttpError(401, "attestation_required"); // unreachable: dev identity needs it
+    record.devKey = await devKeyOf(env.SS_DEV_TOKEN);
+  }
   try {
     await env.SS_KV.put(await sessionKey(token), JSON.stringify(record), { expirationTtl: ttl });
   } catch (e) {
@@ -60,7 +72,9 @@ export async function lookupSession(token: string, env: Env, now: number): Promi
     const record = JSON.parse(raw) as SessionRecord;
     const expiresAt = Date.parse(record.expiresAt);
     if (typeof record.id !== "string" || !Number.isFinite(expiresAt) || expiresAt <= now) return null;
-    return { id: record.id, appId: typeof record.appId === "string" ? record.appId : null, expiresAt: record.expiresAt };
+    const session: SessionRecord = { id: record.id, appId: typeof record.appId === "string" ? record.appId : null, expiresAt: record.expiresAt };
+    if (typeof record.devKey === "string") session.devKey = record.devKey;
+    return session;
   } catch {
     return null;
   }

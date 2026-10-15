@@ -14,8 +14,15 @@ export interface KV {
   }>;
 }
 
+/** Cloudflare Workers Rate Limiting binding (`[[ratelimits]]`); src/index.ts checks the real type satisfies it. */
+export interface RateLimiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface Env {
   SS_KV: KV;
+  /** Atomic per-location limiter (no KV writes). Optional: without it the KV counters below do the limiting. */
+  SS_RATE_LIMITER?: RateLimiter;
   // Secrets (wrangler secret put …)
   GEMINI_API_KEY?: string;
   SS_DEV_TOKEN?: string;
@@ -31,6 +38,7 @@ export interface Env {
   APNS_BUNDLE_ID?: string;
   APNS_ENV?: string;
   SESSION_TTL_SECONDS?: string;
+  SESSION_MODELS?: string;
 }
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -65,6 +73,18 @@ export const DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 3600;
 export function sessionTtlSeconds(env: Env): number {
   const n = Number(env.SESSION_TTL_SECONDS);
   return Number.isInteger(n) && n >= 60 ? n : DEFAULT_SESSION_TTL_SECONDS;
+}
+
+/** The app's Gemini model (Config/Base.xcconfig GEMINI_MODEL_ID); change SESSION_MODELS whenever the app's model changes. */
+export const DEFAULT_SESSION_MODELS = ["gemini-3.5-flash"];
+
+/** Models a Session token may call (POST …/models/<model>:generateContent only). */
+export function sessionModels(env: Env): string[] {
+  const list = (env.SESSION_MODELS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return list.length ? list : DEFAULT_SESSION_MODELS;
 }
 
 export function attestEnvironment(env: Env): AttestEnvironment | null {

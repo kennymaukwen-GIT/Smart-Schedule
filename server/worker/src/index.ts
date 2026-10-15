@@ -3,29 +3,35 @@
 //   GET  /attest/challenge        one-time challenge (rate-limited per IP)
 //   POST /attest                  verify an App Attest attestation, remember the key (rate-limited per IP)
 //   POST /session                 assertion-authenticated → session token for the app's extension
-//   ANY  /v1beta/*                assertion- or session-authenticated → Gemini API with the server's key
+//   ANY  /v1beta/*                assertion-authenticated → Gemini API with the server's key; a session token only
+//                                 for POST /v1beta/models/<SESSION_MODELS>:generateContent
 //   POST /devices/push-to-start   assertion-authenticated → store the device's push-to-start registration
 //   cron * * * * *                send due push-to-start notifications
 
 import { APPLE_APP_ATTESTATION_ROOT_CA_PEM } from "./apple-root-ca.ts";
 import { handleAttest, handleChallenge } from "./attest-routes.ts";
-import { authenticate, clientIp, enforceRateLimit } from "./auth.ts";
+import { authenticate } from "./auth.ts";
 import { runCron } from "./cron.ts";
-import type { Deps, Env, KV } from "./env.ts";
+import type { Deps, Env, KV, RateLimiter } from "./env.ts";
+import { sessionModels } from "./env.ts";
 import { proxyGemini } from "./gemini.ts";
 import { HttpError, errorResponse, log } from "./http.ts";
+import { clientIp, enforceIpLimit, enforceRateLimit } from "./ratelimit.ts";
 import { handlePushToStart } from "./registration.ts";
 import { MAX_SESSION_BODY, handleSession } from "./session.ts";
 
 export type { Env } from "./env.ts";
 
-// Compile-time check that the real binding satisfies the subset this Worker relies on.
+// Compile-time checks that the real bindings satisfy the subsets this Worker relies on.
 export type KVNamespaceSatisfiesKV = KVNamespace extends KV ? true : never;
-const _kvCheck: KVNamespaceSatisfiesKV = true;
-void _kvCheck;
+export type RateLimitSatisfiesRateLimiter = RateLimit extends RateLimiter ? true : never;
+const _bindingCheck: [KVNamespaceSatisfiesKV, RateLimitSatisfiesRateLimiter] = [true, true];
+void _bindingCheck;
 
 /** The app sends text prompts; 2 MB leaves ample room and bounds what an unauthenticated caller can make us read. */
 const MAX_GEMINI_BODY = 2 * 1024 * 1024;
+/** The notification extension sends text prompts plus its tool declarations. */
+const MAX_SESSION_GEMINI_BODY = 512 * 1024;
 const MAX_REGISTRATION_BODY = 1024 * 1024;
 
 export interface ScheduledEventLike {
@@ -49,34 +55,38 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
 
   if (path === "/attest/challenge") {
     if (method !== "GET") throw new HttpError(405, "method_not_allowed", { allow: "GET" });
-    await enforceRateLimit(env, `ip:${clientIp(request)}`, deps.now());
+    await enforceIpLimit(env, clientIp(request), deps.now());
     return handleChallenge(env);
   }
 
   if (path === "/attest") {
     if (method !== "POST") throw new HttpError(405, "method_not_allowed", { allow: "POST" });
-    await enforceRateLimit(env, `ip:${clientIp(request)}`, deps.now());
+    await enforceIpLimit(env, clientIp(request), deps.now());
     return handleAttest(request, env, deps);
   }
 
   if (path === "/session") {
     if (method !== "POST") throw new HttpError(405, "method_not_allowed", { allow: "POST" });
-    const { identity, body } = await authenticate(request, env, deps, { maxBody: MAX_SESSION_BODY, allowSession: false });
-    await enforceRateLimit(env, identity.id, deps.now());
+    const { identity, body, via } = await authenticate(request, env, deps, { maxBody: MAX_SESSION_BODY });
+    await enforceRateLimit(env, identity.id, deps.now(), { strict: via !== "assertion" });
     return handleSession(body, identity, env, deps);
   }
 
   if (path.startsWith("/v1beta/")) {
-    // The only route that accepts `Authorization: Session <token>` (the notification extension cannot attest).
-    const { identity, body } = await authenticate(request, env, deps, { maxBody: MAX_GEMINI_BODY, allowSession: true });
-    await enforceRateLimit(env, identity.id, deps.now());
+    // The only route that accepts `Authorization: Session <token>`, and only for the extension's one call
+    // (POST …/models/<SESSION_MODELS>:generateContent, ≤ 512 KB). Bearer and dev keep the full /v1beta/* passthrough.
+    const { identity, body, via } = await authenticate(request, env, deps, {
+      maxBody: MAX_GEMINI_BODY,
+      session: { maxBody: MAX_SESSION_GEMINI_BODY, models: sessionModels(env) },
+    });
+    await enforceRateLimit(env, identity.id, deps.now(), { strict: via !== "assertion" });
     return proxyGemini(request, body, env, deps);
   }
 
   if (path === "/devices/push-to-start") {
     if (method !== "POST") throw new HttpError(405, "method_not_allowed", { allow: "POST" });
-    const { identity, body } = await authenticate(request, env, deps, { maxBody: MAX_REGISTRATION_BODY, allowSession: false });
-    await enforceRateLimit(env, identity.id, deps.now());
+    const { identity, body, via } = await authenticate(request, env, deps, { maxBody: MAX_REGISTRATION_BODY });
+    await enforceRateLimit(env, identity.id, deps.now(), { strict: via !== "assertion" });
     return handlePushToStart(body, identity, env, deps);
   }
 

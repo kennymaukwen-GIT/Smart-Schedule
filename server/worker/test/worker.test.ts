@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 import { b64decode, b64encode, hex, sha256, utf8 } from "../src/encoding.ts";
+import { ipBucket } from "../src/ratelimit.ts";
 import { eventHash } from "../src/registration.ts";
 import type { Chain } from "./helpers/app-attest.ts";
 import { BUNDLE_ID, TEAM_ID, bearer, makeAssertion, makeAttestation, makeChain } from "./helpers/app-attest.ts";
@@ -8,6 +9,8 @@ import type { Harness } from "./helpers/harness.ts";
 import { START, jsonOf, makeHarness } from "./helpers/harness.ts";
 import { generateEcKeyPair } from "./helpers/webcrypto.ts";
 import { encode as cborEncode } from "cborg";
+
+const SESSION_MODEL = "gemini-3.5-flash"; // SESSION_MODELS default = the app's GEMINI_MODEL_ID
 
 let chain: Chain;
 before(async () => {
@@ -304,24 +307,85 @@ describe("authentication", () => {
     assert.equal(unknown.state.pulled, false);
   });
 
-  it("rate-limits failed authentications per IP before reading the body", async () => {
-    const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true", RATE_LIMIT_PER_MIN: "3" } });
-    const ip = { "cf-connecting-ip": "203.0.113.9" };
-    for (let i = 0; i < 3; i++) {
-      const r = await h.request("/v1beta/models", { headers: { ...ip, authorization: "Bearer !!!" } });
-      assert.equal(r.status, 401);
+  async function badSignature(h: Harness, device: Device, ip: string): Promise<Response> {
+    device.counter++;
+    const assertion = await makeAssertion({ privateKey: device.privateKey, counter: device.counter, body: utf8("signed something else") });
+    return h.request("/v1beta/models/x:generateContent", { method: "POST", headers: { "cf-connecting-ip": ip, authorization: bearer(device.keyId, assertion) }, body: "{}" });
+  }
+
+  for (const rateLimiter of [true, false]) {
+    it(`does not let garbage from a shared IP lock out valid callers (${rateLimiter ? "binding" : "KV fallback"})`, async () => {
+      const h = makeHarness({ rootCaPem: chain.root.pem, rateLimiter, env: { ALLOW_DEV_TOKEN: "true", RATE_LIMIT_PER_MIN: "3" } });
+      const device = await attestDevice(h);
+      const { token } = (await (await device.send("/session", "{}")).json()) as { token: string };
+      const ip = "203.0.113.9";
+      const budgetCallsBefore = h.limiter?.calls.filter((k) => k.startsWith("pre:")).length ?? 0;
+      const foreign = await makeAssertion({ privateKey: device.privateKey, counter: 99, body: new Uint8Array(0), appId: "ABCDE12345.com.example.other" });
+      const garbage: Record<string, string>[] = [
+        { authorization: "Bearer !!!" },
+        { authorization: bearer(crypto.getRandomValues(new Uint8Array(32)), foreign) }, // unknown key
+        { authorization: bearer(device.keyId, foreign) }, // known key, wrong rpId: refused before the body
+        { authorization: `Session ${"Z".repeat(43)}` }, // unknown session
+        {},
+      ];
+      for (let round = 0; round < 10; round++) {
+        for (const headers of garbage) {
+          const r = await h.request(`/v1beta/models/${SESSION_MODEL}:generateContent`, { method: "POST", headers: { ...headers, "cf-connecting-ip": ip }, body: "{}" });
+          assert.equal(r.status, 401);
+        }
+      }
+      const at = { "cf-connecting-ip": ip };
+      assert.equal((await h.request("/v1beta/models", { headers: { ...at, "x-dev-token": "dev-secret-token" } })).status, 200, "dev");
+      const viaSession = await h.request(`/v1beta/models/${SESSION_MODEL}:generateContent`, { method: "POST", headers: { ...at, authorization: `Session ${token}` }, body: "{}" });
+      assert.equal(viaSession.status, 200, "session");
+      assert.equal((await device.send("/v1beta/models/x:generateContent", "{}", { headers: at })).status, 200, "bearer");
+      assert.deepEqual(h.kv.keysWithPrefix("rl:authfail:"), [], "cheap rejections are not counted");
+      if (h.limiter) {
+        const added = h.limiter.calls.filter((k) => k.startsWith("pre:")).length - budgetCallsBefore;
+        assert.equal(added, 1, "of everything sent from that IP, only the valid Bearer request reached the body budget");
+      }
+    });
+  }
+
+  it("budgets Bearer body reads per (IP, keyId), counting post-body failures (KV fallback)", async () => {
+    const h = makeHarness({ rootCaPem: chain.root.pem, rateLimiter: false, env: { RATE_LIMIT_PER_MIN: "4" } });
+    const d = await attestDevice(h);
+    const e = await attestDevice(h);
+    for (let i = 0; i < 4; i++) {
+      const r = await badSignature(h, d, "203.0.113.9");
+      assert.deepEqual([r.status, await r.json()], [401, { error: "invalid_assertion" }]);
     }
-    assert.equal(h.kv.writes.find((w) => w.key.startsWith("rl:authfail:203.0.113.9:"))?.expirationTtl, 120);
-    const blocked = streamingRequest("/v1beta/models/x:generateContent", { ...ip, "x-dev-token": "dev-secret-token", "content-length": "16" });
+    const failures = `rl:authfail:203.0.113.9:${d.keyIdB64}:${Math.floor(h.clock.now / 60_000)}`;
+    assert.equal(await h.kv.get(failures), "4");
+    assert.equal(h.kv.writes.find((w) => w.key === failures)?.expirationTtl, 120);
+
+    d.counter++;
+    const assertion = await makeAssertion({ privateKey: d.privateKey, counter: d.counter, body: new Uint8Array(16) });
+    const blocked = streamingRequest("/v1beta/models/x:generateContent", { "cf-connecting-ip": "203.0.113.9", authorization: bearer(d.keyId, assertion), "content-length": "16" });
+    const r = await h.worker.fetch(blocked.request, h.env, { waitUntil() {} });
+    assert.deepEqual([r.status, await r.json()], [429, { error: "rate_limited" }]);
+    assert.equal(blocked.state.pulled, false, "refused before the body is read");
+
+    assert.equal((await d.send("/v1beta/models/x:generateContent", "{}", { headers: { "cf-connecting-ip": "203.0.113.10" } })).status, 200, "same key, other IP");
+    assert.equal((await e.send("/v1beta/models/x:generateContent", "{}", { headers: { "cf-connecting-ip": "203.0.113.9" } })).status, 200, "other key, same IP");
+    h.clock.now += 60_000;
+    assert.equal((await d.send("/v1beta/models/x:generateContent", "{}", { headers: { "cf-connecting-ip": "203.0.113.9" } })).status, 200, "next minute");
+  });
+
+  it("with the binding, every Bearer body read counts per (IP, keyId) and nothing is written to KV for it", async () => {
+    const h = makeHarness({ rootCaPem: chain.root.pem, env: { RATE_LIMIT_PER_MIN: "4" } });
+    const d = await attestDevice(h);
+    const e = await attestDevice(h);
+    for (let i = 0; i < 4; i++) assert.equal((await badSignature(h, d, "203.0.113.9")).status, 401);
+    d.counter++;
+    const assertion = await makeAssertion({ privateKey: d.privateKey, counter: d.counter, body: new Uint8Array(16) });
+    const blocked = streamingRequest("/v1beta/models/x:generateContent", { "cf-connecting-ip": "203.0.113.9", authorization: bearer(d.keyId, assertion), "content-length": "16" });
     const r = await h.worker.fetch(blocked.request, h.env, { waitUntil() {} });
     assert.equal(r.status, 429);
-    assert.deepEqual(await r.json(), { error: "rate_limited" });
-    assert.ok(Number(r.headers.get("retry-after")) >= 1);
     assert.equal(blocked.state.pulled, false);
-
-    assert.equal((await h.request("/v1beta/models", { headers: { "cf-connecting-ip": "203.0.113.10", "x-dev-token": "dev-secret-token" } })).status, 200, "other IPs unaffected");
-    h.clock.now += 60_000;
-    assert.equal((await h.request("/v1beta/models", { headers: { ...ip, "x-dev-token": "dev-secret-token" } })).status, 200, "next minute");
+    assert.equal((await e.send("/v1beta/models/x:generateContent", "{}", { headers: { "cf-connecting-ip": "203.0.113.9" } })).status, 200);
+    assert.equal((await d.send("/v1beta/models/x:generateContent", "{}", { headers: { "cf-connecting-ip": "203.0.113.10" } })).status, 200);
+    assert.deepEqual(h.kv.keysWithPrefix("rl:authfail:"), []);
   });
 
   describe("assertion counter", () => {
@@ -693,6 +757,17 @@ describe("POST /session and Session tokens", () => {
     return sha256(utf8(token)).then((h) => `sess:${hex(h)}`);
   }
 
+  /** The extension's one call. */
+  function useSession(h: Harness, token: string, body = "{}", headers: Record<string, string> = {}): Promise<Response> {
+    return h.request(`/v1beta/models/${SESSION_MODEL}:generateContent`, { method: "POST", headers: { ...headers, authorization: `Session ${token}` }, body });
+  }
+
+  async function devSession(h: Harness): Promise<string> {
+    const r = await h.request("/session", { method: "POST", headers: { "x-dev-token": "dev-secret-token" }, body: "{}" });
+    assert.equal(r.status, 200);
+    return ((await r.json()) as { token: string }).token;
+  }
+
   it("issues a 32-byte base64url token to an attested key and stores only its hash", async () => {
     const h = makeHarness({ rootCaPem: chain.root.pem });
     const device = await attestDevice(h);
@@ -706,13 +781,14 @@ describe("POST /session and Session tokens", () => {
     assert.ok(!h.kv.writes.some((w) => w.key.includes(token) || w.value.includes(token)), "the token itself is never stored");
   });
 
-  it("issues to the dev identity with appId null and honours SESSION_TTL_SECONDS", async () => {
+  it("issues to the dev identity with appId null, the dev token's fingerprint, and SESSION_TTL_SECONDS", async () => {
     const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true", SESSION_TTL_SECONDS: "3600" } });
     const r = await h.request("/session", { method: "POST", headers: { "x-dev-token": "dev-secret-token" }, body: "{}" });
     const { token, expiresAt } = (await r.json()) as { token: string; expiresAt: string };
     assert.equal(expiresAt, "2026-10-15T09:00:00Z");
     const key = await sessionKey(token);
-    assert.deepEqual(JSON.parse((await h.kv.get(key))!), { id: "dev", appId: null, expiresAt });
+    const devKey = hex(await sha256(utf8("dev-secret-token"))).slice(0, 16);
+    assert.deepEqual(JSON.parse((await h.kv.get(key))!), { id: "dev", appId: null, expiresAt, devKey });
     assert.equal(h.kv.writes.find((w) => w.key === key)?.expirationTtl, 3600);
   });
 
@@ -727,23 +803,83 @@ describe("POST /session and Session tokens", () => {
     assert.equal((await h.request("/session", { headers: dev })).status, 405);
   });
 
-  it("authenticates /v1beta/*: forwarded with the API key and without the Authorization header", async () => {
+  it("authenticates the extension's call: forwarded with the API key and without the Authorization header", async () => {
     const h = makeHarness({ rootCaPem: chain.root.pem });
     const device = await attestDevice(h);
     const { token } = await issue(h, device);
-    const body = utf8('{"contents":[{"parts":[{"text":"from the extension"}]}]}');
-    const r = await h.request("/v1beta/models/gemini-2.5-flash:generateContent", {
-      method: "POST",
-      headers: { authorization: `Session ${token}`, "content-type": "application/json" },
-      body,
-    });
+    const body = '{"contents":[{"parts":[{"text":"from the extension"}]}]}';
+    const r = await useSession(h, token, body, { "content-type": "application/json" });
     assert.equal(r.status, 200);
     const call = h.calls.at(-1)!;
-    assert.equal(call.url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
-    assert.deepEqual(call.body, body);
+    assert.equal(call.url, `https://generativelanguage.googleapis.com/v1beta/models/${SESSION_MODEL}:generateContent`);
+    assert.deepEqual(call.body, utf8(body));
     assert.equal(call.headers.get("x-goog-api-key"), "test-gemini-key");
     assert.equal(call.headers.get("authorization"), null);
     assert.equal((JSON.parse((await h.kv.get(`key:${device.keyIdB64}`))!) as { counter: number }).counter, 1, "no assertion counter involved");
+  });
+
+  describe("scope", () => {
+    const outOfScope: [string, string][] = [
+      ["POST", "/v1beta/models/gemini-2.5-pro:generateContent"],
+      ["POST", `/v1beta/models/${SESSION_MODEL}:streamGenerateContent`],
+      ["POST", "/v1beta/models/imagen-4.0-generate-001:predict"],
+      ["POST", `/v1beta/models/${SESSION_MODEL}:predict`],
+      ["POST", "/v1beta/models/veo-3.0-generate-preview:predictLongRunning"],
+      ["GET", "/v1beta/files"],
+      ["DELETE", "/v1beta/files/abc"],
+      ["POST", "/v1beta/cachedContents"],
+      ["POST", "/v1beta/tunedModels"],
+      ["GET", "/v1beta/models"],
+      ["GET", `/v1beta/models/${SESSION_MODEL}:generateContent`],
+      ["PUT", `/v1beta/models/${SESSION_MODEL}:generateContent`],
+      ["POST", `/v1beta/models/${SESSION_MODEL}%3AgenerateContent`],
+      ["POST", `/v1beta/models/${SESSION_MODEL}:generateContent/extra`],
+    ];
+
+    it("refuses everything but POST …/models/<SESSION_MODELS>:generateContent with 403 session_scope and no upstream call", async () => {
+      const h = makeHarness({ rootCaPem: chain.root.pem });
+      const device = await attestDevice(h);
+      const { token } = await issue(h, device);
+      for (const [method, path] of outOfScope) {
+        const init: RequestInit = { method, headers: { authorization: `Session ${token}` } };
+        if (method !== "GET" && method !== "DELETE") init.body = "{}";
+        const r = await h.request(path, init);
+        assert.deepEqual([r.status, await r.json()], [403, { error: "session_scope" }], `${method} ${path}`);
+      }
+      assert.equal(h.calls.length, 0);
+      assert.equal((await useSession(h, token)).status, 200, "the extension's call still works");
+    });
+
+    it("decides the scope before the session lookup and before the body is read", async () => {
+      const h = makeHarness();
+      let pulled = false;
+      const body = new ReadableStream<Uint8Array>({ pull() { pulled = true; throw new Error("read"); } }, { highWaterMark: 0 });
+      const request = new Request("https://worker.test/v1beta/files", { method: "POST", body, headers: { authorization: `Session ${"Q".repeat(43)}` }, duplex: "half" } as RequestInit);
+      const r = await h.worker.fetch(request, h.env, { waitUntil() {} });
+      assert.deepEqual([r.status, await r.json()], [403, { error: "session_scope" }]);
+      assert.equal(pulled, false);
+      assert.ok(!h.kv.gets.some((k) => k.startsWith("sess:")), "no session lookup");
+    });
+
+    it("follows SESSION_MODELS", async () => {
+      const h = makeHarness({ rootCaPem: chain.root.pem, env: { SESSION_MODELS: "model-a, model-b" } });
+      const device = await attestDevice(h);
+      const { token } = await issue(h, device);
+      const post = (model: string) => h.request(`/v1beta/models/${model}:generateContent`, { method: "POST", headers: { authorization: `Session ${token}` }, body: "{}" });
+      assert.equal((await post("model-b")).status, 200);
+      assert.equal((await post(SESSION_MODEL)).status, 403);
+    });
+
+    it("caps a session request's body at 512 KB (Bearer and dev keep 2 MB)", async () => {
+      const h = makeHarness({ rootCaPem: chain.root.pem, env: { ALLOW_DEV_TOKEN: "true" } });
+      const device = await attestDevice(h);
+      const { token } = await issue(h, device);
+      const big = "x".repeat(512 * 1024 + 1);
+      const r = await useSession(h, token, big);
+      assert.deepEqual([r.status, await r.json()], [413, { error: "payload_too_large" }]);
+      assert.equal((await useSession(h, token, "x".repeat(512 * 1024))).status, 200);
+      assert.equal((await h.request(`/v1beta/models/${SESSION_MODEL}:generateContent`, { method: "POST", headers: { "x-dev-token": "dev-secret-token" }, body: big })).status, 200);
+    });
   });
 
   it("is refused on /session and /devices/push-to-start, and means nothing to /attest", async () => {
@@ -763,20 +899,20 @@ describe("POST /session and Session tokens", () => {
     const h = makeHarness({ rootCaPem: chain.root.pem, env: { SESSION_TTL_SECONDS: "600" } });
     const device = await attestDevice(h);
     const { token } = await issue(h, device);
-    const use = (t: string) => h.request("/v1beta/models", { headers: { authorization: `Session ${t}` } });
-    assert.equal((await use(token)).status, 200);
-    for (const bad of [b64encode(crypto.getRandomValues(new Uint8Array(32))).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_"), "short", "x".repeat(44)]) {
-      const r = await use(bad);
+    assert.equal((await useSession(h, token)).status, 200);
+    const unknown = b64encode(crypto.getRandomValues(new Uint8Array(32))).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    for (const bad of [unknown, "short", "x".repeat(44)]) {
+      const r = await useSession(h, bad);
       assert.deepEqual([r.status, await r.json()], [401, { error: "invalid_session" }], bad);
     }
     h.clock.now += 600_000;
-    const expired = await use(token);
+    const expired = await useSession(h, token);
     assert.deepEqual([expired.status, await expired.json()], [401, { error: "invalid_session" }]);
 
     // A record KV has not purged yet is still refused once its expiresAt has passed.
     const stale = "S".repeat(43);
     await h.kv.put(await sessionKey(stale), JSON.stringify({ id: device.keyIdB64, appId: `${TEAM_ID}.${BUNDLE_ID}`, expiresAt: "2026-10-15T08:00:00Z" }), { expirationTtl: 3600 });
-    const lagging = await use(stale);
+    const lagging = await useSession(h, stale);
     assert.deepEqual([lagging.status, await lagging.json()], [401, { error: "invalid_session" }]);
   });
 
@@ -784,23 +920,114 @@ describe("POST /session and Session tokens", () => {
     const h = makeHarness({ rootCaPem: chain.root.pem, env: { RATE_LIMIT_PER_MIN: "3" } });
     const device = await attestDevice(h);
     const { token } = await issue(h, device); // 1
-    const use = () => h.request("/v1beta/models", { headers: { authorization: `Session ${token}` } });
-    assert.equal((await use()).status, 200); // 2
-    assert.equal((await use()).status, 200); // 3
-    const limited = await use();
+    assert.equal((await useSession(h, token)).status, 200); // 2
+    assert.equal((await useSession(h, token)).status, 200); // 3
+    const limited = await useSession(h, token);
     assert.deepEqual([limited.status, await limited.json()], [429, { error: "rate_limited" }]);
     assert.equal((await device.send("/v1beta/models")).status, 429, "the key's own requests share the bucket");
     h.clock.now += 60_000;
-    assert.equal((await use()).status, 200);
+    assert.equal((await useSession(h, token)).status, 200);
   });
 
-  it("stops honouring dev sessions once ALLOW_DEV_TOKEN is no longer \"true\"", async () => {
-    const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true" } });
-    const r = await h.request("/session", { method: "POST", headers: { "x-dev-token": "dev-secret-token" }, body: "{}" });
-    const { token } = (await r.json()) as { token: string };
-    assert.equal((await h.request("/v1beta/models", { headers: { authorization: `Session ${token}` } })).status, 200);
-    h.env.ALLOW_DEV_TOKEN = "false";
-    const refused = await h.request("/v1beta/models", { headers: { authorization: `Session ${token}` } });
-    assert.deepEqual([refused.status, await refused.json()], [401, { error: "invalid_session" }]);
+  it("with the binding, a burst of 100 parallel session requests forwards no more than the limit", async () => {
+    const h = makeHarness({ rootCaPem: chain.root.pem }); // limit 30
+    const device = await attestDevice(h);
+    const { token } = await issue(h, device); // uses 1 of the key's 30
+    const results = await Promise.all(Array.from({ length: 100 }, () => useSession(h, token)));
+    assert.equal(results.filter((r) => r.status === 200).length, 29);
+    assert.equal(results.filter((r) => r.status === 429).length, 71);
+    assert.equal(h.calls.length, 29);
   });
+
+  it("without the binding, the KV counter write is mandatory for session and dev identities", async () => {
+    const h = makeHarness({ rootCaPem: chain.root.pem, rateLimiter: false, env: { ALLOW_DEV_TOKEN: "true" } });
+    const device = await attestDevice(h);
+    const { token } = await issue(h, device);
+    h.clock.now += 1000;
+    // Model KV's one write per key per second.
+    const lastWrite = new Map<string, number>();
+    h.kv.failPut = (key) => {
+      if (!key.startsWith("rl:")) return false;
+      const second = Math.floor(h.clock.now / 1000);
+      if (lastWrite.get(key) === second) return true;
+      lastWrite.set(key, second);
+      return false;
+    };
+    const burst = await Promise.all(Array.from({ length: 100 }, () => useSession(h, token)));
+    assert.equal(burst.filter((r) => r.status === 200).length, 1);
+    const refused = burst.find((r) => r.status === 429)!;
+    assert.equal(refused.headers.get("retry-after"), "1");
+    assert.deepEqual(await refused.json(), { error: "rate_limited" });
+
+    const devBurst = await Promise.all(Array.from({ length: 20 }, () => h.request("/v1beta/models", { headers: { "x-dev-token": "dev-secret-token" } })));
+    assert.equal(devBurst.filter((r) => r.status === 200).length, 1);
+
+    // Bearer stays best effort: it is already throttled by its own counter write.
+    assert.equal((await device.send("/v1beta/models")).status, 200);
+    assert.equal(h.calls.length, 3);
+  });
+
+  describe("dev sessions", () => {
+    it("end when ALLOW_DEV_TOKEN is no longer \"true\", or SS_DEV_TOKEN is rotated or removed", async () => {
+      const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true" } });
+      const token = await devSession(h);
+      assert.equal((await useSession(h, token)).status, 200);
+      const refuse = async (what: string) => {
+        const r = await useSession(h, token);
+        assert.deepEqual([r.status, await r.json()], [401, { error: "invalid_session" }], what);
+      };
+      h.env.ALLOW_DEV_TOKEN = "false";
+      await refuse("ALLOW_DEV_TOKEN off");
+      h.env.ALLOW_DEV_TOKEN = "true";
+      h.env.SS_DEV_TOKEN = "rotated-dev-token";
+      await refuse("SS_DEV_TOKEN rotated");
+      h.env.SS_DEV_TOKEN = "";
+      await refuse("SS_DEV_TOKEN removed");
+      // Back to the same token: its sessions are valid again (rotate the token to end them for good).
+      h.env.SS_DEV_TOKEN = "dev-secret-token";
+      assert.equal((await useSession(h, token)).status, 200);
+    });
+
+    it("fail closed without a dev token fingerprint", async () => {
+      const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true" } });
+      const legacy = "L".repeat(43);
+      await h.kv.put(await sessionKey(legacy), JSON.stringify({ id: "dev", appId: null, expiresAt: "2026-10-20T00:00:00Z" }), { expirationTtl: 3600 });
+      const r = await useSession(h, legacy);
+      assert.deepEqual([r.status, await r.json()], [401, { error: "invalid_session" }]);
+    });
+  });
+});
+
+describe("per-IP limits", () => {
+  it("bucket IPv4 by address and IPv6 by /64", () => {
+    const cases: [string | null, string][] = [
+      ["203.0.113.7", "203.0.113.7"],
+      ["2001:db8:1:2:3:4:5:6", "v6:2001:db8:1:2::/64"],
+      ["2001:0DB8:0001:0002::1", "v6:2001:db8:1:2::/64"],
+      ["2001:db8:1:2:ffff:ffff:ffff:ffff", "v6:2001:db8:1:2::/64"],
+      ["2001:db8::", "v6:2001:db8:0:0::/64"],
+      ["::1", "v6:0:0:0:0::/64"],
+      ["fe80::1%en0", "v6:fe80:0:0:0::/64"],
+      ["::ffff:203.0.113.5", "203.0.113.5"],
+      ["64:ff9b::203.0.113.5", "v6:64:ff9b:0:0::/64"],
+      ["not:an:address", "v6:not:an:address"],
+      [null, "unknown"],
+      ["", "unknown"],
+    ];
+    for (const [raw, bucket] of cases) assert.equal(ipBucket(raw), bucket, String(raw));
+  });
+
+  for (const rateLimiter of [true, false]) {
+    it(`share one /attest* allowance per IPv6 /64 (${rateLimiter ? "binding, no KV writes" : "KV fallback"})`, async () => {
+      const h = makeHarness({ rateLimiter, env: { RATE_LIMIT_PER_MIN: "2" } });
+      const from = (ip: string) => h.request("/attest/challenge", { headers: { "cf-connecting-ip": ip } });
+      assert.equal((await from("2001:db8:1:2::a")).status, 200);
+      assert.equal((await from("2001:db8:1:2:9:9:9:9")).status, 200);
+      assert.equal((await from("2001:db8:1:2:ffff::1")).status, 429, "another address in the same /64");
+      assert.equal((await from("2001:db8:1:3::1")).status, 200, "the next /64");
+      const rl = h.kv.writes.filter((w) => w.key.startsWith("rl:"));
+      if (rateLimiter) assert.deepEqual(rl, [], "unauthenticated callers cause no KV counter writes");
+      else assert.ok(rl.some((w) => w.key.startsWith("rl:ip:v6:2001:db8:1:2::/64:")));
+    });
+  }
 });
