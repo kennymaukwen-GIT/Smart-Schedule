@@ -16,7 +16,14 @@ import type { Deps, Env, KV, RateLimiter } from "./env.ts";
 import { sessionModels } from "./env.ts";
 import { proxyGemini } from "./gemini.ts";
 import { HttpError, errorResponse, log } from "./http.ts";
-import { clientIp, enforceIpLimit, enforceRateLimit } from "./ratelimit.ts";
+import {
+  checkAttestDaily,
+  clientIp,
+  enforceIpLimit,
+  enforceRateLimit,
+  enforceSessionDailyLimit,
+  recordAttestSuccess,
+} from "./ratelimit.ts";
 import { handlePushToStart } from "./registration.ts";
 import { MAX_SESSION_BODY, handleSession } from "./session.ts";
 
@@ -55,14 +62,20 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
 
   if (path === "/attest/challenge") {
     if (method !== "GET") throw new HttpError(405, "method_not_allowed", { allow: "GET" });
-    await enforceIpLimit(env, clientIp(request), deps.now());
+    const bucket = clientIp(request);
+    await enforceIpLimit(env, bucket, deps.now());
+    await checkAttestDaily(env, bucket, deps.now());
     return handleChallenge(env);
   }
 
   if (path === "/attest") {
     if (method !== "POST") throw new HttpError(405, "method_not_allowed", { allow: "POST" });
-    await enforceIpLimit(env, clientIp(request), deps.now());
-    return handleAttest(request, env, deps);
+    const bucket = clientIp(request);
+    await enforceIpLimit(env, bucket, deps.now());
+    await checkAttestDaily(env, bucket, deps.now());
+    const response = await handleAttest(request, env, deps);
+    if (response.status === 200) await recordAttestSuccess(env, bucket, deps.now()); // a new identity for this bucket
+    return response;
   }
 
   if (path === "/session") {
@@ -80,6 +93,7 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
       session: { maxBody: MAX_SESSION_GEMINI_BODY, models: sessionModels(env) },
     });
     await enforceRateLimit(env, identity.id, deps.now(), { strict: via !== "assertion" });
+    if (via === "session") await enforceSessionDailyLimit(env, identity.id, deps.now());
     return proxyGemini(request, body, env, deps);
   }
 

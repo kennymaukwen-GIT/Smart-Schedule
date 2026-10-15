@@ -39,6 +39,8 @@ export interface Env {
   APNS_ENV?: string;
   SESSION_TTL_SECONDS?: string;
   SESSION_MODELS?: string;
+  SESSION_DAILY_LIMIT?: string;
+  ATTEST_DAILY_PER_IP?: string;
 }
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -75,7 +77,12 @@ export function sessionTtlSeconds(env: Env): number {
   return Number.isInteger(n) && n >= 60 ? n : DEFAULT_SESSION_TTL_SECONDS;
 }
 
-/** The app's Gemini model (Config/Base.xcconfig GEMINI_MODEL_ID); change SESSION_MODELS whenever the app's model changes. */
+/**
+ * Fallback for SESSION_MODELS. Must include the GEMINI_MODEL_ID (Config/Base.xcconfig) of every app version still in
+ * use: add a new ID (and deploy) before submitting the build that uses it — App Review tests the notification
+ * extension — and remove an old one only once no supported build sends it, or Google has shut it down. Never a prefix.
+ * test/config-sync.test.ts checks that the current GEMINI_MODEL_ID is listed here and in wrangler.toml.
+ */
 export const DEFAULT_SESSION_MODELS = ["gemini-3.5-flash"];
 
 /** Models a Session token may call (POST …/models/<model>:generateContent only). */
@@ -85,6 +92,21 @@ export function sessionModels(env: Env): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
   return list.length ? list : DEFAULT_SESSION_MODELS;
+}
+
+function positiveInt(value: string | undefined, fallback: number): number {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+/** Session-authenticated generateContent calls per identity per UTC day (the extension makes 1–3 per reply). */
+export function sessionDailyLimit(env: Env): number {
+  return positiveInt(env.SESSION_DAILY_LIMIT, 200);
+}
+
+/** Successful attestations per client IP bucket per UTC day (high: carriers put many users behind one IPv4). */
+export function attestDailyPerIp(env: Env): number {
+  return positiveInt(env.ATTEST_DAILY_PER_IP, 200);
 }
 
 export function attestEnvironment(env: Env): AttestEnvironment | null {

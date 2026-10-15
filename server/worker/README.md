@@ -121,7 +121,9 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `ALLOW_DEV_TOKEN` | var | 只有字串 `"true"` 會啟用 `X-Dev-Token`（以及 dev 身分申請的 session） |
 | `RATE_LIMIT_PER_MIN` | var | 每個身分（attested key / `dev`；session 算在申請它的 key）每分鐘的 request 數，也是 `/attest*` 每個 IP（IPv6 以 /64 計）與每個 (IP, key) 的 Bearer body 讀取上限；須與 `[[ratelimits]]` 的 `simple.limit` 相同；預設 30 |
 | `SESSION_TTL_SECONDS` | var | `POST /session` 發出的 token 壽命（秒，≥ 60），預設 `604800`（7 天） |
-| `SESSION_MODELS` | var | Session token 可呼叫的模型（逗號分隔），預設 `gemini-3.5-flash` = App 的 `GEMINI_MODEL_ID`（`Config/Base.xcconfig`）。**App 換模型時必須一起改** |
+| `SESSION_MODELS` | var | Session token 可呼叫的模型（逗號分隔，完整 ID，不接受 prefix），預設 `gemini-3.5-flash`。**必須包含所有仍在使用的 App 版本的 `GEMINI_MODEL_ID`**（`Config/Base.xcconfig`）：新 ID 要在送審使用它的 build 之前加入並部署 Worker（App Review 會測 notification extension）；舊 ID 等到沒有受支援的 build 再送它、或 Google 已關閉它時才移除。`test/config-sync.test.ts` 會檢查目前的 `GEMINI_MODEL_ID` 有列在這裡 |
+| `SESSION_DAILY_LIMIT` | var | 每個身分每 UTC 日以 session 呼叫 generateContent 的上限，預設 `200`（extension 每次回覆 1–3 次）；Bearer 不受影響 |
+| `ATTEST_DAILY_PER_IP` | var | 每個 IP bucket（IPv6 以 /64 計）每 UTC 日**成功** attest 的上限（= 新身分數），預設 `200`（行動網路常有許多使用者共用一個 IPv4） |
 | `APNS_KEY_ID`, `APNS_TEAM_ID` | var | APNs token auth |
 | `APNS_BUNDLE_ID` | var | 預設 `com.smartschedule.app` |
 | `APNS_ENV` | var | `sandbox` → `api.sandbox.push.apple.com`；`production` → `api.push.apple.com` |
@@ -201,15 +203,17 @@ Session 與 dev 在讀 body 前就已驗證，不經過這個預算。
 | counter 沒有大於儲存值（含寫回時發現已被其他 request 推進） | `401 stale_counter` |
 | Session token 用在 extension 那一個呼叫以外的地方 | `403 session_scope` |
 | session token 不存在、格式不對、已過期；dev session 而 dev token 已關閉、換掉或移除 | `401 invalid_session` |
-| counter / session / 註冊無法寫入 KV | `503 server_busy` |
-| 身分超過 rate limit、`/attest*` 的 IP 超過、(IP, key) 的 body 預算用完；session / dev 的 KV 計數寫不進去 | `429 rate_limited` + `Retry-After` |
+| counter / session / 註冊無法寫入 KV；session / dev 的 KV rate limit 計數寫不進去（`Retry-After: 1`，App 會在 0.8 s、1.6 s 後重試） | `503 server_busy` |
+| 身分超過 rate limit、`/attest*` 的 IP 超過、(IP, key) 的 body 預算用完、session 的每日上限、IP 的每日 attest 上限 | `429 rate_limited` + `Retry-After` |
 | body 過大或與 `Content-Length` 不符（Bearer / dev 的 Gemini 2 MB、session 的 Gemini 512 KB、push-to-start 1 MB、/session 1 KB、attest 64 KB） | `413 payload_too_large` |
 
 ### Rate limit
 
 - **每個身分**（keyId、`dev`；session 算在申請它的 keyId）：先問 `SS_RATE_LIMITER`（key `id:<identity>`，同一據點內原子計數），
-  再加上全域的 KV 計數 `rl:<id>:<minute>`。**Session 與 dev 的 KV 寫入是必要的**：寫不進去（例如 KV 每個 key 每秒一次的限制）就回
-  `429`（`Retry-After: 1`），不會放行未計數的 request，所以平行的 burst 在 KV 這層每秒只過得了約一個。
+  再加上全域的 KV 計數 `rl:<id>:<minute>`。**Session 與 dev 的 KV 寫入是必要的**（即使 binding 已綁定：binding 只在單一據點內計數，
+  KV 是唯一的全域上限）：寫不進去（例如 KV 每個 key 每秒一次的限制）就回 `503 server_busy`（`Retry-After: 1`），不會放行未計數的 request，
+  所以平行的 burst 在 KV 這層每秒只過得了約一個。用 503 而不是 429，是因為這通常只是同一秒內的寫入碰撞（例如 App 的 Bearer request
+  與 extension 的 session request 寫同一個 key，或 Google 回 503 後 0.8 s 的重試），App 會在 0.8 s、1.6 s 後重試，而 429 對 App 是最終錯誤。
   Bearer 的 KV 計數寫入失敗則放行（它本來就被自己的 `key:` counter 寫入限制在約每秒一個）。
 - **`/attest/challenge`、`/attest`**：每個 IP bucket（IPv4 為位址本身；**IPv6 為其 /64**，例如 `v6:2001:db8:1:2::/64`，
   因為一台主機至少控制一個 /64）。有 binding 時只用 binding（key `ip:<bucket>`），未驗證的呼叫者不會產生任何 KV 計數寫入；
@@ -227,7 +231,11 @@ token，再交給自己的 extension：
 3. App 把 token 存到 App Group 共用的 Keychain；extension 呼叫 Gemini 時送 `Authorization: Session <token>`。
 4. **Scope**：session 只能用於 `POST /v1beta/models/<SESSION_MODELS 之一>:generateContent`（extension 唯一的呼叫），body ≤ 512 KB；
    其他 method、path（files、cachedContents、tunedModels …）、model 或動作（`:predict`、`:predictLongRunning`、`:streamGenerateContent` …）
-   一律 `403 session_scope`，不會呼叫 Google。`SESSION_MODELS` 必須等於 App 的 `GEMINI_MODEL_ID`，App 換模型時一起改。
+   一律 `403 session_scope`，不會呼叫 Google（log `session_scope_refused` 會記下被拒的 model，方便發現還在送舊 model 的舊版 App）。
+   `SESSION_MODELS` 必須包含**所有仍在使用的 App 版本**的 `GEMINI_MODEL_ID`（逗號分隔）：新 ID 要在送審使用它的 build 之前加入並部署 Worker
+   （App Review 會測 notification extension）；舊 ID 等到沒有受支援的 build 再送它、或 Google 已關閉它時才移除。只用完整 ID，不要改成 prefix
+   （prefix 會讓外洩的 token 能呼叫任何、包括更貴的模型）。
+7. 每個身分每 UTC 日以 session 呼叫的次數上限為 `SESSION_DAILY_LIMIT`（預設 200），超過回 `429 rate_limited`（`Retry-After` = 到下一個 UTC 日的秒數）。
 5. rate limit 與申請它的 keyId **共用同一個桶**；轉送給 Google 前移除 `Authorization`。
 6. token 失效（`401 invalid_session`）時 extension 無法自行更新，App 在剩不到 3 天時重新申請（`AppAttestClient.sessionRenewal`）。
 
@@ -235,9 +243,18 @@ token，再交給自己的 extension：
 查詢時也會檢查 `expiresAt`（不依賴 KV 何時真正清除）。
 
 **誰拿得到 token**：App 沒有做 certificate pinning，裝置的擁有者裝上自己的 root CA（Proxyman、Charles）就能從 extension 的 request
-讀到 session token，不需要 jailbreak，而且 App 會自動續期。所以 token 的 scope 才限縮到上面那一個呼叫：剩下的曝險是
-**以該身分、在其 rate limit 之內，對允許的模型呼叫 `generateContent`**（body ≤ 512 KB）。Bearer 不受影響：它綁定單一 body 與只能用一次的 counter。
-要提早作廢可刪除對應的 `sess:` key；每次 `/session` 都產生新的 token，舊的照常到期。
+讀到 session token，不需要 jailbreak，而且 App 會自動續期。所以 token 的 scope 才限縮到上面那一個呼叫：每個 token 剩下的曝險是
+**以其身分、在該身分的 rate limit（每分鐘 `RATE_LIMIT_PER_MIN`、每日 `SESSION_DAILY_LIMIT`）之內，對允許的模型呼叫 `generateContent`**（body ≤ 512 KB）。
+Bearer 不受影響：它綁定單一 body 與只能用一次的 counter。要提早作廢可刪除對應的 `sess:` key；每次 `/session` 都產生新的 token，舊的照常到期。
+
+**每個身分的上限並不限制一台裝置**：裝置擁有者可以自己產生更多身分（重裝 App、「清除所有資料」、或用 proxy 偽造 `401 unknown_key`
+讓 App 重新 attest），每個新身分都能拿到新的 7 天 session 與自己的額度；伺服器無法把不同的 key 連到同一台裝置。目前的緩解：
+
+- 每個身分每日的 session 上限（`SESSION_DAILY_LIMIT`）。
+- 每個 IP bucket 每日成功 attest 的上限（`ATTEST_DAILY_PER_IP`），提高大量產生身分的成本（換 IP 仍可繞過）。
+- **營運端**：在 Gemini 的 Google Cloud 專案設定 quota 與預算上限，並對 Worker log 中 `key_attested`、`session_issued` 的速率設警示。
+- **真正的解法（尚未實作）**：Apple 的 App Attest receipt **risk metric**（該裝置 30 天內為此 App attest 的 key 數），用 DeviceCheck key
+  向 Apple 取得，對 key 數過多的裝置拒絕 `/session`（或 `/attest`）。需要新的 secret，屬於部署決策。
 
 **Dev session**：記錄中存 dev token 的指紋（`devKey` = SHA-256(SS_DEV_TOKEN) 的前 16 個 hex）。`ALLOW_DEV_TOKEN` 不是 `"true"`、
 `SS_DEV_TOKEN` 換掉或移除時，既有的 dev session 立即失效；沒有指紋的 dev 記錄一律拒絕。注意：若之後以**同一個** token 重新開啟，
@@ -322,6 +339,8 @@ APNs request：`POST https://<host>/3/device/<token>`，headers `authorization: 
 | `rl:<id>:<epochMinute>` | 每個身分的 rate limit 計數（id = keyId / `dev`） | 120 s |
 | `rl:ip:<bucket>:<epochMinute>` | `/attest*` 的 IP 計數（**只在沒有 `SS_RATE_LIMITER` 時**） | 120 s |
 | `rl:authfail:<bucket>:<keyId>:<epochMinute>` | Bearer 讀 body 後的失敗次數（**只在沒有 `SS_RATE_LIMITER` 時**） | 120 s |
+| `rl:sday:<id>:<YYYYMMDD>` | 該身分當日以 session 呼叫的次數 | 2 天 |
+| `rl:attestday:<bucket>:<YYYYMMDD>` | 該 IP bucket 當日成功 attest 的次數 | 2 天 |
 | `p2s:<deviceID>` | push-to-start 註冊 | 3 天 |
 | `p2sdead:<deviceID>` | APNs 拒絕的 push token | 3 天 |
 | `due:<YYYYMMDDHHmm>:<deviceID>:<eventHash>` | cron 索引 | triggerAt + 1 h |
@@ -338,7 +357,7 @@ Workers KV 是 eventually consistent：寫入在其他 Cloudflare 據點可能�
 - **KV 的 rate limit 計數**：read-modify-write，並行與跨據點時會少算，是近似值；所以前面還有原子計數的 Rate Limiting binding，
   而且 session / dev 的計數寫入失敗時直接拒絕。binding 本身則是每個據點各自計數。
 - **推播只送一次**：靠 claim 與 sent marker，跨據點重疊的 cron 仍可能重複送出（罕見）。
-- KV 同一個 key 每秒最多寫一次：counter 寫入會重試一次，註冊、session 寫入失敗回 `503 server_busy`；session / dev 的 rate limit 計數寫入失敗回 `429`，Bearer 的則忽略。
+- KV 同一個 key 每秒最多寫一次：counter 寫入會重試一次，註冊、session 寫入失敗回 `503 server_busy`；session / dev 的 rate limit 計數寫入失敗也回 `503 server_busy`（`Retry-After: 1`），Bearer 的則忽略。
 
 需要嚴格一致（counter 嚴格遞增、challenge 嚴格單次、精確 rate limit、確保只送一次）時，應改用 **Durable Objects**
 （例如每個 keyId / deviceID 一個 object），它提供單一執行緒、strongly consistent 的儲存。
@@ -346,9 +365,10 @@ Workers KV 是 eventually consistent：寫入在其他 Cloudflare 據點可能�
 ### 讀寫量與方案
 
 - Assertion 驗證的 request：**2 次寫入**（`key:` counter + `rl:` 計數）、3 次讀取（`key:` 兩次、`rl:`）；沒有 binding 時再加 1 次讀取（body 預算）。
-- Session 驗證的 request：1 次寫入（`rl:`）、2 次讀取（`sess:`、`rl:`）。`/session` 另加 1 次 `sess:` 寫入。
+- Session 驗證的 request：2 次寫入（`rl:`、`rl:sday:`）、3 次讀取（`sess:`、`rl:`、`rl:sday:`）。`/session` 另加 1 次 `sess:` 寫入。
 - 失敗的 request：便宜的拒絕只有 1 次讀取、不寫入；沒有 binding 時，讀完 body 才失敗的 Bearer 另加 1 讀 1 寫（`rl:authfail:`）。
-- `/attest/challenge` 1 次寫入（`chal:`）；`/attest` 1 次寫入 + 1 次刪除；沒有 binding 時各再加 1 次 `rl:ip:` 寫入。
+- `/attest/challenge` 1 次寫入（`chal:`）＋ 1 次讀取（每日 attest 計數）；`/attest` 1 次寫入 + 1 次刪除，成功時再加 1 讀 1 寫（`rl:attestday:`）；
+  沒有 binding 時各再加 1 次 `rl:ip:` 寫入。
 - Rate Limiting binding 的呼叫不算 KV 讀寫。
 - 每次 push-to-start 註冊：1 次寫入 `p2s:`，加上每個「新的」(eventID, triggerAt) 1 次 `due:` 寫入（最多 50）。
 - 每則送出的推播：claim 寫入 + sent 寫入 + claim 刪除，另有數次讀取；JWT 每 50 分鐘 1 次寫入。
@@ -369,7 +389,8 @@ Workers Free plan 的 KV 額度是每天 1,000 次寫入、1,000 次 list，**�
 - App Attest 驗證失敗只回通用錯誤碼，具體原因只寫進 Worker log；log 不含 secrets、push token、session token、event 標題、request body 或 client IP。
 - `X-Dev-Token` 只有 `ALLOW_DEV_TOKEN` 恰為 `"true"` 且 `SS_DEV_TOKEN` 非空時才有效，以 SHA-256 digest 做 constant-time 比對。
 - Session token 只存雜湊；裝置擁有者讀得到它，所以只限 extension 那一個呼叫（`POST …/models/<SESSION_MODELS>:generateContent`、≤ 512 KB），
-  並與申請者共用 rate limit（binding + 寫入必要的 KV 計數）。dev session 綁定目前的 dev token。
+  並與申請者共用 rate limit（binding + 寫入必要的 KV 計數）與每日上限。這些都是**每個身分**的上限；裝置擁有者能自己產生新身分，
+  所以還需要營運端的 Gemini quota / 預算上限與警示（見 `POST /session`）。dev session 綁定目前的 dev token。
 - 已知限制：若 Apple 未來在 App Attest 憑證加入本 verifier 不認得的 critical extension，驗證會 fail closed（log 會寫出 OID）。
 - Gemini proxy 對 Bearer / dev 依合約開放整個 `/v1beta/*`（濫用需要 jailbreak 才能產生 assertion）；若只需要
   `models/*:generateContent`，也可以把 Bearer 收窄到同樣的範圍（屬於合約變更）。
@@ -389,7 +410,9 @@ npm run dev       # wrangler dev（本機 KV；本機連不到 APNs）
 以及 nonce、appId、keyId、counter、aaguid、credentialId 錯誤、指向其他 root、冒名 intermediate、**由其他 key 簽的 credential certificate**、
 過期/尚未生效憑證、非預期例外等失敗案例；assertion（成功、簽章錯誤、stale counter、錯誤 rpId）與 counter 不倒退（含重試）；
 body 上限與 `Content-Length` 不符、讀 body 前就拒絕；每個 (IP, key) 的 body 預算（binding 與 KV 兩種）、共用 IP 上的垃圾不影響合法使用者；
-IPv6 /64 bucket；dev token；rate limit 429（含 100 個平行 session request 的 burst，binding 與 KV 兩種）；session（發放、scope：其他模型、
+IPv6 /64 bucket；dev token；rate limit 429（含 100 個平行 session request 的 burst，binding 與 KV 兩種）；KV 寫入碰撞回 503 而非 429
+（與 App 的 Bearer 寫入、Google 503 後的重試）；session 每日上限；每個 IP bucket 每日 attest 上限；`GEMINI_MODEL_ID` 必須列在 `SESSION_MODELS`
+（`test/config-sync.test.ts` 讀 `Config/Base.xcconfig`）；session（發放、scope：其他模型、
 `:predict` / `:predictLongRunning`、files、cachedContents、GET /v1beta/models 皆 403 且不呼叫上游、512 KB 上限、其他路由拒絕、過期、
 未知 token、與 keyId 共用 rate limit、dev session 隨 dev token 輪替或關閉而失效）；Gemini proxy（body bytes 完全相同、加 key、移除認證 headers、`cf-*` 與 `key` 參數）；
 push-to-start 驗證（整份 vs 單一 event、title 截斷、長 eventID）、整份取代、sent marker 在覆寫後仍保留、同 App 換 key 可接手、dev / 不同 App 回 403；

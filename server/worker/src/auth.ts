@@ -110,7 +110,10 @@ export function sessionScopeAllows(request: Request, models: string[]): boolean 
 async function sessionAuth(token: string, request: Request, env: Env, deps: Deps, scope: NonNullable<AuthOptions["session"]>): Promise<AuthResult> {
   // Scope first: a Session token is readable by the device's owner, so it never reaches anything else.
   if (!sessionScopeAllows(request, scope.models)) {
-    log("warn", "session_scope_refused", { method: request.method, path: new URL(request.url).pathname.slice(0, 120) });
+    const pathname = new URL(request.url).pathname;
+    // The model shows old app builds still sending a model that SESSION_MODELS no longer lists.
+    const model = /^\/v1beta\/models\/([^/:]+)/.exec(pathname)?.[1]?.slice(0, 100) ?? null;
+    log("warn", "session_scope_refused", { method: request.method, model, path: pathname.slice(0, 120) });
     throw new HttpError(403, "session_scope");
   }
   const session = await lookupSession(token, env, deps.now());

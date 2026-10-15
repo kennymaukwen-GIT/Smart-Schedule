@@ -26,14 +26,15 @@ interface Device {
   send(path: string, body?: string | Uint8Array, init?: RequestInit): Promise<Response>;
 }
 
-async function attestDevice(h: Harness, bundleId = BUNDLE_ID): Promise<Device> {
-  const challengeResponse = await h.request("/attest/challenge");
+async function attestDevice(h: Harness, bundleId = BUNDLE_ID, ip?: string): Promise<Device> {
+  const from: Record<string, string> = ip ? { "cf-connecting-ip": ip } : {};
+  const challengeResponse = await h.request("/attest/challenge", { headers: from });
   assert.equal(challengeResponse.status, 200);
   const { challenge } = (await challengeResponse.json()) as { challenge: string };
   const a = await makeAttestation({ chain, now: h.clock.now, challenge: b64decode(challenge)!, appId: `${TEAM_ID}.${bundleId}` });
   const response = await h.request("/attest", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...from },
     body: JSON.stringify({ keyId: a.keyIdB64, attestation: b64encode(a.attestation), challenge, bundleId }),
   });
   assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
@@ -955,9 +956,11 @@ describe("POST /session and Session tokens", () => {
     };
     const burst = await Promise.all(Array.from({ length: 100 }, () => useSession(h, token)));
     assert.equal(burst.filter((r) => r.status === 200).length, 1);
-    const refused = burst.find((r) => r.status === 429)!;
-    assert.equal(refused.headers.get("retry-after"), "1");
-    assert.deepEqual(await refused.json(), { error: "rate_limited" });
+    // Refused, never forwarded uncounted — as 503 server_busy (which the app retries), not a final rate_limited.
+    const refused = burst.filter((r) => r.status !== 200);
+    assert.ok(refused.every((r) => r.status === 503));
+    assert.equal(refused[0]!.headers.get("retry-after"), "1");
+    assert.deepEqual(await refused[0]!.json(), { error: "server_busy" });
 
     const devBurst = await Promise.all(Array.from({ length: 20 }, () => h.request("/v1beta/models", { headers: { "x-dev-token": "dev-secret-token" } })));
     assert.equal(devBurst.filter((r) => r.status === 200).length, 1);
@@ -965,6 +968,73 @@ describe("POST /session and Session tokens", () => {
     // Bearer stays best effort: it is already throttled by its own counter write.
     assert.equal((await device.send("/v1beta/models")).status, 200);
     assert.equal(h.calls.length, 3);
+  });
+
+  describe("with the binding bound and KV at one write per key per second", () => {
+    function modelKvWriteLimit(h: Harness): void {
+      const lastWrite = new Map<string, number>();
+      h.kv.failPut = (key) => {
+        if (!key.startsWith("rl:")) return false;
+        const last = lastWrite.get(key);
+        if (last !== undefined && h.clock.now - last < 1000) return true;
+        lastWrite.set(key, h.clock.now);
+        return false;
+      };
+    }
+
+    it("a session request colliding with the app's Bearer write on the same key gets 503 server_busy, then succeeds", async () => {
+      const h = makeHarness({ rootCaPem: chain.root.pem });
+      const device = await attestDevice(h);
+      const { token } = await issue(h, device);
+      h.clock.now += 5_000;
+      modelKvWriteLimit(h);
+      assert.equal((await device.send("/devices/push-to-start", JSON.stringify({ deviceID: "D-1", events: [] }))).status, 200);
+      h.clock.now += 300;
+      const collided = await useSession(h, token);
+      assert.deepEqual([collided.status, await collided.json()], [503, { error: "server_busy" }], "not rate_limited");
+      assert.equal(collided.headers.get("retry-after"), "1");
+      h.clock.now += 1600;
+      assert.equal((await useSession(h, token)).status, 200, "the app's retry 1.6 s later");
+    });
+
+    it("the extension's retry 0.9 s after a Google 503 gets 503 server_busy; the one at 1.6 s is answered", async () => {
+      const h = makeHarness({ rootCaPem: chain.root.pem });
+      const device = await attestDevice(h);
+      const { token } = await issue(h, device);
+      h.clock.now += 5_000;
+      modelKvWriteLimit(h);
+      let upstream = 0;
+      h.setResponder(() => (++upstream === 1 ? Response.json({ error: { code: 503, message: "overloaded" } }, { status: 503 }) : Response.json({ candidates: [] })));
+      const start = h.clock.now;
+      assert.equal((await useSession(h, token)).status, 503, "Google's own 503, passed through");
+      h.clock.now = start + 900;
+      const second = await useSession(h, token);
+      assert.deepEqual([second.status, await second.json()], [503, { error: "server_busy" }]);
+      h.clock.now = start + 1600;
+      assert.equal((await useSession(h, token)).status, 200);
+      assert.equal(upstream, 2, "the refused retry never reached Google");
+    });
+  });
+
+  it("caps session-authenticated generateContent per identity per UTC day (Bearer unaffected)", async () => {
+    const h = makeHarness({ rootCaPem: chain.root.pem, env: { SESSION_DAILY_LIMIT: "3" } });
+    const device = await attestDevice(h);
+    const first = await issue(h, device);
+    const second = await issue(h, device); // another session of the same identity shares the allowance
+    assert.equal((await useSession(h, first.token)).status, 200);
+    assert.equal((await useSession(h, second.token)).status, 200);
+    h.clock.now += 3600_000;
+    assert.equal((await useSession(h, first.token)).status, 200);
+    const over = await useSession(h, second.token);
+    assert.deepEqual([over.status, await over.json()], [429, { error: "rate_limited" }]);
+    assert.equal(over.headers.get("retry-after"), String(15 * 3600), "until the next UTC day (now 09:00Z)");
+    const key = `rl:sday:${device.keyIdB64}:20261015`;
+    assert.equal(await h.kv.get(key), "3");
+    assert.equal(h.kv.writes.find((w) => w.key === key)?.expirationTtl, 2 * 86400);
+    assert.equal((await device.send("/v1beta/models/x:generateContent", "{}")).status, 200, "Bearer is not capped");
+    assert.equal(h.calls.length, 4);
+    h.clock.now = Date.UTC(2026, 9, 16, 0, 0, 1);
+    assert.equal((await useSession(h, first.token)).status, 200, "next UTC day");
   });
 
   describe("dev sessions", () => {
@@ -999,6 +1069,29 @@ describe("POST /session and Session tokens", () => {
 });
 
 describe("per-IP limits", () => {
+  it("cap successful attestations per IP bucket per UTC day", async () => {
+    const h = makeHarness({ rootCaPem: chain.root.pem, env: { ATTEST_DAILY_PER_IP: "2" } });
+    const ip = "2001:db8:7:7::1";
+    await attestDevice(h, BUNDLE_ID, ip);
+    // A failed attestation is not a new identity: it does not count.
+    const { challenge } = (await jsonOf(await h.request("/attest/challenge", { headers: { "cf-connecting-ip": ip } }))) as { challenge: string };
+    const failed = await h.request("/attest", { method: "POST", headers: { "cf-connecting-ip": ip }, body: JSON.stringify({ keyId: b64encode(new Uint8Array(32)), attestation: "AA==", challenge, bundleId: BUNDLE_ID }) });
+    assert.equal(failed.status, 401);
+    await attestDevice(h, BUNDLE_ID, "2001:db8:7:7:abcd::9"); // same /64
+    assert.equal(await h.kv.get(`rl:attestday:v6:2001:db8:7:7::/64:20261015`), "2");
+
+    for (const path of ["/attest/challenge", "/attest"]) {
+      const init: RequestInit = { headers: { "cf-connecting-ip": "2001:db8:7:7::42" } };
+      if (path === "/attest") Object.assign(init, { method: "POST", body: "{}" });
+      const r = await h.request(path, init);
+      assert.deepEqual([r.status, await r.json()], [429, { error: "rate_limited" }], path);
+      assert.equal(r.headers.get("retry-after"), String(16 * 3600), "until the next UTC day (now 08:00Z)");
+    }
+    await attestDevice(h, BUNDLE_ID, "2001:db8:7:8::1"); // another /64
+    h.clock.now = Date.UTC(2026, 9, 16, 0, 0, 1);
+    await attestDevice(h, BUNDLE_ID, ip); // next UTC day
+  });
+
   it("bucket IPv4 by address and IPv6 by /64", () => {
     const cases: [string | null, string][] = [
       ["203.0.113.7", "203.0.113.7"],

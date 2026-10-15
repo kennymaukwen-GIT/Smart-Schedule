@@ -8,7 +8,7 @@
 //     for identities always (a second, global layer) and for the IP limits only when the binding is absent.
 
 import type { Env } from "./env.ts";
-import { rateLimitPerMinute } from "./env.ts";
+import { attestDailyPerIp, rateLimitPerMinute, sessionDailyLimit } from "./env.ts";
 import { HttpError, log } from "./http.ts";
 
 function minuteOf(now: number): number {
@@ -62,10 +62,12 @@ export function clientIp(request: Request): string {
 }
 
 /**
- * Per-identity limit (keyId, "dev"; a session counts as its keyId). The binding, when bound, counts atomically;
- * the KV counter is a second, global layer. With `strict` (Session and dev identities, which have no other
- * per-request write) a failed KV increment is a 429 too — KV's one write per key per second then caps a burst — instead
- * of letting the request through uncounted.
+ * Per-identity limit (keyId, "dev"; a session counts as its keyId). The binding, when bound, counts atomically but only
+ * per location; the KV counter is the global layer, so its write stays mandatory for `strict` identities (Session and
+ * dev, which have no other per-request write) even with the binding bound. A failed strict write is answered with
+ * 503 server_busy + Retry-After: 1 — usually a harmless collision with another write to the same key in the same
+ * second (KV allows one), which the app retries after 0.8 s and 1.6 s — never let through uncounted, so a burst is
+ * still refused. Bearer requests are already throttled by their own counter write, so theirs is best effort.
  */
 export async function enforceRateLimit(env: Env, id: string, now: number, options: { strict: boolean }): Promise<void> {
   const label = id === "dev" ? "dev" : id.slice(0, 12);
@@ -78,9 +80,8 @@ export async function enforceRateLimit(env: Env, id: string, now: number, option
   try {
     await env.SS_KV.put(key, String(count + 1), { expirationTtl: 120 });
   } catch (e) {
-    if (options.strict) limited("1", "rate_limit_write_failed", { id: label, error: String(e) });
-    // Bearer requests are already throttled by their own counter write (key:<keyId>); don't fail them here.
-    log("warn", "rate_limit_write_failed", { id: label, error: String(e) });
+    log("warn", "rate_limit_write_failed", { id: label, strict: options.strict, error: String(e) });
+    if (options.strict) throw new HttpError(503, "server_busy", { "retry-after": "1" });
   }
 }
 
@@ -131,4 +132,55 @@ export async function recordBodyFailure(env: Env, bucket: string, keyId: string,
   } catch (e) {
     log("warn", "auth_failure_count_failed", { error: String(e) });
   }
+}
+
+// Daily caps (KV; the binding's period is at most 60 s). A device owner can mint attested identities (reinstall,
+// "Erase all data", a proxy that forces re-attestation), so per-identity limits do not bound a device; these raise the
+// cost: each identity's session gets a daily allowance, and each IP bucket a daily number of new identities.
+
+const DAY_MS = 86_400_000;
+const DAILY_COUNTER_TTL_SECONDS = 2 * 86_400;
+
+function utcDay(now: number): string {
+  return new Date(now).toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+function untilNextUtcDay(now: number): string {
+  return String(Math.max(1, Math.ceil(((Math.floor(now / DAY_MS) + 1) * DAY_MS - now) / 1000)));
+}
+
+/** Best-effort read-modify-write; fine at a daily granularity (the per-minute limits catch bursts). */
+async function bumpDaily(env: Env, key: string, count: number): Promise<void> {
+  try {
+    await env.SS_KV.put(key, String(count + 1), { expirationTtl: DAILY_COUNTER_TTL_SECONDS });
+  } catch (e) {
+    log("warn", "daily_counter_write_failed", { error: String(e) });
+  }
+}
+
+/** Session-authenticated generateContent per identity and UTC day (`rl:sday:<id>:<YYYYMMDD>`). Bearer is not counted. */
+export async function enforceSessionDailyLimit(env: Env, id: string, now: number): Promise<void> {
+  const key = `rl:sday:${id}:${utcDay(now)}`;
+  const count = Number((await env.SS_KV.get(key)) ?? "0") || 0;
+  if (count >= sessionDailyLimit(env)) {
+    limited(untilNextUtcDay(now), "session_daily_limit", { id: id === "dev" ? "dev" : id.slice(0, 12), count });
+  }
+  await bumpDaily(env, key, count);
+}
+
+function attestDayKey(bucket: string, now: number): string {
+  return `rl:attestday:${bucket}:${utcDay(now)}`;
+}
+
+/** Refuses /attest/challenge and /attest for an IP bucket that already attested ATTEST_DAILY_PER_IP keys today. */
+export async function checkAttestDaily(env: Env, bucket: string, now: number): Promise<void> {
+  const count = Number((await env.SS_KV.get(attestDayKey(bucket, now))) ?? "0") || 0;
+  if (count >= attestDailyPerIp(env)) limited(untilNextUtcDay(now), "attest_daily_limit", { count });
+}
+
+/** Counts a successful attestation for its IP bucket (only successes: failed attempts are not new identities). */
+export async function recordAttestSuccess(env: Env, bucket: string, now: number): Promise<void> {
+  const key = attestDayKey(bucket, now);
+  const count = Number((await env.SS_KV.get(key)) ?? "0") || 0;
+  await bumpDaily(env, key, count);
 }
