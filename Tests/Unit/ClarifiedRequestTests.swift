@@ -17,7 +17,7 @@ final class ClarifiedRequestTests: XCTestCase {
     }
 
     func testTheAnswersEventsKeepTheRequest() async throws {
-        let assistant = makeAssistant()
+        let assistant = await makeAssistant()
         let question = try await assistant.handle("明天下午開線上會議", now: now)
         XCTAssertTrue(question.needsClarification)
         XCTAssertNil(question.pendingEvents)
@@ -36,7 +36,7 @@ final class ClarifiedRequestTests: XCTestCase {
     // MARK: Helpers
 
     /// "Ask me first", so the events wait as a batch and nothing needs Google.
-    private func makeAssistant() -> ScheduleAssistant {
+    private func makeAssistant() async -> ScheduleAssistant {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ClarifyingGeminiStub.self]
         let gemini = GeminiClient(config: GeminiConfig(baseURL: "https://gemini.example.invalid/v1beta", modelID: "test-model",
@@ -50,7 +50,7 @@ final class ClarifiedRequestTests: XCTestCase {
                                     clock: TestClock.clock, transport: nil,
                                     outbox: SyncOutbox(fileURL: files.url("ClarifiedRequest-outbox")))
         let preferences = PreferencesStore(fileURL: files.url("ClarifiedRequest-prefs"))
-        preferences.update { $0.autonomy = .askFirst }
+        await preferences.update { $0.autonomy = .askFirst }
         return ScheduleAssistant(gemini: gemini, router: router, store: store, preferences: preferences,
                                  clock: TestClock.clock)
     }
