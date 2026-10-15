@@ -99,6 +99,9 @@ actor ScheduleAssistant {
     private var exchanges: [[GeminiTurn]] = []
     private let maxExchanges = 6
     private var lastProposal: Proposal?
+    /// What the user asked before Gemini asked back ("明天下午開會" before "14:00"): the events the answer creates
+    /// keep it in their notes, not only "14:00".
+    private var clarifiedRequest: String?
 
     /// - Parameter clock: nil = `Settings › Time zone` and "Week starts on", read per request.
     init(gemini: GeminiClient = GeminiClient(),
@@ -116,6 +119,7 @@ actor ScheduleAssistant {
     func resetConversation() {
         exchanges.removeAll()
         lastProposal = nil
+        clarifiedRequest = nil
     }
 
     private func context() -> Context {
@@ -157,10 +161,11 @@ actor ScheduleAssistant {
         var reply = Reply()
         var results: [GeminiTurn.FunctionResult] = []
         let requestSeed = UUID().uuidString
+        let request = clarifiedRequest.map { "\($0) → \(utterance)" } ?? utterance
         for (index, call) in response.functionCalls.enumerated() {
             let outcome: [String: Any]
             do {
-                outcome = try await execute(call, seed: "\(requestSeed)|\(index)", utterance: utterance,
+                outcome = try await execute(call, seed: "\(requestSeed)|\(index)", utterance: utterance, request: request,
                                             upcoming: upcoming + [focus].compactMap { $0 }, now: now,
                                             ctx: ctx, reply: &reply)
             } catch {
@@ -172,6 +177,8 @@ actor ScheduleAssistant {
         }
         if !results.isEmpty { exchange.append(.functionResponses(results)) }
         remember(exchange)
+        // A chain of questions keeps the first request; anything else ends it.
+        clarifiedRequest = reply.needsClarification ? (clarifiedRequest ?? utterance) : nil
 
         if reply.text.isEmpty { reply.text = response.text ?? String(localized: "Done.") }
         if reply.waitingToSync { reply.append(Self.waitingToSyncNote) }
@@ -355,6 +362,7 @@ actor ScheduleAssistant {
     private func execute(_ call: GeminiFunctionCall,
                          seed: String,
                          utterance: String,
+                         request: String,
                          upcoming: [ScheduleEvent],
                          now: Date,
                          ctx: Context,
@@ -364,13 +372,13 @@ actor ScheduleAssistant {
         case .createEvents:
             let args = try call.decode(CreateEventsArgs.self)
             let mapped = try args.events.prefix(20).enumerated().map { index, draft in
-                try ctx.mapper.event(from: draft, seed: "\(seed)|\(index)", utterance: utterance)
+                try ctx.mapper.event(from: draft, seed: "\(seed)|\(index)", utterance: request)
             }
             // suggested_notes stay on this iPhone: chips on the card and the event page, never in Google.
             let suggested = Self.suggestedNotes(args, mapped: mapped)
             if ctx.preferences.autonomy == .askFirst {
                 // Nothing is written: the batch waits for Add (a newer batch replaces this one).
-                let batch = await makeBatch(mapped, argsJSON: call.argsJSON, seed: seed, utterance: utterance,
+                let batch = await makeBatch(mapped, argsJSON: call.argsJSON, seed: seed, utterance: request,
                                             suggested: suggested, ctx: ctx, now: now)
                 await store.setPendingEventBatch(batch)
                 lastProposal = .events
@@ -403,7 +411,7 @@ actor ScheduleAssistant {
                                                   argsJSON: call.argsJSON,
                                                   id: pending?.id ?? GoogleEventID.newPlanID(),
                                                   revision: (pending?.revision ?? 0) + 1,
-                                                  utterance: pending?.utterance ?? utterance)
+                                                  utterance: pending?.utterance ?? request)
             await store.setPendingPlan(draft)
             lastProposal = .plan
             reply.planDraft = draft

@@ -2,6 +2,7 @@ import AppIntents
 
 /// Zero-UI input for Siri, Spotlight, Shortcuts and the Action Button:
 /// "Hey Siri, add a plan in Smart Schedule" → Siri asks "What should I schedule?" → done, app never opens.
+/// A request without a clock time gets the assistant's "what time?" question, answered in the same exchange.
 struct AddPlanIntent: AppIntent {
     static let title: LocalizedStringResource = "Add to Smart Schedule"
     static let description = IntentDescription("Describe an event or a goal; Smart Schedule writes it to Google Calendar. Long-term plans wait in the app until you review them and tap Add.")
@@ -19,9 +20,18 @@ struct AddPlanIntent: AppIntent {
             return .result(dialog: "\(Self.consentNeeded)")
         }
         let assistant: any ScheduleAssisting = demo ? DemoAssistant() : ScheduleAssistant.shared
-        let reply: ScheduleAssistant.Reply
+        var reply: ScheduleAssistant.Reply
         do {
             reply = try await assistant.handle(text, focusEventID: nil, now: Date())
+            // "明天下午的「看牙醫」要排在幾點？": Siri asks and the same assistant reads the answer, so it still knows the
+            // event (Gemini's conversation, the demo's draft). Twice at most.
+            var rounds = 0
+            while reply.needsClarification, reply.planDraft == nil, reply.pendingEvents == nil, rounds < 2 {
+                let question: IntentDialog = "\(reply.text)"
+                let answer = try await $text.requestValue(question)
+                reply = try await assistant.handle(answer, focusEventID: nil, now: Date())
+                rounds += 1
+            }
         } catch GeminiError.consentRequired {
             return .result(dialog: "\(Self.consentNeeded)") // revoked meanwhile
         }
