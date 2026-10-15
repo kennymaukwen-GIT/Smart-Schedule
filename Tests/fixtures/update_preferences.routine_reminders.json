@@ -3,7 +3,7 @@
   "now_local": "2026-10-13T10:15",
   "time_zone": "Europe/London",
   "preferences": "event_reminders: 1440,60,30,0\nroutine_reminders: 30\nquiet_hours: off",
-  "calendars": "- My calendar | example@gmail.com (default)\n- Gym | example@gmail.com\n- My calendar | example@yourmail.com",
+  "calendars": "- My calendar | Account 1 (default)\n- Gym | Account 1\n- My calendar | Account 2",
   "expected_call": {
     "name": "update_preferences",
     "args": {

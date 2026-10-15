@@ -360,7 +360,8 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(custom.promptValue(for: .deadlineReminders), "none")
         XCTAssertEqual(custom.promptValue(for: .allDayReminder), "none")
         XCTAssertEqual(custom.promptValue(for: .eveningPreview), "20:15")
-        XCTAssertEqual(custom.promptValue(for: .defaultCalendar), "My calendar | example@yourmail.com")
+        // The calendar's name only: the stored label's account email never reaches the model.
+        XCTAssertEqual(custom.promptValue(for: .defaultCalendar), "My calendar")
         XCTAssertEqual(custom.promptValue(for: .eventUrgency), "time_sensitive")
         var quiet = AppPreferences()
         quiet.quietHours.isEnabled = true
@@ -406,7 +407,13 @@ final class AppPreferencesTests: XCTestCase {
         XCTAssertEqual(AppPreferences.promptValue(canonical: "off 23:00-06:00", for: .quietHours), "off")
         XCTAssertEqual(AppPreferences.promptValue(canonical: "on 23:00-06:00", for: .quietHours), "23:00-06:00")
         XCTAssertEqual(AppPreferences.promptValue(canonical: "900", for: .allDayReminder), "09:00")
-        XCTAssertEqual(AppPreferences.promptValue(canonical: "a/b|My calendar | b", for: .defaultCalendar), "My calendar | b")
+        XCTAssertEqual(AppPreferences.promptValue(canonical: "a/b|My calendar | b", for: .defaultCalendar), "My calendar")
+        XCTAssertEqual(AppPreferences.promptValue(canonical: "acct-b/example@yourmail.com|My calendar | example@yourmail.com",
+                                                  for: .defaultCalendar), "My calendar")
+        // A calendar named with someone's address (shared with the user).
+        XCTAssertEqual(AppPreferences.promptValue(canonical: "a/boss|example.boss@example.org | kenny@example.com",
+                                                  for: .defaultCalendar), "Shared calendar")
+        XCTAssertEqual(AppPreferences.promptValue(canonical: "a/b|", for: .defaultCalendar), "automatic")
         XCTAssertEqual(AppPreferences.promptValue(canonical: "garbage", for: .weekStart), "garbage")
     }
 

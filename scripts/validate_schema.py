@@ -10,12 +10,16 @@
 5. Checks that fixture texts follow the prompt's "# Writing style" (short summaries, no "Tue/Thu", no times),
    and update_preferences values against the per-key encoding the app's normaliser accepts
    (docs/SETTINGS.md §6.2); a default_calendar value must be a line of the fixture's CALENDARS.
+   No Google account email reaches Gemini (docs/GEMINI_FUNCTION_CALLING.md §10.6): a fixture's CALENDARS and
+   PREFERENCES hold no "@" (accounts are "Account N"), and the prompt builders never read an account's address.
    Note suggestions (suggest_event_notes items, create_events suggested_notes) are short checklist items in the
    language of the event title, without bullets, repeats, prices or doses, and say nothing the event's notes or the
    request's ALREADY SUGGESTED line already say (docs/GEMINI_FUNCTION_CALLING.md §12).
 6. Checks Shared/Localization/Localizable.xcstrings: every key has a zh-Hant translation whose format
    specifiers match the key's (positional %1$@ allowed), and every String(localized:) literal in the
    Swift sources is a key.
+7. Version 1.0 sells nothing (docs/SETTINGS.md §16): AppConstants.subscriptionsEnabled is false, and every Swift file
+   that reaches StoreKit or SubscriptionStore, or shows subscription copy, reads the flag in code.
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -364,6 +368,27 @@ def context_checks(root: dict, fixture: str) -> None:
             errors.append(f"{fixture}: a revision keeps plan_title unless the user renames it")
 
 
+# The prompt builders: calendars reach Gemini only through CalendarAliases, never as "<name> | <email>".
+PROMPT_SOURCES = ["Shared/AI/AssistantPrompt.swift", "Shared/AI/NoteSuggestionPrompt.swift"]
+ACCOUNT_ADDRESS = re.compile(r"\b(accountEmail|promptLabel)\b")
+
+
+def privacy_checks(root: dict, fixture: str) -> None:
+    """Fixtures mirror the prompt, which shows no Google account email: CALENDARS and PREFERENCES hold no address."""
+    for field in ("calendars", "preferences"):
+        if "@" in str(root.get(field, "")):
+            errors.append(f"{fixture}: {field} holds an email address; the prompt names accounts 'Account N' "
+                          "(docs/GEMINI_FUNCTION_CALLING.md §10.6)")
+
+
+def prompt_source_checks() -> None:
+    for relative in PROMPT_SOURCES:
+        for number, line in enumerate((ROOT / relative).read_text(encoding="utf-8").splitlines(), 1):
+            code = line.split("//", 1)[0]
+            if ACCOUNT_ADDRESS.search(code):
+                errors.append(f"{relative}:{number}: reads an account's address; name calendars through CalendarAliases")
+
+
 # ---------- String Catalog ----------
 
 SPECIFIER = re.compile(r"%(?:(\d+)\$)?(@|lld|llu|ld|lu|d|u|lf|f|%)")
@@ -460,6 +485,31 @@ def strings_file_checks() -> None:
                 errors.append(f"{path.relative_to(ROOT)}: not a '\"key\" = \"value\";' line: {line.strip()!r}")
 
 
+# ---------- Version 1.0 sells nothing ----------
+
+STOREKIT_USE = re.compile(r"\bimport StoreKit\b|\bSubscriptionStore\b|\bmanageSubscriptionsSheet\b|\bAppStore\.sync\b"
+                          r"|\bTransaction\.(?:updates|currentEntitlements)\b|\bProduct\.products\b")
+SUBSCRIPTION_COPY = re.compile(r'"[^"\n]*(?:[Ss]ubscription|Restore Purchases|Smart Schedule Pro)[^"\n]*"')
+SUBSCRIPTION_FLAG = "AppConstants.subscriptionsEnabled"
+
+
+def subscription_checks() -> int:
+    """Owner decision for 1.0: no subscription. The flag is false, and every file that calls StoreKit or shows
+    subscription copy reads it, so a new Pro surface cannot ship ungated. Comments are ignored."""
+    constants = (ROOT / "Shared/Core/AppConstants.swift").read_text(encoding="utf-8")
+    if not re.search(r"^\s*static let subscriptionsEnabled = false\b", constants, re.M):
+        errors.append("Shared/Core/AppConstants.swift: version 1.0 needs `static let subscriptionsEnabled = false`")
+    gated = 0
+    for directory in SWIFT_DIRS:
+        for path in sorted((ROOT / directory).rglob("*.swift")):
+            code = re.sub(r"//.*", "", path.read_text(encoding="utf-8"))
+            if STOREKIT_USE.search(code) or SUBSCRIPTION_COPY.search(code):
+                gated += 1
+                if SUBSCRIPTION_FLAG not in code:
+                    errors.append(f"{path.relative_to(ROOT)}: StoreKit or subscription copy without {SUBSCRIPTION_FLAG}")
+    return gated
+
+
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
     by_name = {}
@@ -488,6 +538,7 @@ def main() -> int:
         style_checks(call["name"], call["args"], path.name)
         suggestion_checks(call["name"], call["args"], fixture, path.name)
         context_checks(fixture, path.name)
+        privacy_checks(fixture, path.name)
         print(f"✓ fixture {path.name}")
 
         if "--print-payloads" in sys.argv and call["name"] == "create_long_term_plan":
@@ -509,8 +560,12 @@ def main() -> int:
     assert weekly[0] == datetime(2026, 10, 15, 18, 30) and weekly[-1] == datetime(2027, 4, 12, 18, 30)
     print("✓ DST / RRULE / preview reference checks")
 
+    prompt_source_checks()
+    print("✓ prompt builders name calendars without account emails")
+
     print(f"✓ String Catalog: {catalog_checks()} keys with zh-Hant")
     strings_file_checks()
+    print(f"✓ Subscriptions off: {subscription_checks()} files gated by {SUBSCRIPTION_FLAG}")
 
     if errors:
         print("\n".join(f"✗ {e}" for e in errors), file=sys.stderr)

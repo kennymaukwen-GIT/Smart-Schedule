@@ -8,10 +8,11 @@
 	<array/>
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
-		<!-- What the user types or says (as text), and the titles, times, places and notes of the events a request is
-		     about, sent to Google's Gemini API to understand the request. On iOS 18 also the titles, start and end times and
-		     calendar colours of the next two days' events, kept on Smart Schedule's server to start each Live Activity on time; that
-		     registration is keyed by a random install ID, so the type is declared as linked. Never used for tracking. -->
+		<!-- What the user types or says (as text), and the titles, times, notes and Google event IDs of up to 40 events in
+		     the 14 days from today (a location only for AI suggestions on one event), sent through Smart Schedule's server to
+		     Google's Gemini API; no Google account email. On iOS 18 also the titles, event IDs, start and end times and calendar
+		     colours of the next 48 hours' events, kept on the server up to 3 days to start each Live Activity; keyed by a random
+		     install ID, so declared as linked. Never used for tracking. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>

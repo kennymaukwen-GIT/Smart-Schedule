@@ -119,7 +119,7 @@ flowchart LR
 ### 3.4 主 App：SwiftUI 加 Observation（`@Observable`）
 - iOS 18 起跳。`RootView` 疊出 Quick Capture overlay，動畫是 `.scale(anchor: .top)`，看起來像從動態島「長」出來。
 - 背景工作：`.backgroundTask(.appRefresh(...))`（SwiftUI 的 scene modifier）。
-- **Artboard 5 的導覽**：漢堡選單 = 看什麼（`CalendarDrawer`，從左邊滑出，內含自己的 `NavigationStack`，行事曆設定在抽屜裡推入）；頭像 = 我是誰（`AccountSheet`：Google 帳號、Smart Schedule Pro）；General = App 怎麼運作（`SettingsView`）。`AppRouter` 管抽屜開關和這兩個 sheet，也接受 `smartschedule://settings`、`smartschedule://accounts`。月份 chips 和月曆格維持無限捲動；時區或每週起始日改變時，用 `.id(schedule.clockID)` 讓它們以 `displayedMonth` 重新排版。
+- **Artboard 5 的導覽**：漢堡選單 = 看什麼（`CalendarDrawer`，從左邊滑出，內含自己的 `NavigationStack`，行事曆設定在抽屜裡推入）；頭像 = 我是誰（`AccountSheet`：Google 帳號；Smart Schedule Pro 區塊在 1.0 關閉）；General = App 怎麼運作（`SettingsView`）。`AppRouter` 管抽屜開關和這兩個 sheet，也接受 `smartschedule://settings`、`smartschedule://accounts`。月份 chips 和月曆格維持無限捲動；時區或每週起始日改變時，用 `.id(schedule.clockID)` 讓它們以 `displayedMonth` 重新排版。
 - **View model**：`ScheduleViewModel`（可見行程、帳號、待確認的計畫和「先問我」行程、`clock`）、`ChatViewModel`（對話、卡片狀態、AI 同意流程、對話紀錄的讀寫）、`SettingsModel`（設定頁的偏好、紀錄、建議、同意狀態；每次修改都經過 `PreferencesStore.update(source: .settings)`，自動記進「助理記得的事」）。
 - **啟動順序**：先讀回對話紀錄 → `ScheduleViewModel.bootstrap()`（舊版單一帳號搬到多帳號 → 帳號 → 快取 → 同步）→ 對齊 App Group 裡的草稿和「先問我」批次 → 加入學到的建議卡片 → `summonIfDue`。回到前景時另外重新整理行事曆清單（超過 6 小時的）。
 
@@ -143,8 +143,8 @@ flowchart LR
 - **同步**：`CalendarSync` 對每個帳號的每個行事曆各自重列 −7～+120 天（最多同時 4 個），失敗只影響那個行事曆；快取裡的行程以 `EventRef`（帳號、行事曆、id）區分。畫面、提醒和 Live Activity 都讀 `SharedStore.visibleEvents`，由 `EventVisibility` 套用隱藏的行事曆、關掉提醒的行事曆、專注模式過濾條件和示範模式，並把同一個會議在兩個帳號的副本合成一個（主辦人的副本優先）。
 - **寫入**：所有寫入都經過 `CalendarRouter`。新行程寫到預設行事曆（設定 › 行事曆與新行程，或用說的「以後用學校帳號」），修改和刪除寫到該副本自己的行事曆；唯讀行事曆在送出 request 前就回 `RouterError.readOnly`。
 - **偏好設定**：`PreferencesStore`（`preferences.json`）是唯一來源，`current()` 可以同步讀取，所以 `WallClock()`、`ReminderPolicy(preferences:)`、mapper 都在每次使用時讀最新的值。設定頁經過 `SettingsModel` → `PreferencesStore.update(source: .settings)`；用說的經過 `update_preferences` → `PreferencesStore.apply`（同一套驗證）。兩條路都會在「助理記得的事」留一行（每個 key 最多一行，回到預設值就移除），回傳的 receipt 讓對話卡片可以復原。寫入後發 `.preferences` 變更通知：`ScheduleViewModel` 重建 `WallClock`、`ReminderScheduler.reschedule()`（由 `ReminderPlanner` 決定提醒來源、緊急程度、安靜時段、每日摘要和每日上限）、更新 Live Activity。
-- **AI 同意**：`AIConsentStore`（App Group UserDefaults `SSAIConsent`，含說明文字的版本）是 `GeminiClient.generate` 唯一的閘門。App 第一次送出訊息時顯示同意說明，按「允許」後原訊息直接送出；Siri 和通知擴充只回一句「請到設定開啟」。撤回或拒絕後，設定和輸入列上方的提示列可以重新開啟。
-- **訂閱、匯出、清除**：`SubscriptionStore`（StoreKit 2，目前只提供 `isPro`）；`DataExporter` 匯出設定、紀錄、帳號的行事曆名稱、快取行程和對話（不含 token）；`DataEraser` 依序取消通知、結束 Live Activity、撤銷並刪除每個帳號的 token、清掉所有 App Group 檔案和匯出的暫存檔。
+- **AI 同意**：`AIConsentStore`（App Group UserDefaults `SSAIConsent`，含說明文字的版本）是 `GeminiClient.generate` 唯一的閘門。App 第一次送出訊息時顯示同意說明，按「允許」後原訊息直接送出；Siri 和通知擴充只回一句「請到設定開啟」。撤回或拒絕後，設定和輸入列上方的提示列可以重新開啟。送給 Gemini 的行事曆和帳號都經過 `CalendarAliases`（「My calendar | Account 2」），不含 Google 帳號的 email；使用者的訊息、行程文字和錯誤訊息裡的帳號 email 也先換成佔位字，模型寫回來的佔位字在 iPhone 上換回地址；移除帳號時清掉助理的對話，因為後面帳號的編號會變（`docs/GEMINI_FUNCTION_CALLING.md` §10.6）。
+- **訂閱、匯出、清除**：`SubscriptionStore`（StoreKit 2，只提供 `isPro`；1.0 不賣訂閱，`AppConstants.subscriptionsEnabled = false` 讓啟動時不呼叫 StoreKit、頭像頁沒有 Pro 區塊）；`DataExporter` 匯出設定、紀錄、帳號的行事曆名稱、快取行程和對話（不含 token）；`DataEraser` 依序取消通知、結束 Live Activity、撤銷並刪除每個帳號的 token、清掉所有 App Group 檔案和匯出的暫存檔。
 
 ---
 
@@ -185,7 +185,7 @@ sequenceDiagram
 | API key 外洩 | key 只在 Cloudflare Worker。Worker 驗證 App Attest（DeviceCheck framework）的 attestation 與每個 request 的 assertion，依金鑰限流；通知擴充的 session token 只能呼叫 App 用的那個模型的 generateContent |
 | Prompt injection（別人寄來的邀請，標題裡寫指令） | 行事曆資料放在 system prompt 的 DATA 區塊，並移除分隔字元；模型只能呼叫 8 個白名單函式；`modify_event`／`delete_events` 的 id 一定要在本地 cache 裡找得到才放行；批次刪除要使用者按確認；`update_preferences` 只接受列舉的 key，值逐一驗證，改了什麼都顯示在卡片上並可復原 |
 | 個人資料送到 Gemini | 第一次使用前說明並取得同意，設定裡可以撤回（見第 1 節）。不宣稱「不用於訓練」：那只在 Gemini 付費層級成立，上線前要開 Cloud Billing |
-| 刪除資料（沒有自己的帳號系統） | 每個 Google 帳號可以「移除帳號」：撤銷授權（`oauth2.googleapis.com/revoke`）、刪除 Keychain token、清掉該帳號的快取行程。「清除這台裝置上的所有資料」再加上設定、對話紀錄、待發通知、Live Activity。訂閱屬於 Apple 帳號，不受影響 |
+| 刪除資料（沒有自己的帳號系統） | 每個 Google 帳號可以「移除帳號」：撤銷授權（`oauth2.googleapis.com/revoke`）、刪除 Keychain token、清掉該帳號的快取行程。「清除這台裝置上的所有資料」再加上設定、對話紀錄、待發通知、Live Activity。1.0 沒有訂閱；之後的版本若有，訂閱屬於 Apple 帳號，不受影響 |
 | 網路重試造成重複事件 | Event ID 由確定的 seed 算出（base32hex）；伺服器回 409 就當作已經寫過 |
 | Token 過期 | OAuth consent screen 在 Testing 狀態時，refresh token **7 天就失效**。`calendar.events` 屬於 sensitive scope，正式上線要過 Google 的 App 驗證 |
 | 跨 process 同時寫檔 | 用 `NSFileCoordinator` 加 atomic write |

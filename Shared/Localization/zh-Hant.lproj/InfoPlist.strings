@@ -1,4 +1,4 @@
 /* Permission prompts from App/Info.plist (the English text lives in project.yml). This folder also makes
    XcodeGen list zh-Hant in the project's knownRegions. */
-"NSMicrophoneUsageDescription" = "按住麥克風時，Smart Schedule 會聽你說的計畫，不用打字。";
+"NSMicrophoneUsageDescription" = "點麥克風後，Smart Schedule 會聽你說的計畫，不用打字。";
 "NSSpeechRecognitionUsageDescription" = "你說的計畫會先轉成文字，再排進行事曆。";

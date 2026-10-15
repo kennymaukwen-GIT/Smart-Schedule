@@ -171,11 +171,18 @@ final class FixtureDecodingTests: XCTestCase {
         let args = try Fixtures.args(UpdatePreferencesArgs.self, from: name)
         XCTAssertEqual(args.changes.map(\.key), ["default_calendar"])
         let value = try XCTUnwrap(args.changes.first?.value)
-        XCTAssertEqual(value, "My calendar | example@yourmail.com")
+        XCTAssertEqual(value, "My calendar | Account 2")
         let calendars = try XCTUnwrap(Fixtures.root(name)["calendars"] as? String)
         XCTAssertTrue(calendars.components(separatedBy: "\n").contains("- \(value)"), calendars)
-        // The same label the demo's school calendar shows in CALENDARS.
-        XCTAssertTrue(DemoData.accounts.flatMap(\.calendars).contains { $0.promptLabel == value })
+        XCTAssertFalse(calendars.contains("@"), "CALENDARS shows no account email")
+        // The same label the demo's school calendar shows in CALENDARS, and it maps back to that calendar.
+        let demoCalendars = DemoData.accounts.flatMap(\.calendars)
+        let aliases = CalendarAliases(calendars: demoCalendars)
+        XCTAssertEqual(aliases.writableCalendar(matching: value)?.id, DemoData.schoolCalendar)
+        let school = try XCTUnwrap(demoCalendars.first { $0.id == DemoData.schoolCalendar })
+        XCTAssertEqual(aliases.label(of: school), value)
+        XCTAssertEqual(demoCalendars.filter(\.isWritable).map { "- " + aliases.label(of: $0) },
+                       calendars.components(separatedBy: "\n").map { $0.replacingOccurrences(of: " (default)", with: "") })
     }
 
     func testEveryPreferenceFixtureUsesKnownKeys() throws {

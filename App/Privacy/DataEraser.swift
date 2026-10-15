@@ -2,8 +2,9 @@ import Foundation
 import UserNotifications
 
 /// "Erase all data on this device". Smart Schedule has no accounts of its own, so this (with "Remove account" for one
-/// Google account) is how a user removes their data. Events in Google Calendar stay; subscriptions belong to the Apple
-/// Account and survive (restoring them later works). The caller resets its view models to the signed-out welcome state.
+/// Google account) is how a user removes their data. Events in Google Calendar stay; subscriptions (none in version
+/// 1.0, AppConstants.subscriptionsEnabled) belong to the Apple Account and survive. The caller resets its view models
+/// to the signed-out welcome state.
 enum DataEraser {
     @MainActor
     static func eraseAll() async {

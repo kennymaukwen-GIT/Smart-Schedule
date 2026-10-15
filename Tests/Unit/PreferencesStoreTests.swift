@@ -192,7 +192,9 @@ final class PreferencesStoreTests: XCTestCase {
         XCTAssertEqual(result.receipt?.changes.first?.newDisplay, "My calendar · example@yourmail.com")
         XCTAssertEqual(store.current().defaultCalendar, schoolRef)
         XCTAssertEqual(store.current().defaultCalendarLabel, schoolLabel)
-        XCTAssertEqual(store.current().promptValue(for: .defaultCalendar), schoolLabel)
+        // The label with the email stays on this iPhone; the model-facing value is the calendar's name.
+        XCTAssertEqual(store.current().promptValue(for: .defaultCalendar), "My calendar")
+        XCTAssertEqual(result.receipt?.changes.first?.newPromptValue, "My calendar")
 
         let miss = await applyByVoice([request(.defaultCalendar, "Work | boss@example.com")])
         XCTAssertNil(miss.receipt)

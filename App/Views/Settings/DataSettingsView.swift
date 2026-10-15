@@ -74,12 +74,19 @@ struct DataSettingsView: View {
             Button("Erase", role: .destructive) { eraseAll() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and removes every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected.")
+            eraseMessage
         }
         .sheet(item: $export) { file in
             ShareSheet(items: [file.url])
                 .presentationDetents([.medium, .large])
         }
+    }
+
+    /// Version 1.0 sells nothing (AppConstants.subscriptionsEnabled), so only a build with subscriptions mentions them.
+    private var eraseMessage: Text {
+        AppConstants.subscriptionsEnabled
+            ? Text("This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and removes every Google account. Events in Google Calendar are not deleted. Subscriptions belong to your Apple Account and are not affected.")
+            : Text("This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and removes every Google account. Events in Google Calendar are not deleted.")
     }
 
     private func clearHistory() {

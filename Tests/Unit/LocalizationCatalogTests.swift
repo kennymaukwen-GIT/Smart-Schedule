@@ -55,6 +55,11 @@ final class LocalizationCatalogTests: XCTestCase {
         XCTAssertEqual(zh("What the assistant remembers", in: table), "助理記得的事")
         XCTAssertEqual(zh("Erase all data on this device", in: table), "清除這台裝置上的所有資料")
         XCTAssertEqual(zh("Not in your calendar yet", in: table), "尚未加入行事曆")
+        // Version 1.0 (AppConstants.subscriptionsEnabled false): the avatar's label and the erase message without
+        // subscriptions.
+        XCTAssertEqual(zh("Accounts", in: table), "帳號")
+        XCTAssertEqual(zh("This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and removes every Google account. Events in Google Calendar are not deleted.", in: table),
+                       "這會從這支 iPhone 移除你的設定、快取的行程、聊天記錄、登入權杖、已排定的提醒和即時動態，並移除所有 Google 帳號。Google 日曆裡的行程不會被刪除。")
     }
 
     func testSettingsFormatArguments() throws {

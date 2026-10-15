@@ -147,12 +147,16 @@ actor ScheduleAssistant {
         let pendingEvents = await store.pendingEventBatch()
         let calendars = await ctx.router.accounts.calendars()
         let defaultTarget = await ctx.router.accounts.defaultWriteTarget()?.id
+        // The same names the prompt uses: function results name calendars this way too, and hold no account address.
+        let aliases = CalendarAliases(calendars: calendars)
 
         let system = AssistantPrompt.system(now: now, clock: ctx.clock, locale: .current,
                                             upcoming: upcoming, focus: focus, policy: ctx.mapper.policy, draft: draft,
                                             preferences: ctx.preferences, calendars: calendars,
                                             defaultTarget: defaultTarget, pendingEvents: pendingEvents)
-        var exchange = [GeminiTurn.user(utterance)]
+        // The user's own words, without their Google accounts' addresses ("use example@yourmail.com from now on" →
+        // "[Account 2 email]"). The request kept for the events' notes and the reply keeps what they typed.
+        var exchange = [GeminiTurn.user(aliases.scrubbingAccountEmails(utterance))]
         // suggest_event_notes has its own request (`suggestNotes`); a chat turn never calls it.
         let response = try await gemini.generate(system: system, history: exchanges.flatMap { $0 } + exchange,
                                                  allowedFunctions: AssistantFunction.conversational.map(\.rawValue))
@@ -166,10 +170,12 @@ actor ScheduleAssistant {
             let outcome: [String: Any]
             do {
                 outcome = try await execute(call, seed: "\(requestSeed)|\(index)", utterance: utterance, request: request,
-                                            upcoming: upcoming + [focus].compactMap { $0 }, now: now,
+                                            upcoming: upcoming + [focus].compactMap { $0 }, now: now, aliases: aliases,
                                             ctx: ctx, reply: &reply)
             } catch {
-                outcome = ["ok": false, "error": error.localizedDescription]
+                // Gemini reads the error on the next turn: no address in it ("Google sign-in for … expired" names
+                // the account). The reply on this iPhone keeps the full text.
+                outcome = ["ok": false, "error": aliases.redactingEmails(error.localizedDescription)]
                 reply.append(error.localizedDescription)
             }
             let json = (try? JSONSerialization.data(withJSONObject: outcome)) ?? Data("{}".utf8)
@@ -180,7 +186,9 @@ actor ScheduleAssistant {
         // A chain of questions keeps the first request; anything else ends it.
         clarifiedRequest = reply.needsClarification ? (clarifiedRequest ?? utterance) : nil
 
-        if reply.text.isEmpty { reply.text = response.text ?? String(localized: "Done.") }
+        if reply.text.isEmpty {
+            reply.text = response.text.map { aliases.restoringAccountEmails($0) } ?? String(localized: "Done.")
+        }
         if reply.waitingToSync { reply.append(Self.waitingToSyncNote) }
         if reply.changed { await ReminderScheduler.shared.reschedule(store: store) }
         await store.setLastAssistantLine(reply.text)
@@ -365,12 +373,15 @@ actor ScheduleAssistant {
                          request: String,
                          upcoming: [ScheduleEvent],
                          now: Date,
+                         aliases: CalendarAliases,
                          ctx: Context,
                          reply: inout Reply) async throws -> [String: Any] {
         let clock = ctx.clock
         switch AssistantFunction(rawValue: call.name) {
         case .createEvents:
-            let args = try call.decode(CreateEventsArgs.self)
+            // "[Account N email]" back to the address before anything is written, kept or shown.
+            let restored = Self.restoringAccountEmails(in: call, aliases: aliases)
+            let args = try restored.decode(CreateEventsArgs.self)
             let mapped = try args.events.prefix(20).enumerated().map { index, draft in
                 try ctx.mapper.event(from: draft, seed: "\(seed)|\(index)", utterance: request)
             }
@@ -378,7 +389,7 @@ actor ScheduleAssistant {
             let suggested = Self.suggestedNotes(args, mapped: mapped)
             if ctx.preferences.autonomy == .askFirst {
                 // Nothing is written: the batch waits for Add (a newer batch replaces this one).
-                let batch = await makeBatch(mapped, argsJSON: call.argsJSON, seed: seed, utterance: request,
+                let batch = await makeBatch(mapped, argsJSON: restored.argsJSON, seed: seed, utterance: request,
                                             suggested: suggested, ctx: ctx, now: now)
                 await store.setPendingEventBatch(batch)
                 lastProposal = .events
@@ -400,15 +411,17 @@ actor ScheduleAssistant {
             reply.append(ReplyFormatter.conflicts(events, against: upcoming))
             Self.noteHidden(target, in: &reply)
             if events.contains(where: \.isWaitingToSync) { reply.waitingToSync = true }
-            return ["ok": true, "created": events.map { ["id": $0.id, "title": $0.title,
+            // Back to Gemini: the titles without the accounts' addresses again.
+            return ["ok": true, "created": events.map { ["id": $0.id, "title": aliases.scrubbingAccountEmails($0.title),
                                                          "start": clock.promptDateTimeString($0.start)] }]
 
         case .createLongTermPlan:
             // Review first: build and store a draft; nothing reaches Google until commitPlan / confirm_plan "add".
-            let args = try call.decode(LongTermPlanArgs.self)
+            let restored = Self.restoringAccountEmails(in: call, aliases: aliases)
+            let args = try restored.decode(LongTermPlanArgs.self)
             let pending = await store.pendingPlan()
             let draft = try ctx.planBuilder.draft(from: args,
-                                                  argsJSON: call.argsJSON,
+                                                  argsJSON: restored.argsJSON,
                                                   id: pending?.id ?? GoogleEventID.newPlanID(),
                                                   revision: (pending?.revision ?? 0) + 1,
                                                   utterance: pending?.utterance ?? request)
@@ -487,7 +500,7 @@ actor ScheduleAssistant {
             }
 
         case .modifyEvent:
-            let args = try call.decode(ModifyEventArgs.self)
+            let args = try Self.restoringAccountEmails(in: call, aliases: aliases).decode(ModifyEventArgs.self)
             guard let existing = upcoming.first(where: { $0.id == args.eventId }) else {
                 throw AssistantError.unknownEvent(args.eventId) // blocks hallucinated ids from touching real events
             }
@@ -561,9 +574,9 @@ actor ScheduleAssistant {
 
         case .replyToUser:
             let args = try call.decode(ReplyToUserArgs.self)
-            reply.append(args.message)
+            reply.append(aliases.restoringAccountEmails(args.message))
             reply.needsClarification = args.needsClarification ?? false
-            reply.suggestions = Array((args.suggestedReplies ?? []).prefix(3))
+            reply.suggestions = (args.suggestedReplies ?? []).prefix(3).map { aliases.restoringAccountEmails($0) }
             return ["ok": true]
 
         case .updatePreferences:
@@ -581,17 +594,32 @@ actor ScheduleAssistant {
             let accounts = ctx.router.accounts
             let result = await preferences.apply(requests, source: .voice(utterance: utterance),
                                                  resolveCalendar: { text in
-                await accounts.resolveWritableCalendar(matching: text)
+                // A CALENDARS line ("Gym | Account 2", or "[Account 2 email]" for an address the user typed) first.
+                // The user's own words ("my school account") are then matched on this iPhone; an alias that matches no
+                // single calendar (an "Account 3" that is gone, a name two accounts share) is refused so the model
+                // asks, never guessed.
+                if let calendar = aliases.writableCalendar(matching: text) {
+                    return CalendarChoice(ref: calendar.id, label: calendar.promptLabel)
+                }
+                guard !aliases.refersToAlias(text) else { return nil }
+                return await accounts.resolveWritableCalendar(matching: text)
                     .map { CalendarChoice(ref: $0.id, label: $0.promptLabel) }
             })
             rejected += result.rejected
-            Self.describe(result.receipt, rejected: rejected, summary: args.summaryForUser, in: &reply)
+            Self.describe(result.receipt, rejected: rejected, summary: aliases.restoringAccountEmails(args.summaryForUser),
+                          in: &reply)
             if Self.touchesNotifications(result.receipt) { await ReminderScheduler.shared.reschedule(store: store) }
-            return ["ok": rejected.isEmpty,
-                    "applied": (result.receipt?.changes ?? []).map {
-                        ["key": $0.key.rawValue, "old": $0.oldPromptValue, "new": $0.newPromptValue]
-                    },
-                    "rejected": rejected.map { ["key": $0.key, "value": $0.value, "reason": $0.reason] }]
+            // The stored label ("My calendar | <email>") stays on this iPhone: Gemini gets the CALENDARS label.
+            let applied: [[String: String]] = (result.receipt?.changes ?? []).map { change in
+                ["key": change.key.rawValue,
+                 "old": aliases.promptValue(canonical: change.oldValue, for: change.key),
+                 "new": aliases.promptValue(canonical: change.newValue, for: change.key)]
+            }
+            let refused: [[String: String]] = rejected.map { rejection in
+                ["key": rejection.key, "value": aliases.redactingEmails(rejection.value),
+                 "reason": aliases.redactingEmails(rejection.reason)]
+            }
+            return ["ok": rejected.isEmpty, "applied": applied, "rejected": refused]
 
         case .suggestEventNotes:
             // Only allowed in suggestNotes' own request; a chat turn that calls it changes nothing.
@@ -599,6 +627,28 @@ actor ScheduleAssistant {
 
         case nil:
             return ["ok": false, "error": "unknown function \(call.name)"]
+        }
+    }
+
+    /// `call` with "[Account N email]" turned back into the accounts' addresses in every string of its arguments
+    /// (`CalendarAliases.restoringAccountEmails`), for the functions whose text reaches Google Calendar or the user.
+    /// The call as Gemini sent it stays in the history. Unchanged when no placeholder could be in it.
+    private static func restoringAccountEmails(in call: GeminiFunctionCall,
+                                               aliases: CalendarAliases) -> GeminiFunctionCall {
+        guard let text = String(data: call.argsJSON, encoding: .utf8),
+              text.range(of: "account", options: .caseInsensitive) != nil,
+              let object = try? JSONSerialization.jsonObject(with: call.argsJSON),
+              object is [String: Any],
+              let data = try? JSONSerialization.data(withJSONObject: restoring(object, aliases: aliases)) else { return call }
+        return GeminiFunctionCall(name: call.name, id: call.id, argsJSON: data)
+    }
+
+    private static func restoring(_ value: Any, aliases: CalendarAliases) -> Any {
+        switch value {
+        case let text as String: return aliases.restoringAccountEmails(text)
+        case let list as [Any]: return list.map { restoring($0, aliases: aliases) }
+        case let object as [String: Any]: return object.mapValues { restoring($0, aliases: aliases) }
+        default: return value
         }
     }
 
@@ -642,6 +692,9 @@ actor ScheduleAssistant {
     /// Same, with the request's "today" given (unit tests).
     func suggestNotes(for event: ScheduleEvent, now: Date) async throws -> [NoteSuggestion] {
         let ctx = context()
+        // The event as Gemini sees it: no connected account's address in its title, place or notes.
+        let calendars = await ctx.router.accounts.calendars()
+        let aliases = CalendarAliases(calendars: calendars)
         let chinese = NoteSuggester.usesChinese(for: event)
         let rules = NoteSuggester.ruleSuggestions(for: event, existingNotes: event.notes, preferChinese: chinese,
                                                   homeTimeZone: ctx.clock.timeZone)
@@ -649,8 +702,8 @@ actor ScheduleAssistant {
                                           existingNotes: event.notes, limit: NoteSuggester.requestLimit)
         let response = try await gemini.generate(
             system: NoteSuggestionPrompt.system(chinese: chinese),
-            history: [.user(NoteSuggestionPrompt.request(for: event, clock: ctx.clock, now: now, chinese: chinese,
-                                                         alreadySuggested: shown.map(\.text)))],
+            history: [.user(NoteSuggestionPrompt.request(for: aliases.scrubbed(event), clock: ctx.clock, now: now,
+                                                         chinese: chinese, alreadySuggested: shown.map(\.text)))],
             mode: "ANY",
             allowedFunctions: [AssistantFunction.suggestEventNotes.rawValue])
         return Self.noteSuggestions(from: response, rules: rules, shown: shown, existingNotes: event.notes)

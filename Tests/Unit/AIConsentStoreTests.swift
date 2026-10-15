@@ -69,24 +69,46 @@ final class AIConsentStoreTests: XCTestCase {
 
     func testDisclosureSaysWhatIsSentAndToWhom() throws {
         XCTAssertEqual(AIConsentDisclosure.title, "Use the AI assistant?")
-        XCTAssertEqual(AIConsentDisclosure.items.count, 4)
-        XCTAssertTrue(AIConsentDisclosure.items[0].contains("type or say"))
-        XCTAssertTrue(AIConsentDisclosure.items[0].contains("spoken requests as text"))
-        // iOS 18 only: event titles and times kept on the server for the Dynamic Island; never notes or places.
-        let note = try XCTUnwrap(AIConsentDisclosure.serverNote(beforeIOS26: true))
-        XCTAssertTrue(note.contains("titles, start and end times and calendar colours") && note.contains("server") && note.contains("iOS 18"), note)
-        XCTAssertTrue(note.contains("Notes and places are not stored"), note)
-        XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: false))
-        XCTAssertEqual(AIConsent.disclosureVersion, 3, "everyone is asked again for the new disclosure")
-        XCTAssertTrue(AIConsentDisclosure.items[1].contains("Titles, times, locations and notes"))
-        XCTAssertTrue(AIConsentDisclosure.items[3].contains("time zone and language"))
+        XCTAssertEqual(AIConsent.disclosureVersion, 4, "everyone is asked again for the new disclosure")
+        let items = AIConsentDisclosure.items
+        XCTAssertEqual(items.count, 5)
+        // What the user types or says, with whatever names and addresses they mention themselves.
+        XCTAssertTrue(items[0].contains("type or say"), items[0])
+        XCTAssertTrue(items[0].contains("spoken requests as text"), items[0])
+        XCTAssertTrue(items[0].contains("email addresses you mention"), items[0])
+        // UPCOMING and FOCUS: the 14-day / 40-event window with Google event IDs, and no places.
+        XCTAssertTrue(items[1].contains("Google event IDs"), items[1])
+        XCTAssertTrue(items[1].contains("up to 40 events"), items[1])
+        XCTAssertTrue(items[1].contains("14 days"), items[1])
+        XCTAssertTrue(items[1].contains("reminder you reply to"), items[1])
+        XCTAssertFalse(items[1].contains("location"), items[1])
+        // Only "AI suggestions" sends a place, for one event.
+        XCTAssertTrue(items[2].contains("AI suggestions"), items[2])
+        XCTAssertTrue(items[2].contains("location"), items[2])
+        // Calendars are "Account 1", "Account 2" (CalendarAliases): no account email.
+        XCTAssertTrue(items[3].contains("calendar names and assistant settings"), items[3])
+        XCTAssertTrue(items[3].contains("not your Google account email addresses"), items[3])
+        XCTAssertTrue(items[4].contains("time zone and language"), items[4])
         XCTAssertTrue(AIConsentDisclosure.lead.contains("Gemini API"))
         XCTAssertTrue(AIConsentDisclosure.recipient.contains("Google"))
-        XCTAssertTrue(AIConsentDisclosure.footnote.contains("Nothing is sent until you tap Allow"))
+
+        // iOS 18 only: event titles, times and IDs kept on the server and sent through APNs; never notes or places.
+        let note = try XCTUnwrap(AIConsentDisclosure.serverNote(beforeIOS26: true))
+        for part in ["iOS 18", "next 48 hours", "event IDs", "server", "Apple's push service", "Notes and places are not stored"] {
+            XCTAssertTrue(note.contains(part), "\(part) missing from: \(note)")
+        }
+        XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: false))
+
+        // Speech recognition is Apple's, on the iPhone or on Apple's servers.
+        XCTAssertTrue(AIConsentDisclosure.speechNote.contains("Apple"), AIConsentDisclosure.speechNote)
+        XCTAssertTrue(AIConsentDisclosure.speechNote.contains("On-device recognition"), AIConsentDisclosure.speechNote)
+
+        XCTAssertTrue(AIConsentDisclosure.footnote.contains("Nothing is sent to the AI until you tap Allow"))
         XCTAssertTrue(AIConsentDisclosure.footnote.contains("Demo mode"))
         // Only Gemini's paid tier keeps prompts out of training: the app must never promise it.
         let all = ([AIConsentDisclosure.title, AIConsentDisclosure.lead, AIConsentDisclosure.recipient,
-                    AIConsentDisclosure.footnote, note] + AIConsentDisclosure.items).joined(separator: " ").lowercased()
+                    AIConsentDisclosure.footnote, AIConsentDisclosure.speechNote, note] + items)
+            .joined(separator: " ").lowercased()
         XCTAssertFalse(all.contains("train"), all)
     }
 }

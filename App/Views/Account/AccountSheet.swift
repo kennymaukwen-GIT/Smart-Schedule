@@ -1,8 +1,10 @@
 import StoreKit
 import SwiftUI
 
-/// The avatar's sheet: WHO you are. Connected Google accounts (reconnect, remove, add another on a pushed page) and
-/// Smart Schedule Pro (status, restore, manage, terms). Subscriptions are infrastructure only: nothing is gated.
+/// The avatar's sheet: WHO you are. Connected Google accounts (reconnect, remove, add another on a pushed page) and,
+/// when `AppConstants.subscriptionsEnabled` (off in version 1.0), Smart Schedule Pro (status, restore, manage, terms).
+/// Subscriptions are infrastructure only: nothing is gated. Terms of Use and Privacy Policy are always in
+/// Settings › About.
 struct AccountSheet: View {
     @Environment(ScheduleViewModel.self) private var schedule
     @Environment(ChatViewModel.self) private var chat
@@ -31,10 +33,13 @@ struct AccountSheet: View {
         NavigationStack {
             List {
                 accountsSection
-                proSection
-                #if DEBUG
-                storeKitTestingSection
-                #endif
+                // Version 1.0 sells nothing (AppConstants.subscriptionsEnabled): no Pro section, no StoreKit testing.
+                if AppConstants.subscriptionsEnabled {
+                    proSection
+                    #if DEBUG
+                    storeKitTestingSection
+                    #endif
+                }
             }
             .navigationTitle("Accounts")
             .navigationBarTitleDisplayMode(.inline)

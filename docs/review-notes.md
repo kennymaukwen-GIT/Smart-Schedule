@@ -1,6 +1,6 @@
-# App Review notes (paste into App Store Connect › App Review Information › Notes)
+# App Review notes（背景說明，不要整份貼上）
 
-給審核員看的說明。以下英文段落可以直接貼到 App Store Connect 的 Notes 欄位；最後一節是送審前自己要確認的事項。
+給審核員的說明的背景版本，比 App Store Connect 的 Notes 上限（4000 位元組）長，也沒有測試帳號和備用驗證碼。**要貼進 App Store Connect › App Review Information › Notes 的是 [`app-store-metadata.md`](app-store-metadata.md) 第 8.2 節的 `asc:en/review-notes` 區塊**（3,829 位元組）；審核員追問細節時，可以從下面的英文段落或第 8.3 節摘取。最後一節是送審前自己要確認的事項。
 
 ---
 
@@ -20,13 +20,17 @@
 
 **Long-press on a reminder.** The notification content extension lets people reply to a reminder by typing or speaking. The extension calls the AI service (through our server) and Google Calendar itself, so a change ("move it to 4 pm") or a deletion (confirmed with a red button) is done before the notification closes. It uses an ephemeral network session with a 30-second timeout.
 
-**AI and personal data (Guideline 5.1.2(i)).** Before anything is sent, a one-time dialog explains that requests (typed, or spoken and transcribed to text) and the related events' titles, times, locations and notes are sent to Google's Gemini API, names Google as the recipient and says requests pass through our server, which does not keep them, and asks for permission ("Allow" / "Not now"). The same dialog appears when permission is given later in Settings › AI & privacy. On iOS 18 it also says that the titles, start and end times and calendar colours of the next two days' events are kept on our server to start the Live Activities on time (no notes or places). Nothing is sent before the person taps Allow. Permission can be withdrawn in Settings › AI & privacy, and demo mode works without it.
+**AI and personal data (Guideline 5.1.2(i)).** Before anything is sent, a one-time dialog lists exactly what goes to Google's Gemini API: what the person types or says (speech is turned into text by Apple's speech recognition, on the iPhone or on Apple's servers), the titles, times, notes and Google event IDs of up to 40 events in the next 14 days and of the event whose reminder they reply to, the location of one event only when they ask for AI suggestions on it, their calendar names and assistant settings, and their time zone and language. Google account email addresses are never sent: the AI sees calendars as "Account 1", "Account 2", and the app removes the accounts' addresses from event text and error messages first. The dialog names Google as the recipient, says requests pass through our server, which does not keep them, and asks for permission ("Allow" / "Not now"). The same dialog appears when permission is given later in Settings › AI & privacy. On iOS 18 it also says that the titles, start and end times, event IDs and calendar colours of the events in the next 48 hours are kept on our server and sent through Apple's push service to start the Live Activities on time (no notes or places). Nothing is sent to the AI before the person taps Allow. Permission can be withdrawn in Settings › AI & privacy, and demo mode never contacts the AI. The current wording is version 4 of the disclosure, so people who allowed an earlier version are asked again.
 
 **Sign in with Apple (Guideline 4.8).** Not required. The app has no account of its own. Connecting a Google account ("Connect Google Calendar" / "Add Google account") only authorizes access to the person's Google Calendar (Calendar scopes), the same way a calendar app connects to a calendar service. No app account is created and no login is needed to use the app (see demo mode).
 
 **Background modes.** `fetch`: background app refresh syncs Google Calendar changes and keeps reminders and Live Activities up to date. `remote-notification`: Live Activity push-to-start on iOS 18.
 
-**Microphone and speech recognition.** Used only while the person holds the microphone button, to turn a spoken plan into text.
+**Microphone and speech recognition.** Used only after the person taps the microphone button, until they tap it again or send, to turn a spoken plan into text.
+
+**In-app purchases.** Version 1.0 has no in-app purchases or subscriptions; every feature is free to use.
+
+**Age rating.** The app is rated 18+ because the AI service it uses, Google's Gemini API, is only for people 18 or older.
 
 ---
 
@@ -37,3 +41,7 @@
 - [ ] App Store Connect 的 App Privacy 問卷與 `PrivacyInfo.xcprivacy` 一致：Other User Content（App Functionality，連結身分，不追蹤）、Device ID（App Functionality，連結身分，不追蹤）。
 - [ ] 隱私權政策（`SSPrivacyURL` = https://smart-schedules.com/privacy，原始檔 `site/public/privacy.html`）已部署且打得開；佔位值都已填好。
 - [ ] 是否保留 `NSSupportsLiveActivitiesFrequentUpdates`：目前沒有任何頻繁更新，拿掉可以少一個被追問的點。
+- [ ] 1.0 不賣訂閱：`AppConstants.subscriptionsEnabled` 是 false（`ReleaseConfigurationTests`、`validate_schema.py` 第 7 項會檢查）；App Store Connect 不要把任何 App 內購買項目或訂閱附加到這個版本（已經建立的「Smart Schedule Pro」群組或商品就留著不送審）；App 隱私問卷不勾 Purchases（購買項目）。
+- [ ] 要不要在上面的 In-app purchases 段落後面加一句（你決定；Guideline 2.3.1 不允許隱藏的功能，這段程式碼在 1.0 碰不到）："The binary contains StoreKit code for a possible later subscription; it is switched off at build time and can only be turned on in a later version submitted for review."
+- [ ] 年齡分級：App Store Connect 的年齡分級設為 18+（Gemini API 的條款要求使用者年滿 18 歲；問卷算出來比較低就選較高的分級）；隱私權政策和支援頁寫同樣的最低年齡。
+- [ ] 供應地區：1.0 不在歐盟上架。價格與供應狀況裡取消所有歐盟國家（27 個會員國）的 storefront，英國和其他地區照常上架。

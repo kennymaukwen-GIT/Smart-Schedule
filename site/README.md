@@ -33,9 +33,10 @@ site/
 | 佔位文字 | 在哪裡 | 填什麼 |
 |---|---|---|
 | `[開發者名稱 / Developer name]` | 三頁的頁尾；`privacy.html` 第 1 節和第 19 節（中英文各一次） | 資料控管者的法定名稱，和 Apple Developer 帳號、App Store 上的賣家名稱一致（個人就是你的法定姓名） |
-| `[18]` | `privacy.html` 第 16 節「兒童」（中英文各一次） | App 的最低年齡。建議 18：Gemini API 條款要求使用者年滿 18 歲，也不能用在以未成年人為對象或可能被未成年人使用的 App。App Store Connect 的年齡分級要一致。選別的年齡時，整句要重新確認 |
 | `[3]` | `support.html`「多久會回覆」（中英文各一次） | 你願意承諾的回覆工作天數 |
 | `[郵件服務提供者 / Email provider]` | `privacy.html` 第 12 節（中英文各一次） | Email Routing 轉寄目的地信箱的服務商名稱（例如公司名稱），以及寄出回信用的服務。兩者不同時，各列一項。要選有資料處理條款（DPA）的服務，因為第 12 節寫了「依契約或其本身的條款，以不低於本政策的程度保護你的資料」。不要寫任何個人 email 地址 |
+
+最低年齡已經決定是 18（不是佔位文字）：政策第 16 節「最低年齡」、支援頁「AI 助理需要什麼才能運作？」和首頁都寫 18，App Store Connect 的年齡分級要設成 18+（Gemini API 條款要求使用者年滿 18 歲，也不能用在以未成年人為對象或可能被未成年人使用的 App）。
 
 替換完後，下面這個指令應該什麼都不印：
 
@@ -51,23 +52,25 @@ grep -rn 'class="todo"' site/public
    - Gemini API 條款（https://ai.google.dev/gemini-api/terms ，含 18 歲規定和付費服務適用的處理者條款）；
    - 使用政策的 55 天保留期和「被標記時可能由 Google 授權人員人工審閱」（https://ai.google.dev/gemini-api/docs/usage-policies ）；
    - Gemini 的記錄政策（https://ai.google.dev/gemini-api/docs/logs-policy ）；
-   - Google 的處理者資料處理附錄（https://business.safety.google/processorterms/ ）：第 12、17 節寫它以標準契約條款（SCC）處理跨境傳輸，並寫 Google LLC 有歐盟—美國資料隱私框架（DPF）認證（可在 https://www.dataprivacyframework.gov/list 查）；
+   - Google 的處理者資料處理附錄（https://business.safety.google/processorterms/ ）：第 12、17 節寫它以標準契約條款（SCC）處理跨境傳輸，並寫 Google LLC 有歐盟—美國資料隱私框架（DPF）和它的英國延伸（UK Extension）的認證（可在 https://www.dataprivacyframework.gov/list 查，Cloudflare 也一起確認：政策第 17 節寫它用 DPF、英國延伸、瑞士—美國 DPF 和標準契約條款）；
    - Google API Services User Data Policy（https://developers.google.com/terms/api-services-user-data-policy ，第 11 節的「合併、收購或資產出售須事先取得明確同意」）；
    - Apple App Review Guidelines 5.1.1(i)（第三方提供同等保護的聲明，第 12 節）；
    - Cloudflare DPA。
-4. **政策照目前的程式寫，程式改了政策就要跟著改。** 依據是 2026-10-15 對照程式碼（base commit `b6fc485`）整理的事實。下列 App 端的落差都在這個資料夾以外，要另外處理，但**送審前一定要解決**：
-   - 助理的 prompt 會送出「行事曆名稱 | Google 帳號 email」（`Shared/AI/AssistantPrompt.swift:147-155`），政策第 4、11 節照實寫了。但 App 內的同意說明（`AIConsentDisclosure`，也是 設定 › AI 與隱私 ›「傳送的內容」）和政策不一致：沒提到 email 和 Google 行程 ID；寫「地點」，但對話請求不含地點（只有行程頁的「AI 建議」會送）；寫「請求相關的日子（預設接下來兩週）」，但實際一律是從今天起 14 天、最多 40 個行程、備註最多 300 字；iOS 18 的說明沒提到 Apple APNs 會收到行程標題；也沒提到關閉裝置端辨識時語音會送到 Apple。二選一：(a) 改同意說明（`AIConsent.disclosureVersion` 改成 4），docs/review-notes.md 一起改；(b) 改程式改送別名，政策第 4 節（中英文）拿掉 email、第 11 節的「Google 使用者資料（…email 地址）」也可以改回只寫行事曆資料。支援頁現在寫「傳送的內容」是摘要、完整內容看政策第 4、5 節，(a) 完成後可以保留。
-   - 只要 email 還會送到 Gemini（Google 最多保留 55 天），App Store Connect 的隱私問卷和 `App/PrivacyInfo.xcprivacy` 就要加上 Email Address（App Functionality、連結到使用者、不用於追蹤），README 和 docs/SETTINGS.md §16 的上架清單也要跟著改；選 (b) 就不用。
-   - 麥克風是點一下開始、再點一下或送出才停（展開的動態島麥克風按鈕會直接開始錄音），政策第 8 節照實寫了；`project.yml` 的 `NSMicrophoneUsageDescription` 還寫「hold the mic」，要改。
+4. **政策照目前的程式寫，程式改了政策就要跟著改。** 依據是 2026-10-15 對照程式碼（base commit `b6fc485`）整理的事實，加上同一天工作區的改動（帳號 email 不送給 Gemini、同意說明第 4 版、1.0 不賣訂閱）。第一項已經在程式裡改好；其餘是 App 端的落差，都在這個資料夾以外，要另外處理，但**送審前一定要解決**：
+   - **Google 帳號的 email 不送給 Gemini（程式已改）。** 助理的 prompt 經過 `CalendarAliases`（`Shared/AI/CalendarAliases.swift`）：有好幾個帳號時以「Account 1」「Account 2」區分，名稱是 email 的行事曆叫「Shared calendar」；行程標題、地點、備註和送回 Gemini 的錯誤訊息裡，已連接帳號的 email 換成「[account email]」「[Account N email]」，錯誤訊息裡的其他 email 換成「[email address]」；使用者自己輸入或說出的話裡如果有已連接帳號的 email，也換成佔位字，其他照原樣送出；Gemini 回覆裡的佔位字在 iPhone 上換回地址，才寫進 Google 日曆或顯示（`docs/GEMINI_FUNCTION_CALLING.md` §10.6）。同意說明是第 4 版（`AIConsent.disclosureVersion = 4`），五項內容和 prompt 實際送出的一致。網站照這個寫：政策第 4 節（中英文）列出實際送出的內容、說明帳號 email 的代稱和佔位字，並**逐字引用**同意說明的開頭、五項和收件者；第 11 節寫帳號 email 只在 iPhone 上用、不傳給 Gemini；支援頁「怎麼停止 AI 資料分享」引用其中一項；首頁的「AI 與隱私」也寫了。**`AIConsentDisclosure` 的文字再改時，政策第 4 節的引用要一起改**：英文照 `Shared/Storage/AIConsentStore.swift`，中文照 `Shared/Localization/Localizable.xcstrings` 的 zh-Hant 翻譯。
+   - 麥克風是點一下開始、再點一下或送出才停（展開的動態島麥克風按鈕會直接開始錄音），政策第 8 節照實寫了；`project.yml` 和 `zh-Hant.lproj/InfoPlist.strings` 的 `NSMicrophoneUsageDescription` 也已改成「點麥克風後」（tap the mic）。
    - 示範模式：如果之前已經允許 AI 資料分享，App 在示範模式下仍會更新 session（`POST /session`），iOS 18 上也會把範例行程上傳到 `POST /devices/push-to-start`。政策第 1 節和首頁照實寫了。如果改成示範模式時跳過這些（並送一次清除），可以把第 1 節括號裡那句拿掉。
    - Google 撤銷授權是盡力而為（一次請求、10 秒逾時、失敗也不告訴使用者，權杖照樣刪除）。政策第 13、15 節和支援頁照實寫成「向 Google 要求撤銷，需要網路，離線時請到 Google 帳號移除」。如果 App 改成撤銷失敗時提示使用者或保留權杖重試，可以簡化這些句子。
    - App Attest 的 `key:<keyId>` 記錄沒有 TTL，Worker 也沒有刪除它的路由，「清除所有資料」後也還在（政策第 6、13 節照實寫了）。之後加上 TTL 或有簽章的刪除路由（讓「清除所有資料」呼叫）時，改這兩節。
    - 金鑰在**允許 AI 資料分享時**就產生，之後 session 每隔幾天自動更新（session 7 天、剩不到 3 天就換），即使沒用助理；政策第 6 節照實寫了。
    - iOS 18 動態島登記的法律依據寫成「履行契約」（第 15 節），因為 App 目前沒有它專屬的同意開關（AI 同意一併涵蓋、動態島設定預設開啟），用「同意」不夠具體。如果 App 之後在同意畫面或動態島設定加上 iOS 18 伺服器登記的獨立開關，可以改回「同意」。
-   - 其他寫進政策的數字：48 小時、最多 50 個行程、登記 3 天後到期、session 7 天、計數 2 天、log 最多 7 天（Workers Paid plan）、對話從今天起 14 天、最多 40 個行程和最近 6 輪、備註 300 字、動態島提前時間 30／15／10／5 分鐘。
+   - 其他寫進政策的數字：最低年齡 18、48 小時、最多 50 個行程、登記 3 天後到期、session 7 天、計數 2 天、log 最多 7 天（Workers Paid plan）、對話從今天起 14 天、最多 40 個行程和最近 6 輪、備註 300 字、動態島提前時間 30／15／10／5 分鐘。
 5. **support@smart-schedules.com 要真的收得到信，而且收信和回信的服務要寫進政策。** 發佈前先完成 [§3.8](#38-supportsmart-schedulescom-收信) 的 Email Routing，再把轉寄目的地信箱的服務商（和寄回信用的服務，如果不同）填進政策第 12 節的 `[郵件服務提供者 / Email provider]`（見 §1）。政策第 9、12 節寫的是 Cloudflare Email Routing；如果改用別的收信方式，這兩節要改。
-6. **訂閱。** 政策第 7 節和支援頁的訂閱問答寫的是「如有提供」，1.0 不賣訂閱也可以保留。
-7. **上架地區：上架前一定要決定。** GDPR 第 27 條（和英國 GDPR 第 27 條）的豁免只適用於「偶發」而且低風險的處理；Smart Schedule 持續處理使用者資料（伺服器儲存、沒有到期時間的 App Attest 記錄、轉送給 AI），不算偶發。所以在歐洲經濟區、英國或瑞士的商店上架，很可能要指定歐盟代表和英國代表，並把他們的名稱和郵寄地址寫進政策第 1、19 節（中英文）。二選一：(a) 1.0 在 App Store Connect 的「價格與供應狀況」排除歐洲經濟區、英國和瑞士；(b) 指定代表並更新政策。
+6. **1.0 沒有 App 內購買。** 政策第 7 節「購買」寫 1.0 沒有任何 App 內購買或訂閱、App 不查詢購買記錄，第 12 節 Apple 那一項沒有「App 內購買」；支援頁的常見問題只留一題「有 App 內購買或訂閱嗎？」（`#zh-purchases`、`#en-purchases`），回答「沒有」。這要和 `AppConstants.subscriptionsEnabled = false`、App Store Connect 不附加任何購買項目一致。之後的版本開始賣 Smart Schedule Pro 時，在同一次發佈改回（舊的文字在 git 歷史裡）：政策第 7 節（由 Apple 銷售和收費、我們收不到付款資料、App 在 iPhone 上確認訂閱、清除資料不影響購買）和第 12 節的「App 內購買」；支援頁的「怎麼取消訂閱？」「怎麼回復購買項目？」（頭像 › 管理訂閱／回復購買項目、期間結束 24 小時前取消、退款到 reportaproblem.apple.com）、「多久會回覆」和「怎麼刪除我的資料？」裡訂閱的那一句，以及支援頁的 meta description。
+7. **上架地區：1.0 不在歐盟上架**（App Store Connect › 價格與供應狀況取消 27 個歐盟會員國的 storefront，英國和其他地區照常上架）。政策照仍在上架範圍內的地區寫：第 1 節用「GDPR、英國 GDPR、瑞士個資法等」的用語，第 15 節的地區舉例是英國、挪威、冰島、瑞士、美國加州和台灣，申訴機關舉英國的 ICO、挪威的 Datatilsynet、冰島的 Persónuvernd 和瑞士的 FDPIC，法律依據的標題是「適用 GDPR、英國 GDPR 或類似法律時」，第 17 節寫英國使用者適用的 DPF 英國延伸。權利（查詢、更正、刪除、限制、反對、可攜、撤回同意）和法律依據的內容不變，英國 GDPR 一樣適用。
+   - **歐盟代表（GDPR 第 27 條）：排除歐盟期間不需要。** 之後的版本加入歐盟 storefront 前，要指定歐盟代表、把名稱和郵寄地址寫進政策第 1、19 節（中英文），並把第 15 節的地區舉例加回歐洲經濟區。
+   - **英國代表（英國 GDPR 第 27 條）：英國照常上架，所以仍然要處理。** 豁免只適用於「偶發」而且低風險的處理；Smart Schedule 持續處理使用者資料（伺服器儲存、沒有到期時間的 App Attest 記錄、轉送給 AI），不算偶發。除非開發者在英國設有據點，上架前要指定英國代表，並把名稱和郵寄地址寫進政策第 1、19 節（中英文）；不想指定，就要在 1.0 也排除英國。
+   - **挪威、冰島、列支敦斯登和瑞士不是歐盟**，「取消歐盟 storefront」不會排除它們。前三國屬於歐洲經濟區，直接適用 GDPR，第 27 條要求在歐洲經濟區指定代表；瑞士的個人資料保護法（FADP）第 14 條在類似的條件下要求瑞士代表。二選一：也在價格與供應狀況取消這四國，或指定代表並寫進政策第 1、19 節。政策第 15 節的法律依據標題和第 17 節的跨境傳輸，不論這四國是否上架都正確。
 8. **App 名稱。** 首頁標題是「Smart Schedule」。如果 App Store 名稱因為撞名改成別的，首頁、Google OAuth 的 App name 和 App Store 名稱三者要一致。
 9. App 上架後，在首頁加上 App Store 連結。
 

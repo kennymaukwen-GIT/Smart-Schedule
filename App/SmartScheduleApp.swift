@@ -81,7 +81,7 @@ final class AppRouter {
 
     /// The sheets the main screen presents.
     enum Sheet: String, Identifiable {
-        /// The avatar: Google accounts and Smart Schedule Pro.
+        /// The avatar: Google accounts (and Smart Schedule Pro when `AppConstants.subscriptionsEnabled`).
         case accounts
         /// The drawer's General row.
         case settings
@@ -146,8 +146,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                 await AppAttestClient.shared.refreshSessionIfNeeded()
             }
         }
-        // Finishes transactions that arrived while the app was closed and keeps `isPro` current.
-        Task { @MainActor in SubscriptionStore.shared.start() }
+        // Finishes transactions that arrived while the app was closed and keeps `isPro` current. Version 1.0 sells
+        // nothing (AppConstants.subscriptionsEnabled), so StoreKit is not touched at all.
+        if AppConstants.subscriptionsEnabled {
+            Task { @MainActor in SubscriptionStore.shared.start() }
+        }
         Task {
             _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge, .timeSensitive])
         }

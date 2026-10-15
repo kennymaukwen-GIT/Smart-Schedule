@@ -65,7 +65,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
-        NSMicrophoneUsageDescription: Smart Schedule listens when you hold the mic so you can speak a plan instead of typing it.
+        NSMicrophoneUsageDescription: Smart Schedule listens after you tap the mic so you can speak a plan instead of typing it.
         NSSpeechRecognitionUsageDescription: Your spoken plan is transcribed to text before it is scheduled.
         BGTaskSchedulerPermittedIdentifiers: [com.smartschedule.refresh]
         UIBackgroundModes: [fetch, remote-notification]
@@ -125,7 +125,8 @@ targets:
     scheme:
       testTargets:
         - SmartScheduleCoreTests
-      # Local StoreKit testing for the Smart Schedule Pro products when run from Xcode (not bundled).
+      # Local StoreKit testing for the Smart Schedule Pro products when run from Xcode (not bundled). Unused while
+      # AppConstants.subscriptionsEnabled is false (version 1.0 sells nothing).
       storeKitConfiguration: Config/SmartSchedule.storekit
 
   # ───────────── Widget extension: Live Activity / Dynamic Island + Control Center ─────────────

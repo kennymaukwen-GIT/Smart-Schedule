@@ -92,8 +92,12 @@ actor AccountStore {
         defaultWriteTarget(in: accounts(in: read()))
     }
 
-    /// The writable calendar a `default_calendar` value names: an exact CALENDARS line, then an exact email (that
-    /// account's primary calendar), then an email, domain or calendar name containing the text. Case-insensitive.
+    /// The writable calendar a `default_calendar` value names, matched on this iPhone: an exact `promptLabel`, then an
+    /// exact email (that account's primary calendar), then the user's own words: the whole text, or else its words
+    /// without filler ("my school account" → "school"), found in the address of exactly one account (its primary
+    /// calendar) or else in the name of exactly one writable calendar. Case-insensitive. nil when nothing or more than
+    /// one matches, so the assistant asks. The assistant tries `CalendarAliases.writableCalendar(matching:)` (CALENDARS
+    /// lines) first and uses this for the user's own words.
     func resolveWritableCalendar(matching text: String) -> CalendarInfo? {
         let query = Self.folded(text)
         guard !query.isEmpty else { return nil }
@@ -111,11 +115,63 @@ actor AccountStore {
             }
         }
         if let hit = writable.first(where: { $0.isPrimary && Self.folded($0.accountEmail) == query }) { return hit }
-        let primaryFirst = writable.filter(\.isPrimary) + writable.filter { !$0.isPrimary }
-        return primaryFirst.first { calendar in
-            Self.folded(calendar.accountEmail).contains(query)
-                || Self.folded(calendar.displayName).contains(query)
-                || Self.folded(calendar.name).contains(query)
+        switch Self.match([query], in: writable) {
+        case .one(let calendar): return calendar
+        case .ambiguous: return nil
+        case .nothing: break
+        }
+        let words = Self.contentWords(of: query)
+        guard !words.isEmpty, words != [query],
+              case .one(let calendar) = Self.match(words, in: writable) else { return nil }
+        return calendar
+    }
+
+    /// What the user's words found among the writable calendars.
+    private enum WordMatch {
+        case nothing, ambiguous
+        case one(CalendarInfo)
+    }
+
+    /// Accounts whose address holds every term (that account's primary calendar, unless a calendar of another account
+    /// is named by them too), else writable calendars whose name holds every term. Only a single hit counts.
+    private static func match(_ terms: [String], in writable: [CalendarInfo]) -> WordMatch {
+        guard !terms.isEmpty else { return .nothing }
+        func holds(_ text: String) -> Bool {
+            let folded = Self.folded(text)
+            return terms.allSatisfy { folded.contains($0) }
+        }
+        let named = writable.filter { holds($0.displayName) || holds($0.name) }
+        let accounts = Set(writable.filter { holds($0.accountEmail) }.map(\.accountID))
+        if accounts.count > 1 { return .ambiguous }
+        if let account = accounts.first {
+            guard !named.contains(where: { $0.accountID != account }),
+                  let primary = writable.first(where: { $0.accountID == account && $0.isPrimary }) else {
+                return .ambiguous
+            }
+            return .one(primary)
+        }
+        switch named.count {
+        case 0: return .nothing
+        case 1: return .one(named[0])
+        default: return .ambiguous
+        }
+    }
+
+    /// Words that say nothing about which account or calendar is meant.
+    private static let fillerWords: Set<String> = ["my", "the", "a", "an", "account", "accounts", "calendar", "calendars",
+                                                   "email", "e-mail", "address", "google"]
+    /// The same in Chinese, removed wherever they appear (no spaces between Chinese words): "我的學校帳號" → "學校".
+    private static let fillerPhrases = ["我的", "帳號", "帐号", "帳戶", "行事曆", "日曆", "日历", "信箱", "的"]
+
+    /// The folded text's words without filler and surrounding punctuation: "my school account" → ["school"].
+    private static func contentWords(of query: String) -> [String] {
+        let punctuation = CharacterSet(charactersIn: "\"'“”‘’「」『』()[]{},.!?;:！？，。；：、")
+        return query.split(whereSeparator: \.isWhitespace).compactMap { piece -> String? in
+            var word = String(piece).trimmingCharacters(in: punctuation)
+            if word.hasSuffix("'s") || word.hasSuffix("’s") { word = String(word.dropLast(2)) }
+            guard !fillerWords.contains(word) else { return nil }
+            for phrase in fillerPhrases { word = word.replacingOccurrences(of: phrase, with: "") }
+            return word.isEmpty ? nil : word
         }
     }
 

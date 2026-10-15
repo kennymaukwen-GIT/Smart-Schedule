@@ -115,7 +115,8 @@ struct AppPreferences: Codable, Hashable, Sendable {
     // MARK: Input
     /// nil = automatic (the first account's primary calendar).
     var defaultCalendar: CalendarRef? = nil
-    /// "<calendar displayName> | <account email>", as the CALENDARS prompt block lists it. nil with `defaultCalendar`.
+    /// "<calendar displayName> | <account email>" (`CalendarInfo.promptLabel`): shown in Settings and the ledger on this
+    /// iPhone, never sent to the assistant's model. nil with `defaultCalendar`.
     var defaultCalendarLabel: String? = nil
     /// Fallback length of timed `event` and `routine` items (minutes, 5...480). Tasks and deadlines keep 30.
     var defaultEventMinutes = 60
@@ -400,8 +401,9 @@ extension AppPreferences {
         }
     }
 
-    /// The model-facing value, as the PREFERENCES prompt block shows it. default_calendar →
-    /// `defaultCalendarLabel ?? "automatic"`.
+    /// The model-facing value. default_calendar → the calendar's name from `defaultCalendarLabel` without the account
+    /// email ("Shared calendar" when the name is an address), or "automatic". The prompt itself shows default_calendar
+    /// through `CalendarAliases` ("My calendar | Account 2"); this form is the fallback for callers without it.
     func promptValue(for key: PreferenceKey) -> String {
         switch key {
         case .allDayReminder:
@@ -413,7 +415,9 @@ extension AppPreferences {
         case .eveningPreview:
             return eveningPreview.isEnabled ? Self.hhmm(eveningPreview.minuteOfDay) : "off"
         case .defaultCalendar:
-            return defaultCalendar == nil ? "automatic" : (defaultCalendarLabel ?? "automatic")
+            guard defaultCalendar != nil, let label = defaultCalendarLabel, !label.isEmpty else { return "automatic" }
+            let name = label.components(separatedBy: " | ").first ?? label
+            return PromptRedaction.containsEmail(name) ? PromptRedaction.sharedCalendarName : name
         default:
             return canonicalValue(for: key)
         }

@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Artboard 5's header: the hamburger opens the calendar drawer (what you see), the title names the month on
-/// screen ("2027 October" / "2027年10月"), and the avatar opens accounts and subscription (who you are). A tiny
-/// sync mark follows the title only while changes wait for Google or Google refused one.
+/// screen ("2027 October" / "2027年10月"), and the avatar opens accounts, plus the subscription once
+/// AppConstants.subscriptionsEnabled is on (who you are). A tiny sync mark follows the title only while changes wait
+/// for Google or Google refused one.
 struct AppHeader: View {
     let month: Date
     let calendar: Calendar
@@ -50,7 +51,10 @@ struct AppHeader: View {
                 AccountAvatar(initial: avatarInitial, size: 36)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Accounts and subscription")
+            // Version 1.0 sells nothing (AppConstants.subscriptionsEnabled): the avatar opens the accounts only.
+            .accessibilityLabel(AppConstants.subscriptionsEnabled
+                                ? Text("Accounts and subscription")
+                                : Text("Accounts"))
         }
         .frame(minHeight: 44)
         .animation(.snappy, value: syncIndicator)

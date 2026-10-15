@@ -3,7 +3,8 @@ import Observation
 import StoreKit
 
 /// StoreKit 2 infrastructure for the "Smart Schedule Pro" subscription group. Nothing reads `isPro` to gate a
-/// feature yet: pricing and what Pro unlocks are the owner's decision (docs/SETTINGS.md §16).
+/// feature yet: pricing and what Pro unlocks are the owner's decision (docs/SETTINGS.md §16). Off in version 1.0
+/// (`AppConstants.subscriptionsEnabled`): `start()` returns at once and nothing else is reachable.
 ///
 /// StoreKit is the source of truth; nothing is stored here. Local testing uses Config/SmartSchedule.storekit, which
 /// the run scheme points at.
@@ -43,7 +44,8 @@ final class SubscriptionStore {
     /// Once at launch: listens for transactions (renewals, purchases on other devices, refunds), loads the
     /// products and works out the entitlement.
     func start() {
-        guard updatesTask == nil else { return }
+        // Version 1.0 sells nothing (AppConstants.subscriptionsEnabled): StoreKit stays idle.
+        guard AppConstants.subscriptionsEnabled, updatesTask == nil else { return }
         updatesTask = Task { [weak self] in
             for await result in Transaction.updates {
                 if case let .verified(transaction) = result { await transaction.finish() }

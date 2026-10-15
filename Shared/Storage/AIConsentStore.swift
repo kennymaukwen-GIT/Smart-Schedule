@@ -7,7 +7,10 @@ struct AIConsent: Codable, Hashable, Sendable {
     /// Bump when the disclosure (`AIConsentDisclosure`) changes materially: everyone is asked again.
     /// 2: names the transcript of spoken requests, and on iOS 18 the event titles and times kept on the server.
     /// 3: requests pass through Smart Schedule's server; on iOS 18 the end times and calendar colours are kept too.
-    static let disclosureVersion = 3
+    /// 4: no Google account email address reaches Gemini (calendars are "Account 1", "Account 2"); names the 14-day /
+    /// 40-event window, Google event IDs, locations only for AI suggestions, Apple's push service on iOS 18 and Apple
+    /// speech recognition.
+    static let disclosureVersion = 4
 
     var status: Status = .notAsked
     var version = 0                 // disclosure version the decision applies to
@@ -78,10 +81,13 @@ enum AIConsentDisclosure {
         String(localized: "To understand your requests, Smart Schedule sends them to Google's Gemini API. This includes:")
     }
 
+    /// Exactly what `AssistantPrompt` and `NoteSuggestionPrompt` send (docs/GEMINI_FUNCTION_CALLING.md §10.6): no
+    /// account email address, since calendars are named through `CalendarAliases`.
     static var items: [String] {
-        [String(localized: "What you type or say to the assistant (spoken requests as text)"),
-         String(localized: "Titles, times, locations and notes of your events in the days the request is about (the next two weeks by default)"),
-         String(localized: "The names of your calendars and your assistant settings"),
+        [String(localized: "What you type or say to the assistant (spoken requests as text), including any names or email addresses you mention"),
+         String(localized: "Titles, times, notes and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder you reply to"),
+         String(localized: "For AI suggestions on an event: that event only, including its location"),
+         String(localized: "Your calendar names and assistant settings, but not your Google account email addresses"),
          String(localized: "Your time zone and language")]
     }
 
@@ -97,10 +103,15 @@ enum AIConsentDisclosure {
 
     static func serverNote(beforeIOS26: Bool) -> String? {
         guard beforeIOS26 else { return nil }
-        return String(localized: "On iOS 18, the titles, start and end times and calendar colours of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
+        return String(localized: "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on Smart Schedule's server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
+    }
+
+    /// Spoken requests: Apple's speech recognition makes the text the assistant gets (App/Voice/SpeechTranscriber).
+    static var speechNote: String {
+        String(localized: "Apple turns speech into text: on your iPhone when On-device recognition is on and supports your language, otherwise on Apple's servers.")
     }
 
     static var footnote: String {
-        String(localized: "Nothing is sent until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode works without sharing anything.")
+        String(localized: "Nothing is sent to the AI until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode never contacts the AI.")
     }
 }

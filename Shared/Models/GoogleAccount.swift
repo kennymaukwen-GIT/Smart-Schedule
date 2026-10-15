@@ -60,8 +60,10 @@ struct CalendarInfo: Codable, Hashable, Identifiable, Sendable {
         isPrimary ? String(localized: "My calendar") : name
     }
 
-    /// "<displayName> | <accountEmail>": the CALENDARS prompt line, the default_calendar value and
-    /// `AppPreferences.defaultCalendarLabel`. The name loses "|" and line breaks so the line splits unambiguously.
+    /// "<displayName> | <accountEmail>": `AppPreferences.defaultCalendarLabel` and what a default_calendar value is
+    /// matched against on this iPhone. Local only: the assistant's model sees calendars through `CalendarAliases`
+    /// ("My calendar | Account 2"), never an account email. The name loses "|" and line breaks so the label splits
+    /// unambiguously.
     var promptLabel: String {
         let name = displayName
             .components(separatedBy: CharacterSet(charactersIn: "|\r\n"))

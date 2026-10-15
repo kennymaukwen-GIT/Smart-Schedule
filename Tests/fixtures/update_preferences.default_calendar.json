@@ -1,14 +1,14 @@
 {
-  "utterance": "以後用學校帳號",
+  "utterance": "以後用第二個帳號",
   "now_local": "2026-10-13T10:15",
   "time_zone": "Europe/London",
   "preferences": "default_calendar: automatic\ndefault_duration: 60",
-  "calendars": "- My calendar | example@gmail.com (default)\n- Gym | example@gmail.com\n- My calendar | example@yourmail.com",
+  "calendars": "- My calendar | Account 1 (default)\n- Gym | Account 1\n- My calendar | Account 2",
   "expected_call": {
     "name": "update_preferences",
     "args": {
-      "changes": [{ "key": "default_calendar", "value": "My calendar | example@yourmail.com" }],
-      "summary_for_user": "以後新行程會加到學校帳號的行事曆。"
+      "changes": [{ "key": "default_calendar", "value": "My calendar | Account 2" }],
+      "summary_for_user": "以後新行程會加到第二個帳號的行事曆。"
     }
   }
 }

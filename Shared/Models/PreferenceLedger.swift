@@ -74,7 +74,8 @@ struct PreferenceChange: Codable, Hashable, Sendable {
     /// The ledger entry this change replaced (restored by undo); nil when the key was at its default.
     var replacedEntry: LedgerEntry?
 
-    /// Model-facing values for the update_preferences function response ({"key", "old", "new"}).
+    /// Model-facing values without account emails (`AppPreferences.promptValue(canonical:for:)`). The update_preferences
+    /// function response uses `CalendarAliases.promptValue(canonical:for:)`, which names a calendar as CALENDARS does.
     var oldPromptValue: String { AppPreferences.promptValue(canonical: oldValue, for: key) }
     var newPromptValue: String { AppPreferences.promptValue(canonical: newValue, for: key) }
 }
@@ -109,7 +110,7 @@ struct PreferenceApplyResult: Sendable {
 /// A resolved default_calendar value.
 struct CalendarChoice: Hashable, Sendable {
     var ref: CalendarRef
-    var label: String               // "My calendar | example@yourmail.com"
+    var label: String               // "My calendar | example@yourmail.com" (`CalendarInfo.promptLabel`, kept on this iPhone)
 }
 
 /// "You dismissed the 1-day-before reminder 5 times. Stop sending it?" Offered once per (kind, offset), applied only

@@ -82,6 +82,7 @@ li > ul { margin: 0.3rem 0 0; }
 .toc { font-size: 0.97rem; }
 .toc ol { margin-bottom: 0; }
 .quote { border-left: 4px solid var(--link); padding: 0.25rem 0 0.25rem 1rem; margin: 1rem 0; }
+.quote > :last-child { margin-bottom: 0; }
 table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
 caption { text-align: left; font-weight: 600; padding-bottom: 0.4rem; }
 th, td { text-align: left; vertical-align: top; padding: 0.55rem 0.75rem 0.55rem 0; border-bottom: 1px solid var(--line); }
@@ -128,7 +129,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <h2 id="zh-summary">重點摘要</h2>
 <ul>
   <li>你的行事曆直接在你的 iPhone 和 Google 之間傳送。Smart Schedule 的伺服器拿不到你的 Google 登入權杖，也不會同步你的行事曆。</li>
-  <li>你按「允許」之前，AI 助理不會傳送任何內容。允許後，你的請求和相關的行程資訊會經過我們的伺服器送到 Google 的 Gemini API 來理解；伺服器只轉送，不保存內容。</li>
+  <li>你按「允許」之前，AI 助理不會傳送任何內容。允許後，你的請求和相關的行程資訊會經過我們的伺服器送到 Google 的 Gemini API 來理解；伺服器只轉送，不保存內容。App 附上的行事曆資訊不包含你 Google 帳號的 email 地址。</li>
   <li>只有在 iOS 18 上、而且你允許 AI 資料分享時，接下來 48 小時內行程的標題和時間會暫存在我們的伺服器，最晚在 App 最後一次上傳後 3 天刪除，讓行程能準時出現在動態島。</li>
   <li>沒有廣告、沒有追蹤、沒有分析工具，我們也絕不出售你的資料。</li>
   <li>你隨時可以在 App 裡停止分享、移除 Google 帳號、匯出或清除資料。</li>
@@ -143,7 +144,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><a href="#zh-ai">AI 助理（Google Gemini）</a></li>
   <li><a href="#zh-p2s">iOS 18 的動態島（push-to-start）</a></li>
   <li><a href="#zh-attest">App 驗證、裝置識別碼與伺服器安全</a></li>
-  <li><a href="#zh-purchases">購買與訂閱</a></li>
+  <li><a href="#zh-purchases">購買</a></li>
   <li><a href="#zh-apple">Siri、語音輸入和其他 Apple 服務</a></li>
   <li><a href="#zh-contacting">你聯絡我們時</a></li>
   <li><a href="#zh-website">本網站</a></li>
@@ -152,7 +153,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><a href="#zh-retention">保存期限</a></li>
   <li><a href="#zh-security">安全</a></li>
   <li><a href="#zh-rights">你的選擇與權利</a></li>
-  <li><a href="#zh-children">兒童</a></li>
+  <li><a href="#zh-children">最低年齡</a></li>
   <li><a href="#zh-transfers">跨境傳輸</a></li>
   <li><a href="#zh-changes">政策變更</a></li>
   <li><a href="#zh-contact">聯絡方式</a></li>
@@ -160,7 +161,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 </nav>
 
 <h2 id="zh-who">1. 我們是誰</h2>
-<p>Smart Schedule（iPhone App，包括它的小工具、即時動態、通知擴充功能、Siri 與捷徑動作和控制中心按鈕）以及本網站 smart-schedules.com，由 <mark class="todo">[開發者名稱 / Developer name]</mark>（以下稱「我們」）提供。我們負責本政策說明的資料處理（以歐盟 GDPR 的用語，是「控管者」）。聯絡方式：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>。</p>
+<p>Smart Schedule（iPhone App，包括它的即時動態、控制中心按鈕、通知擴充功能、Siri 與捷徑動作）以及本網站 smart-schedules.com，由 <mark class="todo">[開發者名稱 / Developer name]</mark>（以下稱「我們」）提供。我們負責本政策說明的資料處理（以 GDPR、英國 GDPR、瑞士個資法等的用語，是「控管者」）。聯絡方式：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>。</p>
 <p>Smart Schedule 沒有自己的帳號系統。要使用真實的行事曆，你需要連接 Google 帳號；也可以按「不登入先試用」進入示範模式。示範模式使用範例行事曆，從不連線到 AI，也不會傳送你的行事曆資料。（如果你之前已經允許 AI 資料分享，App 在示範模式下仍會更新它和我們伺服器之間的工作階段，在 iOS 18 上也會把範例行程登記到伺服器供動態島使用；見第 5、6 節。）</p>
 
 <h2 id="zh-device">2. 存在你 iPhone 上的資料</h2>
@@ -174,7 +175,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li>Google 登入權杖，存在 iOS 鑰匙圈（Keychain）。</li>
   <li>你對 AI 資料分享的選擇。</li>
 </ul>
-<p>這些檔案受 iOS 資料保護加密，只在 App 自己的元件（App、小工具和通知擴充功能）之間共用。行程內容也會顯示在你裝置上的通知、小工具和即時動態裡；提醒是在 iPhone 上建立的本機通知。App 資料（第 5 節的隨機安裝 ID 除外）可能包含在你的 iCloud 或電腦備份中，備份由你自己管理。</p>
+<p>這些檔案受 iOS 資料保護加密，只在 App 自己的元件（App、即時動態與控制中心擴充功能和通知擴充功能）之間共用。行程內容也會顯示在你裝置上的通知和即時動態裡；提醒是在 iPhone 上建立的本機通知。App 資料（第 5 節的隨機安裝 ID 除外）可能包含在你的 iCloud 或電腦備份中，備份由你自己管理。</p>
 
 <h2 id="zh-google">3. Google 日曆與你的 Google 帳號</h2>
 <p>連接 Google 帳號時，你是在 Google 自己的頁面登入；我們看不到你的密碼。App 會向 Google 要求下列權限：</p>
@@ -197,18 +198,32 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 
 <h3>要你允許才會傳送</h3>
 <p>你在「要使用 AI 助理嗎？」的說明中按「允許」之前（也可以在 設定 › AI 與隱私 允許），不會傳送任何內容給 AI。這適用於助理出現的所有地方：對話、快速輸入、Siri 與捷徑、長按提醒通知回覆，以及行程頁的「AI 建議」。示範模式從不連線到 AI。</p>
+<p>App 裡的說明（同意畫面，以及 設定 › AI 與隱私 ›「傳送的內容」）寫的是：</p>
+<blockquote class="quote">
+<p>為了理解你的要求，Smart Schedule 會把要求傳送到 Google 的 Gemini API，內容包括：</p>
+<ul>
+  <li>你對助理輸入或說出的內容（語音先轉成文字），包括其中提到的任何姓名或 email</li>
+  <li>從今天起 14 天內最多 40 個行程的標題、時間、備註和 Google 行程 ID，以及你回覆提醒的那個行程</li>
+  <li>使用行程的「AI 建議」時：只傳送那個行程，包括地點</li>
+  <li>你的行事曆名稱和助理設定，但不包括你 Google 帳號的 email</li>
+  <li>你的時區和語言</li>
+</ul>
+<p>收件者：Google（透過 Gemini API）。要求會經過 Smart Schedule 的伺服器轉送，伺服器不會保存。</p>
+</blockquote>
+<p>在 iOS 18 上，說明還會列出第 5 節的伺服器登記；說明也寫出語音由 Apple 轉成文字（見第 8 節）。下面是完整的細節。</p>
 
 <h3>一次對話請求包含什麼</h3>
 <ul>
-  <li>你輸入的文字，或你說的話轉成的文字。</li>
+  <li>你輸入的文字，或你說的話轉成的文字，包括其中提到的任何姓名或 email 地址（你已連接的 Google 帳號的地址除外，見下文）。</li>
   <li>你當地的日期時間、時區和裝置語言。</li>
   <li>你的助理設定。</li>
-  <li>你可以新增行程的行事曆名稱，以及每個行事曆所屬的 Google 帳號 email 地址。</li>
+  <li>你可以新增行程的行事曆名稱，以及哪一個是新行程的預設行事曆。這裡不包含你 Google 帳號的 email 地址：連接了好幾個 Google 帳號時，用「Account 1」「Account 2」這類代稱（依你加入帳號的順序）區分帳號；名稱本身是 email 地址的行事曆（例如別人共用給你的行事曆）改稱「Shared calendar」。</li>
   <li>從今天起 14 天內、最多 40 個行程：Google 的行程 ID、標題（前 60 個字）、開始和結束時間、是否為全天、重複或計畫的一部分、所屬行事曆名稱、你能不能修改，以及備註（最多 300 個字）。不包含地點、邀請對象和視訊會議連結。</li>
   <li>需要時：等你確認的行程（「先問我」）、提醒通知所屬的行程，以及你正在審閱的長期計畫。</li>
   <li>目前這段對話最近的幾輪（最多 6 輪），包括助理動作的結果（例如剛建立的行程標題和時間）和錯誤訊息。這只存在記憶體中；你儲存的聊天記錄不會傳送。</li>
 </ul>
 <p>行程頁的「AI 建議」只傳送那一個行程：標題、日期、時間和時長、地點、備註（最多 300 個字）、是否為視訊會議、你的時區、今天的日期、語言和畫面上已有的建議。</p>
+<p>你輸入或說出的內容、行程的標題、地點和備註，以及傳回給 Gemini 的錯誤訊息裡，如果出現你已連接的 Google 帳號的 email 地址，App 會在傳送前把它換成「[account email]」或「[Account 2 email]」這類佔位字；錯誤訊息裡的其他 email 地址也會換成「[email address]」。Gemini 回覆裡的這些佔位字，會在你的 iPhone 上換回原本的地址，才寫進 Google 日曆或顯示給你看。你輸入或說出的其他內容照原樣傳送，包括其中別人的 email 地址。</p>
 <p>你的請求和行程可能包含別人的資料，例如你輸入的姓名和 email、別人邀請你的行程，或別人共用給你的行事曆名稱。請只分享你有權分享的內容。</p>
 
 <h3>怎麼傳送</h3>
@@ -241,8 +256,8 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p><strong>記錄（log）。</strong>伺服器會寫下簡短的技術記錄（事件類型、App Attest 金鑰 ID、App 識別碼、安裝 ID、Apple 推播 ID、狀態碼、錯誤訊息和次數），用來找出故障和濫用。這些記錄的設計是不包含請求內容、行程標題、權杖或 IP 位址；Cloudflare 最多保存 7 天。Cloudflare 自動產生的逐筆請求記錄已經關閉。</p>
 <p>執行我們伺服器的 Cloudflare，為了傳送流量和保護網路，必然會處理連線資料，例如你的 IP 位址。</p>
 
-<h2 id="zh-purchases">7. 購買與訂閱</h2>
-<p>Smart Schedule Pro 訂閱（如有提供）由 Apple 透過 App Store 銷售和收費。我們不會收到你的付款資料、姓名或 Apple 帳號，我們的伺服器上也沒有任何購買資料。App 在你的 iPhone 上確認你是否有有效的訂閱。購買適用 <a href="https://www.apple.com/tw/legal/privacy/">Apple 隱私權政策</a>。購買項目屬於你的 Apple 帳號，在 App 裡清除資料不會影響它。</p>
+<h2 id="zh-purchases">7. 購買</h2>
+<p>Smart Schedule 1.0 沒有任何 App 內購買或訂閱，App 也不會查詢你的購買記錄，所以我們不會收到或處理任何購買或付款資料。下載 App 由 Apple 透過 App Store 處理，適用 <a href="https://www.apple.com/tw/legal/privacy/">Apple 隱私權政策</a>。如果之後的版本提供購買項目，我們會先更新本政策。</p>
 
 <h2 id="zh-apple">8. Siri、語音輸入和其他 Apple 服務</h2>
 <ul>
@@ -263,8 +278,8 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p class="quote">Smart Schedule 使用從 Google API 取得的資訊，以及將這些資訊傳輸到任何其他 App，都將遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API 服務使用者資料政策</a>（Google API Services User Data Policy），包括其中的「有限使用」（Limited Use）規定。</p>
 <p>具體來說：</p>
 <ul>
-  <li>我們只用 Google 使用者資料（你的行事曆資料和 Google 帳號的 email 地址）提供你在 App 裡看得到的功能：顯示你連接了哪些帳號，顯示、建立和修改你的行程、提醒、小工具和即時動態，以及你允許的 AI 助理。</li>
-  <li>我們只會把它傳給：Google 的 Gemini API（只有在你允許時，用來回答你的請求）；我們的伺服器和 Apple 的推播服務（iOS 18 的動態島，同樣需要你的允許）。除此之外，只有在安全需要、遵守法律，或在合併、收購或資產出售時事先取得你明確的同意後，才會傳送。</li>
+  <li>我們只用 Google 使用者資料（你的行事曆資料和 Google 帳號的 email 地址）提供你在 App 裡看得到的功能：顯示你連接了哪些帳號，顯示、建立和修改你的行程、提醒和即時動態，以及你允許的 AI 助理。Google 帳號的 email 地址只在你的 iPhone 上用來顯示和區分你的帳號，不會傳給 Gemini。</li>
+  <li>我們只會把它傳給：Google 的 Gemini API（只有在你允許時，用來回答你的請求；只傳送第 4 節說明的行事曆資料，不傳送帳號的 email 地址）；我們的伺服器和 Apple 的推播服務（iOS 18 的動態島，同樣需要你的允許）。除此之外，只有在安全需要、遵守法律，或在合併、收購或資產出售時事先取得你明確的同意後，才會傳送。</li>
   <li>我們不會把它用於廣告、不會出售，也不會用來判斷信用或借貸。</li>
   <li>除非你要求（例如你寄來的客服信）、安全需要（例如調查濫用）或法律要求，我們這邊不會有任何人閱讀它（Google 的濫用審查見第 4 節）。</li>
   <li>我們不會用 Google 使用者資料或由它衍生的資料，來開發、改進或訓練任何 AI 或機器學習模型（無論通用或個人化），也不允許別人這樣做。Gemini API 只用它來回答你的請求，而且適用的付費服務條款不允許 Google 用它改善自己的產品。</li>
@@ -276,7 +291,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <ul>
   <li><strong>Cloudflare, Inc.</strong>：執行我們的伺服器、它的儲存和記錄、本網站和客服信箱的轉寄。它依其<a href="https://www.cloudflare.com/cloudflare-customer-dpa/">資料處理附錄（DPA）</a>作為我們的處理者。</li>
   <li><strong>Google LLC</strong>：Gemini API（AI 請求，只有在你允許時）。Google 依其<a href="https://business.safety.google/processorterms/">處理者資料處理附錄</a>（Data Processing Addendum for Products Where Google is a Data Processor）和付費服務條款作為我們的處理者，這些條款不允許它用你的請求改善自己的產品（見第 4 節）。另外，Google 日曆和 Google 登入是你直接使用的 Google 服務，適用 Google 隱私權政策。</li>
-  <li><strong>Apple Inc.</strong>：App Attest、推播通知（iOS 18）、App Store 和 App 內購買、Siri 和語音辨識，適用 Apple 自己的條款。</li>
+  <li><strong>Apple Inc.</strong>：App Attest、推播通知（iOS 18）、App Store、Siri 和語音辨識，適用 Apple 自己的條款。</li>
   <li><strong><mark class="todo">[郵件服務提供者 / Email provider]</mark></strong>：替我們保存客服信件的郵件服務提供者，也用來寄出我們的回信（第 9 節）。</li>
 </ul>
 <p>上述每個服務提供者都依契約或其本身的條款，以不低於本政策的程度保護你的資料，並只用它來向我們或你提供服務。</p>
@@ -328,11 +343,11 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><strong>刪除行程本身：</strong>在 Google 日曆裡刪除。</li>
 </ul>
 <h3>寫信給我們</h3>
-<p>依你所在地區的法律（例如歐洲經濟區、英國、美國加州或台灣），你可能有權查詢、閱覽、取得副本、更正或刪除你的資料，限制或反對處理，要求資料可攜，以及撤回同意。大部分資料在你的裝置上，你可以用上面的工具自己處理。我們伺服器上的資料只連結隨機 ID，不連結你的姓名或 email，所以我們通常無法用你的身分找到它；這些資料大部分也會在幾天內到期。請寫信到 <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>，我們會在法律規定的期限內回覆。你也可以向你所在地的個人資料保護主管機關申訴。</p>
+<p>依你所在地區的法律（例如英國、挪威、冰島、瑞士、美國加州或台灣），你可能有權查詢、閱覽、取得副本、更正或刪除你的資料，限制或反對處理，要求資料可攜，以及撤回同意。大部分資料在你的裝置上，你可以用上面的工具自己處理。我們伺服器上的資料只連結隨機 ID，不連結你的姓名或 email，所以我們通常無法用你的身分找到它；這些資料大部分也會在幾天內到期。請寫信到 <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>，我們會在法律規定的期限內回覆。你也可以向你所在地的個人資料保護主管機關申訴，例如英國的資訊專員辦公室（ICO）、挪威的 Datatilsynet、冰島的 Persónuvernd，或瑞士的聯邦資料保護暨資訊委員（FDPIC）。</p>
 <div class="box">
 <p><strong>反對權：</strong>對於以正當利益為依據的處理（見下方的法律依據：安全和防止濫用、本網站、客服信件和 Apple 提供的當機報告），你可以隨時寫信到 <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a> 反對。</p>
 </div>
-<h3>法律依據（歐洲經濟區、英國、瑞士）</h3>
+<h3>法律依據（適用 GDPR、英國 GDPR 或類似法律時）</h3>
 <ul>
   <li><strong>同意：</strong>AI 助理的資料分享（第 4 節）。你可以隨時撤回；撤回同意不影響撤回前的處理。</li>
   <li><strong>履行契約：</strong>提供你要求使用的 App 功能，包括 iOS 18 的動態島登記（第 5 節）：iOS 18 需要我們的伺服器才能準時開始即時動態。App 只在你允許 AI 資料分享時傳送登記，你也可以隨時在 設定 › 通知 › 動態島 › 顯示下一個行程 › 關閉 停用它。</li>
@@ -340,11 +355,11 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><strong>法律義務：</strong>回應合法的要求。</li>
 </ul>
 
-<h2 id="zh-children">16. 兒童</h2>
-<p>Smart Schedule 的使用者須年滿 <mark class="todo">[18]</mark> 歲。依 Google Gemini API 的條款，AI 助理只能由年滿 18 歲的人使用。我們不會在明知的情況下蒐集兒童的個人資料；如果你認為有兒童使用了 AI 助理，請聯絡我們，或直接在那台裝置上清除所有資料。</p>
+<h2 id="zh-children">16. 最低年齡</h2>
+<p>Smart Schedule 只提供給年滿 18 歲的人使用，App Store 的年齡分級是 18+。原因是 Google Gemini API 的條款要求使用者年滿 18 歲，也不允許用在以未滿 18 歲的人為對象、或可能被他們使用的服務。我們不會在明知的情況下蒐集未滿 18 歲的人的個人資料；如果你認為有未滿 18 歲的人使用了 Smart Schedule，請聯絡我們，或直接在那台裝置上清除所有資料。</p>
 
 <h2 id="zh-transfers">17. 跨境傳輸</h2>
-<p>我們的伺服器在 Cloudflare 的全球網路上執行：請求通常在離你較近的 Cloudflare 資料中心處理，保存的資料存在 Cloudflare 沒有指定地區的中央儲存中，並可能在全球各地快取。Google 和 Apple 在它們自己的全球基礎設施（包括美國）處理資料。Cloudflare 依歐盟—美國資料隱私框架（包括英國和瑞士的延伸）及標準契約條款進行跨境傳輸。Google 依其<a href="https://business.safety.google/processorterms/">處理者資料處理附錄</a>處理 Gemini 請求，跨境傳輸依其中的標準契約條款進行；Google LLC 也取得歐盟—美國資料隱私框架認證。</p>
+<p>我們的伺服器在 Cloudflare 的全球網路上執行：請求通常在離你較近的 Cloudflare 資料中心處理，保存的資料存在 Cloudflare 沒有指定地區的中央儲存中，並可能在全球各地快取。Google 和 Apple 在它們自己的全球基礎設施（包括美國）處理資料。Cloudflare 依歐盟—美國資料隱私框架和它的英國延伸（UK Extension，適用於英國的使用者）、瑞士—美國資料隱私框架，以及標準契約條款進行跨境傳輸。Google 依其<a href="https://business.safety.google/processorterms/">處理者資料處理附錄</a>處理 Gemini 請求，跨境傳輸依其中的標準契約條款進行；Google LLC 也取得歐盟—美國資料隱私框架和它的英國延伸的認證。</p>
 
 <h2 id="zh-changes">18. 政策變更</h2>
 <p>我們會在本頁公布更新並修改生效日期。重大變更會在本頁明顯標示；如果變更影響 AI 助理傳送的內容，App 會在傳送任何資料前再次請你允許。</p>
@@ -364,7 +379,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 <h2 id="en-summary">In short</h2>
 <ul>
   <li>Your calendar goes straight between your iPhone and Google. Smart Schedule's server never gets your Google sign-in tokens and does not sync your calendar.</li>
-  <li>The AI assistant sends nothing until you tap Allow. After that, your request and related calendar details go through our server to Google's Gemini API to be understood. Our server passes them on without keeping them.</li>
+  <li>The AI assistant sends nothing until you tap Allow. After that, your request and related calendar details go through our server to Google's Gemini API to be understood. Our server passes them on without keeping them. The calendar details the app adds do not include your Google account email addresses.</li>
   <li>Only on iOS 18, and only with that permission, the titles and times of your events in the next 48 hours are kept on our server, and deleted at the latest 3 days after the app last sends them, so they can appear in the Dynamic Island on time.</li>
   <li>No ads, no tracking, no analytics, and we never sell your data.</li>
   <li>You can stop sharing, remove a Google account, and export or erase your data in the app at any time.</li>
@@ -379,7 +394,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
   <li><a href="#en-ai">The AI assistant (Google Gemini)</a></li>
   <li><a href="#en-p2s">Dynamic Island on iOS 18 (push-to-start)</a></li>
   <li><a href="#en-attest">App Attest, device identifiers and server security</a></li>
-  <li><a href="#en-purchases">Purchases and subscriptions</a></li>
+  <li><a href="#en-purchases">Purchases</a></li>
   <li><a href="#en-apple">Siri, speech input and other Apple services</a></li>
   <li><a href="#en-contacting">When you contact us</a></li>
   <li><a href="#en-website">This website</a></li>
@@ -388,7 +403,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
   <li><a href="#en-retention">How long we keep data</a></li>
   <li><a href="#en-security">Security</a></li>
   <li><a href="#en-rights">Your choices and rights</a></li>
-  <li><a href="#en-children">Children</a></li>
+  <li><a href="#en-children">Minimum age</a></li>
   <li><a href="#en-transfers">International transfers</a></li>
   <li><a href="#en-changes">Changes to this policy</a></li>
   <li><a href="#en-contact">Contact</a></li>
@@ -396,7 +411,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 </nav>
 
 <h2 id="en-who">1. Who we are</h2>
-<p>Smart Schedule (the iPhone app, including its widgets, Live Activities, notification extension, Siri and Shortcuts actions and Control Center control) and this website, smart-schedules.com, are provided by <mark class="todo">[開發者名稱 / Developer name]</mark> ("we", "us"). We are responsible for the processing described in this policy (in GDPR terms, the controller). Contact: <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>.</p>
+<p>Smart Schedule (the iPhone app, including its Live Activities, Control Center control, notification extension, Siri and Shortcuts actions) and this website, smart-schedules.com, are provided by <mark class="todo">[開發者名稱 / Developer name]</mark> ("we", "us"). We are responsible for the processing described in this policy (in the terms of the GDPR, the UK GDPR, the Swiss FADP and similar laws, the controller). Contact: <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>.</p>
 <p>Smart Schedule has no accounts of its own. To use your real calendar you connect a Google account. You can also tap "Try without signing in" to use demo mode. Demo mode uses sample calendars, never contacts the AI and sends none of your calendar data. (If you allowed AI data sharing earlier, the app still renews its session with our server in demo mode, and on iOS 18 it registers the sample events with our server for the Dynamic Island; see sections 5 and 6.)</p>
 
 <h2 id="en-device">2. Data stored on your iPhone</h2>
@@ -410,7 +425,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
   <li>Google sign-in tokens, in the iOS Keychain.</li>
   <li>Your answer to the AI data-sharing question.</li>
 </ul>
-<p>These files are protected by iOS data protection and shared only among the app's own parts (the app, its widgets and its notification extension). Event details also appear on your device in notifications, widgets and Live Activities; reminders are local notifications created on your iPhone. App data (except the random install ID in section 5) can be included in your iCloud or computer backups, which you control.</p>
+<p>These files are protected by iOS data protection and shared only among the app's own parts (the app, its Live Activity and Control Center extension and its notification extension). Event details also appear on your device in notifications and Live Activities; reminders are local notifications created on your iPhone. App data (except the random install ID in section 5) can be included in your iCloud or computer backups, which you control.</p>
 
 <h2 id="en-google">3. Google Calendar and your Google account</h2>
 <p>When you connect a Google account, you sign in on Google's own page; we never see your password. The app asks Google for these permissions:</p>
@@ -433,18 +448,32 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 
 <h3>Only with your permission</h3>
 <p>Nothing is sent to the AI until you tap Allow in the "Use the AI assistant?" dialog (you can also allow it in Settings › AI &amp; privacy). This applies everywhere the assistant works: the chat, Quick Capture, Siri and Shortcuts, replies from a reminder notification, and AI suggestions on an event page. Demo mode never contacts the AI.</p>
+<p>The explanation in the app (the consent dialog, and Settings › AI &amp; privacy › What is sent) reads:</p>
+<blockquote class="quote">
+<p>To understand your requests, Smart Schedule sends them to Google's Gemini API. This includes:</p>
+<ul>
+  <li>What you type or say to the assistant (spoken requests as text), including any names or email addresses you mention</li>
+  <li>Titles, times, notes and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder you reply to</li>
+  <li>For AI suggestions on an event: that event only, including its location</li>
+  <li>Your calendar names and assistant settings, but not your Google account email addresses</li>
+  <li>Your time zone and language</li>
+</ul>
+<p>Recipient: Google, through the Gemini API. Requests pass through Smart Schedule's server, which doesn't keep them.</p>
+</blockquote>
+<p>On iOS 18 it also describes the server registration in section 5, and it explains that Apple turns speech into text (see section 8). The full details follow.</p>
 
 <h3>What a chat request contains</h3>
 <ul>
-  <li>What you type, or what you say transcribed to text.</li>
+  <li>What you type, or what you say transcribed to text, including any names or email addresses in it (except the addresses of the Google accounts you connected; see below).</li>
   <li>Your local date and time, time zone and device language.</li>
   <li>Your assistant settings.</li>
-  <li>The names of the calendars you can add events to, each with the email address of the Google account it belongs to.</li>
-  <li>Up to 40 of your events from today through the next 14 days: Google's event ID, title (first 60 characters), start and end, whether it is all-day, repeating or part of a plan, its calendar's name, whether you can edit it, and its notes (up to 300 characters). Locations, guests and video-call links are not included.</li>
+  <li>The names of the calendars you can add events to, and which one new events go to by default. They do not include your Google account email addresses: with several Google accounts, the accounts are told apart by names such as "Account 1" and "Account 2" (in the order you added them), and a calendar whose name is an email address (such as a calendar someone shared with you) is called "Shared calendar".</li>
+  <li>Up to 40 of your events in the 14 days starting today: Google's event ID, title (first 60 characters), start and end, whether it is all-day, repeating or part of a plan, its calendar's name, whether you can edit it, and its notes (up to 300 characters). Locations, guests and video-call links are not included.</li>
   <li>When relevant: events waiting for your confirmation ("Ask me first"), the event a reminder is about, and a long-term plan you are reviewing.</li>
   <li>The last few turns (up to 6) of the current conversation, including the results of the assistant's actions (such as the title and time of an event it just created) and error messages. These are held in memory only; your saved chat history is never sent.</li>
 </ul>
 <p>For AI suggestions on an event page, only that event is sent: its title, date, time and duration, location, notes (up to 300 characters), whether it is a video call, your time zone, today's date, language and the suggestions already shown.</p>
+<p>If the address of a Google account you connected appears in what you type or say, in an event's title, location or notes, or in an error message sent back to Gemini, the app replaces it with a placeholder such as "[account email]" or "[Account 2 email]" before sending; any other email address in an error message becomes "[email address]". When Gemini's answer uses these placeholders, your iPhone puts the address back before it writes to Google Calendar or shows you the answer. The rest of what you type or say is sent as it is, including other people's email addresses.</p>
 <p>Your requests and events may contain other people's information, such as names and email addresses you type, invitations from other people, or the names of calendars shared with you. Please share only what you are entitled to share.</p>
 
 <h3>How it travels</h3>
@@ -477,8 +506,8 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 <p><strong>Logs.</strong> Our server writes short technical log entries (event types, App Attest key IDs, the app identifier, install IDs, Apple push IDs, status codes, error messages and counts) to find faults and abuse. They are designed never to contain request content, event titles, tokens or IP addresses, and Cloudflare keeps them for up to 7 days. Cloudflare's automatic per-request logs are turned off.</p>
 <p>Cloudflare, which runs our server, necessarily processes connection data such as your IP address to deliver traffic and protect its network.</p>
 
-<h2 id="en-purchases">7. Purchases and subscriptions</h2>
-<p>Smart Schedule Pro subscriptions, where offered, are sold and billed by Apple through the App Store. We never receive your payment details, name or Apple Account, and there is no purchase data on our server. The app checks on your iPhone whether you have an active subscription. The <a href="https://www.apple.com/legal/privacy/">Apple Privacy Policy</a> covers purchases. Purchases belong to your Apple Account and are not affected by erasing data in the app.</p>
+<h2 id="en-purchases">7. Purchases</h2>
+<p>Smart Schedule 1.0 has no in-app purchases or subscriptions, and the app does not check your purchase history, so we receive and process no purchase or payment data. Apple handles downloads of the app through the App Store, under the <a href="https://www.apple.com/legal/privacy/">Apple Privacy Policy</a>. If a later version offers purchases, we will update this policy first.</p>
 
 <h2 id="en-apple">8. Siri, speech input and other Apple services</h2>
 <ul>
@@ -499,8 +528,8 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 <p class="quote">Smart Schedule's use and transfer to any other app of information received from Google APIs will adhere to <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
 <p>In particular:</p>
 <ul>
-  <li>We use Google user data (your calendar data and your Google account's email address) only to provide the features you see in the app: showing which accounts you connected, showing, creating and changing your events, reminders, widgets and Live Activities, and the AI assistant you have allowed.</li>
-  <li>We transfer it only to Google's Gemini API (only with your permission, to answer your requests) and to our server and Apple's push service (for the Dynamic Island on iOS 18, with the same permission). Otherwise we transfer it only where needed for security, to comply with the law, or, as part of a merger, acquisition or sale of assets, only after obtaining your explicit prior consent.</li>
+  <li>We use Google user data (your calendar data and your Google account's email address) only to provide the features you see in the app: showing which accounts you connected, showing, creating and changing your events, reminders and Live Activities, and the AI assistant you have allowed. Your Google account's email address is used only on your iPhone, to show and tell apart your accounts, and is not sent to Gemini.</li>
+  <li>We transfer it only to Google's Gemini API (only with your permission, to answer your requests; only the calendar data described in section 4, never your accounts' email addresses) and to our server and Apple's push service (for the Dynamic Island on iOS 18, with the same permission). Otherwise we transfer it only where needed for security, to comply with the law, or, as part of a merger, acquisition or sale of assets, only after obtaining your explicit prior consent.</li>
   <li>We do not use it for advertising, do not sell it, and do not use it to determine creditworthiness or for lending.</li>
   <li>No one on our side reads it unless you ask us to (for example in a support email you send), it is needed for security (such as investigating abuse), or the law requires it (for Google's own abuse review, see section 4).</li>
   <li>We do not use Google user data, or data derived from it, to develop, improve or train any AI or machine-learning models, generalized or personalized, and we do not allow anyone else to do so. The Gemini API uses it only to answer your request, under paid-service terms that do not allow Google to use it to improve its products.</li>
@@ -512,7 +541,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 <ul>
   <li><strong>Cloudflare, Inc.</strong> runs our server, its storage and logs, this website and the forwarding of support email, as our processor under its <a href="https://www.cloudflare.com/cloudflare-customer-dpa/">Data Processing Addendum</a>.</li>
   <li><strong>Google LLC</strong> provides the Gemini API (AI requests, only with your permission), as our processor under its <a href="https://business.safety.google/processorterms/">Data Processing Addendum for Products Where Google is a Data Processor</a> and its paid-service terms, which do not allow it to use your requests to improve its products (see section 4). Separately, Google Calendar and Google sign-in are Google services you use directly, under the Google Privacy Policy.</li>
-  <li><strong>Apple Inc.</strong> provides App Attest, push notifications (iOS 18), the App Store and in-app purchases, Siri and speech recognition, under Apple's own terms.</li>
+  <li><strong>Apple Inc.</strong> provides App Attest, push notifications (iOS 18), the App Store, Siri and speech recognition, under Apple's own terms.</li>
   <li><strong><mark class="todo">[郵件服務提供者 / Email provider]</mark></strong>, our email provider, stores support messages for us and sends our replies (section 9).</li>
 </ul>
 <p>Each of these providers is bound by contract or by its own terms to protect your data at least as well as this policy describes, and to use it only to provide its service to us or to you.</p>
@@ -564,11 +593,11 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
   <li><strong>Delete the events themselves:</strong> in Google Calendar.</li>
 </ul>
 <h3>By email</h3>
-<p>Depending on where you live (for example the European Economic Area, the UK, California or Taiwan), you may have the right to access, obtain a copy of, correct or delete your data, to restrict or object to its processing, to data portability, and to withdraw consent. Most of your data is on your device, and the tools above put you in control of it. Data on our server is linked only to random IDs, not to your name or email, so we usually cannot find it from your identity, and most of it expires within days. Write to <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a> and we will reply within the time the law requires. You can also complain to your data protection authority.</p>
+<p>Depending on where you live (for example the UK, Norway, Iceland, Switzerland, California or Taiwan), you may have the right to access, obtain a copy of, correct or delete your data, to restrict or object to its processing, to data portability, and to withdraw consent. Most of your data is on your device, and the tools above put you in control of it. Data on our server is linked only to random IDs, not to your name or email, so we usually cannot find it from your identity, and most of it expires within days. Write to <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a> and we will reply within the time the law requires. You can also complain to your data protection authority, such as the Information Commissioner's Office (ICO) in the UK, Datatilsynet in Norway, Persónuvernd in Iceland or the Federal Data Protection and Information Commissioner (FDPIC) in Switzerland.</p>
 <div class="box">
 <p><strong>Right to object:</strong> where we rely on legitimate interests (see the legal bases below: security and abuse prevention, this website, support emails and crash reports from Apple), you can object at any time by emailing <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>.</p>
 </div>
-<h3>Legal bases (EEA, UK, Switzerland)</h3>
+<h3>Legal bases (where the GDPR, UK GDPR or similar laws apply)</h3>
 <ul>
   <li><strong>Consent:</strong> AI data sharing (section 4). You can withdraw it at any time; withdrawing consent does not affect processing done before you withdrew it.</li>
   <li><strong>Contract:</strong> providing the app features you ask to use, including the iOS 18 Dynamic Island registration (section 5): on iOS 18 a Live Activity can start on time only through our server. The app sends the registration only while AI data sharing is allowed, and you can turn it off at any time in Settings › Notifications › Dynamic Island › Show next event › Off.</li>
@@ -576,11 +605,11 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
   <li><strong>Legal obligations:</strong> responding to lawful requests.</li>
 </ul>
 
-<h2 id="en-children">16. Children</h2>
-<p>You must be <mark class="todo">[18]</mark> or older to use Smart Schedule. Under Google's Gemini API terms, the AI assistant may only be used by people aged 18 or older. We do not knowingly collect personal data from children. If you believe a child has used the AI assistant, contact us, or simply erase all data on that device.</p>
+<h2 id="en-children">16. Minimum age</h2>
+<p>You must be 18 or older to use Smart Schedule, and its App Store age rating is 18+. This is because Google's Gemini API terms require users to be 18 or older and do not allow use in services directed at, or likely to be used by, people under 18. We do not knowingly collect personal data from anyone under 18. If you believe someone under 18 has used Smart Schedule, contact us, or simply erase all data on that device.</p>
 
 <h2 id="en-transfers">17. International transfers</h2>
-<p>Our server runs on Cloudflare's global network: requests are usually handled in a Cloudflare data center near you, and stored data is kept in Cloudflare's central storage, which has no fixed region, and may be cached worldwide. Google and Apple process data in their own global infrastructure, including in the United States. Cloudflare relies on the EU-U.S. Data Privacy Framework (with its UK and Swiss extensions) and Standard Contractual Clauses for transfers. Google processes Gemini requests under its <a href="https://business.safety.google/processorterms/">Data Processing Addendum for Products Where Google is a Data Processor</a>, which relies on Standard Contractual Clauses for transfers, and Google LLC is also certified under the EU-U.S. Data Privacy Framework.</p>
+<p>Our server runs on Cloudflare's global network: requests are usually handled in a Cloudflare data center near you, and stored data is kept in Cloudflare's central storage, which has no fixed region, and may be cached worldwide. Google and Apple process data in their own global infrastructure, including in the United States. Cloudflare relies on the EU-U.S. Data Privacy Framework and its UK Extension (which covers users in the UK), the Swiss-U.S. Data Privacy Framework, and Standard Contractual Clauses for transfers. Google processes Gemini requests under its <a href="https://business.safety.google/processorterms/">Data Processing Addendum for Products Where Google is a Data Processor</a>, which relies on Standard Contractual Clauses for transfers, and Google LLC is also certified under the EU-U.S. Data Privacy Framework and its UK Extension.</p>
 
 <h2 id="en-changes">18. Changes to this policy</h2>
 <p>We will post updates on this page and change the effective date. Significant changes will be clearly marked here, and if a change affects what the AI assistant sends, the app will ask for your permission again before sending anything.</p>

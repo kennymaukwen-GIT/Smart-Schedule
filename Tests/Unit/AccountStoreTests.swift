@@ -150,6 +150,32 @@ final class AccountStoreTests: XCTestCase {
         XCTAssertNil(blank)
     }
 
+    func testTheUsersOwnWordsMatchOnlyOneAccountOrCalendar() async {
+        let store = makeStore(url: files.url("AccountStoreTests-words"))
+        let school = SampleAccounts.account("333", email: "example@school.edu", extra: [
+            SampleAccounts.calendar("333", "school-gym", email: "example@school.edu", name: "Gym")
+        ])
+        await store.upsert(kenny)
+        await store.upsert(school)
+        let schoolPrimary = CalendarRef(accountID: "333", calendarID: "example@school.edu")
+        // Words that name no account are dropped: "school" is in one account's address, its primary calendar.
+        let words = await store.resolveWritableCalendar(matching: "my school account")
+        XCTAssertEqual(words?.id, schoolPrimary)
+        let chinese = await store.resolveWritableCalendar(matching: "我的 school 帳號")
+        XCTAssertEqual(chinese?.id, schoolPrimary)
+        // Several accounts or calendars match: nothing is picked, and the assistant asks which one.
+        let calendar = await store.resolveWritableCalendar(matching: "calendar")
+        XCTAssertNil(calendar, "every account has one")
+        let gym = await store.resolveWritableCalendar(matching: "Gym")
+        XCTAssertNil(gym, "both accounts have a Gym")
+        let both = await store.resolveWritableCalendar(matching: "example")
+        XCTAssertNil(both, "in both addresses")
+        let unknown = await store.resolveWritableCalendar(matching: "my work account")
+        XCTAssertNil(unknown)
+        let filler = await store.resolveWritableCalendar(matching: "my account")
+        XCTAssertNil(filler)
+    }
+
     func testPromptLabelIsOneLine() {
         var calendar = SampleAccounts.calendar("1", "x", email: "a@example.com", name: "Team | Ops\nRota")
         XCTAssertEqual(calendar.promptLabel, "Team Ops Rota | a@example.com")

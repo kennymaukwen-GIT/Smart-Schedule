@@ -908,6 +908,16 @@
         }
       }
     },
+    "Apple turns speech into text: on your iPhone when On-device recognition is on and supports your language, otherwise on Apple's servers." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音由 Apple 轉成文字：開啟「裝置端辨識」且支援你的語言時在 iPhone 上處理，否則使用 Apple 的伺服器。"
+          }
+        }
+      }
+    },
     "Ask me first" : {
       "localizations" : {
         "zh-Hant" : {
@@ -2227,6 +2237,16 @@
         }
       }
     },
+    "For AI suggestions on an event: that event only, including its location" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用行程的「AI 建議」時：只傳送那個行程，包括地點"
+          }
+        }
+      }
+    },
     "Forever" : {
       "localizations" : {
         "zh-Hant" : {
@@ -3044,12 +3064,12 @@
         }
       }
     },
-    "Nothing is sent until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode works without sharing anything." : {
+    "Nothing is sent to the AI until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode never contacts the AI." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "點「允許」之前不會傳送任何資料。你隨時可以在「設定 › AI 與隱私」停止分享。示範模式不會分享任何資料。"
+            "value" : "點「允許」之前，不會傳送任何資料給 AI。你隨時可以在「設定 › AI 與隱私」停止分享。示範模式從不連線到 AI。"
           }
         }
       }
@@ -3237,12 +3257,12 @@
         }
       }
     },
-    "On iOS 18, the titles, start and end times and calendar colours of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
+    "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on Smart Schedule's server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 iOS 18 上，接下來兩天行程的標題、開始與結束時間和行事曆顏色也會暫存在 Smart Schedule 的伺服器，讓每個行程在開始前出現在動態島。備註與地點不會儲存。"
+            "value" : "在 iOS 18 上，接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色也會暫存在 Smart Schedule 的伺服器，並透過 Apple 的推播服務送出，讓每個行程在開始前出現在動態島。備註與地點不會儲存。"
           }
         }
       }
@@ -4554,16 +4574,6 @@
         }
       }
     },
-    "The names of your calendars and your assistant settings" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的行事曆名稱和助理設定"
-          }
-        }
-      }
-    },
     "There is no draft plan waiting for review." : {
       "localizations" : {
         "zh-Hant" : {
@@ -4612,6 +4622,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這個計畫正在等你確認。"
+          }
+        }
+      }
+    },
+    "This removes your settings, cached events, chat history, sign-in tokens, scheduled reminders and Live Activities from this iPhone and removes every Google account. Events in Google Calendar are not deleted." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這會從這支 iPhone 移除你的設定、快取的行程、聊天記錄、登入權杖、已排定的提醒和即時動態，並移除所有 Google 帳號。Google 日曆裡的行程不會被刪除。"
           }
         }
       }
@@ -4677,12 +4697,12 @@
         }
       }
     },
-    "Titles, times, locations and notes of your events in the days the request is about (the next two weeks by default)" : {
+    "Titles, times, notes and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder you reply to" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要求涉及的日子裡，你的行程標題、時間、地點和備註（預設為接下來兩週）"
+            "value" : "從今天起 14 天內最多 40 個行程的標題、時間、備註和 Google 行程 ID，以及你回覆提醒的那個行程"
           }
         }
       }
@@ -5137,12 +5157,12 @@
         }
       }
     },
-    "What you type or say to the assistant (spoken requests as text)" : {
+    "What you type or say to the assistant (spoken requests as text), including any names or email addresses you mention" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你對助理輸入或說出的內容（語音先轉成文字）"
+            "value" : "你對助理輸入或說出的內容（語音先轉成文字），包括其中提到的任何姓名或 email"
           }
         }
       }
@@ -5286,6 +5306,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你登入的是 %1$@。請選擇 %2$@ 重新連接。"
+          }
+        }
+      }
+    },
+    "Your calendar names and assistant settings, but not your Google account email addresses" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的行事曆名稱和助理設定，但不包括你 Google 帳號的 email"
           }
         }
       }

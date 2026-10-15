@@ -90,6 +90,13 @@ struct AIConsentDisclosureText: View {
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.92))
             }
+            Label {
+                Text(verbatim: AIConsentDisclosure.speechNote)
+            } icon: {
+                Image(systemName: "mic")
+            }
+            .font(.system(size: 15))
+            .foregroundStyle(.white.opacity(0.92))
             Text(verbatim: AIConsentDisclosure.footnote)
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.textSecondary)

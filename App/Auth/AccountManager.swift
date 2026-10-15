@@ -179,7 +179,8 @@ final class AccountManager {
 
     /// "Remove account": revokes the grant, deletes the token, this account's cached events, range bookkeeping and
     /// queued changes, and forgets the account (its calendars leave the Focus filter). A default calendar or "Ask me
-    /// first" batch in it is cleared. Google Calendar keeps everything.
+    /// first" batch in it is cleared, and the assistant forgets the conversation (the accounts are renumbered).
+    /// Google Calendar keeps everything.
     func disconnect(accountID: String) async {
         await tokens.revoke(accountID: accountID)
         await tokens.signOut(accountID: accountID)
@@ -196,6 +197,9 @@ final class AccountManager {
         }
         await ReminderScheduler.shared.reschedule()
         await LiveActivityManager.shared.refreshIfRunning()
+        // The accounts after this one move up a number ("Account 3" becomes "Account 2"), and the assistant names
+        // calendars by number: no turn from before may reach Gemini, or an old "Account 2" would mean another account.
+        await ScheduleAssistant.shared.resetConversation()
     }
 
     /// Every account (erase all data): the steps of `disconnect` for each, then every token item, the legacy one

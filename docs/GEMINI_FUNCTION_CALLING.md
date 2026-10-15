@@ -184,7 +184,14 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
 
 - **唯一的關卡在 `GeminiClient.generate`**：一開始就檢查 `AIConsentStore.current.isGranted`，沒有同意就丟出 `GeminiError.consentRequired`，連 request 都不會組。聊天、快速輸入、Siri、通知裡的回覆、notification extension 全都經過這裡，所以一個關卡就涵蓋全部入口。單元測試用注入的 `consentCheck` 和一個會計數的 `URLSession` 證明沒有任何 request 送出。
 - 同意存在 App Group 的 `UserDefaults`（key `SSAIConsent`，JSON），三個 process 都能同步讀到；寫入時發 `SharedChange.consent`。
-- 說明文字只有一份：`AIConsentDisclosure`（標題、會送出的 4 類資料、收件者「Google，透過 Gemini API」、註腳）。同意畫面和「設定 › AI 與隱私 › 會送出什麼」都用它。說明內容有重大改變時把 `AIConsent.disclosureVersion` 加 1，所有人會被重新詢問。
+- 說明文字只有一份：`AIConsentDisclosure`（標題、會送出的 5 類資料、收件者「Google，透過 Gemini API」、iOS 18 的伺服器說明、語音辨識說明、註腳）。同意畫面和「設定 › AI 與隱私 › 會送出什麼」都用它。說明內容有重大改變時把 `AIConsent.disclosureVersion` 加 1，所有人會被重新詢問。目前是第 4 版，5 類資料**完全對應** prompt 實際送出的內容（10.6 節）：
+  1. 對助理輸入或說出的內容（語音先轉成文字），包括其中提到的姓名或 email；
+  2. 從今天起 14 天內最多 40 個行程的標題、時間、備註（每個最多 300 字）和 Google 行程 ID，以及回覆提醒的那個行程（UPCOMING 和 FOCUS 都**沒有地點**）；
+  3. 「✨ AI 建議」只送那一個行程，包括地點（12.2 節）；
+  4. 行事曆名稱和助理設定，但**不包括 Google 帳號的 email**；
+  5. 時區和語言。
+
+  另外三段：iOS 18 上接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色存在 Smart Schedule 的伺服器並透過 Apple 的推播服務送出（iOS 26 不顯示）；語音由 Apple 轉成文字（開啟「裝置端辨識」且支援該語言時在 iPhone 上，否則在 Apple 的伺服器）；註腳「點『允許』之前，不會傳送任何資料給 AI……示範模式從不連線到 AI」。
 - **絕對不要寫「不會被用來訓練」**：這只在 Gemini 付費方案成立。上線檢查清單：在 Gemini API 專案啟用 Cloud Billing（付費方案）。免費方案下 Google 可能用 prompt 改善產品。
 - 示範模式（`DemoAssistant`）不呼叫 Gemini，不需要同意。
 - Siri（`AddPlanIntent`）沒有同意時直接回「Turn on AI data sharing in Smart Schedule's Settings first.」，不呼叫助理。
@@ -210,13 +217,14 @@ event_reminders: 1440,60,30,0
 quiet_hours: off
 …18 行，每個 PreferenceKey 一行…
 # CALENDARS (writable; default_calendar values)
-- My calendar | example@gmail.com (default)
-- My calendar | example@yourmail.com
+- My calendar | Account 1 (default)
+- Gym | Account 1
+- My calendar | Account 2
 # PENDING EVENTS (waiting for approval, NOT in the calendar; batch batch-k3p9a0bc)
 Lunch with Andrew | 2026-10-14T13:00 | 2026-10-14T14:00 | event
 ```
 
-UPCOMING 的 flags 在看得到兩個以上行事曆時多了 `cal=<名稱>`（兩個帳號的「My calendar」同名時附上 email），唯讀行事曆的行程多了 `read_only`。語言設定不是「跟我輸入的語言相同」時，`user_language_hint` 那一行改成「Always reply and write titles in …」。
+CALENDARS 和 PREFERENCES 的 `default_calendar` 都**不含 email**：有多個帳號時每一行結尾是 `Account N`（依加入的順序），只有一個帳號時只寫名稱（10.6 節）。UPCOMING 的 flags 在看得到兩個以上行事曆時多了 `cal=<名稱>`（兩個帳號的「My calendar」同名時寫成 `cal=My calendar (Account 2)`），唯讀行事曆的行程多了 `read_only`。語言設定不是「跟我輸入的語言相同」時，`user_language_hint` 那一行改成「Always reply and write titles in …」。
 
 ### 10.2 值的編碼（App 端 `AppPreferences.normalized` 驗證）
 
@@ -228,7 +236,7 @@ UPCOMING 的 flags 在看得到兩個以上行事曆時多了 `cal=<名稱>`（�
 | `quiet_hours` | `HH:mm-HH:mm`（可跨午夜）、`off`、`on` | `22:00-08:00` |
 | `morning_briefing` `evening_preview` | `HH:mm`、`off`、`on` | `07:30` |
 | `daily_reminder_cap` | 1–50 或 `off` | `10` |
-| `default_calendar` | CALENDARS 裡的一行（原樣）或 `automatic` | `My calendar \| example@yourmail.com` |
+| `default_calendar` | CALENDARS 裡的一行（原樣）、`automatic`，或使用者用自己的話指定 CALENDARS 沒寫的帳號時照抄他的話（例如他打的 email） | `My calendar \| Account 2` |
 | `default_duration` | 5–480 分鐘 | `30` |
 | `week_start` | `sunday` `monday` | |
 | `reply_language` | `match` `zh-Hant` `en` | |
@@ -239,16 +247,16 @@ UPCOMING 的 flags 在看得到兩個以上行事曆時多了 `cal=<名稱>`（�
 ### 10.3 執行、回覆、復原
 
 1. 解碼 `UpdatePreferencesArgs`（`value` 送成數字也接受）；不認得的 key 直接拒絕（`unknown key`），不是解碼失敗。
-2. `PreferencesStore.apply(…, source: .voice(utterance:), resolveCalendar:)`：一次寫入所有有效的變更，`default_calendar` 透過 `AccountStore.resolveWritableCalendar(matching:)` 找到可寫入的行事曆。值和目前一樣的變更直接略過。
+2. `PreferencesStore.apply(…, source: .voice(utterance:), resolveCalendar:)`：一次寫入所有有效的變更。`default_calendar` 先用 `CalendarAliases.writableCalendar(matching:)` 對回 CALENDARS 的那一行（也接受「- …」「… (default)」、`My calendar (Account 2)`、`Account 2`，以及 `[Account 2 email]`：使用者打出那個帳號的 email，模型看到的就是這個佔位字）；對不上而且看起來是別名（已經不存在的 `Account 3`，或兩個帳號都有的名稱）就拒絕，讓模型再問；否則才用 `AccountStore.resolveWritableCalendar(matching:)` 在 iPhone 上比對使用者自己的話：整句或去掉「my」「account」「calendar」「我的」「帳號」「行事曆」這類字之後的詞（「my school account」→「school」），要剛好只對到一個帳號的 email（用它的主要行事曆）或一個可寫入行事曆的名稱；對到兩個以上就不選，讓模型問。存下來的標籤仍是 `CalendarInfo.promptLabel`（「My calendar | email」），只在 iPhone 上顯示。值和目前一樣的變更直接略過。
 3. `Reply.preferenceReceipt` 讓聊天顯示「設定已更新」卡片（舊值 → 新值，加上「復原」）；`Reply.rejectedPreferences` 列出被拒絕的項目。`Reply.text` 是 `summary_for_user`，加上 `ReplyFormatter.preferencesUpdated` 和 `preferencesRejected` 的文字版（給 Siri、通知、VoiceOver；聊天畫面畫卡片時會拿掉）。
 4. 改到提醒、緊急程度、安靜時段、摘要或每日上限時，馬上 `ReminderScheduler.reschedule`。
-5. 回給 Gemini：`{"ok": <沒有被拒絕>, "applied": [{"key","old","new"}], "rejected": [{"key","value","reason"}]}`。
+5. 回給 Gemini：`{"ok": <沒有被拒絕>, "applied": [{"key","old","new"}], "rejected": [{"key","value","reason"}]}`。`default_calendar` 的 old／new 是 CALENDARS 的寫法（`CalendarAliases.promptValue(canonical:for:)`，例如 `My calendar | Account 2`），`value` 和 `reason` 裡的 email 都換成佔位字（10.6 節）。
 
 每一筆變更都記進「助理記得的事」（設定 › AI 與隱私），來源寫「你說：「…」」；刪掉那一行就把該設定恢復預設。
 
-示範模式（`DemoAssistant`）在**所有其他判斷之前**先檢查這類句子，所以「8 點前不要提醒我」不會變成 08:00 的行程。離線支援：「8 點前不要提醒我」「早上 8 點以前別提醒我」「don't remind me before 8am」「10 點後別提醒我」→ `quiet_hours`；「健身提前 2 小時提醒」「以後健身都提前兩小時提醒我」「remind me 2 hours before gym」→ `routine_reminders` `120`（句子裡有日期或時間就不算）；「別再提前一天提醒截止日」→ 從截止日的預設提醒拿掉 1 天；「以後用學校帳號」「from now on use my school account」→ 示範的學校行事曆；「以後會議預設 30 分鐘」→ `default_duration`；「以後用英文回覆」「always reply in Chinese」→ `reply_language`；「以後先問我再加」「ask me before adding events」→ `autonomy`。示範模式一樣經過 `PreferencesStore.apply`，所以驗證、紀錄和復原都相同。
+示範模式（`DemoAssistant`）在**所有其他判斷之前**先檢查這類句子，所以「8 點前不要提醒我」不會變成 08:00 的行程。離線支援：「8 點前不要提醒我」「早上 8 點以前別提醒我」「don't remind me before 8am」「10 點後別提醒我」→ `quiet_hours`；「健身提前 2 小時提醒」「以後健身都提前兩小時提醒我」「remind me 2 hours before gym」→ `routine_reminders` `120`（句子裡有日期或時間就不算）；「別再提前一天提醒截止日」→ 從截止日的預設提醒拿掉 1 天；「以後用學校帳號」「from now on use my school account」→ 示範的學校行事曆（示範模式不連線，所以在 iPhone 上比對 email 的網域）；「以後會議預設 30 分鐘」→ `default_duration`；「以後用英文回覆」「always reply in Chinese」→ `reply_language`；「以後先問我再加」「ask me before adding events」→ `autonomy`。示範模式一樣經過 `PreferencesStore.apply`，所以驗證、紀錄和復原都相同。
 
-Fixtures：[`update_preferences.quiet_hours.json`](../Tests/fixtures/update_preferences.quiet_hours.json)、[`update_preferences.routine_reminders.json`](../Tests/fixtures/update_preferences.routine_reminders.json)、[`update_preferences.default_calendar.json`](../Tests/fixtures/update_preferences.default_calendar.json)。fixture 可以帶 `preferences` 和 `calendars` 兩個字串，模擬 prompt 裡的 PREFERENCES 和 CALENDARS 區塊。
+Fixtures：[`update_preferences.quiet_hours.json`](../Tests/fixtures/update_preferences.quiet_hours.json)、[`update_preferences.routine_reminders.json`](../Tests/fixtures/update_preferences.routine_reminders.json)、[`update_preferences.default_calendar.json`](../Tests/fixtures/update_preferences.default_calendar.json)。fixture 可以帶 `preferences` 和 `calendars` 兩個字串，模擬 prompt 裡的 PREFERENCES 和 CALENDARS 區塊；跟 prompt 一樣不能有 email（validator 檢查「@」），帳號寫成 `Account N`。
 
 ### 10.4 「先問我」：單一行程先不寫入
 
@@ -263,6 +271,28 @@ Fixtures：[`update_preferences.quiet_hours.json`](../Tests/fixtures/update_pref
 ### 10.5 寫入走 `CalendarRouter`
 
 多帳號之後，助理的每一次寫入都經過 `CalendarRouter`：新行程寫到預設行事曆（設定或 `default_calendar` 選的，否則第一個帳號的「我的行事曆」）；修改和刪除寫到擁有那份行程的帳號和行事曆；`delete_events` 的 `plan_id` 會在每個可寫入、有同步的行事曆裡找 series master。`PendingDeletion.refs` 記住每個 id 屬於哪個行事曆，確認刪除時照著刪。偏好、時鐘和 mapper 每次 request 都重新讀，設定一改下一句就生效。
+
+### 10.6 不把 Google 帳號的 email 送給 Gemini
+
+Gemini 看到的行事曆和帳號都經過 `CalendarAliases`（`Shared/AI/CalendarAliases.swift`），每次 request 從 `AccountStore.calendars()` 重新建立，不儲存：
+
+| 情況 | Gemini 看到的 |
+|---|---|
+| 多個帳號 | `<名稱> \| Account N`，N 依帳號加入的順序（抽屜裡的順序） |
+| 只有一個帳號 | `<名稱>` |
+| 名稱本身是 email 的行事曆（別人共用給你的、沒有標題而顯示 id 的） | `Shared calendar`；同一個帳號有好幾個時是 `Shared calendar 1`、`Shared calendar 2` |
+| 同一個帳號裡同名的行事曆 | `Team`、`Team (2)` |
+| 帳號的主要行事曆 | 本來就是「My calendar」（`displayName`，依 App 語言是「我的行事曆」） |
+
+- **行程內容**：UPCOMING、FOCUS、PENDING EVENTS 和「✨ AI 建議」的行程標題、地點、備註裡，已連結帳號的 email（含 Gmail 的「.」「+標籤」和 googlemail.com 寫法）換成 `[Account N email]`（只有一個帳號時是 `[account email]`），在截短之前就換，不會留下半個地址。別人的 email 保留（那是行程內容）。整段 prompt 最後再掃一次。
+- **函式結果**：錯誤訊息會在下一輪送回 Gemini，所以 `error` 裡的所有 email 都換掉：帳號的換成 `[Account N email]`，其他的換成 `[email address]`（例如「Google sign-in for … expired」，或名稱是 email 的唯讀行事曆）。聊天裡顯示的回覆仍是完整的文字。`update_preferences` 的結果見 10.3 節。
+- **使用者的話**：送給 Gemini 的使用者訊息也先經過 `scrubbingAccountEmails`，打出或說出已連接帳號的 email 時，Gemini 看到的是 `[Account N email]`；別人的 email 照原樣送出（同意說明第 1 項寫明）。iPhone 上保留原文：聊天紀錄、寫進行程備註的原始要求（provenance）、`PreferenceLedger` 的來源。
+- **帳號地址的比對**：佔位字之外，還會照帳號存下的地址字面（不分大小寫）再換一次，所以地址和前後文字黏在一起（「see...example@yourmail.com」「example@yourmail.com.Thanks」）也換得掉；就算它是更長地址的一部分也照換，多換是安全的那一邊。地址的 pattern 要求 local part 以英數字或「_」開頭，所以前面的引號、點、「+」不會被算進地址裡。
+- **換回地址**：`CalendarAliases.restoringAccountEmails(_:)` 把模型寫的 `[Account N email]`（只有一個帳號時也接受 `[account email]`）換回那個帳號的地址：`create_events`、`create_long_term_plan`、`modify_event` 的參數在對應之前整個換回（標題、地點、備註、參加者），`reply_to_user` 的訊息和建議回覆、`summary_for_user`、沒有呼叫函式時的文字也換回後才給使用者看。Gemini 的對話紀錄仍只有佔位字；`create_events` 回給 Gemini 的標題會再換成佔位字。`[email address]` 不換回。
+- **對回行事曆**：模型只會在 `update_preferences` 的 `default_calendar` 指定行事曆；新增行程寫到預設行事曆，修改和刪除照 UPCOMING 的 id 找到那份行程自己的行事曆，所以不需要 email。規則 12 告訴模型：照抄 CALENDARS 的一行；使用者給了自己帳號的地址時，值可以就是它看到的 `[Account N email]`；使用者用自己的話說帳號（「學校帳號」）時照抄他的話，由 iPhone 比對；不要猜 Account 編號。規則 10 說佔位字代表使用者自己帳號的地址，不要追問；需要那個地址的地方（參加者、標題、地點、備註、回覆）照寫佔位字，App 會換回；`[email address]` 不要追問也不要用。
+- **驗證**：`scripts/validate_schema.py` 檢查 fixture 的 `calendars`、`preferences` 沒有「@」，而且 `AssistantPrompt.swift`、`NoteSuggestionPrompt.swift` 不讀 `accountEmail` 或 `promptLabel`；`AccountEmailPrivacyTests` 用兩個帳號從頭跑一遍（prompt、`update_preferences` 結果、過期登入的錯誤、AI 建議），確認每個 request body 都沒有帳號 email。
+- **限制**：編號每次 request 重新算，移除一個帳號後，後面的帳號編號會往前移，所以移除帳號時（`AccountManager.disconnect(accountID:)`）助理的對話紀錄一併清掉，舊的編號不會再送給 Gemini；舊的「Account 3」對不上時也會被拒絕，模型再問一次。Gemini 看不到網域，所以「學校帳號」這種說法只有在 email、網域或行事曆名稱裡找得到、而且只對到一個時才對得上，否則模型會問是哪一個。只換掉已連結帳號的地址本身：同一個信箱的 Workspace 別名不會被認出。
+- **不在範圍內**（不是送給 Gemini）：iOS 18 推播啟動的行程標題照原樣上傳（同意說明的伺服器那一段）；Siri 和聊天卡片在 iPhone 上顯示「名稱 · email」。
 
 ## 11. 本地驗證
 
