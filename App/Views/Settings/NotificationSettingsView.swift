@@ -83,7 +83,14 @@ struct NotificationSettingsView: View {
             } header: {
                 Text("Dynamic Island")
             } footer: {
-                Text("Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedule plans the next two days each time you open it.")
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedule plans the next two days each time you open it.")
+                    if AIConsentDisclosure.serverNote != nil {
+                        // iOS 18 cannot schedule an activity: Smart Schedule's server starts it, with the titles
+                        // that only AI consent lets leave the iPhone.
+                        Text("On iOS 18, Smart Schedule's server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time.")
+                    }
+                }
             }
 
             Section {

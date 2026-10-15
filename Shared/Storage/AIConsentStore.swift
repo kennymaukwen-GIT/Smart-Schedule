@@ -84,7 +84,9 @@ enum AIConsentDisclosure {
          String(localized: "Your time zone and language")]
     }
 
-    static var recipient: String { String(localized: "Recipient: Google, through the Gemini API.") }
+    static var recipient: String {
+        String(localized: "Recipient: Google, through the Gemini API. Requests pass through Smart Schedule's server, which doesn't keep them.")
+    }
 
     /// iOS 18 cannot start a Live Activity on its own, so a server does it; on iOS 26 the iPhone schedules them itself.
     static var serverNote: String? {

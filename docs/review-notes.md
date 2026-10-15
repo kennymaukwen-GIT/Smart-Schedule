@@ -18,7 +18,7 @@
 
 **Time Sensitive notifications.** Reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning summary and suggestions are Normal. People can change the urgency per kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off.
 
-**Long-press on a reminder.** The notification content extension lets people reply to a reminder by typing or speaking. The extension calls the AI service and Google Calendar itself, so a change ("move it to 4 pm") or a deletion (confirmed with a red button) is done before the notification closes. It uses an ephemeral network session with a 30-second timeout.
+**Long-press on a reminder.** The notification content extension lets people reply to a reminder by typing or speaking. The extension calls the AI service (through our server) and Google Calendar itself, so a change ("move it to 4 pm") or a deletion (confirmed with a red button) is done before the notification closes. It uses an ephemeral network session with a 30-second timeout.
 
 **AI and personal data (Guideline 5.1.2(i)).** Before anything is sent, a one-time dialog explains that requests (typed, or spoken and transcribed to text) and the related events' titles, times, locations and notes are sent to Google's Gemini API, names Google as the recipient, and asks for permission ("Allow" / "Not now"). On iOS 18 the same dialog also says that the titles and start times of the next two days' events are kept on our server to start the Live Activities on time (no notes or places). Nothing is sent before the person taps Allow. Permission can be withdrawn in Settings › AI & privacy, and demo mode works without it.
 

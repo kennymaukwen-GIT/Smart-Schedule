@@ -140,6 +140,22 @@ final class ActivitySchedulerTests: XCTestCase {
         XCTAssertFalse(everything.contains("Terminal 2") || everything.contains("passport"), "no places or notes")
     }
 
+    func testLongTitlesAreCutToWhatTheServerTakes() throws {
+        let title = String(repeating: "Planning ", count: 40) // 360 characters
+        let meeting = event("m", TestClock.local(2026, 10, 15, 9), title: title)
+        let item = ActivityPlanner.items(events: [meeting], leadMinutes: 30, now: now)[0]
+        let state = LiveActivityStateBuilder.build(for: meeting, events: [meeting], lastLine: nil, asOf: item.triggerAt, clock: clock)
+        let entry = try PushToStartRegistrar.event(for: item, attributes: ScheduleActivityAttributes(eventID: "m"), state: state)
+        XCTAssertEqual(entry.title.unicodeScalars.count, PushToStartRegistrar.maxTitleScalars)
+        XCTAssertTrue(title.hasPrefix(entry.title))
+        let decoded = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self, from: Data(entry.contentStateJSON.utf8))
+        XCTAssertEqual(decoded.headline, entry.title, "the pushed headline too")
+        // Counted in Unicode scalars, as the server counts (JavaScript's Array.from): an emoji family is five.
+        let families = String(repeating: "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", count: 50)
+        XCTAssertEqual(PushToStartRegistrar.capped(families).unicodeScalars.count, 200)
+        XCTAssertEqual(PushToStartRegistrar.capped("Dentist"), "Dentist")
+    }
+
     func testRegistrationIsReplacedWhole() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("push-to-start-\(UUID().uuidString).json")
         let defaults = UserDefaults(suiteName: "ActivitySchedulerTests")!

@@ -1356,7 +1356,7 @@ When `dailyReminderCap = N`: group candidate reminders by the local day of their
 - Title: "Use the AI assistant?"
 - Lead: "To understand your requests, Smart Schedule sends them to Google's Gemini API. This includes:"
 - Items: "What you type or say to the assistant (spoken requests as text)" · "Titles, times, locations and notes of your events in the days the request is about (the next two weeks by default)" · "The names of your calendars and your assistant settings" · "Your time zone and language"
-- Recipient: "Recipient: Google, through the Gemini API."
+- Recipient: "Recipient: Google, through the Gemini API. Requests pass through Smart Schedule's server, which doesn't keep them."
 - Server note, iOS 18 only (`AIConsentDisclosure.serverNote`): "On iOS 18, the titles and start times of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." Disclosure version 2 asks everyone again.
 - Footnote: "Nothing is sent until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode works without sharing anything."
 - Never claim that Google does not use the data for training (that is only true on Gemini's paid tier; see §16).

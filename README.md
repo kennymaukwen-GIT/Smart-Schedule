@@ -137,7 +137,7 @@ open SmartSchedule.xcodeproj
 ```
 1. 在 Apple Developer 後台建立 App Group `group.com.smartschedule.shared`，三個 target 都勾選。如果要改 bundle ID 前綴，記得同步改 `AppConstants.appGroupID`。
 2. Google Cloud：啟用 Calendar API，OAuth consent screen 加入 `calendar.events` 和 `calendar.calendarlist.readonly`（抽屜列出每個行事曆要用），建立 **iOS** 類型的 OAuth client。
-3. Gemini：App 裡**沒有** API key。key 只放在 Smart Schedule 的伺服器（`server/worker/`，Cloudflare Worker 的 secret），App 以 App Attest 證明自己後經由伺服器呼叫 Gemini。`GEMINI_BASE_URL` 指向伺服器（`https://<worker 網域>/v1beta`）；模擬器沒有 App Attest，Debug 版改送 `SS_DEV_TOKEN`（Release 一律為空）。上線前替 Gemini API 的專案開啟 Cloud Billing（付費層級）：免費層級下 Google 可能用請求內容改善產品，App 裡不會也不能宣稱「不用於訓練」。
+3. Gemini：App 裡**沒有** API key。key 只放在 Smart Schedule 的伺服器（`server/worker/`，Cloudflare Worker 的 secret），App 以 App Attest 證明自己後經由伺服器呼叫 Gemini（通知擴充不能用 App Attest，改送 App 替它要的 session token）。`GEMINI_BASE_URL` 指向伺服器（`https://<worker 網域>/v1beta`）；模擬器沒有 App Attest，Debug 版改送 `SS_DEV_TOKEN`（Release 一律為空）。上線前替 Gemini API 的專案開啟 Cloud Billing（付費層級）：免費層級下 Google 可能用請求內容改善產品，App 裡不會也不能宣稱「不用於訓練」。
 4. 訂閱：Scheme 的 StoreKit Configuration 用 `Config/SmartSchedule.storekit` 在模擬器測試；上架前在 App Store Connect 建立同樣 ID 的訂閱群組和商品。
 5. 實機執行，到控制中心加入「Smart Schedule」控制項（設定 › 捷徑與 Siri 有步驟說明）。
 

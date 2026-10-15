@@ -41,8 +41,13 @@
 
 ```http
 POST {GEMINI_BASE_URL}/models/{GEMINI_MODEL_ID}:generateContent
-x-goog-api-key: <dev only — production goes through proxy>
+Authorization: Bearer <base64(App Attest key ID bytes ‖ assertion over SHA-256 of this body)>
+（通知擴充：Authorization: Session <token>）
 ```
+
+`GEMINI_BASE_URL` 是 Smart Schedule 的伺服器（`server/worker/`，`https://<worker>/v1beta`）：驗證 App Attest、限流後，把同一個 body 原封不動轉給 `https://generativelanguage.googleapis.com/v1beta/...`，由伺服器加上 Gemini key。App 裡沒有 key（`Shared/Security/AppAttestClient.swift`、`GeminiClient`）。模擬器沒有 App Attest，Debug 版改送 `X-Dev-Token`（伺服器要開 `ALLOW_DEV_TOKEN`）；Release 沒有這條路。伺服器回 401 `unknown_key` / `invalid_assertion` 時重新 attest 一次，`stale_counter`（兩個 request 交錯）時換一個新的 assertion 重送一次。
+
+App Attest 在 iOS 的 app extension 裡不能用（Apple 文件：`generateKey` 在 app extension 一律失敗，只有 watchOS extension 例外），所以通知擴充不 attest：App 用自己的 App Attest 身分向伺服器要一個 7 天的 session token（`POST /session`），存在 App 和擴充共用的 Keychain access group，擴充送 `Authorization: Session <token>`。伺服器只在 `/v1beta/*`（Gemini）接受它，失效時回 401 `invalid_session`，擴充就刪掉它，請使用者打開 App 一次。App 在回到前景、背景更新和 AI 同意改變時，剩不到 3 天就換一個新的（`AppAttestClient.refreshSessionIfNeeded`）；沒有 AI 同意時不要。
 ```json
 {
   "systemInstruction": { "parts": [{ "text": "You are Smart Schedule ...\n# Clock\nnow_local: 2026-10-13T10:15 (Tuesday)\ntime_zone: Europe/London (currently UTC+1.0)\n...\n# UPCOMING / BUSY (id | title | start | end | flags | notes: … when the event has notes)\nss0k3p | Online meeting with Joe | 2026-10-13T15:30 | 2026-10-13T16:30 | event | notes: Product quality review" }] },

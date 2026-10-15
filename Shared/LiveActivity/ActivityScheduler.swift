@@ -170,7 +170,10 @@ final class ActivityScheduler {
         }
         Self.storeStartedTriggers(started.filter { planned[$0.key] != nil })
 
-        if #unavailable(iOS 26.0) {
+        if #available(iOS 26.0, *) {
+            // The iPhone schedules them itself: titles the server kept while this iPhone ran iOS 18 are cleared.
+            await PushToStartRegistrar.uploadIfNeeded(changed: false, consented: false)
+        } else {
             observePushToStartTokens()
             let upcoming = enabled
                 ? ActivityPlanner.items(events: events, leadMinutes: lead, now: now, limit: PushToStartRegistrar.maxEvents)
@@ -185,7 +188,9 @@ final class ActivityScheduler {
                                                  state: LiveActivityStateBuilder.build(for: item.event, events: registered,
                                                                                        lastLine: nil, asOf: item.triggerAt))
             }
-            await PushToStartRegistrar.sync(token: pushToStartToken ?? ScheduleActivity.pushToStartToken, upcomingEvents: entries)
+            let changed = await PushToStartRegistrar.sync(token: pushToStartToken ?? ScheduleActivity.pushToStartToken,
+                                                          upcomingEvents: entries)
+            await PushToStartRegistrar.uploadIfNeeded(changed: changed, consented: AIConsentStore.current.isGranted)
         }
     }
 

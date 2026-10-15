@@ -150,6 +150,7 @@ targets:
       - Shared/AI
       - Shared/Calendar
       - Shared/Auth
+      - Shared/Security   # App Attest: the extension calls Smart Schedule's server itself
       - Shared/Orchestrator
       - Shared/Notifications
       - Shared/DesignSystem
@@ -180,8 +181,8 @@ targets:
       properties:
         com.apple.security.application-groups: [group.com.smartschedule.shared]
         keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]
-        # The extension calls the server itself (long-press replies), so it attests with its own key.
-        com.apple.developer.devicecheck.appattest-environment: $(APP_ATTEST_ENVIRONMENT)
+        # No App Attest here: it does not work in app extensions. The extension sends the server session the app
+        # keeps for it in the shared Keychain group (Shared/Security/AppAttestClient.swift).
 
   # ───────────── Hostless unit tests: pure logic in Shared/, compiled straight into the bundle ─────────────
   # No TEST_HOST, so tests run without launching the app. Shared/Intents (the app/widget App Intents) is left

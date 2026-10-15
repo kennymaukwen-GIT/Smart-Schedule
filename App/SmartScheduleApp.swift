@@ -49,6 +49,7 @@ struct SmartScheduleApp: App {
                     await chat.appendLearnedSuggestions()
                     await schedule.refresh(.foreground)
                     await LiveActivityManager.shared.summonIfDue()
+                    await AppAttestClient.shared.refreshSessionIfNeeded()
                 }
                 Task {
                     // Lists older than 6 h; new calendars show up through the `.accounts` change.
@@ -123,12 +124,28 @@ final class AppRouter {
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    private var consentObservation: SharedChangeObservation?
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         NotificationIDs.registerCategories()
         // Every sync that changes the cache reschedules reminders and refreshes the Live Activity.
         AppRefresh.installSyncHooks()
+        // iOS 18: the push-to-start registration goes to Smart Schedule's server (App Attest), which starts each
+        // event's Live Activity on time.
+        PushToStartRegistrar.install { registration in
+            guard let body = try? PushToStartRegistrar.encoder.encode(registration) else { return false }
+            return (try? await ServerClient.shared.post("devices/push-to-start", json: body)) != nil
+        }
+        // Consent given or withdrawn (here or in the notification extension): the server gets the events or forgets
+        // them, and the extension gets its session.
+        consentObservation = SharedChangeNotifier.observe(.consent) {
+            Task { @MainActor in
+                await LiveActivityManager.shared.refreshIfRunning()
+                await AppAttestClient.shared.refreshSessionIfNeeded()
+            }
+        }
         // Finishes transactions that arrived while the app was closed and keeps `isPro` current.
         Task { @MainActor in SubscriptionStore.shared.start() }
         Task {

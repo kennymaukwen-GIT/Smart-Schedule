@@ -8,6 +8,10 @@ enum DataEraser {
     @MainActor
     static func eraseAll() async {
         await LiveActivityManager.shared.dismiss()
+        // iOS 18: the server forgets the events it was to start Live Activities for (titles), then this install's
+        // App Attest key and the notification extension's session go.
+        await PushToStartRegistrar.eraseAll()
+        await AppAttestClient.shared.forgetAll()
         await ReminderScheduler.shared.removeAll()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         // Revokes every token at Google, deletes them (legacy item included) and the accounts file.

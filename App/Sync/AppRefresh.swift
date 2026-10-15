@@ -26,6 +26,8 @@ enum AppRefresh {
         await SyncEngine.shared.sync(.background)
         await ReminderScheduler.shared.reschedule()
         await LiveActivityManager.shared.refreshIfRunning()
+        // The notification extension's session for Smart Schedule's server, before it runs out.
+        await AppAttestClient.shared.refreshSessionIfNeeded()
     }
 
     /// Call once at launch: a sync that changes the cache also refreshes the Live Activity (the engine reschedules

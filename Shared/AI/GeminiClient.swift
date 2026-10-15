@@ -1,10 +1,11 @@
 import Foundation
 
 struct GeminiConfig: Sendable {
+    /// Smart Schedule's server (server/worker) + "/v1beta": it checks App Attest and adds the Gemini key, which is
+    /// never in the app. The path below it is Gemini's REST path.
     var baseURL: String
     var modelID: String
-    /// Dev only. In production leave empty and point `baseURL` at a proxy that injects the key
-    /// and verifies App Check / DeviceCheck.
+    /// Not sent: the server adds the key. Kept so existing callers still build.
     var apiKey: String?
     /// Gemini 3.x `thinkingLevel` ("low" | "high"). Nil = model default. Do not send to 2.x models.
     var thinkingLevel: String?
@@ -13,7 +14,7 @@ struct GeminiConfig: Sendable {
         GeminiConfig(
             baseURL: AppConstants.info("SSGeminiBaseURL") ?? "https://generativelanguage.googleapis.com/v1beta",
             modelID: AppConstants.info("SSGeminiModelID") ?? "gemini-3.5-flash",
-            apiKey: AppConstants.info("SSGeminiAPIKey"),
+            apiKey: nil,
             thinkingLevel: "low" // parsing a sentence is latency-bound; plans still come out well-structured
         )
     }
@@ -90,19 +91,32 @@ struct GeminiResponse: Sendable {
 ///
 /// The one gate for AI data sharing: every entry point (chat, Quick Capture, Siri, notification replies, the
 /// notification extension) reaches Gemini through `generate`, which refuses without consent.
+///
+/// Requests go to Smart Schedule's server, not to Google: the same Gemini REST path and body, with App Attest
+/// headers (`AttestationProviding`) instead of an API key.
 final class GeminiClient: Sendable {
     let config: GeminiConfig
     private let declarationsJSON: Data
     private let session: URLSession
     private let consentCheck: @Sendable () -> Bool
+    private let attestation: AttestationProviding
 
     /// - Parameter consentCheck: whether the user allowed AI data sharing. Unit tests inject it.
-    init(config: GeminiConfig = .fromBundle,
-         session: URLSession = NetworkSession.shared,
-         consentCheck: @escaping @Sendable () -> Bool = { AIConsentStore.current.isGranted }) {
+    convenience init(config: GeminiConfig = .fromBundle,
+                     session: URLSession = NetworkSession.shared,
+                     consentCheck: @escaping @Sendable () -> Bool = { AIConsentStore.current.isGranted }) {
+        self.init(config: config, session: session, consentCheck: consentCheck, attestation: AppAttestClient.shared)
+    }
+
+    /// - Parameter attestation: proves the request comes from this app. Unit tests inject it.
+    init(config: GeminiConfig,
+         session: URLSession,
+         consentCheck: @escaping @Sendable () -> Bool,
+         attestation: AttestationProviding) {
         self.config = config
         self.session = session
         self.consentCheck = consentCheck
+        self.attestation = attestation
         self.declarationsJSON = Self.loadDeclarations()
     }
 
@@ -129,28 +143,30 @@ final class GeminiClient: Sendable {
         }
 
         let base = config.baseURL.hasSuffix("/") ? String(config.baseURL.dropLast()) : config.baseURL
+        guard ServerEndpoint.origin(of: base) != nil else {
+            // Google itself would need an API key in the app.
+            throw GeminiError.malformed("GEMINI_BASE_URL must point at Smart Schedule's server")
+        }
         guard let url = URL(string: "\(base)/models/\(config.modelID):generateContent") else {
             throw GeminiError.malformed("bad base URL")
         }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let key = config.apiKey { request.setValue(key, forHTTPHeaderField: "x-goog-api-key") }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let data = try await send(request)
+        let data = try await send(request, body: try JSONSerialization.data(withJSONObject: body))
         return try Self.parse(data)
     }
 
     // MARK: - Transport with bounded retry on 429 / 5xx
 
-    private func send(_ request: URLRequest, attempt: Int = 0) async throws -> Data {
-        let (data, response) = try await session.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    /// Each attempt is signed again: the server accepts every assertion once.
+    private func send(_ request: URLRequest, body: Data, attempt: Int = 0) async throws -> Data {
+        let (data, response) = try await AttestedRequest.send(request, body: body, attestation: attestation, session: session)
+        let status = response?.statusCode ?? 0
         if (200..<300).contains(status) { return data }
         if (status == 429 || status >= 500), attempt < 2 {
             try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 800_000_000))
-            return try await send(request, attempt: attempt + 1)
+            return try await send(request, body: body, attempt: attempt + 1)
         }
         let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])
             .flatMap { $0["error"] as? [String: Any] }

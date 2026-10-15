@@ -3227,6 +3227,16 @@
         }
       }
     },
+    "On iOS 18, Smart Schedule's server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 iOS 18 上，每個行程由 Smart Schedule 的伺服器啟動，因此需要在「設定 › AI 與隱私」允許 AI 資料分享。未允許時，只有在這段時間內打開 App，行程才會出現。"
+          }
+        }
+      }
+    },
     "On iOS 18, the titles and start times of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
       "localizations" : {
         "zh-Hant" : {
@@ -3294,6 +3304,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打開快速輸入"
+          }
+        }
+      }
+    },
+    "Open Smart Schedule once so the assistant can answer here." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先打開 Smart Schedule 一次，助理才能在這裡回覆。"
           }
         }
       }
@@ -3490,12 +3510,12 @@
         }
       }
     },
-    "Recipient: Google, through the Gemini API." : {
+    "Recipient: Google, through the Gemini API. Requests pass through Smart Schedule's server, which doesn't keep them." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收件者：Google（透過 Gemini API）。"
+            "value" : "收件者：Google（透過 Gemini API）。要求會經過 Smart Schedule 的伺服器轉送，伺服器不會保存。"
           }
         }
       }
@@ -4070,6 +4090,26 @@
         }
       }
     },
+    "Smart Schedule's server didn't answer (%lld). Try again later." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule 的伺服器沒有回應（%lld）。請稍後再試。"
+          }
+        }
+      }
+    },
+    "Smart Schedule's server sent something unexpected. Try again later." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule 的伺服器傳回了無法辨識的內容。請稍後再試。"
+          }
+        }
+      }
+    },
     "Snooze 10 min" : {
       "localizations" : {
         "zh-Hant" : {
@@ -4139,6 +4179,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開始"
+          }
+        }
+      }
+    },
+    "Starts in %@ min" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 分鐘後開始"
           }
         }
       }
@@ -4510,6 +4560,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目前沒有等待確認的計畫草稿。"
+          }
+        }
+      }
+    },
+    "This device can't prove it is running Smart Schedule, so the assistant is unavailable." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台裝置無法證明正在執行 Smart Schedule，因此無法使用助理。"
           }
         }
       }
