@@ -81,6 +81,7 @@ struct AIConsentDisclosureText: View {
             }
             .font(.system(size: 15, weight: .medium))
             .foregroundStyle(.white)
+            // iOS 18 server storage for push-to-start: nil in version 1.0 (AppConstants.pushToStartEnabled).
             if let note = AIConsentDisclosure.serverNote {
                 Label {
                     Text(verbatim: note)

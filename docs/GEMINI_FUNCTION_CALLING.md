@@ -184,14 +184,14 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
 
 - **唯一的關卡在 `GeminiClient.generate`**：一開始就檢查 `AIConsentStore.current.isGranted`，沒有同意就丟出 `GeminiError.consentRequired`，連 request 都不會組。聊天、快速輸入、Siri、通知裡的回覆、notification extension 全都經過這裡，所以一個關卡就涵蓋全部入口。單元測試用注入的 `consentCheck` 和一個會計數的 `URLSession` 證明沒有任何 request 送出。
 - 同意存在 App Group 的 `UserDefaults`（key `SSAIConsent`，JSON），三個 process 都能同步讀到；寫入時發 `SharedChange.consent`。
-- 說明文字只有一份：`AIConsentDisclosure`（標題、會送出的 5 類資料、收件者「Google，透過 Gemini API」、iOS 18 的伺服器說明、語音辨識說明、註腳）。同意畫面和「設定 › AI 與隱私 › 會送出什麼」都用它。說明內容有重大改變時把 `AIConsent.disclosureVersion` 加 1，所有人會被重新詢問。目前是第 4 版，5 類資料**完全對應** prompt 實際送出的內容（10.6 節）：
+- 說明文字只有一份：`AIConsentDisclosure`（標題、會送出的 5 類資料、收件者「Google，透過 Gemini API」、iOS 18 的伺服器說明（只有開啟 push-to-start 時才有，1.0 沒有）、語音辨識說明、註腳）。同意畫面和「設定 › AI 與隱私 › 會送出什麼」都用它。說明內容有重大改變時把 `AIConsent.disclosureVersion` 加 1，所有人會被重新詢問。目前是第 5 版（1.0 不用 iOS 18 的 push-to-start，所以拿掉了 iOS 18 的伺服器說明；第 4 版起帳號 email 不送給 Gemini），5 類資料**完全對應** prompt 實際送出的內容（10.6 節）：
   1. 對助理輸入或說出的內容（語音先轉成文字），包括其中提到的姓名或 email；
   2. 從今天起 14 天內最多 40 個行程的標題、時間、備註（每個最多 300 字）和 Google 行程 ID，以及回覆提醒的那個行程（UPCOMING 和 FOCUS 都**沒有地點**）；
   3. 「✨ AI 建議」只送那一個行程，包括地點（12.2 節）；
   4. 行事曆名稱和助理設定，但**不包括 Google 帳號的 email**；
   5. 時區和語言。
 
-  另外三段：iOS 18 上接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色存在 Smart Schedule 的伺服器並透過 Apple 的推播服務送出（iOS 26 不顯示）；語音由 Apple 轉成文字（開啟「裝置端辨識」且支援該語言時在 iPhone 上，否則在 Apple 的伺服器）；註腳「點『允許』之前，不會傳送任何資料給 AI……示範模式從不連線到 AI」。
+  另外的段落：語音由 Apple 轉成文字（開啟「裝置端辨識」且支援該語言時在 iPhone 上，否則在 Apple 的伺服器）；註腳「點『允許』之前，不會傳送任何資料給 AI……示範模式從不連線到 AI」。iOS 18 的伺服器說明（接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色存在 Smart Schedule 的伺服器並透過 Apple 的推播服務送出）只在 `AppConstants.pushToStartEnabled` 為 true 時出現（`AIConsentDisclosure.serverNote`），1.0 在每個 iOS 版本都是 nil：伺服器不存任何行程。
 - **絕對不要寫「不會被用來訓練」**：這只在 Gemini 付費方案成立。上線檢查清單：在 Gemini API 專案啟用 Cloud Billing（付費方案）。免費方案下 Google 可能用 prompt 改善產品。
 - 示範模式（`DemoAssistant`）不呼叫 Gemini，不需要同意。
 - Siri（`AddPlanIntent`）沒有同意時直接回「Turn on AI data sharing in Smart Schedule's Settings first.」，不呼叫助理。
@@ -292,7 +292,7 @@ Gemini 看到的行事曆和帳號都經過 `CalendarAliases`（`Shared/AI/Calen
 - **對回行事曆**：模型只會在 `update_preferences` 的 `default_calendar` 指定行事曆；新增行程寫到預設行事曆，修改和刪除照 UPCOMING 的 id 找到那份行程自己的行事曆，所以不需要 email。規則 12 告訴模型：照抄 CALENDARS 的一行；使用者給了自己帳號的地址時，值可以就是它看到的 `[Account N email]`；使用者用自己的話說帳號（「學校帳號」）時照抄他的話，由 iPhone 比對；不要猜 Account 編號。規則 10 說佔位字代表使用者自己帳號的地址，不要追問；需要那個地址的地方（參加者、標題、地點、備註、回覆）照寫佔位字，App 會換回；`[email address]` 不要追問也不要用。
 - **驗證**：`scripts/validate_schema.py` 檢查 fixture 的 `calendars`、`preferences` 沒有「@」，而且 `AssistantPrompt.swift`、`NoteSuggestionPrompt.swift` 不讀 `accountEmail` 或 `promptLabel`；`AccountEmailPrivacyTests` 用兩個帳號從頭跑一遍（prompt、`update_preferences` 結果、過期登入的錯誤、AI 建議），確認每個 request body 都沒有帳號 email。
 - **限制**：編號每次 request 重新算，移除一個帳號後，後面的帳號編號會往前移，所以移除帳號時（`AccountManager.disconnect(accountID:)`）助理的對話紀錄一併清掉，舊的編號不會再送給 Gemini；舊的「Account 3」對不上時也會被拒絕，模型再問一次。Gemini 看不到網域，所以「學校帳號」這種說法只有在 email、網域或行事曆名稱裡找得到、而且只對到一個時才對得上，否則模型會問是哪一個。只換掉已連結帳號的地址本身：同一個信箱的 Workspace 別名不會被認出。
-- **不在範圍內**（不是送給 Gemini）：iOS 18 推播啟動的行程標題照原樣上傳（同意說明的伺服器那一段）；Siri 和聊天卡片在 iPhone 上顯示「名稱 · email」。
+- **不在範圍內**（不是送給 Gemini）：Siri 和聊天卡片在 iPhone 上顯示「名稱 · email」。之後的版本開啟 iOS 18 push-to-start 時，登記給伺服器的行程標題會照原樣上傳（同意說明的伺服器那一段）；1.0 不上傳任何行程。
 
 ## 11. 本地驗證
 

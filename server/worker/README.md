@@ -5,6 +5,8 @@ Smart Schedule 的伺服器端（Cloudflare Worker，TypeScript，**零 runtime 
 - **Gemini proxy**：Gemini API key 只存在 Worker secret，App 不再內含 key。每個 request 都必須通過 **Apple App Attest**
   （或由 App 為其 extension 申請的 session token）驗證，body 原封不動（byte-for-byte）轉送。
 - **Live Activity push-to-start**：iOS 18 無法排程 Live Activity，由 Worker 的 cron 在每個行程的 `triggerAt` 透過 APNs push-to-start 啟動。
+  **1.0 版不使用**：App 的 `AppConstants.pushToStartEnabled = false`，不要求 push token、不上傳任何行程、沒有 `aps-environment`；
+  `wrangler.toml` 的正式環境 `crons = []`，也不需要 APNs secrets（`.p8`）。路由與程式碼保留給之後的版本，開啟方式見「1.0：push-to-start 關閉」。
 
 | 路徑 | 驗證 | 用途 |
 | --- | --- | --- |
@@ -12,8 +14,8 @@ Smart Schedule 的伺服器端（Cloudflare Worker，TypeScript，**零 runtime 
 | `POST /attest` | 無（依 IP rate limit） | 驗證 App Attest attestation，記住 key |
 | `POST /session` | App Attest assertion（或 dev token） | 發 session token 給 App 的 notification content extension |
 | `ANY /v1beta/*` | App Attest assertion（或 dev token）；**Session token 只限 `POST /v1beta/models/<SESSION_MODELS>:generateContent`** | 轉送到 `https://generativelanguage.googleapis.com/v1beta/*` |
-| `POST /devices/push-to-start` | App Attest assertion（或 dev token） | 存裝置的 push-to-start 註冊（整份取代） |
-| cron `* * * * *` | — | 送出到期的 push-to-start |
+| `POST /devices/push-to-start` | App Attest assertion（或 dev token） | 存裝置的 push-to-start 註冊（整份取代）；1.0 的 App 不會呼叫 |
+| cron `* * * * *` | — | 送出到期的 push-to-start；**1.0 關閉**（`crons = []`） |
 
 ---
 
@@ -52,17 +54,17 @@ npm run deploy
 # 2. Secrets：存在 Cloudflare，之後每次部署都會保留，不會寫進 repo
 npx wrangler secret put GEMINI_API_KEY
 npx wrangler secret put APPLE_TEAM_ID           # 10 字元 Team ID（developer.apple.com › Membership details）
-npx wrangler secret put APNS_KEY_ID             # APNs .p8 的 Key ID（見「APNs .p8 設定」）
-npx wrangler secret put APNS_TEAM_ID            # 擁有該 .p8 的 Team ID
-npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
-npx wrangler secret list                        # 只列名稱，確認上面幾個都在
+npx wrangler secret list                        # 只列名稱，確認上面兩個都在
 ```
+
+**1.0 不需要 APNs secrets**（`APNS_KEY_ID`、`APNS_TEAM_ID`、`APNS_PRIVATE_KEY`），也不必建立 `.p8`：1.0 沒有 push-to-start，
+正式環境的 cron 也關閉（`crons = []`）。只有之後的版本開啟 push-to-start 時才需要，步驟見「1.0：push-to-start 關閉」與「APNs .p8 設定」。
 
 **Team ID 與 APNs ID 是 secret，不是 var**：`wrangler deploy` 每次都用 `wrangler.toml` 的 `[vars]` 取代線上的 vars，
 寫在檔案裡就得把 Team ID commit 進 repo，留空則每次部署都把它清掉（`POST /attest` 回 `500 server_misconfigured`）。
 Secret 不受部署影響。同一個名稱不能同時是 var 和 secret，所以先部署（把舊版留在線上的空白 var 拿掉）再 `secret put`；
-`test/config-sync.test.ts` 會檢查這些名稱沒有再出現在 `wrangler.toml`。Apple 開發者帳號還沒核准時可以先不設，
-只是實機 attest 會回 500、push-to-start 不會送出，Simulator（dev token）不受影響。
+`test/config-sync.test.ts` 會檢查這些名稱沒有再出現在 `wrangler.toml`。Apple 開發者帳號還沒核准時可以先不設 `APPLE_TEAM_ID`，
+只是實機 attest 會回 500，Simulator（dev token）不受影響。
 
 **KV namespace**：正式環境的 `[[kv_namespaces]]` 已寫上第一次部署自動建立的 namespace
 （`smart-schedule-worker-ss-kv`）的 `id`；`[env.dev]` 只寫 `binding`，第一次 `npm run deploy:dev` 會另外建立一個。
@@ -83,13 +85,14 @@ fork 這個 repo 時把正式環境的 `id` 那行刪掉，第一次部署就會
 （預設 `"1001"`，與其他 Worker 的 rate limiter 衝突時改掉）；`simple.limit` 請與 `RATE_LIMIT_PER_MIN` 保持相同。
 沒有這個 binding 時 Worker 會改用 KV 計數（見「Rate limit」）。
 
-部署後，App 的 `SSGeminiBaseURL` 指向 `https://<你的 Worker 網域>/v1beta`，App Attest、session 與 push-to-start 也用同一個網域。
+部署後，App 的 `SSGeminiBaseURL` 指向 `https://<你的 Worker 網域>/v1beta`，App Attest 與 session 也用同一個網域
+（之後開啟 push-to-start 時亦同）。
 本 repo 不寫死任何網域或 Team ID。
 
 ### 開發 / 正式環境
 
 `APP_ATTEST_ENV` 必須對應 App 的 `com.apple.developer.devicecheck.appattest-environment` entitlement，
-`APNS_ENV` 必須對應 App 的 `aps-environment`：
+`APNS_ENV` 必須對應 App 的 `aps-environment`（1.0 的 App 沒有 `aps-environment`、也不跑 cron，`APNS_ENV` 目前沒有作用，維持下表的值即可）：
 
 | App build | Worker（`GEMINI_BASE_URL`） | `APP_ATTEST_ENV` | `APNS_ENV` | `ALLOW_DEV_TOKEN` |
 | --- | --- | --- | --- | --- |
@@ -97,9 +100,10 @@ fork 這個 repo 時把正式環境的 `id` 那行刪掉，第一次部署就會
 | Debug，Xcode 裝到 iPhone | 開發版 | `development` | `sandbox` | `"true"` |
 | TestFlight / App Store | 正式版 | `production` | `production` | **必須不是** `"true"` |
 
-Release 設定從 Xcode 直接 Run 到 iPhone（或 Development export）時，App Attest 是 `production`、可以用正式版，
-但 `aps-environment` 仍是 development，push token 屬於 sandbox，正式版 Worker 送到正式 APNs 會被拒（`BadDeviceToken`）。
-push-to-start 請用 TestFlight 測，或用 Debug build 搭配開了 cron 與 APNs secrets 的開發版（見 `wrangler.toml` 的 `[env.dev]`）。
+Release 設定從 Xcode 直接 Run 到 iPhone（或 Development export）時，App Attest 是 `production`、可以用正式版。
+（之後開啟 push-to-start 時：這種 build 的 `aps-environment` 仍是 development，push token 屬於 sandbox，正式版 Worker 送到正式 APNs
+會被拒（`BadDeviceToken`）。push-to-start 請用 TestFlight 測，或用 Debug build 搭配開了 cron 與 APNs secrets 的開發版，
+見 `wrangler.toml` 的 `[env.dev]`。）
 
 開發與正式是兩個不同的 Worker：`wrangler.toml` 的 `[env.dev]` 是 `smart-schedule-worker-dev`（自己的 KV namespace、
 rate limiter 與 secrets，`ALLOW_DEV_TOKEN = "true"`、`APP_ATTEST_ENV = "development"`、`APNS_ENV = "sandbox"`、不跑 cron），
@@ -135,7 +139,25 @@ CI 也會用假的 `Secrets.xcconfig` 確認上面的寫法在 Debug/Release × 
 
 ---
 
+## 1.0：push-to-start 關閉
+
+1.0 版的 App 不使用 iOS 18 Live Activity push-to-start（`Shared/Core/AppConstants.swift` 的 `pushToStartEnabled = false`）：
+不要求 push token、不呼叫 `POST /devices/push-to-start`、伺服器上不存任何行程資料，App 也沒有 `aps-environment` entitlement。
+iOS 26 仍在 iPhone 上自行排程 Live Activity；iOS 18 只有在 App 執行時（提前時間內打開 App）才會出現。
+所以正式環境 `wrangler.toml` 的 `[triggers]` 是 `crons = []`（沒有 APNs secrets 時，cron 每分鐘都只會記一筆 `server_misconfigured`），
+不需要 `.p8`。`crons = []` 部署時也會移除先前部署留下的 cron trigger（Cloudflare 文件：最多約 15 分鐘生效）。
+`test/config-sync.test.ts` 會在 `project.yml` 沒有 `aps-environment` 時要求正式環境的 `crons` 為空。
+
+之後的版本要開啟時（App 端的完整清單見 `AppConstants.pushToStartEnabled` 的註解）：
+
+1. 依下面「APNs .p8 設定」建立 `.p8`，`npx wrangler secret put` 設好 `APNS_KEY_ID`、`APNS_TEAM_ID`、`APNS_PRIVATE_KEY`。
+2. 把 `wrangler.toml` 正式環境的 `[triggers]` 改回 `crons = ["* * * * *"]`，`npm run deploy`。
+3. App 端把 `aps-environment`、`APS_ENVIRONMENT` 與 `remote-notification` 加回 `project.yml`，`pushToStartEnabled` 改為 `true`，
+   並提高 `AIConsent.disclosureVersion`，更新隱私權政策、privacy manifest 與 App Store Connect 的 App 隱私權答案。
+
 ## APNs .p8 設定
+
+1.0 不需要這一節（見上一節）；開啟 push-to-start 時才做。
 
 1. Apple Developer › Certificates, Identifiers & Profiles › **Keys** › ＋，勾選 **Apple Push Notifications service (APNs)**，建立後下載 `AuthKey_<KEYID>.p8`（只能下載一次，請妥善保存，不要 commit；`.gitignore` 已排除 `*.p8`）。
 2. `npx wrangler secret put APNS_KEY_ID`（該 key 的 Key ID，10 字元）、`npx wrangler secret put APNS_TEAM_ID`（擁有該 key 的 Team ID）。
@@ -343,7 +365,8 @@ eventID 須為非空、≤ 1024 bytes、不含控制字元；`attributesJSON` / 
 > Client 注意：deviceID 要長期保留；不要因為換了 App Attest key 或收到錯誤就換 deviceID。只有在 client 自己的還原 / 遺失 key 流程中
 > （例如 App Group 裡的 deviceID 已不存在）才產生新的 deviceID。`403` 代表 dev / attested 或 App 不符，是設定問題。
 
-### Cron（每分鐘）
+### Cron（每分鐘；1.0 關閉）
+1.0 的正式環境不跑 cron（`crons = []`，見「1.0：push-to-start 關閉」）。開啟後的行為如下：
 對 now − 2 min 到 now 的每一分鐘 m，列出 `due:<m>:`（之後的分鐘不可能已到期，所以不列），對每筆重新讀取目前的 `p2s:<deviceID>`，
 只處理 eventID 雜湊相同且 `triggerAt` 落在 m 的 event（否則代表已刪除或移動，略過）。**`triggerAt ≤ now` 才送**（不會提早），
 所以實際送出時間是 triggerAt 之後的第一次 cron（最多晚約 60 s）。以下情況略過：token 為 null / 無效 / 等於 `p2sdead:<deviceID>`；
@@ -421,10 +444,11 @@ Workers KV 是 eventually consistent：寫入在其他 Cloudflare 據點可能�
 - Rate Limiting binding 的呼叫不算 KV 讀寫。
 - 每次 push-to-start 註冊：1 次寫入 `p2s:`，加上每個「新的」(eventID, triggerAt) 1 次 `due:` 寫入（最多 50）。
 - 每則送出的推播：claim 寫入 + sent 寫入 + claim 刪除，另有數次讀取；JWT 每 50 分鐘 1 次寫入。
-- Cron 每分鐘 **3 次 KV list**（約 4,320 次/天）。
+- Cron 每分鐘 **3 次 KV list**（約 4,320 次/天）；**1.0 關閉 cron，這一項是 0**，也沒有 push-to-start 註冊與推播的寫入。
 
-Workers Free plan 的 KV 額度是每天 1,000 次寫入、1,000 次 list，**光是 cron 的 list 就超過**，請使用 Workers Paid plan
-（含每月百萬次等級的讀寫/list 額度）。上線前請依實際使用者數估算費用。
+Workers Free plan 的 KV 額度是每天 1,000 次寫入、1,000 次 list。開啟 cron 時光是它的 list 就超過；1.0 沒有 cron，但每個 assertion
+驗證的 request 仍有 2 次寫入，每天約 500 個 Gemini request 就會用完寫入額度，所以上線仍建議 Workers Paid plan
+（含每月百萬次等級的讀寫/list 額度（請在畫面上確認））。上線前請依實際使用者數估算費用。
 
 ---
 
@@ -479,7 +503,7 @@ GEMINI_BASE_URL[config=Debug][sdk=iphonesimulator*] = http:/$()/localhost:8787/v
 body 上限與 `Content-Length` 不符、讀 body 前就拒絕；每個 (IP, key) 的 body 預算（binding 與 KV 兩種）、共用 IP 上的垃圾不影響合法使用者；
 IPv6 /64 bucket；dev token；rate limit 429（含 100 個平行 session request 的 burst，binding 與 KV 兩種）；KV 寫入碰撞回 503 而非 429
 （與 App 的 Bearer 寫入、Google 503 後的重試）；session 每日上限；每個 IP bucket 每日 attest 上限；`GEMINI_MODEL_ID` 必須列在 `SESSION_MODELS`
-（`test/config-sync.test.ts` 讀 `Config/Base.xcconfig`）；session（發放、scope：其他模型、
+（`test/config-sync.test.ts` 讀 `Config/Base.xcconfig`）；`project.yml` 沒有 `aps-environment` 時正式環境不跑 cron；session（發放、scope：其他模型、
 `:predict` / `:predictLongRunning`、files、cachedContents、GET /v1beta/models 皆 403 且不呼叫上游、512 KB 上限、其他路由拒絕、過期、
 未知 token、與 keyId 共用 rate limit、dev session 隨 dev token 輪替或關閉而失效）；Gemini proxy（body bytes 完全相同、加 key、移除認證 headers、`cf-*` 與 `key` 參數）；
 push-to-start 驗證（整份 vs 單一 event、title 截斷、長 eventID）、整份取代、sent marker 在覆寫後仍保留、同 App 換 key 可接手、dev / 不同 App 回 403；

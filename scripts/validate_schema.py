@@ -20,6 +20,11 @@
    Swift sources is a key.
 7. Version 1.0 sells nothing (docs/SETTINGS.md §16): AppConstants.subscriptionsEnabled is false, and every Swift file
    that reaches StoreKit or SubscriptionStore, or shows subscription copy, reads the flag in code.
+8. Version 1.0 has no iOS 18 Live Activity push-to-start and no remote push: AppConstants.pushToStartEnabled is false,
+   every Swift file that asks iOS for a push-to-start token or installs, syncs, uploads or erases the registration
+   reads the flag in code, and project.yml has neither the aps-environment entitlement nor the remote-notification
+   background mode while both push flags (pushToStartEnabled, liveActivityPushEnabled) are false (and aps-environment
+   once one is on).
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -510,6 +515,40 @@ def subscription_checks() -> int:
     return gated
 
 
+# ---------- Version 1.0 has no push-to-start and no remote push ----------
+
+PUSH_TO_START_USE = re.compile(r'\bpushToStartToken(?:Updates)?\b|"devices/push-to-start"'
+                               r'|\bPushToStartRegistrar\.(?:install|sync|uploadIfNeeded|eraseAll)\b')
+PUSH_TO_START_FLAG = "AppConstants.pushToStartEnabled"
+PUSH_FLAGS = ("pushToStartEnabled", "liveActivityPushEnabled")
+
+
+def push_checks() -> int:
+    """Owner decision for 1.0: no iOS 18 push-to-start, nothing about events on the server, no APNs. The flag is false,
+    and every file that could ask for a token or send the registration reads it, so a new path cannot ship ungated.
+    aps-environment follows the flags both ways; remote-notification must be gone while they are off. Comments are
+    ignored."""
+    constants = (ROOT / "Shared/Core/AppConstants.swift").read_text(encoding="utf-8")
+    if not re.search(r"^\s*static let pushToStartEnabled = false\b", constants, re.M):
+        errors.append("Shared/Core/AppConstants.swift: version 1.0 needs `static let pushToStartEnabled = false`")
+    gated = 0
+    for directory in SWIFT_DIRS:
+        for path in sorted((ROOT / directory).rglob("*.swift")):
+            code = re.sub(r"//.*", "", path.read_text(encoding="utf-8"))
+            if PUSH_TO_START_USE.search(code):
+                gated += 1
+                if PUSH_TO_START_FLAG not in code:
+                    errors.append(f"{path.relative_to(ROOT)}: push-to-start token or upload without {PUSH_TO_START_FLAG}")
+    push_on = any(re.search(rf"^\s*static let {flag} = true\b", constants, re.M) for flag in PUSH_FLAGS)
+    project = re.sub(r"(^|\s)#.*", r"\1", (ROOT / "project.yml").read_text(encoding="utf-8"))
+    if push_on and "aps-environment" not in project:
+        errors.append(f"project.yml: {' / '.join(PUSH_FLAGS)} is on, so the app needs aps-environment: $(APS_ENVIRONMENT)")
+    for entry in ([] if push_on else ["aps-environment", "remote-notification"]):
+        if entry in project:
+            errors.append(f"project.yml: no {entry} while {' and '.join(PUSH_FLAGS)} are false (no remote push in 1.0)")
+    return gated
+
+
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
     by_name = {}
@@ -566,6 +605,7 @@ def main() -> int:
     print(f"✓ String Catalog: {catalog_checks()} keys with zh-Hant")
     strings_file_checks()
     print(f"✓ Subscriptions off: {subscription_checks()} files gated by {SUBSCRIPTION_FLAG}")
+    print(f"✓ Push-to-start off, no aps-environment: {push_checks()} files gated by {PUSH_TO_START_FLAG}")
 
     if errors:
         print("\n".join(f"✗ {e}" for e in errors), file=sys.stderr)

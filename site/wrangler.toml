@@ -1,22 +1,24 @@
-# smart-schedules.com: the public home, privacy and support pages, as an assets-only Worker (no script).
-# Only ./public is uploaded; this file and README.md stay out of the upload. Deploy steps: README.md in this folder.
-# Run from the repo root with the wrangler that server/worker already has:
-#   server/worker/node_modules/.bin/wrangler deploy -c site/wrangler.toml
+# www.smart-schedules.com: the public home, privacy and support pages, as a Cloudflare Pages project (Direct Upload,
+# static files only: no Functions, no _worker.js). DNS stays at Squarespace; the only DNS change is one CNAME
+# "www" → <project>.pages.dev. Step-by-step: README.md in this folder (§3).
+#
+# Pages Direct Upload works without this file. It is here so that wrangler, run from THIS folder (site/), knows the
+# project name and uploads ./public only:
+#   cd site
+#   ../server/worker/node_modules/.bin/wrangler pages project create smart-schedules-site --production-branch main  # once
+#   ../server/worker/node_modules/.bin/wrangler pages deploy public --project-name smart-schedules-site --branch main
+#   ../server/worker/node_modules/.bin/wrangler pages dev                                       # http://localhost:8788
+# - Pages reads only a wrangler.toml in the current directory: `-c` / `--config` is refused ("Pages does not support
+#   custom paths for the Wrangler configuration file"). Run from site/ so this file is used and wrangler's cache lands in
+#   site/.wrangler/ (git-ignored); from the repo root it would create an untracked .wrangler/ there.
+# - Only ./public is uploaded; this file, README.md and .gitignore stay out of the upload.
+# - With pages_build_output_dir set, this file is the source of truth for the project's settings: the dashboard shows
+#   them read-only. There are no bindings or vars, so there is nothing else to keep in sync.
+# - Routing is the Pages default (no option needed): /privacy serves privacy.html; /privacy.html and /privacy/ redirect
+#   (308) to /privacy; unknown paths get public/404.html with status 404 (without a top-level 404.html Pages would treat
+#   the site as a single-page app and answer every path with the home page). public/_headers is applied, never served.
+# - The custom domain is set in the dashboard (Workers & Pages › smart-schedules-site › Custom domains); wrangler has
+#   no command or setting for it. Only www.smart-schedules.com: an apex domain on Pages needs Cloudflare nameservers.
 name = "smart-schedules-site"
+pages_build_output_dir = "./public"
 compatibility_date = "2026-09-15"
-# Served only on the custom domain below: no platform hostname, no per-version preview URLs.
-workers_dev = false
-preview_urls = false
-
-[assets]
-directory = "./public"
-# /privacy serves privacy.html; /privacy.html and /privacy/ redirect to /privacy.
-html_handling = "auto-trailing-slash"
-# Unknown paths get public/404.html with status 404.
-not_found_handling = "404-page"
-
-# The apex domain. Needs smart-schedules.com to be an active zone in the same Cloudflare account; the first deploy
-# then creates the DNS record and certificate. www → apex is a Redirect Rule in the dashboard (README.md).
-[[routes]]
-pattern = "smart-schedules.com"
-custom_domain = true

@@ -10,7 +10,10 @@ struct AIConsent: Codable, Hashable, Sendable {
     /// 4: no Google account email address reaches Gemini (calendars are "Account 1", "Account 2"); names the 14-day /
     /// 40-event window, Google event IDs, locations only for AI suggestions, Apple's push service on iOS 18 and Apple
     /// speech recognition.
-    static let disclosureVersion = 4
+    /// 5: version 1.0 has no Live Activity push-to-start (`AppConstants.pushToStartEnabled` false), so the iOS 18 note
+    /// on event titles kept on Smart Schedule's server and sent through Apple's push service is gone
+    /// (`AIConsentDisclosure.serverNote`). Turning push-to-start on brings that note back: bump again then.
+    static let disclosureVersion = 5
 
     var status: Status = .notAsked
     var version = 0                 // disclosure version the decision applies to
@@ -95,14 +98,22 @@ enum AIConsentDisclosure {
         String(localized: "Recipient: Google, through the Gemini API. Requests pass through Smart Schedule's server, which doesn't keep them.")
     }
 
-    /// iOS 18 cannot start a Live Activity on its own, so a server does it; on iOS 26 the iPhone schedules them itself.
+    /// iOS 18 cannot start a Live Activity on its own, so with push-to-start a server does it; on iOS 26 the iPhone
+    /// schedules them itself. nil in version 1.0 on every iOS: push-to-start is off (`AppConstants.pushToStartEnabled`)
+    /// and nothing about events is kept on the server.
     static var serverNote: String? {
         if #available(iOS 26.0, *) { return serverNote(beforeIOS26: false) }
         return serverNote(beforeIOS26: true)
     }
 
     static func serverNote(beforeIOS26: Bool) -> String? {
-        guard beforeIOS26 else { return nil }
+        serverNote(beforeIOS26: beforeIOS26, pushToStart: AppConstants.pushToStartEnabled)
+    }
+
+    /// `pushToStart`: `AppConstants.pushToStartEnabled`, a parameter so tests can check the wording kept for a later
+    /// version that turns it on (which also bumps `AIConsent.disclosureVersion`).
+    static func serverNote(beforeIOS26: Bool, pushToStart: Bool) -> String? {
+        guard beforeIOS26, pushToStart else { return nil }
         return String(localized: "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on Smart Schedule's server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
     }
 

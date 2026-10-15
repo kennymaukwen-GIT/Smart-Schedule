@@ -343,7 +343,8 @@ struct ServerClient: Sendable {
     var attestation: AttestationProviding = AppAttestClient.shared
     var session: URLSession = NetworkSession.shared
 
-    /// POSTs JSON to `path` ("devices/push-to-start"); the response body on 2xx.
+    /// POSTs JSON to `path` ("devices/push-to-start", only with `AppConstants.pushToStartEnabled`, so not in version
+    /// 1.0); the response body on 2xx.
     func post(_ path: String, json body: Data) async throws -> Data {
         guard let origin else { throw AttestationError.notConfigured }
         var request = URLRequest(url: origin.appendingPathComponent(path), timeoutInterval: 20)

@@ -8,9 +8,26 @@ enum AppConstants {
     static let backgroundRefreshTaskID = "com.smartschedule.refresh"
     static let controlKind = "com.smartschedule.control.summon"
 
-    /// Per-activity update tokens (`.token`): the Worker has no route for them yet, so keep false. Push-to-start
-    /// (iOS 18, `PushToStartRegistrar` → POST /devices/push-to-start) works without this flag.
+    /// Per-activity update tokens (`.token`): the Worker has no route for them yet, so keep false. Independent of
+    /// `pushToStartEnabled`, but like it needs the aps-environment entitlement, which version 1.0 does not have
+    /// (project.yml; scripts/validate_schema.py checks the two agree).
     static let liveActivityPushEnabled = false
+
+    /// iOS 18 Live Activity push-to-start: `ActivityScheduler` registers the planned events with
+    /// `PushToStartRegistrar`, the app uploads them (POST /devices/push-to-start) and the Worker's cron sends an APNs
+    /// push at each trigger time. Version 1.0 does not use it, so this stays false: no push-to-start token is asked
+    /// for or observed, no registration is written or uploaded, nothing about events is kept on Smart Schedule's
+    /// server and the app has no APNs entitlement. iOS 26 still schedules each Live Activity on the iPhone
+    /// (`Activity.request(…, start:)`); on iOS 18 one appears only when the app runs within the lead time or while the
+    /// event is under way (it then stays after the app closes). The consent text
+    /// (`AIConsentDisclosure.serverNote`) and the Dynamic Island footer in Settings follow it; "Erase all data" then
+    /// only removes what an earlier build may have left on the iPhone, with no request
+    /// (`PushToStartRegistrar.forgetLocally`). A build-time constant on purpose. Turning it on takes, besides a new
+    /// build and App Review: aps-environment, APS_ENVIRONMENT and the remote-notification background mode back in
+    /// project.yml, the APNs secrets and `crons = ["* * * * *"]` in server/worker/wrangler.toml, a new
+    /// `AIConsent.disclosureVersion`, and the privacy policy, privacy manifests and App Privacy answers.
+    /// scripts/validate_schema.py and ReleaseConfigurationTests fail while it is true.
+    static let pushToStartEnabled = false
 
     /// Smart Schedule Pro (StoreKit 2, App/Store). Version 1.0 sells nothing, so this stays false: the account sheet
     /// has no Pro section, the avatar is "Accounts", the erase message does not mention subscriptions, and StoreKit is

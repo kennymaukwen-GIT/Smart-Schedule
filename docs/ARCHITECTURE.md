@@ -24,7 +24,7 @@
 | Gemini 模型版本 | 2.5 系列已經過了公告的最早關機日（2026-10-16）；3.x 的模型 ID 換得很快 | `GEMINI_MODEL_ID` 由 xcconfig 注入，預設 `gemini-3.5-flash`。**上線前務必到 deprecations 頁確認**。換模型時先把新 ID 加進 Worker 的 `SESSION_MODELS` 並部署（舊 ID 留到舊版 App 不再使用），否則通知擴充的回覆會被拒（403 `session_scope`） |
 | Gemini 3 多輪 function calling | 要把 thought signature 原樣傳回，否則回 400 | `GeminiTurn` 把模型回傳的 content 以 raw JSON 原封保存（`Shared/AI/GeminiClient.swift`） |
 | 把個人資料傳給第三方 AI 前要先說明並取得同意（App Store 5.1.2(i)，2025 年 11 月） | 審核會在乾淨安裝、Siri、通知擴充裡各試一次 | `GeminiClient.generate` 在組 request 之前先檢查 `AIConsentStore.current.isGranted`，沒有同意就丟 `GeminiError.consentRequired`，一個閘門蓋住所有入口。App 顯示同意說明（`App/Views/Chat/AIConsentSheet.swift`），Siri 和通知改成告訴使用者到設定開啟。Demo 模式不呼叫 Gemini |
-| 動態島「在每個行程開始前自動出現」 | App 在背景不能 `Activity.request()` | iOS 26：`Activity.request(…, start:)` 排程啟動；iOS 18：APNs push-to-start（`PushToStartRegistrar` 準備好整份資料，伺服器在觸發時間送出） |
+| 動態島「在每個行程開始前自動出現」 | App 在背景不能 `Activity.request()` | iOS 26：`Activity.request(…, start:)` 排程啟動。iOS 18：1.0 只在 App 執行時開始（提前時間內或行程進行中打開 App），之後關掉 App 也留著。APNs push-to-start（`PushToStartRegistrar` 準備好整份資料，伺服器在觸發時間送出）的程式碼保留給之後的版本，1.0 關閉（`AppConstants.pushToStartEnabled = false`：不要 token、不上傳、沒有 `aps-environment`） |
 | 從 App 打開系統的專注模式設定 | 沒有公開的 URL 可以直接開到「專注模式」 | 提供 `SetFocusFilterIntent`（`App/Intents/CalendarFocusFilter.swift`），設定頁用文字說明路徑：設定 › 專注模式 › 選一個 › 加入過濾條件 › Smart Schedule |
 | App 介面語言 | iOS 自己管理每個 App 的語言，App 不能自行切換 | 設定 › 語言打開 `UIApplication.openSettingsURLString`（系統設定裡這個 App 的頁面） |
 | 控制中心、Action Button、鎖定畫面控制項、Siri 片語 | 只有使用者自己能加入，App 無法代勞 | 設定 › 捷徑與 Siri 寫出每一種的步驟（`ShortcutsGuideView`） |
@@ -108,7 +108,7 @@ flowchart LR
   - Expanded：`.leading` 放時鐘、`.center` 放標題、`.trailing` 放「21 MIN」膠囊；`.bottom` 放一週微型日曆和輸入膠囊。
   - Minimal：只有 ⏰。
 - 互動：`Link` 用於 deep link（`smartschedule://compose`、`?mode=voice`）；`Button(intent:)` 用於不開 App 的動作。
-- 推播：`pushType: .token` 搭配 `NSSupportsLiveActivitiesFrequentUpdates`；APNs 的 `apns-push-type: liveactivity`，topic 是 `<bundle>.push-type.liveactivity`。
+- 推播：`pushType: .token` 搭配 `NSSupportsLiveActivitiesFrequentUpdates`；APNs 的 `apns-push-type: liveactivity`，topic 是 `<bundle>.push-type.liveactivity`。1.0 不用任何推播：`AppConstants.liveActivityPushEnabled` 和 `pushToStartEnabled` 都是 false，`Activity.request` 用 `pushType: nil`，App 沒有 `aps-environment` 也沒有 `remote-notification` 背景模式。
 
 ### 3.3 通知：UserNotificationsUI Content Extension
 - 細節見 [`NOTIFICATIONS.md`](NOTIFICATIONS.md)。
@@ -206,8 +206,9 @@ sequenceDiagram
 ## 7. 只能在實機上驗證的項目
 
 - [ ] 控制中心 → `OpenQuickCaptureIntent` 打開快速輸入（已鎖定和未鎖定都要測），動態島沒有新的 activity。
-- [ ] iOS 26：App 關著時，`Activity.request(…, start:)` 排程的 activity 在提前量準時出現；同時排 10／20／50 筆，記下第幾筆丟出 `ActivityAuthorizationError`，減 2 回填 `ActivityPlanner.maxPending`；排程後重開機，pending 是否存活。
-- [ ] iOS 18：Worker 的 cron 送 push-to-start，動態島出現，同一個 eventID 不重送。
+- [ ] iOS 26：App 關著時，`Activity.request(…, start:)` 排程的 activity 在提前量準時出現（1.0 的 build 沒有 `aps-environment`，也要準時出現）；同時排 10／20／50 筆，記下第幾筆丟出 `ActivityAuthorizationError`，減 2 回填 `ActivityPlanner.maxPending`；排程後重開機，pending 是否存活。
+- [ ] iOS 18（1.0 沒有 push-to-start）：提前時間內或行程進行中打開 App，即時動態馬上出現，關掉 App 後還在；App 一直關著時不會出現。設定 › 通知 › 動態島 的說明出現 iOS 18 那一句（「On iOS 18, an event appears only if you open Smart Schedule…」）。AI 同意畫面沒有伺服器那一段。
+- [ ] 上傳 build 後 App Store Connect 有沒有寄 ITMS-90078 之類的推播 entitlement 警告（二進位檔裡還有關掉的 push-to-start 程式碼）：警告不是退件，記下來就好（請在畫面上確認）。
 - [ ] Content Extension 裡的 inline `TextField` 能不能取得鍵盤焦點。保底方案是系統的文字輸入 action。
 - [ ] 不同機型上 expanded island 是否超出 160 pt，例如 Pro Max 和標準尺寸、粗體字、動態字級。
 - [ ] `GEMINI_MODEL_ID` 是否仍有效，以及 `thinkingLevel` 參數是否被該模型接受；正式 Worker 的 `SESSION_MODELS` 包含它，長按通知回覆可以用。
@@ -218,4 +219,9 @@ sequenceDiagram
 - [ ] 抽屜在不同機型上的寬度（`min(340, 84%)`）和往左滑關閉的手勢不會和清單捲動衝突。
 - [ ] App Attest：Debug（`appattest-environment` development，連開發版 Worker）與 TestFlight（production，連正式版 Worker）各裝一次，第一次用助理時 `GET /attest/challenge` → `POST /attest` 成功，之後的 Gemini request 帶 `Authorization: Bearer`；Release 版從不送 `X-Dev-Token`。兩個 Worker 都要先 `wrangler secret put APPLE_TEAM_ID`（沒設時 `POST /attest` 回 500）。
 - [ ] 通知擴充的 session（用 TestFlight／Release 版測）：App 回到前景或背景更新時，剩不到 3 天就 `POST /session` 換新；在伺服器刪掉該 `sess:` key 後長按通知回覆，看到「請先打開 Smart Schedule 一次…」，打開 App 後恢復。Debug 版在 Simulator 上 session 失效後改送 `X-Dev-Token`：`SS_DEV_TOKEN` 有值且開發 Worker 開了 `ALLOW_DEV_TOKEN` 時回覆照常成功，空白時顯示「請先打開 Smart Schedule 一次…」（伺服器回 `attestation_required`）。
+- [ ] 「清除所有資料」在 1.0 不送任何 push-to-start 請求（`PushToStartRegistrar.forgetLocally`），伺服器 KV 裡沒有新的 `p2s:` key。
+
+**延後到開啟 push-to-start 的版本（1.0 不測）：**
+
+- [ ] iOS 18：Worker 的 cron 送 push-to-start，動態島出現，同一個 eventID 不重送。
 - [ ] iOS 18：沒有 AI 同意時伺服器收不到任何標題；在設定按「允許」看到同意說明；撤回同意或「清除所有資料」後，伺服器的 `p2s:` 登記變成沒有行程。

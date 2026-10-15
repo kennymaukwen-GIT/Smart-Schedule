@@ -116,6 +116,16 @@ final class ActivitySchedulerTests: XCTestCase {
 
     // MARK: Push-to-start (iOS 18)
 
+    /// Off (version 1.0, `AppConstants.pushToStartEnabled`): a pass asks iOS for no push-to-start token and registers,
+    /// uploads or clears nothing, on iOS 18 and 26 alike. On: iOS 18 registers, iOS 26 only clears what an iOS 18
+    /// registration left on the server.
+    func testPushToStartOffAsksForNoTokenAndSendsNothing() {
+        XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: false, schedulesOnDevice: false), .off)
+        XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: false, schedulesOnDevice: true), .off)
+        XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: true, schedulesOnDevice: false), .register)
+        XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: true, schedulesOnDevice: true), .clearServer)
+    }
+
     func testPushToStartCarriesWhatActivityKitDecodesAndNothingElse() throws {
         var trip = event("ev1", TestClock.local(2026, 10, 15, 9), title: "Flight to Tokyo")
         trip.location = "Terminal 2"

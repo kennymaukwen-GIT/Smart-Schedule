@@ -7,6 +7,7 @@
 //                                 for POST /v1beta/models/<SESSION_MODELS>:generateContent
 //   POST /devices/push-to-start   assertion-authenticated → store the device's push-to-start registration
 //   cron * * * * *                send due push-to-start notifications
+// Version 1.0 of the app uses no push-to-start: it never calls /devices/push-to-start, and wrangler.toml runs no cron.
 
 import { APPLE_APP_ATTESTATION_ROOT_CA_PEM } from "./apple-root-ca.ts";
 import { handleAttest, handleChallenge } from "./attest-routes.ts";

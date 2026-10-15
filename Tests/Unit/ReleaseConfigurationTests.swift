@@ -10,4 +10,17 @@ final class ReleaseConfigurationTests: XCTestCase {
     func testVersionOneSellsNoSubscription() {
         XCTAssertFalse(AppConstants.subscriptionsEnabled)
     }
+
+    /// 1.0 uses no iOS 18 Live Activity push-to-start and no APNs at all: no push token is asked for or uploaded,
+    /// nothing about events is kept on the server, the consent text says nothing about it, and the app has no
+    /// aps-environment entitlement (scripts/validate_schema.py checks project.yml and that every file reaching
+    /// push-to-start reads the flag). iOS 26 still schedules the Live Activities on the iPhone. Turn it on only together
+    /// with everything `AppConstants.pushToStartEnabled` lists, and this test.
+    func testVersionOneUsesNoPush() {
+        XCTAssertFalse(AppConstants.pushToStartEnabled)
+        XCTAssertFalse(AppConstants.liveActivityPushEnabled)
+        XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: true), "no server storage to disclose")
+        XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: AppConstants.pushToStartEnabled, schedulesOnDevice: false), .off)
+        XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: AppConstants.pushToStartEnabled, schedulesOnDevice: true), .off)
+    }
 }

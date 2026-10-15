@@ -12,11 +12,19 @@ enum DataEraser {
         // a return to the front would otherwise start a pass); resumed once the data is gone.
         ActivityScheduler.shared.suspend()
         await LiveActivityManager.shared.dismiss()
-        // Consent goes first: a Live Activity pass that starts from here on can only clear the server, not upload.
+        // Consent goes first: nothing is sent with it from here on (with push-to-start on, a Live Activity pass that
+        // starts now can only clear the server, not upload).
         AIConsentStore.reset()
-        // iOS 18: the server forgets the events it was to start Live Activities for (titles), after any upload
-        // already under way; then this install's App Attest key and the notification extension's session go.
-        await PushToStartRegistrar.eraseAll()
+        if AppConstants.pushToStartEnabled {
+            // iOS 18: the server forgets the events it was to start Live Activities for (titles), after any upload
+            // already under way.
+            await PushToStartRegistrar.eraseAll()
+        } else {
+            // Version 1.0 uploads nothing for push-to-start: only a registration an earlier build may have left in
+            // the App Group goes, with no request.
+            await PushToStartRegistrar.forgetLocally()
+        }
+        // Then this install's App Attest key and the notification extension's session are forgotten on the iPhone.
         await AppAttestClient.shared.forgetAll()
         await ReminderScheduler.shared.removeAll()
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()

@@ -85,10 +85,16 @@ struct NotificationSettingsView: View {
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedule plans the next two days each time you open it.")
-                    if AIConsentDisclosure.serverNote != nil {
-                        // iOS 18 cannot schedule an activity: Smart Schedule's server starts it, with the titles
-                        // that only AI consent lets leave the iPhone.
-                        Text("On iOS 18, Smart Schedule's server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time.")
+                    if AppConstants.pushToStartEnabled {
+                        if AIConsentDisclosure.serverNote != nil {
+                            // iOS 18 cannot schedule an activity: Smart Schedule's server starts it, with the titles
+                            // that only AI consent lets leave the iPhone.
+                            Text("On iOS 18, Smart Schedule's server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time.")
+                        }
+                    } else if !ActivityPlanner.schedulesOnDevice {
+                        // Version 1.0 has no push-to-start: iOS 18 cannot schedule an activity, so one starts only
+                        // when the app runs once it is due (ActivityScheduler). Nothing about events leaves the iPhone.
+                        Text("On iOS 18, an event appears only if you open Smart Schedule within that time before it starts or while it's under way. On iOS 26 and later, it appears on time even when the app is closed.")
                     }
                 }
             }

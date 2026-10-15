@@ -1,11 +1,12 @@
 # App Store Connect 上架資料（Smart Schedule 1.0）
 
 可以直接貼到 App Store Connect 的文字（繁體中文和英文），以及每個問卷該怎麼填、為什麼這樣填。
-每個功能說法都對照過 2026-10-15 的程式碼（`App/`、`Shared/`、`Widgets/`、`NotificationContent/`、`server/worker/`），
-對照表在第 11 節。程式碼改了功能、或 AI 同意說明改版（`AIConsent.disclosureVersion`，目前是 **4**），這份文件要一起更新。
+每個功能說法都對照過 2026-10-16 的程式碼（`App/`、`Shared/`、`Widgets/`、`NotificationContent/`、`server/worker/`），
+對照表在第 11 節。程式碼改了功能、或 AI 同意說明改版（`AIConsent.disclosureVersion`，目前是 **5**），這份文件要一起更新。
 
 1.0 已決定的事：年齡分級 **18+**（Gemini API 條款要求年滿 18 歲）、**不賣訂閱也沒有任何 App 內購買**、
-**不在歐洲經濟區（歐盟、挪威、冰島、列支敦斯登）和瑞士上架**（英國和其他地區照常）、**Google 帳號的 email 不會傳給 Gemini**（同意說明第 4 版）。
+**不在歐洲經濟區（歐盟、挪威、冰島、列支敦斯登）、瑞士、香港、澳門和中國大陸上架**（英國和其他地區照常）、**Google 帳號的 email 不會傳給 Gemini**（同意說明第 4 版起）、
+**不用 iOS 18 的即時動態 push-to-start**（`AppConstants.pushToStartEnabled = false`：伺服器不存任何行程、App 不用遠端推播（APNs）；同意說明第 5 版）、**開發者在英國**（不需要英國 GDPR 第 27 條的代表人）。
 
 `<!-- asc:… -->` 標記後面的區塊就是要貼的內容；`python3 -I <腳本> docs/app-store-metadata.md` 可以檢查字數上限
 （第 12 節）。方括號 `[…]` 是送審前要填的佔位值。
@@ -15,11 +16,12 @@
 ## 0. 送審前一定要處理的事
 
 - [ ] 把 `[開發者名稱 / Developer name]`、聯絡電話、測試帳號、備用驗證碼這些佔位值填好。網站（`site/public/`）上標黃的佔位值也要先填好再部署：Guideline 2.1 不接受佔位文字和打不開的網址，而 Support URL 必須通到真正的聯絡資訊。
-- [ ] smart-schedules.com 的首頁、`/privacy`、`/support` 都已上線（三個網址在這份文件裡都會用到）。
-- [ ] Smart Schedule 的伺服器（`server/worker/`）已部署成正式環境：`APP_ATTEST_ENV = "production"`、`APNS_ENV = "production"`，`SESSION_MODELS` 包含這個版本的 `GEMINI_MODEL_ID`。審核期間要一直開著（Guideline 2.1：「turn on your back-end service」）。
+- [ ] https://www.smart-schedules.com 的首頁、`/privacy`、`/support` 都已上線、直接回 200（三個網址在這份文件裡都會用到）。一律用 **www**：網站放在 Cloudflare Pages，DNS 留在 Squarespace，只加一筆 `www` 的 CNAME；沒有 www 的根網域不提供網站（`site/README.md` §3）。
+- [ ] Smart Schedule 的伺服器（`server/worker/`）已部署成正式環境：`APP_ATTEST_ENV = "production"`，`GEMINI_API_KEY` 和 `APPLE_TEAM_ID` 兩個 secret 已設定，`SESSION_MODELS` 包含這個版本的 `GEMINI_MODEL_ID`。1.0 沒有 push-to-start，所以 `crons = []`，不需要 APNs 的 `.p8` 和 `APNS_*` secrets（`server/worker/README.md`「1.0：push-to-start 關閉」）。審核期間要一直開著（Guideline 2.1：「turn on your back-end service」）。
 - [ ] Gemini API 的 Google Cloud 專案已開啟 Cloud Billing（付費層級）。英國在上架範圍內，Gemini API 條款寫明「You may use only Paid Services when making API Clients available to users in the European Economic Area, Switzerland, or the United Kingdom」（[Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms)；這段文字來自搜尋摘錄，送審前到條款頁再確認一次）。
 - [ ] Google OAuth consent screen 已通過驗證並設為「In production」（步驟見 [`google-oauth-verification.md`](google-oauth-verification.md)）。還在 Testing 時，審核員會看到「Google 尚未驗證這個應用程式」，測試帳號也必須先加進 test users，而且 refresh token 7 天就失效。
-- [ ] 確認 Gemini API 在香港是否可用（第 4.4 節）。這會影響主要目標市場之一。
+- [ ] 價格與供應狀況已取消歐洲經濟區、瑞士、香港、澳門和中國大陸（第 4.3 節；後三個是因為 Gemini API 不在那裡提供，第 4.4 節）。
+- [ ] 到 ICO 網站的「Do I need to pay the fee?」確認要不要繳資料保護費（data protection fee），金額以 ICO 網站為準（第 4.4 節第 4 點）。
 
 ---
 
@@ -34,8 +36,8 @@
 | 內容版權（Content Rights） | 「Yes, it contains, shows, or accesses third-party content」並勾選有權使用 | App 讀取並顯示使用者自己的 Google 日曆（經使用者授權、依 Google API 條款），也顯示 Gemini 產生的文字。 |
 | 年齡分級（Age Rating） | **18+**（問卷算出來比較低，用「Override to Higher Age Rating」調高） | 第 6 節 |
 | 授權合約（License Agreement） | Apple 標準 EULA | App 內「使用條款」連到 Apple 的標準 EULA（`SSTermsURL`） |
-| 隱私權政策網址（Privacy Policy URL） | `https://smart-schedules.com/privacy` | 和 App 內 設定 › 關於 › 隱私權政策（`SSPrivacyURL`）相同 |
-| 使用者隱私選項網址（User Privacy Choices URL，選填） | `https://smart-schedules.com/support#en-delete`（中文頁面用 `#zh-delete`） | 說明怎麼刪除資料、移除帳號、撤回 AI 同意 |
+| 隱私權政策網址（Privacy Policy URL） | `https://www.smart-schedules.com/privacy` | 和 App 內 設定 › 關於 › 隱私權政策（`SSPrivacyURL`）相同 |
+| 使用者隱私選項網址（User Privacy Choices URL，選填） | `https://www.smart-schedules.com/support#en-delete`（中文頁面用 `#zh-delete`） | 說明怎麼刪除資料、移除帳號、撤回 AI 同意 |
 
 App 是 iPhone 專用（`TARGETED_DEVICE_FAMILY: "1"`、只支援直向、只有深色介面），最低 iOS 18.0。
 
@@ -43,7 +45,7 @@ App 是 iPhone 專用（`TARGETED_DEVICE_FAMILY: "1"`、只支援直向、只有
 
 ## 2. 繁體中文（Chinese, Traditional）產品頁
 
-台灣和香港的 App Store 都用這個語系。用語跟 App 的繁體中文介面一致（行事曆、行程、動態島、即時動態、快速輸入、先問我、助理記得的事）。
+台灣的 App Store 用這個語系（1.0 不在香港和澳門上架，見第 4.3 節）。用語跟 App 的繁體中文介面一致（行事曆、行程、動態島、即時動態、快速輸入、先問我、助理記得的事）。
 
 ### 2.1 名稱（Name，最多 30 字元）
 
@@ -115,23 +117,22 @@ Smart Schedule 是搭配 Google 日曆的 iPhone AI 行程助理。打字或說�
 ■ 隱私
 • 不登入先試用：示範模式有範例行事曆和離線助理，不需要帳號，也不會連線到 AI。
 • AI 助理使用 Google 的 Gemini API。第一次使用前，App 會列出會傳送哪些內容並徵求你的同意；按「允許」之前，不會傳送任何資料給 AI。請求會經過 Smart Schedule 的伺服器轉給 Gemini，伺服器不保存這些內容。你 Google 帳號的 email 不會傳給 AI。隨時可以在設定裡停止分享。
-• 在 iOS 18 上，同樣經過你的同意，接下來 48 小時內行程的標題和時間會暫存在我們的伺服器，讓行程能準時出現在動態島。
 • 和 Google 日曆的同步直接在你的 iPhone 和 Google 之間進行。沒有廣告，也沒有追蹤。
 • 可以匯出你的資料、移除任何一個 Google 帳號（同時撤銷授權），或清除這台 iPhone 上 Smart Schedule 的所有資料。
 
 ■ 使用前須知
 • 需要 iOS 18 以上。要使用自己的行事曆，需要 Google 帳號；AI 助理需要網路連線。
 • 依 Google Gemini API 的條款，Smart Schedule 只提供給年滿 18 歲的人使用。
-• 在 iOS 18 上，行程要準時出現在動態島需要允許 AI 資料分享；沒有允許時，在行程開始前的那段時間打開 App 才會出現。
+• 在 iOS 18 上，即時動態只有在行程開始前的那段時間內（或行程進行中）打開 App 才會出現；iOS 26 以上不用打開 App 也會準時出現。
 • 介面支援繁體中文和英文。
 
-隱私權政策：https://smart-schedules.com/privacy
+隱私權政策：https://www.smart-schedules.com/privacy
 ```
 
 ### 2.5 關鍵字（Keywords，最多 100 位元組，逗號後不加空格）
 
 中文字在 UTF-8 是 3 個位元組，所以大約只能放 30 個中文字。名稱和副標題裡的字（Smart、Schedule、AI、行程、助理）已經會被搜尋，不再重複。
-「計畫」（台灣）和「計劃」（香港）兩種寫法都放。不放其他 App 或公司的名稱（包括 Google、Gemini）。
+「計畫」（台灣）和「計劃」（香港常用）兩種寫法都放；1.0 不在香港上架，「計劃」留著不影響其他關鍵字，要換成別的詞也可以。不放其他 App 或公司的名稱（包括 Google、Gemini）。
 
 <!-- asc:zh-Hant/keywords -->
 ```text
@@ -142,9 +143,9 @@ Smart Schedule 是搭配 Google 日曆的 iPhone AI 行程助理。打字或說�
 
 | 欄位 | 網址 |
 |---|---|
-| 支援網址（Support URL） | `https://smart-schedules.com/support` |
-| 行銷網址（Marketing URL） | `https://smart-schedules.com` |
-| 隱私權政策網址 | `https://smart-schedules.com/privacy`（在 App 資訊裡設定，第 1 節） |
+| 支援網址（Support URL） | `https://www.smart-schedules.com/support` |
+| 行銷網址（Marketing URL） | `https://www.smart-schedules.com` |
+| 隱私權政策網址 | `https://www.smart-schedules.com/privacy`（在 App 資訊裡設定，第 1 節） |
 
 網站同一頁裡繁體中文在前、英文在後，兩個語系用同樣的網址。
 
@@ -220,17 +221,16 @@ REMINDERS THAT FIT YOUR DAY
 PRIVACY
 • Try without signing in: demo mode has sample calendars and an offline assistant. No account needed, and nothing is sent to the AI.
 • The AI assistant uses Google's Gemini API. Before its first use, the app lists what will be sent and asks for your permission; nothing goes to the AI until you tap Allow. Requests pass through Smart Schedule's server to Gemini, and the server doesn't keep them. Your Google account email addresses are never sent to the AI. You can stop sharing any time in Settings.
-• On iOS 18, with the same permission, the titles and times of your events in the next 48 hours are kept on our server so they can appear in the Dynamic Island on time.
 • Calendar sync runs directly between your iPhone and Google. No ads, no tracking.
 • Export your data, remove any Google account (its access is revoked), or erase everything Smart Schedule keeps on your iPhone.
 
 GOOD TO KNOW
 • Requires iOS 18 or later. Using your own calendar requires a Google account; the AI assistant needs an internet connection.
 • Under Google's Gemini API terms, Smart Schedule is for people aged 18 or older.
-• On iOS 18, starting a Live Activity on time needs AI data sharing; without it, the event appears when you open the app shortly before it starts.
+• On iOS 18, a Live Activity appears only if you open the app shortly before the event starts or while it's under way; on iOS 26 and later it appears on time without opening the app.
 • Available in English and Traditional Chinese.
 
-Privacy Policy: https://smart-schedules.com/privacy
+Privacy Policy: https://www.smart-schedules.com/privacy
 ```
 
 ### 3.5 Keywords (100 bytes max, no spaces after commas)
@@ -246,9 +246,9 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,o
 
 | Field | URL |
 |---|---|
-| Support URL | `https://smart-schedules.com/support` |
-| Marketing URL | `https://smart-schedules.com` |
-| Privacy Policy URL | `https://smart-schedules.com/privacy` (set under App Information) |
+| Support URL | `https://www.smart-schedules.com/support` |
+| Marketing URL | `https://www.smart-schedules.com` |
+| Privacy Policy URL | `https://www.smart-schedules.com/privacy` (set under App Information) |
 
 ### 3.7 字數
 
@@ -257,9 +257,9 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,o
 | 名稱（主要／備用 1／備用 2） | 22／21／21 字元 | 26／28／24 字元 | 30 字元 |
 | 副標題 | 13 字元 | 29 字元 | 30 字元 |
 | 宣傳文字 | 65 字元 | 158 字元 | 170 字元 |
-| 描述 | 1,702 字元 | 3,873 字元 | 4,000 字元 |
+| 描述 | 1,651 字元 | 3,744 字元 | 4,000 字元 |
 | 關鍵字 | 99 位元組 | 100 位元組 | 100 位元組 |
-| 審核備註（第 8.2 節） | — | 3,829 位元組（填入備用驗證碼後要重算） | 4,000 位元組 |
+| 審核備註（第 8.2 節） | — | 3,867 位元組（填入備用驗證碼後要重算） | 4,000 位元組 |
 
 精確數字用第 12 節的腳本算；改了文字就重跑一次。
 
@@ -282,20 +282,22 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,o
 1.0 的 App 裡完全不會呼叫 StoreKit（`AppConstants.subscriptionsEnabled = false`，`ReleaseConfigurationTests` 和
 `scripts/validate_schema.py` 會擋下把它打開的改動），商店頁也就不會出現「App 內購買」。描述和截圖都不要提訂閱或 Pro。
 
-### 4.3 供應地區：不在歐洲經濟區和瑞士上架（英國照常）
+### 4.3 供應地區：不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架（英國照常）
 
-價格與供應狀況（Pricing and Availability）› 國家或地區（Countries or Regions）：取消下面 **27 個歐盟會員國**，再加上 **挪威 Norway、冰島 Iceland、列支敦斯登 Liechtenstein、瑞士 Switzerland**；其他地區（包括英國）保留。
+價格與供應狀況（Pricing and Availability）› 國家或地區（Countries or Regions）：取消下面 **27 個歐盟會員國**，再加上 **挪威 Norway、冰島 Iceland、列支敦斯登 Liechtenstein、瑞士 Switzerland**，以及 **香港 Hong Kong、澳門 Macau、中國大陸 China mainland**；其他地區（包括英國和台灣）保留。澳門在清單上的英文名稱可能是「Macao」（請在畫面上確認）。
 
 | | |
 |---|---|
 | 奧地利 Austria、比利時 Belgium、保加利亞 Bulgaria、克羅埃西亞 Croatia、賽普勒斯 Cyprus、捷克 Czechia、丹麥 Denmark、愛沙尼亞 Estonia、芬蘭 Finland | 法國 France、德國 Germany、希臘 Greece、匈牙利 Hungary、愛爾蘭 Ireland、義大利 Italy、拉脫維亞 Latvia、立陶宛 Lithuania、盧森堡 Luxembourg |
 | 馬爾他 Malta、荷蘭 Netherlands、波蘭 Poland、葡萄牙 Portugal、羅馬尼亞 Romania、斯洛伐克 Slovakia、斯洛維尼亞 Slovenia、西班牙 Spain、瑞典 Sweden | |
 
+加上這 7 個（歐盟以外，不會跟著歐盟一起取消，要一個一個取消）：挪威 Norway、冰島 Iceland、列支敦斯登 Liechtenstein、瑞士 Switzerland、香港 Hong Kong、澳門 Macau、中國大陸 China mainland。香港、澳門和中國大陸要取消，是因為 Gemini API 不在那裡提供，AI 助理用不了（第 4.4 節第 1、2 點）。
+
 其他設定：
 
 - 預購（Pre-Order）：不要開。
 - 「iPhone and iPad Apps on Apple Silicon Macs」和「Apple Vision Pro」：建議都取消。App 依賴動態島、控制中心、即時動態和 App Attest，這些在 Mac 和 Vision Pro 上不是同樣的體驗，也沒有測過。
-- 英國照常上架，適用英國 GDPR。隱私權政策已涵蓋（第 1 節的「控管者」、第 15 節的權利、ICO 和法律依據）；英國代表人見第 4.4 節第 4 點。
+- 英國照常上架，適用英國 GDPR。隱私權政策已涵蓋（第 1 節的「控管者」、第 15 節的權利、ICO 和法律依據）。開發者在英國（網域 WHOIS 的註冊人國家是 GB），所以**不需要英國代表人**；要確認的是 ICO 的資料保護費，見第 4.4 節第 4 點。
 
 **數位服務法（DSA）交易商身分。** Apple 的說明（[Manage EU Digital Services Act trader requirements](https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements)，2026-10-15 讀取）寫的是：
 
@@ -305,17 +307,16 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,o
 
 所以 1.0 **不需要**交易商的驗證（公開地址、電話、email 和身分文件），但帳號**還是要做一次聲明**：送審新 App 時 App Store Connect 會要求。
 路徑：Business › Agreements › Compliance › Digital Services Act › Complete Compliance Requirements › 選「This is not a trader account」（不用填聯絡資訊）。
-之後的版本要加入歐盟店面時，再重新判斷是不是交易商。（README 和 `docs/SETTINGS.md` 第 16 節寫「交易商身分等加入歐盟時再處理」，少了「仍要先聲明」這一步。）
+之後的版本要加入歐盟店面時，再重新判斷是不是交易商。
 
-### 4.4 上架前要確認的地區問題（需要你決定）
+### 4.4 上架地區的決定（2026-10-16 已決定）與剩下要確認的事
 
-1. **香港和澳門：Gemini API 可能不提供。** 一份第三方整理（2026 年 4 月核對）說 Google AI Studio／Gemini API 的可用地區清單沒有香港、澳門和中國大陸（台灣、英國有）；Google 開發者論壇上也有從香港伺服器和 Cloudflare Workers 呼叫被拒的回報。
-   這個沙盒連不到 ai.google.dev，**請到 <https://ai.google.dev/gemini-api/docs/available-regions> 親自確認**。
+1. **香港和澳門：1.0 不上架（已決定，第 4.3 節）。** 一份第三方整理（2026 年 4 月核對）說 Google AI Studio／Gemini API 的可用地區清單沒有香港、澳門和中國大陸（台灣、英國有）；Google 開發者論壇上也有從香港伺服器和 Cloudflare Workers 呼叫被拒的回報。
    依這些回報，Gemini 判斷地區時看的是送出請求的伺服器：Cloudflare Worker 預設在離使用者最近的機房執行，香港使用者的請求很可能從香港機房送出，被 Google 以「User location is not supported」拒絕。
-   如果香港真的不在清單上，可以選：(a) 取消香港和澳門店面；(b) 調整 Worker 的部署位置（Cloudflare 的 Smart Placement 或指定區域的設定，部署前查 Cloudflare 文件），讓呼叫 Gemini 的請求從支援的地區送出，同時確認 Gemini 條款允許服務該地區的使用者；(c) 照常上架，香港使用者只能用行事曆、提醒和示範模式，AI 助理會顯示錯誤（不建議）。
-2. **中國大陸：建議取消。** Gemini API 不在中國大陸提供；Apple 說明部分 App 在中國大陸上架需要 ICP 備案號（[App information reference](https://developer.apple.com/help/app-store-connect/reference/app-information/)），生成式 AI 服務另外需要主管機關核准。
-3. **其他 Gemini API 不提供的地區**：把 Google 的可用地區清單和 App Store 的店面清單對照一次，清單外的地區照第 1 點的方式處理。
-4. **英國代表人。** 已決定：歐洲經濟區和瑞士不上架，所以不需要那邊的代表人；英國照常上架。開發者**在英國有據點（例如住在英國）**時不需要英國代表人；沒有的話，英國 GDPR 第 27 條要求指定一位（有專門代為擔任的服務），把名稱和郵寄地址寫進隱私權政策第 1、19 節（中英文）。豁免只適用於偶發而且低風險的處理，Smart Schedule 持續處理資料，很可能不適用（見 `site/README.md` 第 7 點）。
+   取消這兩個店面之後，1.0 不需要再查可用地區，也不需要調整 Worker 的執行位置。之後的版本想加回來時，先到 <https://ai.google.dev/gemini-api/docs/available-regions> 確認，再評估 Worker 的執行位置（Cloudflare 的 Smart Placement 或指定區域的設定，部署前查 Cloudflare 文件），讓呼叫 Gemini 的請求從支援的地區送出，同時確認 Gemini 條款允許服務該地區的使用者。
+2. **中國大陸：1.0 不上架（已決定，第 4.3 節）。** Gemini API 不在中國大陸提供；Apple 說明部分 App 在中國大陸上架需要 ICP 備案號（[App information reference](https://developer.apple.com/help/app-store-connect/reference/app-information/)），生成式 AI 服務另外需要主管機關核准。
+3. **其他 Gemini API 不提供的地區（還沒做）**：把 Google 的可用地區清單和 App Store 的店面清單對照一次，清單外的地區照第 1 點的方式處理（取消店面）。
+4. **英國：不需要英國代表人；要確認 ICO 的資料保護費。** 開發者在英國（網域 WHOIS 的註冊人國家是 GB）。英國 GDPR 第 27 條的代表人只要求英國境外的控管者指定，所以不需要；歐洲經濟區和瑞士不上架，也不需要那邊的代表人。要確認的是 **ICO 的資料保護費（data protection fee）**：在英國處理個人資料的組織或個人，除非符合豁免，都要向 ICO 繳年費。上架前到 ICO 網站（ico.org.uk）的「Do I need to pay the fee?」自我評估，依結果繳費，或記下不用繳的理由；級距、金額和豁免條件以 ICO 網站當時寫的為準（這份文件不寫金額）。隱私權政策第 1、19 節的控管者名稱，要和繳費登記的名稱一致。
 
 ---
 
@@ -344,18 +345,18 @@ Apple 的定義（[App privacy details](https://developer.apple.com/app-store/ap
 
 | 資料 | 去哪裡、留多久 | 歸類 | 程式碼 |
 |---|---|---|---|
-| 使用者輸入或說出的請求（語音先轉成文字）；最多 40 個、今天起 14 天內行程的標題、時間、備註和 Google 行程 ID；回覆的那則提醒的行程；行事曆名稱（以「Account 1」這類代稱區分帳號）和助理設定；時區和語言；「AI 建議」那一個行程的地點 | 經 Smart Schedule 伺服器（Cloudflare Worker）原封不動轉給 Google Gemini API，伺服器不保存；Google 為偵測濫用最多保存 55 天（[Gemini API 使用政策](https://ai.google.dev/gemini-api/docs/usage-policies)，付費層級也一樣） | Other User Content（第三方保存超過即時處理所需，所以算 collect） | `Shared/AI/AssistantPrompt.swift`、`Shared/AI/NoteSuggestionPrompt.swift`、`Shared/AI/GeminiClient.swift`、`server/worker/src/gemini.ts` |
-| iOS 18：接下來 48 小時內行程的標題、行程 ID、開始和結束時間、行事曆顏色 | 存在伺服器 KV 最多 3 天，經 Apple 推播服務送出 push-to-start；只在允許 AI 資料分享時 | Other User Content | `Shared/LiveActivity/PushToStartRegistrar.swift`、`server/worker/src/registration.ts` |
-| 隨機安裝 ID（`deviceID`）和 ActivityKit 的 push-to-start token | 伺服器最多 3 天 | Device ID | `PushToStartRegistrar.swift` |
-| App Attest 金鑰 ID；給通知擴充用的 session（只存 token 的雜湊） | 金鑰紀錄沒有到期時間；session 7 天 | Device ID（用途：驗證、防濫用，屬於 App Functionality） | `Shared/Security/AppAttestClient.swift`、`server/worker/src/attest-routes.ts`、`session.ts` |
+| 使用者輸入或說出的請求（語音先轉成文字）；最多 40 個、今天起 14 天內行程的標題、時間、備註和 Google 行程 ID；回覆的那則提醒的行程；行事曆名稱（以「Account 1」這類代稱區分帳號）和助理設定；時區和語言；「AI 建議」那一個行程的地點 | 經 Smart Schedule 伺服器（Cloudflare Worker）原封不動轉給 Google Gemini API，伺服器不保存；Google 為偵測濫用最多保存 55 天（[Gemini API 使用政策](https://ai.google.dev/gemini-api/docs/usage-policies)，付費層級也一樣） | Other User Content（第三方保存超過即時處理所需，所以算 collect；每個請求都帶這個安裝的 App Attest 金鑰 ID，所以宣告為連結到使用者） | `Shared/AI/AssistantPrompt.swift`、`Shared/AI/NoteSuggestionPrompt.swift`、`Shared/AI/GeminiClient.swift`、`server/worker/src/gemini.ts` |
+| App Attest 金鑰 ID（這個安裝在 Secure Enclave 產生的金鑰，每個請求都帶）；給通知擴充用的 session（只存 token 的雜湊） | 伺服器以金鑰 ID 保存公開金鑰和計數器，用來驗證每個請求、依安裝限制請求次數，沒有到期時間；session 7 天 | Device ID（用途：驗證、防濫用，屬於 App Functionality） | `Shared/Security/AppAttestClient.swift`、`server/worker/src/attest-routes.ts`、`session.ts` |
 | 連線 IP（IPv4，或 IPv6 的 /64） | 只用來限制 `/attest` 的頻率，每日計數保存 2 天 | Device ID。Apple 要求依用途歸類 IP；這裡的用途是防濫用 | `server/worker/src/ratelimit.ts` |
-| 伺服器日誌：金鑰 ID、安裝 ID、HTTP 狀態和錯誤代碼 | Workers Logs 最多 7 天，不含請求內容、標題、token 或 IP | 已包含在 Device ID（App Functionality：安全與服務穩定） | `server/worker/src/http.ts` 的 `log()`；`wrangler.toml` 關掉 invocation logs |
+| 伺服器日誌：金鑰 ID、App 識別碼、HTTP 狀態和錯誤代碼 | Workers Logs 最多 7 天，不含請求內容、標題、token 或 IP | 已包含在 Device ID（App Functionality：安全與服務穩定） | `server/worker/src/http.ts` 的 `log()`；`wrangler.toml` 關掉 invocation logs |
+
+1.0 不用 iOS 18 的即時動態 push-to-start（`AppConstants.pushToStartEnabled = false`）：App 不要求 push token、不上傳任何行程，也沒有隨機安裝 ID，所以這張表沒有「iOS 18 的行程登記」和「安裝 ID／push token」兩列，伺服器上也沒有任何行程資料。之後的版本開啟 push-to-start 時，要把它們加回來（Other User Content、Device ID），並在 App Store Connect 重新填問卷。
 
 ### 5.3 考慮過、但不勾的類型
 
 | 類型 | 為什麼不勾 |
 |---|---|
-| Contact Info › Email Address | Google 帳號的 email 只存在 iPhone（Keychain、`accounts.json`），只在 OAuth 登入時當 `login_hint` 送給 Google 自己。同意說明第 4 版起，帳號 email 不會以帳號資訊送到伺服器或 Gemini：使用者的請求和行程文字裡的帳號 email 都換成佔位字（`Shared/AI/CalendarAliases.swift`、`Shared/Models/PromptRedaction.swift`，測試在 `Tests/Unit/AccountEmailPrivacyTests.swift`）。iOS 18 登記到伺服器的行程標題裡如果含有帳號 email，會照原樣上傳，屬 Other User Content；使用者自己打進請求裡的其他 email（例如邀請對象）也屬於 Other User Content。 |
+| Contact Info › Email Address | Google 帳號的 email 只存在 iPhone（Keychain、`accounts.json`），只在 OAuth 登入時當 `login_hint` 送給 Google 自己。同意說明第 4 版起，帳號 email 不會以帳號資訊送到伺服器或 Gemini：使用者的請求和行程文字裡的帳號 email 都換成佔位字（`Shared/AI/CalendarAliases.swift`、`Shared/Models/PromptRedaction.swift`，測試在 `Tests/Unit/AccountEmailPrivacyTests.swift`）。使用者自己打進請求裡的其他 email（例如邀請對象）也屬於 Other User Content。 |
 | Google 日曆的行程本身 | 行程在 iPhone 和使用者自己的 Google 帳號之間直接同步（`Shared/Calendar/GoogleCalendarClient.swift`），開發者拿不到；App 裡沒有任何 Google 的 SDK，所以 Google 不是 Apple 定義的「third-party partner」（加進 App 的程式碼的提供者）。送到伺服器和 Gemini 的那部分已算在 Other User Content。 |
 | User Content › Audio Data | 語音由 Apple 的語音辨識轉成文字（關掉「裝置端辨識」或語言不支援時會送到 Apple 的伺服器）。Apple：「You are not responsible for disclosing data collected by Apple.」離開 iPhone 的只有文字。 |
 | Purchases | 1.0 完全不呼叫 StoreKit。 |
@@ -368,8 +369,8 @@ Apple 的定義（[App privacy details](https://developer.apple.com/app-store/ap
 
 ### 5.4 對照 `PrivacyInfo.xcprivacy` 的結果
 
-- `App/PrivacyInfo.xcprivacy`：`NSPrivacyTracking` false、沒有 tracking domains；宣告 Other User Content 和 Device ID，都 linked、不追蹤、用途 App Functionality。和 5.1 一致。
-- `NotificationContent/PrivacyInfo.xcprivacy`：只宣告 Other User Content（擴充會送 AI 請求，但不建立安裝 ID）；`Widgets/PrivacyInfo.xcprivacy`：沒有收集任何資料。App Privacy 問卷是整個 App 一份，以主 App 為準。
+- `App/PrivacyInfo.xcprivacy`：`NSPrivacyTracking` false、沒有 tracking domains；宣告 Other User Content 和 Device ID，都 linked、不追蹤、用途 App Functionality。和 5.1 一致。Device ID 指的是 App Attest 金鑰 ID（1.0 沒有 push-to-start 的安裝 ID 或 push token）。
+- `NotificationContent/PrivacyInfo.xcprivacy`：只宣告 Other User Content（擴充會送 AI 請求，帶的是 App 替它取得的 session token；金鑰 ID 由主 App 的 Device ID 宣告）；`Widgets/PrivacyInfo.xcprivacy`：沒有收集任何資料。App Privacy 問卷是整個 App 一份，以主 App 為準。
 
 ---
 
@@ -398,7 +399,7 @@ Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級�
 | Violence | 全部 | **None** | |
 | Chance-Based Activities | Gambling、Simulated Gambling、Contests、Loot Boxes | **None / No** | |
 | Additional Information | Age Categories and Override | **Override to Higher Age Rating → 18+** | 算出來應該是 9+ |
-| | Age Suitability URL（選填） | `https://smart-schedules.com/support#en-needs` | 支援頁寫明只提供給年滿 18 歲的人（中文段落是 `#zh-needs`） |
+| | Age Suitability URL（選填） | `https://www.smart-schedules.com/support#en-needs` | 支援頁寫明只提供給年滿 18 歲的人（中文段落是 `#zh-needs`） |
 
 存檔後到 App Information 看全球和各地區的分級。iOS 26 以前的系統用舊的分級制度，顯示在「Operating Systems Earlier than Version 26」，
 18+ 在那裡應該會對應到 17+，請在 App Store Connect 確認。韓國若另有分級通知，照 Apple 的指示處理。
@@ -440,7 +441,7 @@ Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級�
 
 ### 8.2 備註（Notes，最多 4000 位元組，英文）
 
-**要貼的是下面這一段**（唯一的貼上來源）。`docs/review-notes.md` 是背景說明：英文段落超過 App Store Connect 的 4000 位元組上限，也沒有測試帳號，不要整份貼上。下面是重寫並更新到同意說明第 4 版、且放得下的版本；`☰`、`›`、`⋯` 每個佔 3 位元組，已經算進去。
+**要貼的是下面這一段**（唯一的貼上來源）。`docs/review-notes.md` 是背景說明：英文段落超過 App Store Connect 的 4000 位元組上限，也沒有測試帳號，不要整份貼上。下面是重寫並更新到同意說明第 5 版（1.0 沒有 iOS 18 push-to-start）、且放得下的版本；`☰`、`›`、`⋯` 每個佔 3 位元組，已經算進去。
 
 <!-- asc:en/review-notes -->
 ```text
@@ -454,7 +455,7 @@ AI ASSISTANT AND CONSENT (5.1.2(i))
 The assistant uses Google's Gemini API through our server (it holds the API key; the app has none and uses App Attest), so the server must be reachable; calendar features work without it. The first message opens "Use the AI assistant?", which lists what is sent: the request text; titles, times, notes and Google event IDs of up to 40 events in the next 14 days; one event's location only for AI suggestions; calendar names and assistant settings; time zone and language. It names Google as the recipient and asks Allow / Not now. Google account email addresses are never sent (calendars appear as "Account 1", "Account 2"). Not now keeps the assistant off. Settings (☰ › General) › AI & privacy shows the status, "What is sent", Allow and Stop sharing. Siri and notification replies refuse until permission is given in the app. Demo mode never contacts the AI.
 
 LIVE ACTIVITY / DYNAMIC ISLAND
-One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island; default 30, or Off) until it ends; it leaves the Lock Screen 10 minutes after the end. No upcoming event, no Live Activity. iOS 26 schedules them on the iPhone. iOS 18 starts each with one push-to-start from our server, only after AI permission (the consent dialog also says the next 48 hours' titles and times are kept on the server); otherwise it appears when the app is opened during the lead time. No update pushes: the countdown is a system timer. Tapping it opens Quick Capture.
+One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island; default 30, or Off) until it ends; it leaves the Lock Screen 10 minutes after the end. No upcoming event, no Live Activity. Everything happens on the iPhone: nothing is sent to our server and no AI permission is needed. iOS 26: opening the app schedules the next two days' activities (Activity.request with a start date), so each appears on time with the app closed. iOS 18 cannot schedule them: an activity appears when the app is opened during the lead time or the event, and stays after the app closes. The countdown is a system timer. Tapping it opens Quick Capture.
 
 CONTROL CENTER
 The "Smart Schedule" control (Control Center › + › Add a Control) opens Quick Capture with the keyboard up. It never starts a Live Activity.
@@ -463,7 +464,7 @@ NOTIFICATION REPLIES
 Long-press a reminder and type, e.g. "push this 30 minutes later". The extension updates the event (Google Calendar, or the sample data in demo mode) before the notification closes; deleting needs a red Confirm button. "Snooze 10 min" is also offered.
 
 DATA DELETION (5.1.1(v))
-Remove account (avatar › ⋯ next to the account, or swipe left; or ☰ › ⋯ next to the address) revokes Google access and deletes its tokens and cached events. ☰ › General › Data › "Erase all data on this device" revokes every Google account, withdraws AI permission, clears our server's Live Activity registration and deletes all local data. Events in Google Calendar are not deleted.
+Remove account (avatar › ⋯ next to the account, or swipe left; or ☰ › ⋯ next to the address) revokes Google access and deletes its tokens and cached events. ☰ › General › Data › "Erase all data on this device" revokes every Google account, withdraws AI permission and deletes all local data. Events in Google Calendar are not deleted.
 
 OTHER
 No in-app purchases or subscriptions. Rated 18+ because Google's Gemini API terms require users to be 18 or older. The microphone is used only after tapping the mic button, to turn speech into text.
@@ -476,11 +477,11 @@ No in-app purchases or subscriptions. Rated 18+ because Google's Gemini API term
 ```text
 Time Sensitive notifications: reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning briefing and suggestions are Normal. People can change the urgency for each kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off. During quiet hours reminders arrive silently.
 
-Background modes: "fetch" lets background app refresh sync Google Calendar changes and keep reminders and Live Activities up to date. "remote-notification" is for the Live Activity push-to-start on iOS 18. The app sends no other remote notifications; reminders are local notifications.
+Background modes: only "fetch", which lets background app refresh sync Google Calendar changes and keep reminders and Live Activities up to date. Reminders are local notifications created on the iPhone.
 
-NSSupportsLiveActivitiesFrequentUpdates: declared, but the app sends no update pushes at all. On iOS 18 the server sends exactly one push-to-start per event; the countdown uses Text(timerInterval:).
+NSSupportsLiveActivitiesFrequentUpdates: declared, but Live Activities get no updates from a server at all; the countdown uses Text(timerInterval:).
 
-What our server keeps: AI requests are passed to Google's Gemini API and not stored. On iOS 18 only, after the person allows AI data sharing, the titles, event IDs, start and end times and calendar colours of the next 48 hours' events are stored for up to 3 days to send the push-to-start through Apple's push service (no notes, places or attendees). Withdrawing permission or "Erase all data on this device" clears that registration. The server also keeps the App Attest key record used to verify the app.
+What our server keeps: AI requests are passed to Google's Gemini API and not stored, and no calendar data is stored at all (Live Activities are made on the iPhone). The server keeps the App Attest key record used to verify the app.
 
 Speech: the microphone and speech recognition are used only after the person taps the mic button, until they tap it again or send. With "On-device recognition" on (the default) and a supported language, audio stays on the iPhone; otherwise Apple's speech service transcribes it. Only the text is used by the assistant.
 
@@ -504,6 +505,7 @@ Accounts: Smart Schedule has no accounts of its own, so there is no account to d
 
 - **6.9 吋（iPhone with Dynamic Island, large display）：1320 × 2868 直向**，用 iPhone 17 Pro Max 模擬器或實機拍。這是這份規劃的主要尺寸。
 - Apple 的截圖規格頁（[Screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications)，2026-10-15 讀取）現在寫的必要尺寸是「At least one screenshot for **iPhone with Dynamic Island (medium display)**」，也就是 6.3 吋 **1206 × 2622**（iPhone 17 Pro）。用同樣的畫面在 iPhone 17 Pro 模擬器再拍一組，兩組都上傳最保險；App Store Connect 的版本頁會標出哪一格必填。
+- 用 iOS 26 的模擬器拍（iPhone 17 Pro Max／17 Pro）。第 2 張的「開始前 30、15、10 或 5 分鐘出現」在 iOS 26 成立；iOS 18 要在那段時間內打開 App 才會出現，描述的「使用前須知」已寫明，畫面本身兩種系統一樣。
 - 每種尺寸最多 10 張，`.png` 或 `.jpg`，**不能有透明（alpha）**。不支援 iPad，所以不用 iPad 截圖。
 - 兩個語系各一組：繁體中文組把模擬器的語言設成繁體中文（台灣），用中文輸入；英文組用英文。
 - 狀態列統一：`xcrun simctl status_bar booted override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3`。
@@ -538,10 +540,9 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 這些不在這份文件的範圍內，已經避免寫進上面的商店文字：
 
 1. **Siri 片語只有英文。** `SmartScheduleShortcuts` 的片語（「Add a plan in Smart Schedule」）沒有 `AppShortcuts.xcstrings`，Siri 用中文時不會認得。中文描述因此只寫「支援 Siri 與捷徑」，不引用片語。
-2. **DSA：** README 和 `docs/SETTINGS.md` 第 16 節沒寫「不在歐盟上架仍要聲明一次 non-trader」，見第 4.3 節。
-3. **截圖必要尺寸：** Apple 現在把 6.3 吋（1206 × 2622）列為必要，見第 9.1 節。
-4. **香港的 Gemini API 可用性和 Worker 的執行位置**，見第 4.4 節。
-5. **英國代表人**（開發者不在英國時），見第 4.4 節第 4 點。
+2. **截圖必要尺寸：** Apple 現在把 6.3 吋（1206 × 2622）列為必要，見第 9.1 節。
+3. **香港、澳門和中國大陸：1.0 不上架**（Gemini API 不在那裡提供），見第 4.3、4.4 節。
+4. **英國代表人：不需要**（開發者在英國）；**ICO 的資料保護費要確認**，見第 4.4 節第 4 點。
 
 ---
 
@@ -557,7 +558,7 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 | 控制中心、鎖定畫面控制項打開快速輸入；動作按鈕 | `Widgets/SmartScheduleControl.swift`、`Shared/Intents/OpenQuickCaptureIntent.swift`、`App/Views/Settings/ShortcutsGuideView.swift` |
 | Siri 與捷徑，不用打開 App | `AddPlanIntent`（`openAppWhenRun = false`）、`SmartScheduleShortcuts` |
 | 即時動態：開始前 30／15／10／5 分鐘出現、倒數、這一週、結束後消失 | `AppPreferences.liveActivityLeadChoices = [30, 15, 10, 5]`；`Shared/LiveActivity/ActivityScheduler.swift`；`Widgets/ScheduleLiveActivity.swift`（`IslandWeekStrip`、`Text(timerInterval:)`） |
-| iOS 18 需要 AI 資料分享才準時出現 | `PushToStartRegistrar.swift`；`App/Views/Settings/NotificationSettingsView.swift` 的說明文字 |
+| iOS 18 只有在提前時間內（或進行中）打開 App 才出現；iOS 26 不用打開 App 也準時出現 | `ActivityPlanner.schedulesOnDevice`、`ActivityPlanner.pushToStartStep`（`Shared/LiveActivity/ActivityScheduler.swift`）；`AppConstants.pushToStartEnabled = false`；`App/Views/Settings/NotificationSettingsView.swift` 的說明文字 |
 | 長按提醒回覆、延後 10 分鐘 | `NotificationContent/`；`Shared/Notifications/NotificationIDs.swift`（「Type in any plan to add or change」、「Snooze 10 min」） |
 | 月、週、日檢視，24 小時時間軸 | `App/Views/MonthGridView.swift`、`QuickCaptureView.swift`、`CaptureModePicker.swift`、`CaptureDayPager.swift` |
 | 多個 Google 帳號、行事曆顯示或隱藏、新行程存到哪裡 | `App/Views/Navigation/CalendarDrawer.swift`、`App/Views/Settings/CalendarSettingsView.swift`、`Shared/Calendar/CalendarRouter.swift` |
@@ -568,9 +569,9 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 | 專注模式過濾條件 | `App/Intents/CalendarFocusFilter.swift` |
 | 一直略過的提醒會問要不要停掉 | `Shared/Notifications/ReminderEngagement.swift`、`Shared/Storage/PreferencesStore.swift`（連續 `LearnedSuggestion.dismissThreshold` = 5 次，`Shared/Models/PreferenceLedger.swift`） |
 | 示範模式不連線到 AI | `Shared/Orchestrator/DemoAssistant.swift`；`ChatViewModel.enableDemo()` |
-| 同意前不送任何資料給 AI；同意說明的內容 | `GeminiClient.generate` 的 `consentRequired`；`Shared/Storage/AIConsentStore.swift`（`AIConsentDisclosure`，第 4 版） |
+| 同意前不送任何資料給 AI；同意說明的內容 | `GeminiClient.generate` 的 `consentRequired`；`Shared/Storage/AIConsentStore.swift`（`AIConsentDisclosure`，第 5 版；`serverNote` 在 1.0 是 nil） |
 | 帳號 email 不會傳給 AI | `Shared/AI/CalendarAliases.swift`、`Shared/Models/PromptRedaction.swift`、`Tests/Unit/AccountEmailPrivacyTests.swift` |
-| 伺服器不保存請求；iOS 18 暫存 48 小時行程 | `server/worker/src/gemini.ts`、`registration.ts`（3 天） |
+| 伺服器不保存請求，也不存任何行程（1.0 沒有 push-to-start） | `server/worker/src/gemini.ts`；`AppConstants.pushToStartEnabled = false`、`PushToStartRegistrar.install(enabled:upload:)`；`server/worker/wrangler.toml` 的 `crons = []` |
 | 沒有廣告、沒有追蹤 | `project.yml` 沒有第三方套件；`App/PrivacyInfo.xcprivacy` 的 `NSPrivacyTracking` 是 false |
 | 匯出、移除帳號（撤銷授權）、清除所有資料 | `App/Privacy/DataExporter.swift`、`App/Auth/AccountManager.swift`、`App/Privacy/DataEraser.swift` |
 | iOS 18 以上；繁體中文和英文 | `project.yml`（`deploymentTarget iOS 18.0`）；`Shared/Localization/Localizable.xcstrings` |

@@ -18,6 +18,31 @@ enum ActivityPlanner {
     /// that starts up to this much before the trigger by the iPhone's clock is not "moved later".
     static let earlyStartTolerance: TimeInterval = 180
 
+    /// iOS 26 and later schedule an activity to start at its trigger time (`Activity.request(…, start:)`), which iOS
+    /// starts even with the app closed. iOS 18 cannot: an app starts one only while it is in front (or a server does,
+    /// with push-to-start).
+    static var schedulesOnDevice: Bool {
+        if #available(iOS 26.0, *) { return true }
+        return false
+    }
+
+    /// What a pass does about push-to-start.
+    enum PushToStartStep: Equatable {
+        /// Nothing: no push-to-start token is asked for or observed, nothing is registered, uploaded or cleared, so
+        /// nothing about events or tokens leaves the iPhone (version 1.0, `AppConstants.pushToStartEnabled` false).
+        case off
+        /// iOS 26 schedules the activities on the iPhone: titles the server kept while this iPhone ran iOS 18 are
+        /// cleared (a request only when an earlier upload left some there).
+        case clearServer
+        /// iOS 18: observe the push-to-start token, register the planned events and upload them with AI consent.
+        case register
+    }
+
+    static func pushToStartStep(enabled: Bool, schedulesOnDevice: Bool) -> PushToStartStep {
+        guard enabled else { return .off }
+        return schedulesOnDevice ? .clearServer : .register
+    }
+
     /// iOS 18: what to register for push-to-start. Events still to come, and events due within the server's retry
     /// window that are not showing and were not shown for this trigger: a push that failed is tried again for two
     /// minutes, and the server's record of what it sent keeps one it delivered from starting twice.
@@ -78,8 +103,11 @@ enum ActivityPlanner {
 ///
 /// • iOS 26 and later: each planned event gets an activity scheduled to start at its trigger time
 ///   (`Activity.request(…, start:)`, state `.pending`), which iOS starts even with the app closed.
-/// • iOS 18: only APNs push-to-start can start an activity in the background; the planned events, with their
-///   attributes and content already encoded, go to `PushToStartRegistrar` for a server to send.
+/// • iOS 18: only APNs push-to-start can start an activity in the background. With `AppConstants.pushToStartEnabled`
+///   the planned events, with their attributes and content already encoded, go to `PushToStartRegistrar` for a server
+///   to send. Version 1.0 has it off (`ActivityPlanner.pushToStartStep`): no token is asked for and nothing leaves the
+///   iPhone, so an activity appears only once the app runs within the lead time (it then starts at once). While the
+///   app keeps running, a pass at the next trigger time (`dueWake`) starts that one on time.
 /// • Both: an event already due when the app is in front starts at once; a changed scheduled activity is replaced
 ///   (the old one ends only once the new one is requested); a deleted event's activity ends; an ended event's
 ///   activity ends and leaves the Lock Screen 10 minutes after the end.
@@ -102,6 +130,10 @@ final class ActivityScheduler {
     private var isObservingPushToStart = false
     private var isObservingActivities = false
     private var pushToStartToken: Data?
+    /// iOS 18 without push-to-start: a pass at the next trigger time while the app keeps running, so the activity
+    /// appears then instead of at the next change or return to the front. Only while the process runs; from the
+    /// background the request fails harmlessly and the pass when the app becomes active starts it.
+    private var dueWake: Task<Void, Never>?
     /// "Erase all data" is under way: passes plan nothing, whatever started them (a consent change, a sync, the
     /// app returning to the front), so nothing is scheduled again from the cache that is about to go.
     private var isSuspended = false
@@ -190,10 +222,28 @@ final class ActivityScheduler {
         }
         Self.storeStartedTriggers(started.filter { planned[$0.key] != nil })
 
-        if #available(iOS 26.0, *) {
+        switch ActivityPlanner.pushToStartStep(enabled: AppConstants.pushToStartEnabled,
+                                               schedulesOnDevice: ActivityPlanner.schedulesOnDevice) {
+        case .off:
+            // Version 1.0: no push-to-start token is asked for, and nothing about events is registered or uploaded.
+            // iOS 26 scheduled the activities above; on iOS 18 the ones already due were started above, and the next
+            // one starts in a pass at its trigger time if the app is still running then.
+            dueWake?.cancel()
+            dueWake = nil
+            if !ActivityPlanner.schedulesOnDevice,
+               let next = plan.filter({ !covered.contains($0.eventID) && $0.triggerAt > now }).map(\.triggerAt).min() {
+                dueWake = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(max(1, next.timeIntervalSinceNow + 1)))
+                    guard !Task.isCancelled, let self else { return }
+                    // This pass sets the next wake; it must not cancel the task running it.
+                    self.dueWake = nil
+                    await self.reconcile()
+                }
+            }
+        case .clearServer:
             // The iPhone schedules them itself: titles the server kept while this iPhone ran iOS 18 are cleared.
             await PushToStartRegistrar.uploadIfNeeded(changed: false, consented: false)
-        } else {
+        case .register:
             observePushToStartTokens()
             let upcoming = enabled
                 ? ActivityPlanner.pushToStartItems(
@@ -301,9 +351,9 @@ final class ActivityScheduler {
         return activity.activityState == .active || activity.activityState == .stale
     }
 
-    /// An activity started outside this pass (iOS 18 push-to-start, which also gives the app background time; an
-    /// iOS 26 scheduled one starting) is reconciled at once, which records it as shown: swiped away later, it is not
-    /// started again for the same trigger.
+    /// An activity started outside this pass (an iOS 26 scheduled one starting; with push-to-start, an iOS 18 push,
+    /// which also gives the app background time) is reconciled at once, which records it as shown: swiped away later,
+    /// it is not started again for the same trigger.
     private func observeActivities() {
         guard !isObservingActivities else { return }
         isObservingActivities = true
@@ -315,9 +365,10 @@ final class ActivityScheduler {
         }
     }
 
-    /// iOS 18: a new push-to-start token re-registers the planned events (observed while the app runs).
+    /// iOS 18: a new push-to-start token re-registers the planned events (observed while the app runs). Only with
+    /// `AppConstants.pushToStartEnabled` (`PushToStartStep.register`): version 1.0 never asks iOS for a token.
     private func observePushToStartTokens() {
-        guard !isObservingPushToStart else { return }
+        guard AppConstants.pushToStartEnabled, !isObservingPushToStart else { return }
         isObservingPushToStart = true
         Task { [weak self] in
             for await token in ScheduleActivity.pushToStartTokenUpdates {

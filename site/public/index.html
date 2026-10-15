@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>Smart Schedule · iPhone 的 AI 行程助理 · AI scheduling assistant for iPhone</title>
 <meta name="description" content="Smart Schedule 是搭配 Google 日曆的 iPhone AI 行程助理。Smart Schedule is an AI scheduling assistant for iPhone that works with your Google Calendar.">
-<link rel="canonical" href="https://smart-schedules.com/">
+<link rel="canonical" href="https://www.smart-schedules.com/">
 <link rel="icon" type="image/png" href="/logo.png">
 <style>
 :root {
@@ -142,10 +142,10 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 </ul>
 
 <h2>為什麼需要存取你的 Google 日曆</h2>
-<p>Smart Schedule 是你 Google 日曆的用戶端。它讀取你的行程，用來顯示月曆、提醒和即時動態；在你（或你要求助理）新增、修改、刪除行程時寫回 Google 日曆；並讀取你的行事曆清單，讓你選擇要顯示哪些行事曆、新行程存到哪裡。與 Google 日曆的同步直接在你的 iPhone 和 Google 之間進行；只有你允許 AI 資料分享後，相關行程才會經過我們的伺服器送到 Gemini，iOS 18 上接下來 48 小時行程的標題和時間會暫存在伺服器最多 3 天，用於動態島。</p>
+<p>Smart Schedule 是你 Google 日曆的用戶端。它讀取你的行程，用來顯示月曆、提醒和即時動態；在你（或你要求助理）新增、修改、刪除行程時寫回 Google 日曆；並讀取你的行事曆清單，讓你選擇要顯示哪些行事曆、新行程存到哪裡。與 Google 日曆的同步直接在你的 iPhone 和 Google 之間進行；只有你允許 AI 資料分享後，相關行程才會經過我們的伺服器送到 Gemini。動態島和即時動態直接在你的 iPhone 上產生，不會上傳行程。</p>
 
 <h2>AI 與隱私</h2>
-<p>助理用 Google 的 Gemini API 理解你的話。點「允許」之前，不會傳送任何資料給 AI；允許後，你的請求和相關的行程會經過我們的伺服器（在 Cloudflare 上執行）送到 Gemini，伺服器不保存這些內容，你也可以隨時在 App 裡停止分享。App 不會把你 Google 帳號的 email 地址傳給 AI：有好幾個帳號時，助理只看到「Account 1」「Account 2」這類代稱。在 iOS 18 上，同樣需要你的允許，接下來 48 小時內行程的標題和時間也會存在我們的伺服器（最晚在 App 最後一次上傳後 3 天刪除），並經由 Apple 的推播服務送出，讓行程能準時出現在動態島。依 Gemini API 的條款，Smart Schedule 只提供給年滿 18 歲的人使用。沒有廣告、沒有追蹤，我們不出售資料。完整說明請看<a href="/privacy">隱私權政策</a>。</p>
+<p>助理用 Google 的 Gemini API 理解你的話。點「允許」之前，不會傳送任何資料給 AI；允許後，你的請求和相關的行程會經過我們的伺服器（在 Cloudflare 上執行）送到 Gemini，伺服器不保存這些內容，你也可以隨時在 App 裡停止分享。App 不會把你 Google 帳號的 email 地址傳給 AI：有好幾個帳號時，助理只看到「Account 1」「Account 2」這類代稱。依 Gemini API 的條款，Smart Schedule 只提供給年滿 18 歲的人使用。沒有廣告、沒有追蹤，我們不出售資料。完整說明請看<a href="/privacy">隱私權政策</a>。</p>
 <p class="quote">Smart Schedule 使用從 Google API 取得的資訊，以及將這些資訊傳輸到任何其他 App，都將遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API 服務使用者資料政策</a>（Google API Services User Data Policy），包括其中的「有限使用」（Limited Use）規定。</p>
 
 <h2>連結與聯絡</h2>
@@ -179,10 +179,10 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 </ul>
 
 <h2>Why Smart Schedule uses your Google Calendar</h2>
-<p>Smart Schedule is a client for your Google Calendar. It reads your events to show your calendar, reminders and Live Activities; writes to Google Calendar when you (or the assistant, at your request) add, change or delete events; and reads your list of calendars so you can choose which ones to show and where new events go. Syncing with Google Calendar happens directly between your iPhone and Google. Our server only sees calendar details you choose to share with the AI assistant and, on iOS 18, the titles and times of the next 48 hours' events for the Dynamic Island (kept up to 3 days).</p>
+<p>Smart Schedule is a client for your Google Calendar. It reads your events to show your calendar, reminders and Live Activities; writes to Google Calendar when you (or the assistant, at your request) add, change or delete events; and reads your list of calendars so you can choose which ones to show and where new events go. Syncing with Google Calendar happens directly between your iPhone and Google. Our server only sees calendar details you choose to share with the AI assistant. The Dynamic Island and Live Activities are created on your iPhone, with no events uploaded.</p>
 
 <h2>AI and privacy</h2>
-<p>The assistant uses Google's Gemini API to understand what you say. Nothing is sent to the AI until you tap Allow. After that, your request and the related events go through our server (running on Cloudflare) to Gemini; our server does not keep them, and you can stop sharing in the app at any time. The app does not send your Google account email addresses to the AI: with several accounts, the assistant sees only names such as "Account 1" and "Account 2". On iOS 18, with the same permission, the titles and times of your events in the next 48 hours are also kept on our server (deleted at the latest 3 days after the app last sends them) and sent through Apple's push service, so they can appear in the Dynamic Island on time. Under the Gemini API terms, Smart Schedule is only for people aged 18 or older. No ads, no tracking, and we never sell data. The <a href="/privacy">Privacy Policy</a> explains everything in detail.</p>
+<p>The assistant uses Google's Gemini API to understand what you say. Nothing is sent to the AI until you tap Allow. After that, your request and the related events go through our server (running on Cloudflare) to Gemini; our server does not keep them, and you can stop sharing in the app at any time. The app does not send your Google account email addresses to the AI: with several accounts, the assistant sees only names such as "Account 1" and "Account 2". Under the Gemini API terms, Smart Schedule is only for people aged 18 or older. No ads, no tracking, and we never sell data. The <a href="/privacy">Privacy Policy</a> explains everything in detail.</p>
 <p class="quote">Smart Schedule's use and transfer to any other app of information received from Google APIs will adhere to <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
 
 <h2>Links and contact</h2>

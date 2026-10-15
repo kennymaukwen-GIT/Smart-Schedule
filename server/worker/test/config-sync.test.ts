@@ -73,6 +73,15 @@ describe("app ↔ Worker configuration", () => {
     assert.equal(new Set(namespaceIDs).size, namespaceIDs.length, "rate limiter namespace_id must differ per environment");
   });
 
+  it("production runs no cron while the app has no aps-environment (version 1.0: no push-to-start, no APNs secrets)", () => {
+    const project = repoFile("project.yml").replace(/(^|\s)#.*$/gm, "$1");
+    const production = wranglerEnvironments().get("production") ?? "";
+    const crons = match(production, /^\[triggers\]\ncrons[ \t]*=[ \t]*(\[[^\]\n]*\])/m, "[triggers] crons (production)");
+    if (!/\baps-environment\b/.test(project)) {
+      assert.equal(crons.replace(/\s/g, ""), "[]", "set crons = [] in wrangler.toml: without APNs every run only logs server_misconfigured");
+    }
+  });
+
   it("the Team ID, APNs IDs and keys are secrets: never assigned in wrangler.toml, where a deploy would reset them", () => {
     const toml = repoFile("server/worker/wrangler.toml");
     for (const name of ["GEMINI_API_KEY", "SS_DEV_TOKEN", "APNS_PRIVATE_KEY", "APPLE_TEAM_ID", "APNS_KEY_ID", "APNS_TEAM_ID"]) {

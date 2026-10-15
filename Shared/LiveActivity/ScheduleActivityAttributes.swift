@@ -6,8 +6,9 @@ import Foundation
 /// • Views cannot do I/O at render time; everything shown must be in this state.
 /// • Only Button/Toggle (App Intents) and Link are interactive — no TextField, no scrolling.
 ///
-/// One activity per event about to start (`ActivityScheduler`). A push-to-start payload (iOS 18) carries this type's
-/// JSON from the default `JSONEncoder`: ActivityKit decodes pushed content with its default strategies.
+/// One activity per event about to start (`ActivityScheduler`). A push-to-start payload (iOS 18; only with
+/// `AppConstants.pushToStartEnabled`, off in version 1.0) carries this type's JSON from the default `JSONEncoder`:
+/// ActivityKit decodes pushed content with its default strategies.
 struct ScheduleActivityAttributes: ActivityAttributes {
     /// The event this activity counts down to; `ActivityScheduler` finds the activity by it after the event changes.
     /// nil = the always-on activity of an older build, which the scheduler ends.

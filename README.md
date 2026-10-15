@@ -50,7 +50,7 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 - **多個 Google 帳號**：抽屜每個帳號一區，標題是 email，下面是該帳號的每個行事曆。點色塊一下就隱藏或顯示；點列進入行事曆設定（只在這台 iPhone 的顏色、這個行事曆要不要提醒、「用於新行程」）。最後一列「新增 Google 帳號」。
 - **新增 Google 帳號**（`App/Views/Account/AddAccountView.swift`）：抽屜、頭像的帳號頁、歡迎畫面的「新增 Google 帳號」／「連接 Google 日曆」都會打開這一頁。輸入自己的 email（例如 example@gmail.com），格式不完整會直接提示；按「前往 Google 登入」後，這個 email 會當作 Google 登入頁的 `login_hint`（Google 直接選好或填好這個帳號），使用者還是在 Google 自己的頁面登入、同意授權——只靠 email 沒辦法連結帳號，Smart Schedule 也看不到密碼。Google 回來後，App 比對 ID token 裡的 email 和輸入的 email（Gmail 會忽略大小寫、點和 `+標籤`）：相同就存下帳號、抓行事曆清單，顯示「已連接 example@gmail.com」，抽屜馬上出現它的行事曆；不同的話**先不存**，問「你登入的是 X，不是 Y。」，可以選「加入 X」、「改用 Y 重新登入」或「取消」（撤銷剛拿到的授權）；已經連接過的帳號只會更新，不會重複。Gmail、學校或公司的 Google Workspace 帳號都可以；學校或公司不允許時、沒有勾選日曆權限時、沒有網路時，都會用一句話說明怎麼辦。也可以按「從 Google 帳號清單選擇」不輸入 email。示範模式中繼續會先結束示範模式（頁面上有說明）。
 - **移除帳號**：頭像的帳號頁（每列的「⋯」選單或向左滑）和抽屜（帳號標題旁的「⋯」）都有「移除帳號」。確認視窗說明這個帳號的日曆和行程只會從這支 iPhone 的 Smart Schedule 移除，Google 日曆裡的資料不會被刪除；如果這個帳號還有變更沒送到 Google，會寫出「還有 N 項變更尚未同步到 Google，移除後會遺失。」並提供「先同步」。移除會撤銷 Google 授權、刪除 Keychain 裡的 token、清掉這個帳號的快取行程和待送出的變更、把它的行事曆從專注模式過濾條件拿掉；如果新行程原本存到這個帳號，會改回自動並顯示「新行程改存到「X」。」。移除最後一個帳號就回到歡迎畫面。
-- **AI 資料分享同意**（App Store 5.1.2(i)）：第一次送出訊息前先跳出說明，列出會傳給 Google Gemini API 的內容（輸入或說出的話、今天起 14 天內最多 40 個行程的標題、時間、備註和 Google 行程 ID、「AI 建議」那一個行程的地點、行事曆名稱和助理設定、時區和語言），按「允許」才送出；按「暫時不要」助理就不會呼叫 Gemini，輸入列上方會說明怎麼開啟。**Google 帳號的 email 不會送給 Gemini**：行事曆以「Account 1」「Account 2」區分，行程文字和錯誤訊息裡的帳號 email 先換成佔位字（[`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) §10.6）。說明改版時（目前第 4 版）每個人都會再被問一次。設定 › AI 與隱私可以查看和撤回。示範模式不需要同意。
+- **AI 資料分享同意**（App Store 5.1.2(i)）：第一次送出訊息前先跳出說明，列出會傳給 Google Gemini API 的內容（輸入或說出的話、今天起 14 天內最多 40 個行程的標題、時間、備註和 Google 行程 ID、「AI 建議」那一個行程的地點、行事曆名稱和助理設定、時區和語言），按「允許」才送出；按「暫時不要」助理就不會呼叫 Gemini，輸入列上方會說明怎麼開啟。**Google 帳號的 email 不會送給 Gemini**：行事曆以「Account 1」「Account 2」區分，行程文字和錯誤訊息裡的帳號 email 先換成佔位字（[`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) §10.6）。說明改版時（目前第 5 版：1.0 不用 iOS 18 的 push-to-start，所以 iOS 18 也沒有伺服器那一段）每個人都會再被問一次。設定 › AI 與隱私可以查看和撤回。示範模式不需要同意。
 - **用說的改設定**：「以後 8 點前不要提醒我」「健身提前 2 小時提醒」「以後用學校帳號」會變成設定，對話裡出現「設定已更新」卡片（舊值 → 新值，可以復原），也記在設定 › AI 與隱私 ›「助理記得的事」，每一條都能刪除（回到預設值）。
 - **先問我**：設定 › 助理 › 加入行程選「先問我」時，單一行程會先停在「尚未加入行事曆」卡片，按「加入」才寫入，按「編輯」說要改什麼。
 - **從習慣學習**：連續略過同一種預設提醒 5 次，對話裡會問要不要停掉；按「停止」才會改。
@@ -144,17 +144,25 @@ open SmartSchedule.xcodeproj
 
 ## 上架前檢查清單
 
-完整清單、1.0 已決定的事（不賣訂閱、年齡分級 18+、不在歐洲經濟區和瑞士上架）和待決定事項（之後版本的訂閱價格和 Pro 要鎖什麼、隱私權政策網址）在 [`docs/SETTINGS.md`](docs/SETTINGS.md) 第 16 節。
+完整清單、1.0 已決定的事（不賣訂閱、年齡分級 18+、不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架、不用 iOS 18 的即時動態 push-to-start、網站在 https://www.smart-schedules.com、開發者在英國）和待決定事項（之後版本的訂閱價格和 Pro 要鎖什麼、使用條款）在 [`docs/SETTINGS.md`](docs/SETTINGS.md) 第 16 節。App Store Connect 要貼的文字和每個問卷的答案在 [`docs/app-store-metadata.md`](docs/app-store-metadata.md)。
 
 - [ ] **Gemini 付費層級**：替 Gemini API 的 Google Cloud 專案開啟 Cloud Billing。免費層級下 Google 可能用請求內容改善產品；App 和隱私權政策都不能宣稱「不用於訓練」。App 經由 `server/worker/` 呼叫 Gemini，API key 不在 App 裡。
 - [ ] **Google OAuth 驗證**：`calendar.events` 和 `calendar.calendarlist.readonly` 都是敏感 scope。送審 consent screen（App 名稱、logo、首頁、隱私權政策、授權網域）、每個 scope 的用途說明，以及一段示範影片（OAuth 流程、新增行程、抽屜列出行事曆）。consent screen 還在 Testing 時，refresh token 7 天就會失效。步驟、要貼的英文和影片腳本見 [`docs/google-oauth-verification.md`](docs/google-oauth-verification.md)。
-- [ ] **App Store 隱私標籤**（與 `App/PrivacyInfo.xcprivacy` 一致）：Other User Content（請求內容和跟請求一起送出的行程，經 Smart Schedule 的伺服器（Cloudflare Worker）轉給 Google Gemini；iOS 18 另把未來 48 小時行程的標題、行程 ID、起訖時間與顏色存在伺服器，經 Apple 推播服務送動態島的 push-to-start；Google 帳號 email 不送給 Gemini）、Device ID（隨機的安裝 ID 與 push token），用途都是 App 功能、連結身分、不用於追蹤。隱私權政策要寫明 Cloudflare 是處理者、Google 是接收者。
+- [ ] **Apple Developer 帳號**：Apple Developer Program 已核准。Team ID（developer.apple.com › Membership details）填進 `Config/Secrets.xcconfig`，也用 `npx wrangler secret put APPLE_TEAM_ID` 設給正式環境的 Worker（沒設時 `POST /attest` 回 500，AI 助理不能用；見 [`server/worker/README.md`](server/worker/README.md)）。
+- [ ] **App ID 和功能**：`com.smartschedule.app`、`com.smartschedule.app.widgets`、`com.smartschedule.app.notification-content` 三個都勾 App Groups（`group.com.smartschedule.shared`）；主 App 另外要 App Attest 和 Time Sensitive Notifications。**不需要 Push Notifications**：1.0 沒有 `aps-environment`（`AppConstants.pushToStartEnabled = false`）。
+- [ ] **Worker（1.0）**：只要 `GEMINI_API_KEY` 和 `APPLE_TEAM_ID` 兩個 secret；正式環境 `crons = []`，不用建立 APNs 的 `.p8`，也不用設 `APNS_*` secrets（`server/worker/README.md`「1.0：push-to-start 關閉」）。
+- [ ] **App Store 隱私標籤**（與 `App/PrivacyInfo.xcprivacy` 一致）：Other User Content（請求內容和跟請求一起送出的行程，經 Smart Schedule 的伺服器（Cloudflare Worker）轉給 Google Gemini，伺服器不保存；1.0 沒有 push-to-start，伺服器不存任何行程；Google 帳號 email 不送給 Gemini）、Device ID（App Attest 金鑰 ID：每個請求都帶，伺服器用來驗證請求和依安裝限制次數；1.0 沒有安裝 ID 或 push token），用途都是 App 功能、連結身分、不用於追蹤。隱私權政策要寫明 Cloudflare 是處理者、Google 是接收者。
 - [ ] **不賣訂閱（1.0）**：`AppConstants.subscriptionsEnabled` 保持 false；不要把任何 App 內購買項目或訂閱附加到 1.0 送審（App Store Connect 裡如果已經建立「Smart Schedule Pro」群組或商品，就留著不送審）；App 隱私問卷不勾 Purchases。之後要賣時再把旗標和 `ReleaseConfigurationTests`、`validate_schema.py` 第 7 項一起改，建立跟 `Config/SmartSchedule.storekit` 相同 ID 的商品（`com.smartschedule.pro.monthly`、`com.smartschedule.pro.yearly`），簽署 Paid Apps 協議，加上各語系的訂閱名稱，用 sandbox 測試，並把支援頁的訂閱問答和隱私權政策第 7 節改回來。
 - [ ] **年齡分級 18+**：在 App Store Connect 填年齡分級問卷，分級設為 18+（問卷算出來比較低就選較高的分級），因為 Gemini API 的條款要求使用者年滿 18 歲。隱私權政策和支援頁寫同樣的最低年齡。
-- [ ] **不在歐洲經濟區和瑞士上架**：價格與供應狀況裡取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登和瑞士；英國和其他地區照常上架。數位服務法（DSA）仍要先聲明一次「不是交易商」（見 `docs/app-store-metadata.md` §4.3），交易商驗證等之後的版本加入歐盟時再處理。
+- [ ] **不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架**：價格與供應狀況裡取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登和瑞士，以及香港、澳門和中國大陸（Gemini API 不在那裡提供）；英國和其他地區照常上架（`docs/app-store-metadata.md` §4.3）。數位服務法（DSA）仍要先聲明一次「不是交易商」（見 `docs/app-store-metadata.md` §4.3），交易商驗證等之後的版本加入歐盟時再處理。
+- [ ] **英國**：開發者在英國，不需要英國 GDPR 第 27 條的代表人。到 ico.org.uk 的「Do I need to pay the fee?」確認要不要繳 ICO 的資料保護費（data protection fee），金額以 ICO 網站為準（`docs/app-store-metadata.md` §4.4）。
 - [ ] **App Review**：5.1.2(i) 同意說明在任何個人資料送到 Gemini 之前出現（全新安裝、Siri、通知擴充都要確認）；2.1 在審核備註說明「不登入先試用」，最好附測試用 Google 帳號；5.1.1(v) 說明「移除帳號」（撤銷授權）和「清除這台裝置上的所有資料」。
-- [ ] **實機確認**：Time Sensitive 在專注模式下能穿透、專注模式過濾條件開關時 `perform()` 有執行。
-- [ ] 部署 `site/`（首頁、隱私權政策、支援頁，見 [`site/README.md`](site/README.md)）到 smart-schedules.com：`SSPrivacyURL` 已設為 https://smart-schedules.com/privacy，網站上線前這個連結打不開；先填好頁面裡標黃的佔位值（開發者名稱、支援頁的回覆天數）。support@smart-schedules.com 是 Google Workspace 的 Gmail 信箱（隱私權政策第 9、12、13、17 節已寫明）；DNS 搬到 Cloudflare 時 Google 的郵件紀錄要原樣搬過去、不要開 Email Routing，Active 後再完成 DKIM 和 DMARC，見 `site/README.md` 第 3.1 節。
+- [ ] **實機確認**：Time Sensitive 在專注模式下能穿透、專注模式過濾條件開關時 `perform()` 有執行；iOS 26 的即時動態在 App 關著時準時出現，iOS 18 在提前時間內打開 App 才出現（`docs/ARCHITECTURE.md` 第 7 節）。
+- [ ] **App Store Connect**：建立 App（Bundle ID `com.smartschedule.app`），照 [`docs/app-store-metadata.md`](docs/app-store-metadata.md) 填 App 資訊、兩個語系的產品頁、App 隱私、年齡分級、供應地區和審核資訊（測試 Google 帳號、備用驗證碼）。
+- [ ] **TestFlight**：用 Distribute App 上傳 Release build（正式環境的 `GEMINI_BASE_URL`），先在 TestFlight 用正式 Worker 測過 AI 助理、長按通知回覆和 App Attest，再送審。
+- [ ] **截圖**：6.9 吋和 6.3 吋 iPhone 各一組、繁體中文和英文各一組，只用虛構資料（`docs/app-store-metadata.md` 第 9 節）。
+- [ ] **網站 https://www.smart-schedules.com**（首頁、隱私權政策、支援頁，見 [`site/README.md`](site/README.md) §3）：先填好頁面裡標黃的佔位值（開發者名稱、支援頁的回覆天數），再把 `site/` 部署成 Cloudflare Pages 專案，在 Pages 加上自訂網域 `www.smart-schedules.com`，然後在 Squarespace 的 DNS 加**一筆** CNAME（`www` → 專案的 `pages.dev` 主機名稱）。**DNS 不搬到 Cloudflare**，nameserver 和 DNSSEC 不動，Google Workspace 的 MX、SPF、DKIM、DMARC 和 `google-site-verification` 一筆都不動。`SSPrivacyURL` 已設為 https://www.smart-schedules.com/privacy，網站上線前這個連結打不開。根網域 smart-schedules.com 轉到 www 是選做（`site/README.md` §3.5，Squarespace 的網域轉址；要是開了，隱私權政策第 10 節要補一句 Squarespace 會處理轉址的連線）。
+- [ ] **support@ 郵件**：support@smart-schedules.com 是 Google Workspace 的 Gmail 信箱（隱私權政策第 9、12、13、17 節已寫明），在 Squarespace 完成 DKIM 和 DMARC（`site/README.md` §3.6），不用 Cloudflare Email Routing；Search Console 用網域資源 `smart-schedules.com` 驗證（§3.7，TXT 加在 Squarespace）。
 
 ## 驗證狀態
 
@@ -163,5 +171,5 @@ open SmartSchedule.xcodeproj
 | Gemini schema lint（OpenAPI subset，9 個函式）、15 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文）、1.0 不賣訂閱（`AppConstants.subscriptionsEnabled` 是 false，用到 StoreKit 或訂閱文字的檔案都讀這個旗標） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
 | Swift 編譯（App、Widgets、Notification extension） | ⏳ 設定、多帳號改動後待 CI 重新編譯（GitHub Actions 的 macOS runner：xcodegen 加 xcodebuild） |
 | 單元測試 | ⏳ 設定、多帳號改動後待 CI 重跑（hostless `SmartScheduleCoreTests`） |
-| 只能在實機上確認的行為（控制中心打開快速輸入、排程啟動與 push-to-start 的 Live Activity、通知內 inline TextField、160 pt 高度） | ⏳ 清單在 `docs/ARCHITECTURE.md` 第 7 節 |
+| 只能在實機上確認的行為（控制中心打開快速輸入、iOS 26 排程啟動的 Live Activity、iOS 18 打開 App 時出現的 Live Activity（1.0 沒有 push-to-start）、通知內 inline TextField、160 pt 高度） | ⏳ 清單在 `docs/ARCHITECTURE.md` 第 7 節 |
 | Gemini 模型 ID | ⚠️ 預設 `gemini-3.5-flash`；上線前到 Gemini deprecations 頁確認。換 ID 前先加進 Worker 的 `SESSION_MODELS` |

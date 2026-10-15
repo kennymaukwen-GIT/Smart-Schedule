@@ -3,8 +3,9 @@ import XCTest
 
 /// Gemini requests go to Smart Schedule's server with App Attest headers and never an API key; the body the
 /// assertion signs is exactly the body sent; the server's 401s get one fresh assertion (or a new key). The
-/// notification extension sends a session the app renews; the iOS 18 push-to-start registration reaches the server
-/// only with consent and is cleared when consent goes or the data is erased.
+/// notification extension sends a session the app renews; the iOS 18 push-to-start registration (behind
+/// `AppConstants.pushToStartEnabled`, off in version 1.0) reaches the server only with consent and is cleared when
+/// consent goes or the data is erased; with it off, nothing is uploaded and erasing needs no request.
 final class GeminiProxyTests: XCTestCase {
     private let config = GeminiConfig(baseURL: "https://ss.example.dev/v1beta", modelID: "test-model",
                                       apiKey: "must-not-be-sent", thinkingLevel: "low")
@@ -294,7 +295,7 @@ final class GeminiProxyTests: XCTestCase {
         XCTAssertNil(store.load())
     }
 
-    // MARK: Push-to-start upload (iOS 18)
+    // MARK: Push-to-start upload (iOS 18, AppConstants.pushToStartEnabled)
 
     private let flight = PushToStartRegistrar.Event(eventID: "e1", title: "Flight", eventStart: Date(timeIntervalSince1970: 1_800_003_600),
                                                     leadTime: 30, triggerAt: Date(timeIntervalSince1970: 1_800_001_800),
@@ -309,6 +310,47 @@ final class GeminiProxyTests: XCTestCase {
         defaults.removePersistentDomain(forName: "GeminiProxyTests.\(name)")
         await PushToStartRegistrar.sync(token: token, upcomingEvents: events, fileURL: file, defaults: defaults)
         return (file, defaults)
+    }
+
+    /// Version 1.0 (`AppConstants.pushToStartEnabled` false): the app installs no uploader, so even a registration an
+    /// earlier build left on this iPhone never goes up, with consent or without, and nothing waits to be retried.
+    func testWithPushToStartOffNothingIsUploaded() async throws {
+        let (file, defaults) = try await registration("off", events: [flight])
+        let uploads = UploadRecorder()
+        addTeardownBlock { PushToStartRegistrar.install(enabled: false) { _ in false } }
+
+        PushToStartRegistrar.install(enabled: false, upload: uploads.accept)
+        await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, fileURL: file, defaults: defaults)
+        await PushToStartRegistrar.uploadIfNeeded(changed: false, consented: false, fileURL: file, defaults: defaults)
+        XCTAssertTrue(uploads.sent.isEmpty)
+        XCTAssertFalse(defaults.bool(forKey: PushToStartRegistrar.uploadPendingKey))
+        XCTAssertFalse(defaults.bool(forKey: PushToStartRegistrar.serverHasEventsKey))
+
+        // The same calls reach the uploader once it is installed with push-to-start on (a later version).
+        PushToStartRegistrar.install(enabled: true, upload: uploads.accept)
+        await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, fileURL: file, defaults: defaults)
+        XCTAssertEqual(uploads.sent.map { $0.events.count }, [1])
+
+        // Turned off again, the uploader is gone: withdrawing consent cannot reach the server either.
+        PushToStartRegistrar.install(enabled: false, upload: uploads.accept)
+        await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: false, fileURL: file, defaults: defaults)
+        XCTAssertEqual(uploads.sent.count, 1)
+    }
+
+    /// "Erase all data" with push-to-start off: what an earlier build left in the App Group (the registration and its
+    /// flags) goes without any request, so it works offline.
+    func testForgetLocallyRemovesTheRegistrationWithoutARequest() async throws {
+        let (file, defaults) = try await registration("forget", events: [flight])
+        defaults.set(true, forKey: PushToStartRegistrar.serverHasEventsKey)
+        defaults.set(true, forKey: PushToStartRegistrar.uploadPendingKey)
+        XCTAssertNotNil(PushToStartRegistrar.pending(fileURL: file))
+
+        await PushToStartRegistrar.forgetLocally(fileURL: file, defaults: defaults)
+        XCTAssertNil(PushToStartRegistrar.pending(fileURL: file))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertNil(defaults.object(forKey: PushToStartRegistrar.serverHasEventsKey))
+        XCTAssertNil(defaults.object(forKey: PushToStartRegistrar.uploadPendingKey))
+        XCTAssertTrue(ProxyStub.requests.isEmpty, "no request")
     }
 
     func testTheRegistrationIsUploadedOnlyWithConsentAndClearedWhenItIsWithdrawn() async throws {

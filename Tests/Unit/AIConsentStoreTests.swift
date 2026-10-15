@@ -69,7 +69,7 @@ final class AIConsentStoreTests: XCTestCase {
 
     func testDisclosureSaysWhatIsSentAndToWhom() throws {
         XCTAssertEqual(AIConsentDisclosure.title, "Use the AI assistant?")
-        XCTAssertEqual(AIConsent.disclosureVersion, 4, "everyone is asked again for the new disclosure")
+        XCTAssertEqual(AIConsent.disclosureVersion, 5, "everyone is asked again for the new disclosure")
         let items = AIConsentDisclosure.items
         XCTAssertEqual(items.count, 5)
         // What the user types or says, with whatever names and addresses they mention themselves.
@@ -92,12 +92,19 @@ final class AIConsentStoreTests: XCTestCase {
         XCTAssertTrue(AIConsentDisclosure.lead.contains("Gemini API"))
         XCTAssertTrue(AIConsentDisclosure.recipient.contains("Google"))
 
-        // iOS 18 only: event titles, times and IDs kept on the server and sent through APNs; never notes or places.
-        let note = try XCTUnwrap(AIConsentDisclosure.serverNote(beforeIOS26: true))
+        // The iOS 18 server note follows AppConstants.pushToStartEnabled: version 1.0 has no push-to-start, keeps
+        // nothing about events on the server and says nothing about it, on any iOS.
+        XCTAssertEqual(AIConsentDisclosure.serverNote(beforeIOS26: true) != nil, AppConstants.pushToStartEnabled)
+        XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: true, pushToStart: false))
+        XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: false))
+
+        // Kept for a later version with push-to-start, iOS 18 only: event titles, times and IDs kept on the server and
+        // sent through APNs; never notes or places.
+        let note = try XCTUnwrap(AIConsentDisclosure.serverNote(beforeIOS26: true, pushToStart: true))
         for part in ["iOS 18", "next 48 hours", "event IDs", "server", "Apple's push service", "Notes and places are not stored"] {
             XCTAssertTrue(note.contains(part), "\(part) missing from: \(note)")
         }
-        XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: false))
+        XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: false, pushToStart: true), "iOS 26 schedules them itself")
 
         // Speech recognition is Apple's, on the iPhone or on Apple's servers.
         XCTAssertTrue(AIConsentDisclosure.speechNote.contains("Apple"), AIConsentDisclosure.speechNote)

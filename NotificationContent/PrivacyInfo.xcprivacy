@@ -10,9 +10,10 @@
 	<array>
 		<!-- What the user types or says (as text), and the titles, times, notes and Google event IDs of up to 40 events in
 		     the 14 days from today (a location only for AI suggestions on one event), sent through Smart Schedule's server to
-		     Google's Gemini API; no Google account email. On iOS 18 also the titles, event IDs, start and end times and calendar
-		     colours of the next 48 hours' events, kept on the server up to 3 days to start each Live Activity; keyed by a random
-		     install ID, so declared as linked. Never used for tracking. -->
+		     Google's Gemini API; no Google account email. The server keeps none of it, and version 1.0 keeps nothing about
+		     events on the server (no Live Activity push-to-start: AppConstants.pushToStartEnabled is false). Declared as
+		     linked: each request carries the session token the server issued for the app's App Attest key, whose key ID
+		     the app's manifest declares (Device ID). Never used for tracking. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>

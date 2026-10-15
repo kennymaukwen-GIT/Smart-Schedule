@@ -132,17 +132,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         NotificationIDs.registerCategories()
         // Every sync that changes the cache reschedules reminders and refreshes the Live Activity.
         AppRefresh.installSyncHooks()
-        // iOS 18: the push-to-start registration goes to Smart Schedule's server (App Attest), which starts each
-        // event's Live Activity on time.
-        PushToStartRegistrar.install { registration in
+        // iOS 18 push-to-start, off in version 1.0 (AppConstants.pushToStartEnabled): the registration would go to
+        // Smart Schedule's server (App Attest), which starts each event's Live Activity on time. Off, no uploader is
+        // installed, so nothing about events or push tokens can leave the iPhone.
+        PushToStartRegistrar.install(enabled: AppConstants.pushToStartEnabled) { registration in
             guard let body = try? PushToStartRegistrar.encoder.encode(registration) else { return false }
             return (try? await ServerClient.shared.post("devices/push-to-start", json: body)) != nil
         }
-        // Consent given or withdrawn (here or in the notification extension): the server gets the events or forgets
-        // them, and the extension gets its session.
+        // Consent given or withdrawn (here or in the notification extension): the extension gets its session, and
+        // with push-to-start on the server gets the events or forgets them (a Live Activity pass). Off, consent
+        // changes nothing about the Live Activities, which then stay on the iPhone.
         consentObservation = SharedChangeNotifier.observe(.consent) {
             Task { @MainActor in
-                await LiveActivityManager.shared.refreshIfRunning()
+                if AppConstants.pushToStartEnabled {
+                    await LiveActivityManager.shared.refreshIfRunning()
+                }
                 await AppAttestClient.shared.refreshSessionIfNeeded()
             }
         }

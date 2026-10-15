@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>支援 Support · Smart Schedule</title>
-<meta name="description" content="Smart Schedule 支援與常見問題：聯絡方式、刪除資料、移除 Google 帳號、停止 AI 分享、匯出資料。Smart Schedule support and FAQ: contact, deleting data, removing a Google account, stopping AI sharing, exporting data.">
-<link rel="canonical" href="https://smart-schedules.com/support">
+<meta name="description" content="Smart Schedule 支援與常見問題：聯絡方式、刪除資料、移除 Google 帳號、停止 AI 分享、動態島、匯出資料。Smart Schedule support and FAQ: contact, deleting data, removing a Google account, stopping AI sharing, the Dynamic Island, exporting data.">
+<link rel="canonical" href="https://www.smart-schedules.com/support">
 <link rel="icon" type="image/png" href="/logo.png">
 <style>
 :root {
@@ -145,6 +145,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><a href="#zh-delete">怎麼刪除我的資料？</a></li>
   <li><a href="#zh-remove-account">怎麼移除 Google 帳號？</a></li>
   <li><a href="#zh-withdraw">怎麼停止 AI 資料分享（撤回同意）？</a></li>
+  <li><a href="#zh-live">動態島什麼時候會出現？</a></li>
   <li><a href="#zh-purchases">有 App 內購買或訂閱嗎？</a></li>
   <li><a href="#zh-needs">AI 助理需要什麼才能運作？</a></li>
   <li><a href="#zh-export">怎麼匯出我的資料？</a></li>
@@ -157,11 +158,11 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>到 設定 › 資料 › 清除這台裝置上的所有資料。這會：</p>
 <ul>
   <li>停止即時動態、移除提醒通知；</li>
-  <li>撤回 AI 資料分享，並清除我們伺服器上的動態島登記（iOS 18）；</li>
+  <li>撤回 AI 資料分享；</li>
   <li>向 Google 要求撤銷授權（需要網路連線），並刪除所有登入權杖；</li>
   <li>刪除帳號、快取的行程、待送出的變更、設定、聊天記錄和匯出檔。</li>
 </ul>
-<p>Google 日曆裡的行程不會被刪除；要刪除行程本身，請在 Google 日曆裡刪除。有網路時清除的話，我們伺服器上剩下的少量技術資料不含行程內容，大部分會在幾天內到期（見隱私權政策的<a href="/privacy#zh-retention">保存期限</a>）。如果清除時沒有網路，登記給動態島的行程標題（iOS 18）可能會在我們的伺服器上留最多 3 天；請在有網路時清除，或等 3 天。</p>
+<p>Google 日曆裡的行程不會被刪除；要刪除行程本身，請在 Google 日曆裡刪除。我們伺服器上剩下的少量技術資料不含行程內容，大部分會在幾天內到期（見隱私權政策的<a href="/privacy#zh-retention">保存期限</a>）。</p>
 <p>打算刪除 App 的話，請在有網路時先清除資料：刪除 App 不會撤銷 Google 授權，iOS 也可能保留登入權杖。清除後，可以到 Google 帳號的<a href="https://myaccount.google.com/connections">第三方應用程式和服務</a>確認 Smart Schedule 已經不在清單上。</p>
 
 <h3 id="zh-remove-account">怎麼移除 Google 帳號？</h3>
@@ -169,7 +170,15 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>撤銷授權需要網路連線。如果移除時沒有網路，或你想確認授權已經撤銷，請到 Google 帳號的<a href="https://myaccount.google.com/connections">第三方應用程式和服務</a>移除 Smart Schedule 的存取權。</p>
 
 <h3 id="zh-withdraw">怎麼停止 AI 資料分享（撤回同意）？</h3>
-<p>到 設定 › AI 與隱私 › 停止分享。之後助理不會再傳送任何內容給 Google Gemini；在 iOS 18 上，伺服器上的動態島登記也會被清除，行程只有在開始前的那段時間打開 App，才會出現在動態島。示範模式仍然可以使用。想再開啟時，到同一頁按「允許」。同一頁的「傳送的內容」列出會傳送哪幾類資料（例如「你的行事曆名稱和助理設定，但不包括你 Google 帳號的 email」）；完整的傳送內容請看隱私權政策的<a href="/privacy#zh-ai">第 4 節</a>和<a href="/privacy#zh-p2s">第 5 節</a>。</p>
+<p>到 設定 › AI 與隱私 › 停止分享。之後助理不會再傳送任何內容給 Google Gemini。動態島和即時動態不受影響：它們本來就在你的 iPhone 上產生，不需要 AI 資料分享。示範模式仍然可以使用。想再開啟時，到同一頁按「允許」。同一頁的「傳送的內容」列出會傳送哪幾類資料（例如「你的行事曆名稱和助理設定，但不包括你 Google 帳號的 email」）；完整的傳送內容請看隱私權政策的<a href="/privacy#zh-ai">第 4 節</a>。</p>
+
+<h3 id="zh-live">動態島什麼時候會出現？</h3>
+<p>每個有時間的行程，會在開始前你設定的時間出現在動態島和鎖定畫面（設定 › 通知 › 動態島 › 顯示下一個行程：30、15、10 或 5 分鐘，預設 30 分鐘），行程結束後消失。即時動態直接在你的 iPhone 上產生，不需要允許 AI 資料分享，也不會把行程傳到我們的伺服器。</p>
+<ul>
+  <li><strong>iOS 26 以上：</strong>每次打開 Smart Schedule，App 會安排接下來兩天的即時動態；時間到了，即使沒有打開 App 也會準時出現。</li>
+  <li><strong>iOS 18：</strong>iOS 18 不讓 App 預先安排，所以只有在行程開始前的這段時間內或行程進行中打開 Smart Schedule，行程才會出現；出現之後，關掉 App 它也會留著。</li>
+</ul>
+<p>一直沒有出現的話，確認「顯示下一個行程」不是「關閉」，以及 iPhone 設定 › App › Smart Schedule 裡的「即時動態」是開著的。詳細說明見隱私權政策的<a href="/privacy#zh-live">第 5 節</a>。</p>
 
 <h3 id="zh-purchases">有 App 內購買或訂閱嗎？</h3>
 <p>沒有。這個版本（1.0）沒有任何 App 內購買或訂閱，所以沒有需要取消或回復的購買項目。</p>
@@ -217,6 +226,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><a href="#en-delete">How do I delete my data?</a></li>
   <li><a href="#en-remove-account">How do I remove a Google account?</a></li>
   <li><a href="#en-withdraw">How do I stop AI data sharing (withdraw consent)?</a></li>
+  <li><a href="#en-live">When does an event appear in the Dynamic Island?</a></li>
   <li><a href="#en-purchases">Are there in-app purchases or subscriptions?</a></li>
   <li><a href="#en-needs">What does the AI assistant need to work?</a></li>
   <li><a href="#en-export">How do I export my data?</a></li>
@@ -229,11 +239,11 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>Go to Settings › Data › Erase all data on this device. This:</p>
 <ul>
   <li>stops Live Activities and removes reminder notifications;</li>
-  <li>withdraws AI data sharing and clears the Dynamic Island registration on our server (iOS 18);</li>
+  <li>withdraws AI data sharing;</li>
   <li>asks Google to revoke access (this needs an internet connection) and deletes every sign-in token;</li>
   <li>deletes accounts, cached events, pending changes, settings, chat history and exports.</li>
 </ul>
-<p>Events in Google Calendar are not deleted; to delete the events themselves, delete them in Google Calendar. If you erase while online, the little technical data left on our server holds no event content, and most of it expires within days (see <a href="/privacy#en-retention">How long we keep data</a> in the Privacy Policy). If you're offline when you erase, event titles registered for the Dynamic Island (iOS 18) can stay on our server for up to 3 days; erase while online, or wait 3 days.</p>
+<p>Events in Google Calendar are not deleted; to delete the events themselves, delete them in Google Calendar. The little technical data left on our server holds no event content, and most of it expires within days (see <a href="/privacy#en-retention">How long we keep data</a> in the Privacy Policy).</p>
 <p>If you plan to delete the app, erase your data first, while you're online: deleting the app does not revoke Google access, and iOS may keep sign-in tokens. Afterwards you can check under <a href="https://myaccount.google.com/connections">Third-party apps &amp; services</a> in your Google Account that Smart Schedule is no longer listed.</p>
 
 <h3 id="en-remove-account">How do I remove a Google account?</h3>
@@ -241,7 +251,15 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>Revoking needs an internet connection. If you were offline when you removed the account, or want to make sure access is revoked, remove Smart Schedule's access under <a href="https://myaccount.google.com/connections">Third-party apps &amp; services</a> in your Google Account.</p>
 
 <h3 id="en-withdraw">How do I stop AI data sharing (withdraw consent)?</h3>
-<p>Go to Settings › AI &amp; privacy › Stop sharing. The assistant then sends nothing more to Google Gemini. On iOS 18 the Dynamic Island registration on our server is cleared too, and an event appears in the Dynamic Island only if you open the app shortly before it starts. Demo mode keeps working. To turn sharing back on, tap Allow on the same page. "What is sent" on that page lists the kinds of data sent (for example "Your calendar names and assistant settings, but not your Google account email addresses"); for the full list of what is sent, see <a href="/privacy#en-ai">section 4</a> and <a href="/privacy#en-p2s">section 5</a> of the Privacy Policy.</p>
+<p>Go to Settings › AI &amp; privacy › Stop sharing. The assistant then sends nothing more to Google Gemini. The Dynamic Island and Live Activities are not affected: they are created on your iPhone and never needed AI data sharing. Demo mode keeps working. To turn sharing back on, tap Allow on the same page. "What is sent" on that page lists the kinds of data sent (for example "Your calendar names and assistant settings, but not your Google account email addresses"); for the full list of what is sent, see <a href="/privacy#en-ai">section 4</a> of the Privacy Policy.</p>
+
+<h3 id="en-live">When does an event appear in the Dynamic Island?</h3>
+<p>Each timed event appears in the Dynamic Island and on the Lock Screen the time you chose before it starts (Settings › Notifications › Dynamic Island › Show next event: 30, 15, 10 or 5 minutes; 30 by default) and goes away after it ends. Live Activities are created on your iPhone: they need no AI data sharing, and your events are not sent to our server for them.</p>
+<ul>
+  <li><strong>iOS 26 and later:</strong> each time you open Smart Schedule, it schedules the next two days' Live Activities, and each one appears on time even when the app isn't open.</li>
+  <li><strong>iOS 18:</strong> iOS 18 doesn't let apps schedule them ahead, so an event appears only if you open Smart Schedule within that time before it starts or while it's under way. Once it appears, it stays after you close the app.</li>
+</ul>
+<p>If an event never appears, check that "Show next event" isn't Off, and that Live Activities are turned on in iPhone Settings › Apps › Smart Schedule. For details, see <a href="/privacy#en-live">section 5</a> of the Privacy Policy.</p>
 
 <h3 id="en-purchases">Are there in-app purchases or subscriptions?</h3>
 <p>No. This version (1.0) has no in-app purchases or subscriptions, so there is nothing to cancel or restore.</p>

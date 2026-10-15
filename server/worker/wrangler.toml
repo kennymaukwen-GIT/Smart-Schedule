@@ -9,9 +9,14 @@ compatibility_date = "2026-09-15"
 workers_dev = true
 preview_urls = false
 
-# Every minute: send the Live Activity push-to-start notifications that are due.
+# No cron in version 1.0: the app has no Live Activity push-to-start (AppConstants.pushToStartEnabled = false, no
+# aps-environment) and uploads no registrations, and without the APNS_* secrets every run would only log
+# server_misconfigured. `crons = []` also removes the cron trigger an earlier deploy made (it can take up to 15 minutes
+# to stop). The /devices/push-to-start route stays. To turn push-to-start on in a later version: set the APNS_* secrets
+# (README.md › APNs .p8 設定), then crons = ["* * * * *"] (every minute: send the push-to-start notifications that are
+# due). test/config-sync.test.ts keeps this empty while project.yml has no aps-environment.
 [triggers]
-crons = ["* * * * *"]
+crons = []
 
 # One KV namespace for everything (key prefixes chal:, key:, sess:, rl:, p2s:, p2sdead:, due:, claim:, sent:, apns:).
 # "smart-schedule-worker-ss-kv", made by the first `wrangler deploy` (automatic provisioning). In a fork of this
@@ -52,6 +57,7 @@ ALLOW_DEV_TOKEN = "false"
 RATE_LIMIT_PER_MIN = "30"
 APNS_BUNDLE_ID = "com.smartschedule.app"
 # Must match the app build's aps-environment: "sandbox" (Xcode builds) or "production" (TestFlight / App Store).
+# Only the cron uses it, and version 1.0 has neither (see [triggers]).
 APNS_ENV = "production"
 # Lifetime of the session tokens POST /session issues for the notification extension (seconds, >= 60; 7 days).
 SESSION_TTL_SECONDS = "604800"
@@ -71,6 +77,7 @@ ATTEST_DAILY_PER_IP = "200"
 #   npx wrangler secret put GEMINI_API_KEY
 #   npx wrangler secret put APPLE_TEAM_ID       10 characters (developer.apple.com › Membership details). Required:
 #                                               the App ID checked during attestation is "<APPLE_TEAM_ID>.<bundleId>".
+#   Not needed for version 1.0 (no push-to-start, no cron), only once push-to-start is turned on:
 #   npx wrangler secret put APNS_KEY_ID         the .p8 key's Key ID           } Live Activity push-to-start
 #   npx wrangler secret put APNS_TEAM_ID        the Team ID that owns the key  } (APNs token-based auth)
 #   npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
@@ -88,8 +95,8 @@ ATTEST_DAILY_PER_IP = "200"
 #   npx wrangler secret put GEMINI_API_KEY --env dev
 #   npx wrangler secret put SS_DEV_TOKEN --env dev
 #   npx wrangler secret put APPLE_TEAM_ID --env dev        (Debug builds on an iPhone)
-# Push-to-start from a Debug build on an iPhone (a sandbox APNs token): also set APNS_KEY_ID, APNS_TEAM_ID and
-# APNS_PRIVATE_KEY with --env dev, and crons = ["* * * * *"] below.
+# Push-to-start from a Debug build on an iPhone (a sandbox APNs token; only once the app turns it on, not in 1.0):
+# also set APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY with --env dev, and crons = ["* * * * *"] below.
 # Local: `npm run dev` runs this environment on http://localhost:8787 with the secrets in a git-ignored .dev.vars.
 [env.dev]
 name = "smart-schedule-worker-dev"

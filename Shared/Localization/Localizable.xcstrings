@@ -3257,6 +3257,16 @@
         }
       }
     },
+    "On iOS 18, an event appears only if you open Smart Schedule within that time before it starts or while it's under way. On iOS 26 and later, it appears on time even when the app is closed." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 iOS 18 上，只有在行程開始前的這段時間內或行程進行中打開 Smart Schedule，行程才會出現。在 iOS 26 以上版本，即使沒有打開 App，行程也會準時出現。"
+          }
+        }
+      }
+    },
     "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on Smart Schedule's server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
       "localizations" : {
         "zh-Hant" : {

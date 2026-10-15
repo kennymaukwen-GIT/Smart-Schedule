@@ -11,6 +11,10 @@ import Foundation
 /// uploader the app installs (`install(upload:)`; code here is also built into the widget extension, which has no
 /// network client). Event titles leave the iPhone only with AI consent, whose disclosure names this server storage.
 /// Uploads and "Erase all data" run one at a time, in the order asked for (`serialized`).
+///
+/// Off in version 1.0 (`AppConstants.pushToStartEnabled`): the app installs no uploader (`install(enabled:upload:)`),
+/// `ActivityScheduler` never syncs or uploads and asks iOS for no token, and "Erase all data" only removes what an
+/// earlier build may have left here (`forgetLocally`). The code stays for a later version.
 enum PushToStartRegistrar {
     /// The 48-hour window rarely holds more; a cap keeps the upload small.
     static let maxEvents = 50
@@ -63,6 +67,13 @@ enum PushToStartRegistrar {
     /// The app installs the network upload at launch; it returns whether the server accepted the registration.
     static func install(upload: @escaping @Sendable (Registration) async -> Bool) {
         lock.withLock { uploader = upload }
+    }
+
+    /// The app's launch hook: installs `upload` only when `enabled` (`AppConstants.pushToStartEnabled`). Not enabled
+    /// (version 1.0), any uploader is removed, so `uploadIfNeeded` and `eraseAll` without an explicit `upload` never
+    /// reach the network, whatever the registration file or consent say.
+    static func install(enabled: Bool, upload: @escaping @Sendable (Registration) async -> Bool) {
+        lock.withLock { uploader = enabled ? upload : nil }
     }
 
     /// Sends the registration whenever the server's copy may differ from what it should hold: it changed, the last
@@ -125,6 +136,17 @@ enum PushToStartRegistrar {
                 write(registration, to: fileURL)
                 return
             }
+            try? FileManager.default.removeItem(at: fileURL)
+            for key in [legacyDeviceIDKey, uploadPendingKey, serverHasEventsKey] { defaults?.removeObject(forKey: key) }
+        }
+    }
+
+    /// "Erase all data" with push-to-start off (version 1.0, `AppConstants.pushToStartEnabled`): nothing was uploaded,
+    /// so the registration file and its flags, which only an earlier build can have left, go without any request.
+    /// Waits for an upload or erase already under way, like `eraseAll`.
+    static func forgetLocally(fileURL: URL = PushToStartRegistrar.defaultFileURL,
+                              defaults: UserDefaults? = UserDefaults(suiteName: AppConstants.appGroupID)) async {
+        await serialized {
             try? FileManager.default.removeItem(at: fileURL)
             for key in [legacyDeviceIDKey, uploadPendingKey, serverHasEventsKey] { defaults?.removeObject(forKey: key) }
         }

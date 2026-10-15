@@ -17,17 +17,18 @@ configFiles:
 
 settings:
   configs:
-    # Push environment: development in every configuration, so builds and archives signed with the (automatic)
-    # development profile match it. Distribute App (TestFlight / App Store) re-signs with the distribution profile,
-    # which sets production (Apple: APS Environment Entitlement). Never write production here: it would not match a
-    # development profile.
     # App Attest: development uses Apple's sandbox; TestFlight and App Store builds always use production.
     # SS_DEV_TOKEN (Config/Secrets.xcconfig) only reaches Debug builds: Release forces it empty.
+    # No push environment: version 1.0 uses no remote push (AppConstants.pushToStartEnabled and
+    # liveActivityPushEnabled are false), so the app has no aps-environment entitlement. To turn push-to-start on in a
+    # later version, add `APS_ENVIRONMENT: development` to both Debug and Release (development in every configuration,
+    # so builds and archives signed with the automatic development profile match it; Distribute App re-signs with the
+    # distribution profile, which sets production — never write production here), then
+    # `aps-environment: $(APS_ENVIRONMENT)` to the app's entitlements and remote-notification to its UIBackgroundModes.
+    # scripts/validate_schema.py checks the flags and these entries agree.
     Debug:
-      APS_ENVIRONMENT: development
       APP_ATTEST_ENVIRONMENT: development
     Release:
-      APS_ENVIRONMENT: development
       APP_ATTEST_ENVIRONMENT: production
       SS_DEV_TOKEN: ""
   base:
@@ -68,7 +69,9 @@ targets:
         NSMicrophoneUsageDescription: Smart Schedule listens after you tap the mic so you can speak a plan instead of typing it.
         NSSpeechRecognitionUsageDescription: Your spoken plan is transcribed to text before it is scheduled.
         BGTaskSchedulerPermittedIdentifiers: [com.smartschedule.refresh]
-        UIBackgroundModes: [fetch, remote-notification]
+        # fetch: the BGAppRefresh task (App/Sync/AppRefresh.swift). No remote-notification: version 1.0 receives no
+        # pushes (AppConstants.pushToStartEnabled).
+        UIBackgroundModes: [fetch]
         # Only HTTPS and hashing (exempt): no export-compliance question on every upload.
         ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:
@@ -84,9 +87,10 @@ targets:
         # Debug only: lets the simulator (no App Attest) call the server. Empty in Release.
         SSDevToken: $(SS_DEV_TOKEN)
         # Shown in Settings › About and the account sheet. SSTermsURL is Apple's standard EULA; SSPrivacyURL is the policy
-        # in site/public/privacy.html, live once site/ is deployed to smart-schedules.com (site/README.md).
+        # in site/public/privacy.html, live once site/ is deployed to the Cloudflare Pages project served at
+        # www.smart-schedules.com (one CNAME "www" at Squarespace DNS; site/README.md).
         SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
-        SSPrivacyURL: https://smart-schedules.com/privacy
+        SSPrivacyURL: https://www.smart-schedules.com/privacy
         SSSupportEmail: support@smart-schedules.com
     entitlements:
       path: App/SmartSchedule.entitlements
@@ -94,7 +98,8 @@ targets:
         com.apple.security.application-groups: [group.com.smartschedule.shared]
         keychain-access-groups: [$(AppIdentifierPrefix)com.smartschedule.shared]
         com.apple.developer.usernotifications.time-sensitive: true
-        aps-environment: $(APS_ENVIRONMENT)
+        # No aps-environment: version 1.0 uses no remote push (see settings above). Local and Time Sensitive
+        # notifications, Live Activities requested with pushType nil and iOS 26's scheduled start do not need it.
         com.apple.developer.devicecheck.appattest-environment: $(APP_ATTEST_ENVIRONMENT)
     # GEMINI_BASE_URL comes only from the git-ignored Config/Secrets.xcconfig: a Release build without a valid one
     # would ship an assistant that can never answer, so it fails here; Debug builds only warn (demo mode works).
