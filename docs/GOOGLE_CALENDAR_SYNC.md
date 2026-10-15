@@ -251,7 +251,7 @@ Smart Schedule 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 U
 | `network` | `NWPathMonitor` 從離線變回連線 | 同 `timer` |
 | `outbox` | outbox 送出了東西之後、失敗項目按「重試」 | 同 `timer` |
 | `notification` | 通知內容擴充開啟提醒時（另外用 `events.get` 抓那一個事件） | 同 `timer` |
-| `summon` | 控制中心／動態島叫出時（`SyncRequests.request("summon")`） | 同 `timer` |
+| `summon` | 目前沒有觸發者（控制中心按鈕改為打開快速輸入）；保留給沒有 SyncEngine 的程式碼透過 `SyncRequests` 要求同步 | 同 `timer` |
 
 同步改變了 cache 時：重排提醒、更新 Live Activity（App 在啟動時用 `AppRefresh.installSyncHooks()` 掛上），並發出 `SharedChange.syncStatus`，其他 process 收到後重新讀取。
 

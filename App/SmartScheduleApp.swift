@@ -186,9 +186,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
         case UNNotificationDefaultActionIdentifier:
             if let eventID { await MainActor.run { AppRouter.shared.selectedEventID = eventID } }
+            await LiveActivityManager.shared.refreshIfRunning()
 
         default:
-            break // UNNotificationDismissActionIdentifier: only the engagement record above.
+            // UNNotificationDismissActionIdentifier. The long-press card may have changed or deleted events (the
+            // extension cannot reach the Live Activities), so they are brought in line now.
+            await LiveActivityManager.shared.refreshIfRunning()
         }
     }
 

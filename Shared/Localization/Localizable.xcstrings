@@ -1935,12 +1935,12 @@
         }
       }
     },
-    "Each timed event appears in the Dynamic Island this long before it starts and leaves the Lock Screen 10 minutes after it ends. Smart Schedule plans the next two days each time you open it." : {
+    "Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedule plans the next two days each time you open it." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每個有時間的行程會在開始前這段時間出現在動態島，結束 10 分鐘後從鎖定畫面消失。每次打開 Smart Schedule，都會安排接下來兩天的行程。"
+            "value" : "每個有時間的行程會在開始前這段時間出現在動態島，結束後消失。每次打開 Smart Schedule，都會安排接下來兩天的行程。"
           }
         }
       }

@@ -370,7 +370,8 @@ final class ScheduleViewModel {
         }
     }
 
-    /// Pending glyphs come and go with the outbox, so the events are read again too.
+    /// Pending glyphs come and go with the outbox, so the events are read again too. A change written by the
+    /// notification extension (which cannot reach the Live Activities) also reaches them here.
     private func syncStatusChanged() {
         syncStatusTask?.cancel()
         syncStatusTask = Task { [weak self] in
@@ -378,6 +379,7 @@ final class ScheduleViewModel {
             guard !Task.isCancelled, let self else { return }
             self.syncStatus = SyncStatusStore.current
             await self.reloadEvents()
+            await LiveActivityManager.shared.refreshIfRunning()
         }
     }
 

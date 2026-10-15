@@ -83,7 +83,7 @@ struct NotificationSettingsView: View {
             } header: {
                 Text("Dynamic Island")
             } footer: {
-                Text("Each timed event appears in the Dynamic Island this long before it starts and leaves the Lock Screen 10 minutes after it ends. Smart Schedule plans the next two days each time you open it.")
+                Text("Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedule plans the next two days each time you open it.")
             }
 
             Section {

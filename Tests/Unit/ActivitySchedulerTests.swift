@@ -121,8 +121,12 @@ final class ActivitySchedulerTests: XCTestCase {
         trip.location = "Terminal 2"
         trip.notes = "Bring passport"
         let item = ActivityPlanner.items(events: [trip], leadMinutes: 15, now: now)[0]
-        let state = LiveActivityStateBuilder.build(for: trip, events: [trip], lastLine: nil, asOf: item.triggerAt, clock: clock)
+        // Even when handed the assistant's last reply, the registration never carries it to the server.
+        var state = LiveActivityStateBuilder.build(for: trip, events: [trip], lastLine: "Added: Dentist · Fri 10:00",
+                                                   asOf: item.triggerAt, clock: clock)
         let entry = try PushToStartRegistrar.event(for: item, attributes: ScheduleActivityAttributes(eventID: "ev1"), state: state)
+        XCTAssertFalse(entry.contentStateJSON.contains("Dentist"), entry.contentStateJSON)
+        state.lastAssistantLine = nil
         XCTAssertEqual(entry.eventID, "ev1")
         XCTAssertEqual(entry.title, "Flight to Tokyo")
         XCTAssertEqual(entry.eventStart, TestClock.local(2026, 10, 15, 9))

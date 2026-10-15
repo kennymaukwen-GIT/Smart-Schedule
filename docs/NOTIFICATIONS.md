@@ -18,7 +18,7 @@
 | 做不到 | 原因 | App 的做法 |
 |---|---|---|
 | 替使用者關掉 Google Calendar App 的通知 | App 不能改其他 App 的設定 | 「由誰發送提醒」的註腳提醒使用者自己去關，避免重複提醒 |
-| 動態島在 App 關著時，自動在每個行程前出現 | 背景啟動 Live Activity 只能靠 App Intent（控制中心按鈕、Siri）或 **APNs push-to-start**，後者需要伺服器 | 開啟 App 時判斷要不要顯示（第 8 節）；設定頁註腳說明需要推播伺服器 |
+| 動態島在 App 關著時，自動在每個行程前出現 | App 在背景不能 `Activity.request()` | iOS 26：`Activity.request(…, start:)` 排程啟動；iOS 18：伺服器（`server/worker`）在觸發時間送 APNs push-to-start（第 8 節） |
 | 直接打開系統「專注模式」設定頁 | 沒有公開的 URL | 設定頁說明路徑：設定 App › 專注模式 › 選一個模式 › 加入過濾條件 › Smart Schedule |
 | 在 App 裡加控制中心按鈕、動作按鈕、鎖定畫面捷徑 | 只有使用者能加 | 設定 › 捷徑與 Siri 的說明頁 |
 
@@ -120,7 +120,8 @@ iOS 每個 App 最多保留 64 個待發本地通知，超過的會被默默丟�
   - 規劃（`ActivityPlanner`，純函式、有單元測試）：未來 48 小時內開始、有時間、未完成、不是草稿的行程，最近的優先，最多 `ActivityPlanner.maxPending`（8，待真機測試回填）。觸發時間 = 開始 − 提前量；結束時間 = min(行程結束, 觸發 + 8 小時)，超過 8 小時的行程直接截斷。
   - **iOS 26 起**：`Activity.request(…, style: .standard, alertConfiguration:, start: 觸發時間)` 排程啟動（狀態 `.pending`），App 關著也會準時出現。系統規定排程啟動一定要附提醒（標題 = 行程名稱，內文「%lld 分鐘後開始」）。
   - **iOS 18**：App 不能排程，也不能在背景啟動；`PushToStartRegistrar.sync(token:upcomingEvents:)` 把 48 小時內的行程（ID、標題、開始時間、提前量、觸發時間，加上用預設 `JSONEncoder` 編好的 attributes 與 content-state）整份寫進 App Group 的 `push-to-start.json`，由伺服器在觸發時間送 push-to-start。上傳伺服器是 Part B。
-  - 兩者共用：已在提前量內的行程，App 在前景時立刻啟動；行程改了（標題、時間、提前量）→ 排程中的 activity `end(nil, .immediate)` 後重排，已顯示中的直接更新內容（移到更晚則結束後重排）；行程刪除、完成、或動態島關閉 → 立即結束；行程結束 → `end(最後內容, .after(結束 + 10 分鐘))`。使用者滑掉的 activity 不會被同一個觸發時間再叫出來；排程中但在出現前就消失的（例如重開機）會重排。
+  - 兩者共用：已在提前量內的行程，App 在前景時立刻啟動；行程改了（標題、時間、提前量）→ 排程中的 activity 先排好新的、成功後才 `end(nil, .immediate)` 舊的（背景裡排不了新的，就先留著舊的，下次前景再換），已顯示中的直接更新內容（移到更晚超過 3 分鐘則結束後重排；伺服器的 push-to-start 最多提早一分鐘送達，不算移動）；行程刪除、完成、或動態島關閉 → 立即結束；行程結束 → `end(最後內容, .after(結束 + 10 分鐘))`。使用者滑掉的 activity 不會被同一個觸發時間再叫出來；排程中但在出現前就消失的（例如重開機）會重排。
+  - iOS 18 送給伺服器的 content-state 只含登記的這些行程（週列只有它們）且沒有助理的最後一句；activity 開始後 App 第一次更新時補齊。App 執行時觀察 `Activity.activityUpdates`，伺服器啟動的 activity 一出現就記成「已顯示」，使用者滑掉後不會被 App 再叫出來。
   - 倒數：內容在開始時過期（`staleDate` = 開始時間），畫面用 `context.isStale` 自動改成倒數到結束，不需要任何更新推播。
 - 限制：App 在行程結束時沒有執行的話，iOS 26 的 activity 要等系統 8 小時上限才結束（iOS 18 由伺服器以 `input-push-token` 取得更新 token 後送 `end` 可以解決，見 Part B）。
 - 週列的星期順序跟著「每週起始日」：`ContentState.firstWeekday`（舊的 payload 沒有這個欄位時當作星期日）。

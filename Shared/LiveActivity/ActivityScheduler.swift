@@ -14,6 +14,9 @@ enum ActivityPlanner {
     /// Scheduled plus running activities at most: scheduled ones count toward the system's limit on simultaneous
     /// activities. Fill in from device testing: the count at which `ActivityAuthorizationError` is thrown, minus 2.
     static let maxPending = 8
+    /// A server's push-to-start may arrive this much before the trigger (it sends up to a minute ahead, and clocks
+    /// differ): such an activity is not "moved later".
+    static let earlyStartTolerance: TimeInterval = 180
 
     struct Item: Equatable {
         let event: ScheduleEvent
@@ -65,11 +68,14 @@ enum ActivityPlanner {
 ///   (`Activity.request(…, start:)`, state `.pending`), which iOS starts even with the app closed.
 /// • iOS 18: only APNs push-to-start can start an activity in the background; the planned events, with their
 ///   attributes and content already encoded, go to `PushToStartRegistrar` for a server to send.
-/// • Both: an event already due when the app is in front starts at once; a changed or deleted event's activity is
-///   ended and planned again; an ended event's activity ends and leaves the Lock Screen 10 minutes after the end.
+/// • Both: an event already due when the app is in front starts at once; a changed scheduled activity is replaced
+///   (the old one ends only once the new one is requested); a deleted event's activity ends; an ended event's
+///   activity ends and leaves the Lock Screen 10 minutes after the end.
 ///
 /// Starting an activity (scheduled or not) only works while the app is in front; from the background the request
-/// fails and the next foreground pass makes it. Updating and ending work from the background too.
+/// fails and the next foreground pass makes it. Updating and ending work from the background too. Nothing can end an
+/// activity on time while the app does not run (ActivityKit has no end date, and update pushes are not used): then
+/// iOS ends it at its 8-hour limit.
 @MainActor
 final class ActivityScheduler {
     static let shared = ActivityScheduler()
@@ -82,7 +88,17 @@ final class ActivityScheduler {
     private var isReconciling = false
     private var needsAnotherPass = false
     private var isObservingPushToStart = false
+    private var isObservingActivities = false
     private var pushToStartToken: Data?
+
+    private enum Decision {
+        /// Still right: brought up to date.
+        case keep
+        /// A scheduled activity for an older version of the event: request the new one, then end this one.
+        case replace
+        /// No longer about to start (moved later): ended, planned again.
+        case ended
+    }
 
     func reconcile(now: Date? = nil) async {
         if isReconciling {
@@ -110,6 +126,7 @@ final class ActivityScheduler {
         let planned = Dictionary(plan.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
         let known = Dictionary(events.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
+        observeActivities()
         var started = Self.startedTriggers()
         var covered = Set<String>()
         for activity in ScheduleActivity.activities where Self.isLive(activity) {
@@ -119,9 +136,19 @@ final class ActivityScheduler {
                 continue
             }
             if let item = planned[id] {
-                if await keep(activity, as: item, events: events, lastLine: lastLine, now: now) {
+                switch await keep(activity, as: item, events: events, lastLine: lastLine, now: now) {
+                case .keep:
                     covered.insert(id)
                     started[id] = item.triggerAt.timeIntervalSince1970
+                case .replace:
+                    // The old one stays unless the new one is requested (that fails from the background).
+                    covered.insert(id)
+                    if start(item, events: events, lastLine: lastLine, now: now, replacing: true) {
+                        await activity.end(nil, dismissalPolicy: .immediate)
+                        started[id] = item.triggerAt.timeIntervalSince1970
+                    }
+                case .ended:
+                    break
                 }
             } else if let event = known[id], event.end <= now, let lead {
                 // Over: the final content stays on the Lock Screen until 10 minutes after the end.
@@ -149,38 +176,43 @@ final class ActivityScheduler {
                 ? ActivityPlanner.items(events: events, leadMinutes: lead, now: now, limit: PushToStartRegistrar.maxEvents)
                     .filter { $0.triggerAt > now }
                 : []
+            // What the server stores: only the registered events (the week strip shows just those) and no assistant
+            // reply. The app fills in the rest with its first update once the activity is running.
+            let registered = upcoming.map(\.event)
             let entries = upcoming.compactMap { item in
                 try? PushToStartRegistrar.event(for: item,
                                                  attributes: ScheduleActivityAttributes(eventID: item.eventID),
-                                                 state: content(item, events: events, lastLine: lastLine, asOf: item.triggerAt).state)
+                                                 state: LiveActivityStateBuilder.build(for: item.event, events: registered,
+                                                                                       lastLine: nil, asOf: item.triggerAt))
             }
             await PushToStartRegistrar.sync(token: pushToStartToken ?? ScheduleActivity.pushToStartToken, upcomingEvents: entries)
         }
     }
 
-    /// Whether `activity` still stands for `item` as it is now; if so it is brought up to date, otherwise ended.
+    /// What to do with `activity`, which stands for `item`'s event; a running one is brought up to date here.
     private func keep(_ activity: ScheduleActivity, as item: ActivityPlanner.Item,
-                      events: [ScheduleEvent], lastLine: String?, now: Date) async -> Bool {
+                      events: [ScheduleEvent], lastLine: String?, now: Date) async -> Decision {
         let shown = activity.content.state
         let sameEvent = shown.headline == item.event.title && shown.eventStart == item.event.start
             && shown.eventEnd == item.event.end
         if #available(iOS 26.0, *), activity.activityState == .pending {
-            // A scheduled activity cannot move: a new time, title or lead time means a new one.
-            if sameEvent, shown.countdownFrom == item.triggerAt, item.triggerAt > now { return true }
-            await activity.end(nil, dismissalPolicy: .immediate)
-            return false
+            // A scheduled activity cannot be changed: a new time, title or lead time needs a new one. Unchanged, it
+            // stays even past its trigger (iOS is about to start it).
+            return sameEvent && shown.countdownFrom == item.triggerAt ? .keep : .replace
         }
-        if item.triggerAt > now {
+        if item.triggerAt > now.addingTimeInterval(ActivityPlanner.earlyStartTolerance) {
             // Moved later: no longer about to start. Planned again below.
             await activity.end(nil, dismissalPolicy: .immediate)
-            return false
+            return .ended
         }
         await activity.update(content(item, events: events, lastLine: lastLine, asOf: now))
-        return true
+        return .keep
     }
 
     /// Requests the activity: now when already due, otherwise scheduled (iOS 26). false when nothing was started.
-    private func start(_ item: ActivityPlanner.Item, events: [ScheduleEvent], lastLine: String?, now: Date) -> Bool {
+    /// `replacing`: an older scheduled one for the same event still takes a place until this succeeds.
+    private func start(_ item: ActivityPlanner.Item, events: [ScheduleEvent], lastLine: String?, now: Date,
+                       replacing: Bool = false) -> Bool {
         let attributes = ScheduleActivityAttributes(eventID: item.eventID)
         let pushType: PushType? = AppConstants.liveActivityPushEnabled ? .token : nil
         if item.triggerAt <= now {
@@ -191,7 +223,7 @@ final class ActivityScheduler {
         }
         if #available(iOS 26.0, *) {
             let running = ScheduleActivity.activities.filter(Self.isLive).count
-            guard running < ActivityPlanner.maxPending else { return false }
+            guard running < ActivityPlanner.maxPending + (replacing ? 1 : 0) else { return false }
             return (try? ScheduleActivity.request(attributes: attributes,
                                                   content: content(item, events: events, lastLine: lastLine, asOf: item.triggerAt),
                                                   pushType: pushType,
@@ -241,6 +273,20 @@ final class ActivityScheduler {
     private static func isLive(_ activity: ScheduleActivity) -> Bool {
         if #available(iOS 26.0, *), activity.activityState == .pending { return true }
         return activity.activityState == .active || activity.activityState == .stale
+    }
+
+    /// An activity started outside this pass (iOS 18 push-to-start, which also gives the app background time; an
+    /// iOS 26 scheduled one starting) is reconciled at once, which records it as shown: swiped away later, it is not
+    /// started again for the same trigger.
+    private func observeActivities() {
+        guard !isObservingActivities else { return }
+        isObservingActivities = true
+        Task { [weak self] in
+            for await activity in ScheduleActivity.activityUpdates where activity.attributes.eventID != nil {
+                guard let self else { return }
+                await self.reconcile()
+            }
+        }
     }
 
     /// iOS 18: a new push-to-start token re-registers the planned events (observed while the app runs).

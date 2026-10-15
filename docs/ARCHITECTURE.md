@@ -63,7 +63,7 @@ flowchart LR
   GEM["Gemini API<br/>(經 proxy)"]
   GCAL["Google Calendar API v3"]
 
-  CC -- LiveActivityIntent --> LAM
+  CC -- OpenQuickCaptureIntent / deep link --> APP
   DI -- Link deep link --> APP
   SIRI --> ASSIST
   APP --> ASSIST
@@ -100,7 +100,7 @@ flowchart LR
 - `StaticControlConfiguration` 搭配 `ControlWidgetButton(action: OpenQuickCaptureIntent())`：打開 App 停在快速輸入。沒有 `openAppWhenRun = true` 的 intent 在控制中心只會在背景默默執行。
 - 控制項只能顯示 SF Symbol 或自訂 symbol（`.symbolset`）。要和 App icon 的時鐘一模一樣，得把它匯出成 custom symbol。
 - 同一個控制項可以放進控制中心、鎖定畫面左下和右下的按鈕位，以及 Action Button。
-- 開發者論壇上有人回報「從 widget 或 control 觸發的 intent 沒能啟動 Live Activity」，可能和 Xcode 16.0 時期的版本有關。**要在實機上驗證。**
+- 控制項的 intent 不啟動 Live Activity；`openAppWhenRun = true` 讓 App 到前景，在 App process 執行 `perform()`。**要在實機上驗證**：按下後停在快速輸入、鍵盤已叫出，動態島沒有新的 activity。
 
 ### 3.2 動態島：ActivityKit 加 WidgetKit `ActivityConfiguration`
 - 版面配置（`Widgets/ScheduleLiveActivity.swift`）：
@@ -204,7 +204,9 @@ sequenceDiagram
 
 ## 7. 只能在實機上驗證的項目
 
-- [ ] 控制中心 → `LiveActivityIntent` → `Activity.request`，在已鎖定和未鎖定兩種狀態下都要測。
+- [ ] 控制中心 → `OpenQuickCaptureIntent` 打開快速輸入（已鎖定和未鎖定都要測），動態島沒有新的 activity。
+- [ ] iOS 26：App 關著時，`Activity.request(…, start:)` 排程的 activity 在提前量準時出現；同時排 10／20／50 筆，記下第幾筆丟出 `ActivityAuthorizationError`，減 2 回填 `ActivityPlanner.maxPending`；排程後重開機，pending 是否存活。
+- [ ] iOS 18：Worker 的 cron 送 push-to-start，動態島出現，同一個 eventID 不重送。
 - [ ] Content Extension 裡的 inline `TextField` 能不能取得鍵盤焦點。保底方案是系統的文字輸入 action。
 - [ ] 不同機型上 expanded island 是否超出 160 pt，例如 Pro Max 和標準尺寸、粗體字、動態字級。
 - [ ] `GEMINI_MODEL_ID` 是否仍有效，以及 `thinkingLevel` 參數是否被該模型接受。

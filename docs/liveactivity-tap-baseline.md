@@ -21,7 +21,7 @@ Deep link 定義（`Shared/Core/AppConstants.swift`）：
 | T4 | `IslandInputPill` | `Link(destination: DeepLink.composeVoice)` 包麥克風圖示 | 展開的動態島 | `smartschedule://compose?mode=voice` |
 | T5 | `IslandInputPill` | `Link(destination: DeepLink.compose)` 包紙飛機圖示 | 展開的動態島 | `smartschedule://compose` |
 
-`Button(intent:)`：**0 個**。`DismissScheduleIntent`（`Shared/Intents/SummonScheduleIntent.swift`）有定義，但沒有任何畫面使用它。
+`Button(intent:)`：**0 個**。`DismissScheduleIntent`（Step 0 時在 `Shared/Intents/SummonScheduleIntent.swift`，Step 2 起移到 `Shared/Intents/DismissScheduleIntent.swift`）有定義，但沒有任何畫面使用它。
 
 驗證方式：每個改動 Live Activity 的 commit 之後執行
 

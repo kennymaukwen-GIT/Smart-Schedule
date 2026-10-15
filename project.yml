@@ -17,15 +17,17 @@ configFiles:
 
 settings:
   configs:
-    # Push environment per configuration. Signing also sets it from the provisioning profile: development profiles
-    # use development, distribution profiles and TestFlight production (Apple: APS Environment Entitlement).
+    # Push environment: development in every configuration, so builds and archives signed with the (automatic)
+    # development profile match it. Distribute App (TestFlight / App Store) re-signs with the distribution profile,
+    # which sets production (Apple: APS Environment Entitlement). Never write production here: it would not match a
+    # development profile.
     # App Attest: development uses Apple's sandbox; TestFlight and App Store builds always use production.
     # SS_DEV_TOKEN (Config/Secrets.xcconfig) only reaches Debug builds: Release forces it empty.
     Debug:
       APS_ENVIRONMENT: development
       APP_ATTEST_ENVIRONMENT: development
     Release:
-      APS_ENVIRONMENT: production
+      APS_ENVIRONMENT: development
       APP_ATTEST_ENVIRONMENT: production
       SS_DEV_TOKEN: ""
   base:

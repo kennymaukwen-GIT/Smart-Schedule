@@ -8,7 +8,7 @@
 
 **Live Activities / Dynamic Island.** Smart Schedule shows a Live Activity only for an event that is about to start or under way:
 
-- Each timed event gets its own Live Activity. It appears 30, 15, 10 or 5 minutes before the event starts (Settings › Notifications › Dynamic Island; default 30 minutes, or Off) and leaves the Lock Screen 10 minutes after the event ends. An activity never runs longer than 8 hours.
+- Each timed event gets its own Live Activity. It appears 30, 15, 10 or 5 minutes before the event starts (Settings › Notifications › Dynamic Island; default 30 minutes, or Off) and ends with the event: whenever Smart Schedule runs after the event (opening the app, a background refresh or a sync) it ends the activity, which then leaves the Lock Screen 10 minutes after the event ends. If the app does not run, iOS ends the activity at its 8-hour limit. The app sends no update pushes.
 - When no event is coming up, there is no Live Activity. The app never keeps one open as a permanent widget.
 - iOS 26: the app schedules each activity ahead with `Activity.request(…, start:)` for events in the next 48 hours, with the start alert iOS requires. iOS 18: a push-to-start notification from our server starts it at the same time.
 - The countdown uses `Text(timerInterval:)`, so the activity needs no update pushes. `NSSupportsLiveActivitiesFrequentUpdates` is declared, but the app sends no frequent updates: only the one push-to-start per event on iOS 18.
@@ -32,7 +32,7 @@
 
 ## 送審前確認（不要貼給審核員）
 
-- [ ] Archive 後 `codesign -d --entitlements :- SmartSchedule.app` 的 `aps-environment` 是 `production`（Release 的 `APS_ENVIRONMENT`，簽章時也會依發佈用 provisioning profile 設定）。
+- [ ] 用 Distribute App 匯出（TestFlight / App Store）後，`codesign -d --entitlements :- SmartSchedule.app` 的 `aps-environment` 是 `production`。專案裡所有設定都寫 `development`（和自動簽章的開發用 profile 一致），匯出時由發佈用 provisioning profile 改成 `production`；不要在 project.yml 寫死 production。
 - [ ] Part B 的伺服器已部署，iOS 18 的 push-to-start 實測可用；否則上面 iOS 18 那句要改成「打開 App 時，行程在提前量內就出現」，同意視窗的伺服器說明也要先拿掉。
 - [ ] App Store Connect 的 App Privacy 問卷與 `PrivacyInfo.xcprivacy` 一致：Other User Content（App Functionality，連結身分，不追蹤）、Device ID（App Functionality，連結身分，不追蹤）。
 - [ ] 隱私權政策網址（`SSPrivacyURL`）換成真的頁面，內容涵蓋 Gemini 與伺服器暫存。

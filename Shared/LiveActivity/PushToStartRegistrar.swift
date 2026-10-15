@@ -44,6 +44,8 @@ enum PushToStartRegistrar {
     static func event(for item: ActivityPlanner.Item,
                       attributes: ScheduleActivityAttributes,
                       state: ScheduleActivityAttributes.ContentState) throws -> Event {
+        var state = state
+        state.lastAssistantLine = nil // the assistant's reply never goes to the server
         let encoder = JSONEncoder() // default strategies only: ActivityKit decodes pushes with its defaults
         return Event(eventID: item.eventID,
                      title: item.event.title,
