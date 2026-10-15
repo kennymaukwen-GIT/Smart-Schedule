@@ -1548,7 +1548,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 
 ## 13. project.yml changes (integrator)
 
-1. `targets.SmartSchedule.info.properties`: add `SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/` (Apple's standard EULA as the placeholder), `SSPrivacyURL: https://example.com/privacy` (placeholder), `SSSupportEmail: support@smart-schedules.com`.
+1. `targets.SmartSchedule.info.properties`: add `SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/` (Apple's standard EULA as the placeholder), `SSPrivacyURL: https://smart-schedules.com/privacy` (site/public/privacy.html), `SSSupportEmail: support@smart-schedules.com`.
 2. `targets.SmartSchedule.scheme`: add `storeKitConfiguration: Config/SmartSchedule.storekit` (XcodeGen target scheme option; if the installed XcodeGen rejects it, define a full `schemes.SmartSchedule` with `run.storeKitConfiguration`). `Config/` is not a source folder, so the file is not copied into the bundle.
 3. No new source folders: every new Shared file sits in an existing folder, so the widget and notification-extension source lists stay as they are (`Shared/Models`, `Shared/Storage` and `Shared/Core` are already in all three targets and the tests; `App/Intents`, `App/Auth`, `App/Store`, `App/Privacy` are under `App/`).
 4. No new entitlements (Focus filters, StoreKit 2 and Time Sensitive need nothing beyond what exists).
@@ -1597,4 +1597,4 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 - [ ] **StoreKit**: create the subscription group and products in App Store Connect with the same ids, sign the Paid Apps agreement, add localized subscription names, test with sandbox and the `.storekit` file.
 - [ ] **Time Sensitive** entitlement stays enabled; verify Focus break-through on device.
 - [ ] **Focus filter**: verify `perform()` on Focus on and off on a real device.
-- [ ] Replace the placeholder `SSPrivacyURL` in `project.yml`.
+- [ ] Deploy `site/` to smart-schedules.com so `SSPrivacyURL` (https://smart-schedules.com/privacy) resolves; fill in the highlighted placeholders first (site/README.md).

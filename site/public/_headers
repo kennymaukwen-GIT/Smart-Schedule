@@ -1,0 +1,7 @@
+# Response headers for every page (Cloudflare Workers static assets and classic Pages both read this file;
+# wrangler never uploads it as a page). No scripts, fonts or third-party resources are used, so the policy is strict.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'

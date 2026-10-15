@@ -35,5 +35,5 @@
 - [ ] 用 Distribute App 匯出（TestFlight / App Store）後，`codesign -d --entitlements :- SmartSchedule.app` 的 `aps-environment` 是 `production`。專案裡所有設定都寫 `development`（和自動簽章的開發用 profile 一致），匯出時由發佈用 provisioning profile 改成 `production`；不要在 project.yml 寫死 production。
 - [ ] Part B 的伺服器已部署，iOS 18 的 push-to-start 實測可用；否則上面 iOS 18 那句要改成「打開 App 時，行程在提前量內就出現」，同意視窗的伺服器說明也要先拿掉。
 - [ ] App Store Connect 的 App Privacy 問卷與 `PrivacyInfo.xcprivacy` 一致：Other User Content（App Functionality，連結身分，不追蹤）、Device ID（App Functionality，連結身分，不追蹤）。
-- [ ] 隱私權政策網址（`SSPrivacyURL`）換成真的頁面，內容涵蓋 Gemini 與伺服器暫存。
+- [ ] 隱私權政策（`SSPrivacyURL` = https://smart-schedules.com/privacy，原始檔 `site/public/privacy.html`）已部署且打得開；佔位值都已填好。
 - [ ] 是否保留 `NSSupportsLiveActivitiesFrequentUpdates`：目前沒有任何頻繁更新，拿掉可以少一個被追問的點。

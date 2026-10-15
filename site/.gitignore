@@ -1,0 +1,2 @@
+# Local state from `wrangler dev -c site/wrangler.toml`.
+.wrangler/

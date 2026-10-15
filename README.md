@@ -151,7 +151,7 @@ open SmartSchedule.xcodeproj
 - [ ] **StoreKit**：在 App Store Connect 建立訂閱群組「Smart Schedule Pro」和跟 `Config/SmartSchedule.storekit` 相同 ID 的商品（`com.smartschedule.pro.monthly`、`com.smartschedule.pro.yearly`），簽署 Paid Apps 協議，加上各語系的訂閱名稱，用 sandbox 測試。
 - [ ] **App Review**：5.1.2(i) 同意說明在任何個人資料送到 Gemini 之前出現（全新安裝、Siri、通知擴充都要確認）；2.1 在審核備註說明「不登入先試用」，最好附測試用 Google 帳號；5.1.1(v) 說明「移除帳號」（撤銷授權）和「清除這台裝置上的所有資料」。
 - [ ] **實機確認**：Time Sensitive 在專注模式下能穿透、專注模式過濾條件開關時 `perform()` 有執行。
-- [ ] 把 `project.yml` 裡的佔位值 `SSPrivacyURL` 換成正式的隱私權政策網址（`SSSupportEmail` 已是 support@smart-schedules.com，`SSTermsURL` 用 Apple 標準 EULA）。
+- [ ] 部署 `site/`（首頁、隱私權政策、支援頁，見 [`site/README.md`](site/README.md)）到 smart-schedules.com：`SSPrivacyURL` 已設為 https://smart-schedules.com/privacy，網站上線前這個連結打不開；先填好頁面裡標黃的佔位值（開發者名稱、郵件服務、最低年齡）。
 
 ## 驗證狀態
 

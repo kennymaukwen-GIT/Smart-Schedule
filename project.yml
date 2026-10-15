@@ -32,7 +32,7 @@ settings:
       SS_DEV_TOKEN: ""
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
@@ -69,6 +69,8 @@ targets:
         NSSpeechRecognitionUsageDescription: Your spoken plan is transcribed to text before it is scheduled.
         BGTaskSchedulerPermittedIdentifiers: [com.smartschedule.refresh]
         UIBackgroundModes: [fetch, remote-notification]
+        # Only HTTPS and hashing (exempt): no export-compliance question on every upload.
+        ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:
           - CFBundleURLName: com.smartschedule.deeplink
             CFBundleURLSchemes: [smartschedule]
@@ -81,10 +83,10 @@ targets:
         SSGeminiModelID: $(GEMINI_MODEL_ID)
         # Debug only: lets the simulator (no App Attest) call the server. Empty in Release.
         SSDevToken: $(SS_DEV_TOKEN)
-        # Shown in Settings › About and the account sheet. SSTermsURL is Apple's standard EULA and SSSupportEmail is final;
-        # SSPrivacyURL is still a placeholder: replace it before submitting.
+        # Shown in Settings › About and the account sheet. SSTermsURL is Apple's standard EULA; SSPrivacyURL is the policy
+        # in site/public/privacy.html, live once site/ is deployed to smart-schedules.com (site/README.md).
         SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
-        SSPrivacyURL: https://example.com/privacy
+        SSPrivacyURL: https://smart-schedules.com/privacy
         SSSupportEmail: support@smart-schedules.com
     entitlements:
       path: App/SmartSchedule.entitlements
