@@ -13,7 +13,9 @@
     "dev": "wrangler dev",
     "embed-root-ca": "sh scripts/embed-apple-root-ca.sh",
     "check-root-ca": "node scripts/check-root-ca.mjs",
-    "deploy": "node scripts/check-root-ca.mjs && wrangler deploy"
+    "deploy": "node scripts/check-root-ca.mjs && wrangler deploy --env=\"\"",
+    "deploy:dev": "node scripts/check-root-ca.mjs && wrangler deploy --env dev",
+    "check-key": "sh scripts/check-gemini-key.sh"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261001.1",

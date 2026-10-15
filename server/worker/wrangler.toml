@@ -1,18 +1,24 @@
-# Smart Schedule Worker — deploy steps in README.md. No secrets or account-specific values in this file.
+# Smart Schedule Worker — deploy steps in README.md. No secrets in this file (the KV namespace ID is not one).
+# Production: `npm run deploy`. Development (simulator, X-Dev-Token): `npm run deploy:dev`, see [env.dev] below.
 name = "smart-schedule-worker"
 main = "src/index.ts"
 compatibility_date = "2026-09-15"
+# Served at https://smart-schedule-worker.<account subdomain>.workers.dev (the app's GEMINI_BASE_URL). Said
+# explicitly so wrangler does not warn or decide on its own. No preview URLs: every uploaded version would get a
+# public URL of its own with the same secrets and KV.
+workers_dev = true
+preview_urls = false
 
 # Every minute: send the Live Activity push-to-start notifications that are due.
 [triggers]
 crons = ["* * * * *"]
 
 # One KV namespace for everything (key prefixes chal:, key:, sess:, rl:, p2s:, p2sdead:, due:, claim:, sent:, apns:).
-# Without an id, `npx wrangler deploy` creates the namespace and binds it automatically (wrangler 4 provisioning).
-# To use a namespace you created yourself (`npx wrangler kv namespace create SS_KV`), uncomment the id line.
+# "smart-schedule-worker-ss-kv", made by the first `wrangler deploy` (automatic provisioning). In a fork of this
+# repo, delete the id line: the first deploy then makes a namespace in your account.
 [[kv_namespaces]]
 binding = "SS_KV"
-# id = "<paste from: npx wrangler kv namespace create SS_KV>"
+id = "c4a254a6957942a0b0c2ff1e29f22db1"
 
 # Atomic rate limiting without KV writes (Cloudflare Workers Rate Limiting). Keys: id:<identity> (per keyId / "dev";
 # a session counts as its keyId), ip:<IPv4 or IPv6 /64> (/attest*), pre:<ip>:<keyId> (Bearer body reads).
@@ -66,3 +72,45 @@ ATTEST_DAILY_PER_IP = "200"
 #   npx wrangler secret put GEMINI_API_KEY
 #   npx wrangler secret put SS_DEV_TOKEN        (only needed where ALLOW_DEV_TOKEN = "true")
 #   npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Development Worker for the simulator, which has no App Attest: Debug builds send X-Dev-Token instead (SS_DEV_TOKEN
+# in Config/Secrets.xcconfig, the same value as this Worker's SS_DEV_TOKEN secret). A Worker of its own
+# (smart-schedule-worker-dev), with its own KV namespace and secrets, so the production Worker never accepts a dev
+# token. Bindings and vars are not inherited from the top level, so all of them are repeated here.
+#   npm run deploy:dev
+#   npx wrangler secret put GEMINI_API_KEY --env dev
+#   npx wrangler secret put SS_DEV_TOKEN --env dev
+[env.dev]
+name = "smart-schedule-worker-dev"
+workers_dev = true
+preview_urls = false
+
+# No Live Activity pushes from the simulator; set crons = ["* * * * *"] when testing push-to-start on a device.
+[env.dev.triggers]
+crons = []
+
+# Made by the first `npm run deploy:dev`.
+[[env.dev.kv_namespaces]]
+binding = "SS_KV"
+
+[[env.dev.ratelimits]]
+name = "SS_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 30, period = 60 }
+
+[env.dev.vars]
+# Needed only for Xcode-installed builds on a device (App Attest "development"); the simulator uses the dev token.
+APPLE_TEAM_ID = ""
+BUNDLE_IDS = "com.smartschedule.app,com.smartschedule.app.notification-content"
+APP_ATTEST_ENV = "development"
+ALLOW_DEV_TOKEN = "true"
+RATE_LIMIT_PER_MIN = "30"
+APNS_KEY_ID = ""
+APNS_TEAM_ID = ""
+APNS_BUNDLE_ID = "com.smartschedule.app"
+APNS_ENV = "sandbox"
+SESSION_TTL_SECONDS = "604800"
+SESSION_MODELS = "gemini-3.5-flash"
+SESSION_DAILY_LIMIT = "200"
+ATTEST_DAILY_PER_IP = "200"

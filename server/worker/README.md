@@ -57,13 +57,19 @@ npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
 npm run deploy
 ```
 
-**KV namespace**：`wrangler.toml` 的 `[[kv_namespaces]]` 只寫 `binding = "SS_KV"`、沒有 `id`，第一次 `wrangler deploy`
-會自動建立 namespace 並綁定（wrangler 4 的 automatic provisioning，之後的部署沿用同一個）。若想自己建立：
+**KV namespace**：正式環境的 `[[kv_namespaces]]` 已寫上第一次部署自動建立的 namespace
+（`smart-schedule-worker-ss-kv`）的 `id`；`[env.dev]` 只寫 `binding`，第一次 `npm run deploy:dev` 會另外建立一個。
+fork 這個 repo 時把正式環境的 `id` 那行刪掉，第一次部署就會在你的帳號建立新的 namespace。
 
-```sh
-npx wrangler kv namespace create SS_KV
-# 把印出的 id 填進 wrangler.toml 中被註解的那一行：  id = "<id>"
-```
+**workers.dev**：`workers_dev = true`（App 用 `https://<name>.<帳號子網域>.workers.dev`），`preview_urls = false`
+（每個上傳的版本不會各有一個公開網址）。兩者都寫明，wrangler 就不會再跳警告。`npm run deploy` 會加 `--env=""`
+指定部署正式環境（檔案裡有 `[env.dev]` 時，wrangler 不指定環境會警告）。
+
+**驗證 Gemini 金鑰**：`npm run check-key` 會問金鑰（輸入時不顯示，也不會出現在指令列），用 Worker 相同的方式
+（`x-goog-api-key` → `generativelanguage.googleapis.com`）打一次，只印 HTTP 狀態、Google 的錯誤代碼和回覆的開頭。
+`AQ.` 開頭的新格式金鑰在部分帳號會被 Gemini API 拒絕（`401 ACCESS_TOKEN_TYPE_UNSUPPORTED`），所以部署前先跑一次；
+被拒時腳本會再試 Bearer 和 Vertex AI express mode，看出是哪一種金鑰。
+`npm run check-key -- --worker` 則經過開發用 Worker（X-Dev-Token）走完整條 App → Worker → Gemini。
 
 **Rate Limiting binding**：`wrangler.toml` 的 `[[ratelimits]]`（`name = "SS_RATE_LIMITER"`、`simple = { limit = 30, period = 60 }`）
 是 Cloudflare Workers Rate Limiting：不寫 KV、在同一據點內原子計數。`namespace_id` 是你自選、在帳號內唯一的正整數
@@ -83,7 +89,32 @@ npx wrangler kv namespace create SS_KV
 | Xcode 安裝（development） | `development` | `sandbox` | 可為 `"true"`（Simulator 沒有 App Attest） |
 | TestFlight / App Store | `production` | `production` | **必須不是** `"true"` |
 
-建議開發與正式用兩個不同的 Worker（不同 `name`、不同 KV namespace、不同 secrets），不要在正式 Worker 開啟 dev token。
+開發與正式是兩個不同的 Worker：`wrangler.toml` 的 `[env.dev]` 是 `smart-schedule-worker-dev`（自己的 KV namespace、
+rate limiter 與 secrets，`ALLOW_DEV_TOKEN = "true"`、`APP_ATTEST_ENV = "development"`、`APNS_ENV = "sandbox"`、不跑 cron），
+正式 Worker 永遠不接受 dev token（`test/config-sync.test.ts` 會檢查）。
+
+### Simulator 用的開發版
+
+Simulator 沒有 App Attest，Debug build 改送 `X-Dev-Token`，只有開發用 Worker 接受：
+
+```sh
+cd server/worker
+npm run deploy:dev                                   # 建立 smart-schedule-worker-dev 與它的 KV
+npx wrangler secret put GEMINI_API_KEY --env dev     # 貼上 Gemini 金鑰
+openssl rand -hex 32                                 # 產生一組 dev token，複製起來
+npx wrangler secret put SS_DEV_TOKEN --env dev       # 貼上剛才那組
+npm run check-key -- --worker                        # 填開發版網址與 dev token，確認整條路通
+```
+
+App 端（`Config/Secrets.xcconfig`，git-ignored）只讓 Simulator 用開發版：
+
+```
+GEMINI_BASE_URL = https:/$()/smart-schedule-worker.<帳號子網域>.workers.dev/v1beta
+GEMINI_BASE_URL[sdk=iphonesimulator*] = https:/$()/smart-schedule-worker-dev.<帳號子網域>.workers.dev/v1beta
+SS_DEV_TOKEN[sdk=iphonesimulator*] = <同一組 dev token>
+```
+
+Release build 的 `SS_DEV_TOKEN` 一律是空的（`project.yml`），所以 dev token 不會出現在送審的 App 裡。
 
 ---
 
