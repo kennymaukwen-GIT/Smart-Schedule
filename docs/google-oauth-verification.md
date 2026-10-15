@@ -6,19 +6,31 @@ Smart Schedule 要求兩個 Google Calendar 的**敏感 scope**（`calendar.even
 - 依據的程式是 2026-10-15 的工作目錄（AI 同意說明第 4 版：Google 帳號 email 不送給 Gemini）。程式的 scope、同意說明或網站改了，這份文件、表單和影片都要跟著改。
 - Google 的官方頁面（developers.google.com、support.google.com）在撰寫環境打不開，下面的規定來自這些頁面的搜尋摘要，另有幾項來自第三方或開發者論壇（會註明）。**送審前請再讀一次第 10 節列出的原文**，按鈕名稱以控制台實際顯示為準。
 
+> **重要，先讀這段：Cloud 專案在 Google Workspace 組織 `smart-schedules.com` 底下（2026-10-15 依 Admin console 截圖更新）**
+>
+> 擁有者有 Google Workspace：組織「Smart Schedule」，smart-schedules.com 是主要網域（Verified）。support@smart-schedules.com 是這個 Workspace 的**真實 Gmail 信箱**，也是登入 Google Cloud 的帳號；Cloud 控制台顯示「Set up Google Cloud for your organisation」，表示專案建在組織 `smart-schedules.com` 底下（專案選擇器（project picker）裡專案上方的組織名稱，請在畫面上確認）。所以：
+>
+> - **Audience › User type 一定選 External，不要選 Internal。** Internal 只有在專案屬於 Workspace 組織時才會出現，選了之後只有這個 Workspace 自己的帳號（`@smart-schedules.com`）能登入：App Review 審核員和真正的使用者（Gmail 或其他學校、公司的帳號）都會被 Google 擋下，而且 Internal 的 App 不走第 3.6 節的送審。已經選成 Internal 的話，到 Audience 頁改成 External（按鈕名稱類似 **Make external**，請在畫面上確認）。
+> - **Publishing status 要從 Testing 改成 In production**（第 3.5 節）。External 而且還在 Testing 時，只有測試使用者能登入，refresh token 7 天就失效。
+> - **User support email 和 Developer contact information 都填 support@smart-schedules.com。** 它是真實信箱，用它登入時會直接出現在 User support email 的下拉選單（第 3.2 節）；Google 的審查信也會寄到這裡，在 Gmail 裡直接回覆即可。
+> - **Search Console 的網域驗證可能已經完成**：Workspace 驗證 smart-schedules.com 時通常會在 DNS 加一筆 `google-site-verification` TXT（也可能用別的方式驗證），用同一個帳號在 Search Console 新增網域資源時可能直接通過（請在畫面上確認）。見第 3.1 節。
+> - **DNS 從 Squarespace 搬到 Cloudflare 時**（[`site/README.md`](../site/README.md) 第 3.1 節），Google 的 MX、SPF、DKIM 和 DMARC（有的話）以及**每一筆** `google-site-verification` TXT 都要原樣搬過去，而且不要開 Cloudflare Email Routing（它會換掉 MX）；漏了 MX，support@ 收不到信，Google 的審查信也會漏掉；漏了驗證 TXT，Workspace 和 Search Console 的網域驗證都會失效。
+> - 整個 Cloud 組織和專案都掛在 support@ 這個 Workspace 帳號上：Workspace 訂閱要持續有效，帳號要設好救援 email 和電話。新建立的組織可能預設啟用「Domain restricted sharing」（`iam.allowedPolicyMemberDomains`）這類組織政策，在 IAM 加入組織外的帳號（例如個人 Gmail）時可能被擋（請在畫面上確認）。「Set up Google Cloud for your organisation」精靈不是 OAuth 驗證的前提，可以之後再做（請在畫面上確認）。
+
 ## 0. 一覽：要填的值
 
 | 欄位（Google Auth Platform） | 填什麼 |
 |---|---|
 | App name | `Smart Schedule`（和首頁、App Store、iPhone 上的名稱完全一致；不能含「Google」） |
-| User support email | `support@smart-schedules.com`（下拉選單的限制見 3.2） |
+| User support email | `support@smart-schedules.com`（Workspace 的真實信箱；用它登入才會出現在下拉選單，見 3.2） |
 | App logo | [`site/public/logo.png`](../site/public/logo.png)（120×120 PNG，約 3 KB，由 App 圖示縮小，和首頁同一張） |
 | Application home page | `https://smart-schedules.com` |
 | Application privacy policy link | `https://smart-schedules.com/privacy` |
 | Application terms of service link | **留空**（1.0 用 Apple 的標準 EULA，在 apple.com 上，不能當授權網域） |
 | Authorized domains | `smart-schedules.com` |
-| Developer contact information | `support@smart-schedules.com` |
-| Audience › User type | External |
+| Developer contact information | `support@smart-schedules.com`（真實信箱，審查信寄到這裡） |
+| Audience › User type | **External**（不要選 Internal，見文件開頭的提醒） |
+| Audience › Publishing status | **In production**（第 3.5 節） |
 | Clients | 只有一個：類型 **iOS**、Bundle ID `com.smartschedule.app` |
 | Data access › scopes | `openid`、`.../auth/userinfo.email`、`.../auth/calendar.events`、`.../auth/calendar.calendarlist.readonly`（第 1 節） |
 | Limited Use 聲明 | 首頁 https://smart-schedules.com/ 的「AI and privacy」段落；隱私權政策第 11 節 https://smart-schedules.com/privacy#en-limited-use （中文 `#zh-limited-use`） |
@@ -48,29 +60,32 @@ Smart Schedule 要求兩個 Google Calendar 的**敏感 scope**（`calendar.even
 - [ ] **Gemini 是付費層級**：Gemini API 的 Google Cloud 專案已連結有效的 Cloud Billing，AI Studio 的記錄（Logs）關閉、沒有選擇把資料集分享給 Google（[`site/README.md`](../site/README.md) 第 2 節）。這是下面「不用於訓練」那些句子成立的條件；免費層級時**不要送審**。英國也在上架範圍，Gemini 條款要求對英國使用者只能用付費服務，所以本來就必須是付費層級。
 - [ ] **Cloud 專案**：已啟用 Google Calendar API；Google Auth Platform › Clients 只有一個 iOS client（Bundle ID `com.smartschedule.app`，填好 Team ID）。測試時建立的 Web／Desktop client 先刪掉：Google 要求影片涵蓋專案裡所有 OAuth client。
 - [ ] **測試用 Google 帳號**：專門用來錄影的帳號（文件裡寫成 `example@gmail.com`），不要有真實的個人資料。準備幾個明天以後的行程、兩個自己的行事曆（例如 My calendar、Gym），再由另一個帳號共用一個行事曆給它（例如 Family，權限「See all event details」），抽屜裡才看得到唯讀行事曆。
-- [ ] **信箱有人看**：support@smart-schedules.com（Cloudflare Email Routing 轉寄）和 Cloud 專案擁有者的信箱。審查只用 email 聯絡專案的擁有者／編輯者和開發者聯絡信箱；第三方文章說來信的寄件地址以 `api-oauth-dev-verification-reply` 開頭（google.com），記得檢查垃圾郵件，並把它加進聯絡人。
+- [ ] **信箱有人看**：support@smart-schedules.com（Google Workspace 的 Gmail 信箱）和 Cloud 專案擁有者的信箱（擁有者就是 support@ 時是同一個）。審查只用 email 聯絡專案的擁有者／編輯者和開發者聯絡信箱；第三方文章說來信的寄件地址以 `api-oauth-dev-verification-reply` 開頭（google.com），記得檢查垃圾郵件，並把它加進聯絡人。
+- [ ] **support@ 收發信正常**：DNS 搬到 Cloudflare 後，Google 的 MX、SPF 和所有 `google-site-verification` TXT 都在 Cloudflare 上（Google Admin Toolbox 的 Check MX，或 `dig MX smart-schedules.com`）；等 Cloudflare 上的區域（zone）變成 Active 之後，做完 Admin console 的「Complete email setup」（DKIM、DMARC），回給審查員的信比較不會被當成垃圾郵件。步驟見 [`site/README.md`](../site/README.md) 第 3.1 節。
 
 ## 3. 送審步驟（依序）
 
 Search Console 驗證網域 → Branding（驗證並發佈品牌）→ 錄影片 → Data access（scope、用途說明、影片連結）→ Audience 發佈到 In production → Verification Center 送審。
 
-整個過程用**同一個 Google 帳號**操作：它是 Cloud 專案的 Owner，也是 Search Console 裡 smart-schedules.com 的擁有者（論壇上 Google 的回覆要求驗證網域的帳號是專案的 Owner 或 Editor）。
+整個過程用**同一個 Google 帳號**操作：support@smart-schedules.com（Workspace 帳號）。它是 Cloud 專案的 Owner，也是 Search Console 裡 smart-schedules.com 的擁有者（論壇上 Google 的回覆要求驗證網域的帳號是專案的 Owner 或 Editor）。
 
 ### 3.1 Search Console：驗證 smart-schedules.com
 
+**可能已經驗證過了**：smart-schedules.com 是 Workspace 的主要網域，Workspace 驗證網域時通常會在 DNS 加一筆 `google-site-verification` TXT（請在 Cloudflare 的 DNS Records 確認）。用驗證 Workspace 網域的同一個帳號（support@smart-schedules.com）在 Search Console 新增網域資源時，可能直接顯示已驗證，或給你和 DNS 裡已有的那筆相同的值，按驗證就通過（請在畫面上確認）。沒有的話照下面做。
+
 1. 用上面那個帳號登入 https://search.google.com/search-console ，「新增資源」選**網域**（Domain），輸入 `smart-schedules.com`。不要選「網址前置字元」（URL prefix）：OAuth 驗證要的是網域層級的所有權。
 2. 複製畫面上的 TXT 記錄（`google-site-verification=…`）。
-3. Cloudflare 控制台 › smart-schedules.com › DNS › Records › Add record：Type `TXT`、Name `@`、Content 貼上、TTL Auto，儲存。
+3. Cloudflare 控制台 › smart-schedules.com › DNS › Records › Add record：Type `TXT`、Name `@`、Content 貼上、TTL Auto，儲存。根網域已經有 Workspace 用的 `google-site-verification` TXT 時，**另外加一筆**，不要覆蓋或刪掉舊的；同一個名稱可以有好幾筆 `google-site-verification` TXT（只能有一筆的是 SPF，`v=spf1` 開頭的那筆）。
 4. 回 Search Console 按「驗證」。DNS 生效可能要幾分鐘到 24 小時。
-5. 通過後**不要刪掉 TXT 記錄**，刪了會失去驗證。之後換人管理時，在 Search Console › 設定 › 使用者和權限 加入新的擁有者，同時在 Cloud IAM 給他 Owner 或 Editor。
+5. 通過後**不要刪掉任何一筆 `google-site-verification` TXT**，刪了會失去驗證（Workspace 用的那筆刪了，Workspace 的網域驗證也會失效）。之後換人管理時，在 Search Console › 設定 › 使用者和權限 加入新的擁有者，同時在 Cloud IAM 給他 Owner 或 Editor。
 
 ### 3.2 Branding：填資料、驗證、發佈
 
-Google Cloud 控制台 › **Google Auth Platform**（從 APIs & Services › OAuth consent screen 也會進到這裡）。第一次設定時「Get started」精靈會依序問 App 資訊、Audience（選 **External**）、聯絡資訊，最後同意 Google API Services User Data Policy。
+Google Cloud 控制台 › **Google Auth Platform**（從 APIs & Services › OAuth consent screen 也會進到這裡）。第一次設定時「Get started」精靈會依序問 App 資訊、Audience（選 **External**；專案在 Workspace 組織底下，所以也會出現 Internal，**不要選**，見文件開頭的提醒）、聯絡資訊（填 support@smart-schedules.com），最後同意 Google API Services User Data Policy。
 
 到 **Branding** 頁，照第 0 節的表填：
 
-- **User support email**：下拉選單只列出目前登入的帳號和你管理的 Google 群組。support@smart-schedules.com 只是 Cloudflare 的轉寄地址，不是 Google 帳號，所以不會出現在選單裡。做法：用「改用我目前的電子郵件地址」以 support@smart-schedules.com 註冊一個 Google 帳號（驗證碼經轉寄收到），在 Cloud IAM 給它 Owner，然後用它登入來選這個地址；最簡單是整個專案和 Search Console 都由這個帳號擁有。不要選個人信箱。
+- **User support email**：下拉選單只列出目前登入的帳號和你管理的 Google 群組。support@smart-schedules.com 是 Workspace「Smart Schedule」的真實帳號，用它登入 Cloud 控制台時就在選單裡，直接選它。用別的帳號（例如個人 Gmail）登入時它不會出現，改用 support@ 登入再選；整個專案和 Search Console 都由這個帳號擁有最簡單。不需要另外註冊 Google 帳號或用轉寄地址。不要選個人信箱。
 - **App logo**：上傳 `site/public/logo.png`。規定：正方形、不超過 1 MB、JPG／PNG／BMP，建議 120×120 px，不能用 Google 的產品圖示或商標，送審後要和同意畫面上的一致。上傳 logo（或顯示 App 名稱）就需要品牌驗證。
 - **Terms of service**：留空。填了就必須在已驗證的網域上。
 - **Authorized domains**：先加 `smart-schedules.com`，再填首頁和政策網址。
@@ -96,7 +111,9 @@ Verification Center 的「Prepare for verification」在品牌**驗證並發佈*
 
 ### 3.5 Audience：發佈到 In production
 
-**Audience › Publishing status: Testing → Publish app**，確認後變成 **In production**。
+先確認 **Audience › User type 是 External**。這個專案在 Workspace 組織 `smart-schedules.com` 底下，User type 可以是 Internal，但 Internal 只讓 `@smart-schedules.com` 的帳號登入，審核員和使用者都會被擋；是 Internal 的話先改成 External（按鈕名稱類似 **Make external**，請在畫面上確認）。
+
+接著 **Audience › Publishing status: Testing → Publish app**，確認後變成 **In production**。
 
 - Testing 狀態下，Google 發的 refresh token **7 天就失效**（App 會要求重新連接），而且只有測試使用者能登入。發佈後不再有 7 天限制。
 - 驗證通過前，使用者登入會先看到「Google hasn't verified this app」，而且最多 100 個新使用者。所以 **App Store 版要等驗證通過再上架**；Apple 審核員如果用 Google 帳號登入也會看到這個畫面（審核備註已請他們用「Try without signing in」）。
@@ -344,7 +361,8 @@ iOS 18 only, with the same consent: to start Live Activities on time, the titles
 
 | 原因 | 對策 |
 |---|---|
-| 網域沒驗證、首頁「not registered」 | 3.1：Search Console 的**網域**資源，由專案 Owner／Editor 驗證，TXT 記錄保留 |
+| 網域沒驗證、首頁「not registered」 | 3.1：Search Console 的**網域**資源，由專案 Owner／Editor 驗證，TXT 記錄保留（DNS 搬到 Cloudflare 時，Workspace 和 Search Console 的 `google-site-verification` TXT 都要搬） |
+| 審核員或使用者登入時被擋，只有 `@smart-schedules.com` 的帳號能登入 | Audience › User type 是 Internal：改成 External（3.5），發佈到 In production |
 | 首頁沒說明 App 用途、是登入頁、或 App 名稱和同意畫面不同 | 首頁開頭就是「Smart Schedule」和用途說明；Branding 的 App name 一字不差 |
 | 首頁「unresponsive」 | 填 `https://smart-schedules.com`（不要 http、www 或會轉址的網址）；Cloudflare 不要對機器人出驗證頁。論壇上也有網站正常仍被標記的案例，這時在 View issues 申請人工複查 |
 | 隱私權政策不在同一網域、沒從首頁連過去、沒說明怎麼存取／使用／保存／分享 Google 使用者資料 | `https://smart-schedules.com/privacy`，首頁有連結；第 3、4、5、11、13 節分別說明 |
@@ -460,6 +478,7 @@ Google 官方（撰寫環境打不開，以搜尋摘要為準，送審前請再�
 - Requesting Minimum Scopes（Confirm Downscoping／Unable to use narrower scopes）：https://support.google.com/cloud/answer/13807380
 - Frequently Asked Questions（AI／ML 與 Google 使用者資料）：https://support.google.com/cloud/answer/13463817
 - Unverified apps（100 位新使用者上限、scope 不一致時的未驗證畫面）：https://support.google.com/cloud/answer/7454865
+- Manage App Audience（User type：Internal 需要 Google Cloud 組織、只限組織成員；External 給任何 Google 帳號；Testing 最多 100 位測試使用者）：https://support.google.com/cloud/answer/15549945
 - Changes to approved app：https://support.google.com/cloud/answer/13464018
 - Choose Google Calendar API scopes：https://developers.google.com/workspace/calendar/api/auth
 - OAuth 2.0 Scopes for Google APIs：https://developers.google.com/identity/protocols/oauth2/scopes

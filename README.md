@@ -154,7 +154,7 @@ open SmartSchedule.xcodeproj
 - [ ] **不在歐洲經濟區和瑞士上架**：價格與供應狀況裡取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登和瑞士；英國和其他地區照常上架。數位服務法（DSA）仍要先聲明一次「不是交易商」（見 `docs/app-store-metadata.md` §4.3），交易商驗證等之後的版本加入歐盟時再處理。
 - [ ] **App Review**：5.1.2(i) 同意說明在任何個人資料送到 Gemini 之前出現（全新安裝、Siri、通知擴充都要確認）；2.1 在審核備註說明「不登入先試用」，最好附測試用 Google 帳號；5.1.1(v) 說明「移除帳號」（撤銷授權）和「清除這台裝置上的所有資料」。
 - [ ] **實機確認**：Time Sensitive 在專注模式下能穿透、專注模式過濾條件開關時 `perform()` 有執行。
-- [ ] 部署 `site/`（首頁、隱私權政策、支援頁，見 [`site/README.md`](site/README.md)）到 smart-schedules.com：`SSPrivacyURL` 已設為 https://smart-schedules.com/privacy，網站上線前這個連結打不開；先填好頁面裡標黃的佔位值（開發者名稱、郵件服務、最低年齡）。
+- [ ] 部署 `site/`（首頁、隱私權政策、支援頁，見 [`site/README.md`](site/README.md)）到 smart-schedules.com：`SSPrivacyURL` 已設為 https://smart-schedules.com/privacy，網站上線前這個連結打不開；先填好頁面裡標黃的佔位值（開發者名稱、支援頁的回覆天數）。support@smart-schedules.com 是 Google Workspace 的 Gmail 信箱（隱私權政策第 9、12、13、17 節已寫明）；DNS 搬到 Cloudflare 時 Google 的郵件紀錄要原樣搬過去、不要開 Email Routing，Active 後再完成 DKIM 和 DMARC，見 `site/README.md` 第 3.1 節。
 
 ## 驗證狀態
 
