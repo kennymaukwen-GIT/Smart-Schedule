@@ -114,17 +114,35 @@ final class GeminiProxyTests: XCTestCase {
         let attestation = FakeAttestation()
         let direct = GeminiConfig(baseURL: "https://generativelanguage.googleapis.com/v1beta", modelID: "test-model",
                                   apiKey: nil, thinkingLevel: nil)
-        do {
-            _ = try await client(attestation, config: direct).generate(system: "system", history: [.user("hi")])
-            XCTFail("expected an error")
-        } catch GeminiError.malformed {
-            // expected: it would need an API key in the app
-        } catch {
-            XCTFail("unexpected \(error)")
+        // Google itself (it would need an API key in the app), or GEMINI_BASE_URL not set at all.
+        for config in [direct, GeminiConfig(baseURL: "", modelID: "test-model", apiKey: nil, thinkingLevel: nil)] {
+            do {
+                _ = try await client(attestation, config: config).generate(system: "system", history: [.user("hi")])
+                XCTFail("expected an error")
+            } catch AttestationError.notConfigured {
+                // expected
+            } catch {
+                XCTFail("unexpected \(error)")
+            }
         }
         XCTAssertTrue(ProxyStub.requests.isEmpty)
         let signed = await attestation.bodies
         XCTAssertTrue(signed.isEmpty)
+    }
+
+    /// 401 attestation_required: no credential the server accepts (a simulator build without the dev token, or an
+    /// extension without a session) is not "the server didn't answer, try again later".
+    func testNoAcceptedCredentialIsNotATransientError() async {
+        ProxyStub.respond([(401, #"{"error":"attestation_required"}"#)])
+        do {
+            _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
+            XCTFail("expected an error")
+        } catch AttestationError.unsupported {
+            // expected in the app (the extension gets sessionMissing)
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+        XCTAssertEqual(ProxyStub.requests.count, 1, "not retried")
     }
 
     // MARK: Endpoint and token
@@ -132,7 +150,10 @@ final class GeminiProxyTests: XCTestCase {
     func testServerOriginComesFromTheBaseURL() {
         XCTAssertEqual(ServerEndpoint.origin(of: "https://ss.example.dev/v1beta"), URL(string: "https://ss.example.dev"))
         XCTAssertEqual(ServerEndpoint.origin(of: "http://localhost:8787/v1beta"), URL(string: "http://localhost:8787"))
+        XCTAssertEqual(ServerEndpoint.origin(of: "http://127.0.0.1:8787/v1beta"), URL(string: "http://127.0.0.1:8787"))
+        XCTAssertNil(ServerEndpoint.origin(of: "http://ss.example.dev/v1beta"), "plain http only for a Worker on this Mac")
         XCTAssertNil(ServerEndpoint.origin(of: "https://generativelanguage.googleapis.com/v1beta"))
+        XCTAssertNil(ServerEndpoint.origin(of: "https://GenerativeLanguage.GoogleAPIs.com/v1beta"))
         XCTAssertNil(ServerEndpoint.origin(of: ""))
     }
 
@@ -243,15 +264,17 @@ final class GeminiProxyTests: XCTestCase {
         // Consent: the registration as it is.
         await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, upload: uploads.accept, fileURL: file, defaults: defaults)
         XCTAssertEqual(uploads.sent.last?.events.map(\.eventID), ["e1"])
+        XCTAssertNotNil(uploads.sent.last?.token)
 
         // Unchanged and accepted: not sent again.
         await PushToStartRegistrar.uploadIfNeeded(changed: false, consented: true, upload: uploads.accept, fileURL: file, defaults: defaults)
         XCTAssertEqual(uploads.sent.count, 1)
 
-        // Consent withdrawn: an empty registration clears the titles on the server, once.
+        // Consent withdrawn: an empty registration clears the titles on the server, once, and the push token too.
         await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: false, upload: uploads.accept, fileURL: file, defaults: defaults)
         XCTAssertEqual(uploads.sent.count, 2)
         XCTAssertEqual(uploads.sent.last?.events, [])
+        XCTAssertNil(uploads.sent.last?.token)
         await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: false, upload: uploads.accept, fileURL: file, defaults: defaults)
         XCTAssertEqual(uploads.sent.count, 2)
     }
@@ -308,6 +331,7 @@ final class GeminiProxyTests: XCTestCase {
 
         await PushToStartRegistrar.eraseAll(upload: uploads.accept, fileURL: file, defaults: defaults)
         XCTAssertEqual(uploads.sent.last?.events, [])
+        XCTAssertNil(uploads.sent.last?.token)
         XCTAssertEqual(uploads.sent.last?.deviceID, deviceID)
         XCTAssertNil(PushToStartRegistrar.pending(fileURL: file))
         await PushToStartRegistrar.sync(token: Data([0x01]), upcomingEvents: [], fileURL: file, defaults: defaults)

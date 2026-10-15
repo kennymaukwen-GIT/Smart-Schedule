@@ -110,7 +110,7 @@ project.yml             XcodeGen 設定（三個 App target 加一個測試 targ
 | **Xcode Previews** | Mac + Xcode 16 以上 | 每個畫面，包括動態島 expanded／compact／minimal 和鎖定畫面，不用執行 App |
 | **Simulator + Demo 模式** | Mac + Xcode | 完整 App：控制中心按鈕、Live Activity、長按通知回覆、主畫面、Quick Capture。不需要 Google 帳號或 Gemini key |
 | **單元測試** | Xcode 按 ⌘U，或 GitHub Actions 自動跑 | 時區和 DST、RRULE、event ID、mapper、Gemini 回應解析、4 KB 預算、偏好設定與紀錄、多帳號（新增帳號的 email 檢查與比對、移除帳號）、提醒排程、週一開始的月曆、備註建議的規則（出國、運動、排除「跑步機維修」這類誤判、已經寫在備註裡的不再建議） |
-| **真機 + 真 API** | Apple ID（部分功能需付費開發者帳號）、Google OAuth client、Gemini key | 實際寫入 Google Calendar、Action Button、真正的鎖定畫面互動 |
+| **真機 + 真 API** | Apple ID（部分功能需付費開發者帳號）、Google OAuth client、已部署的 Worker 網址（`GEMINI_BASE_URL`，見 [`server/worker/README.md`](server/worker/README.md)；Gemini 金鑰只在 Worker 上） | 實際寫入 Google Calendar、Action Button、真正的鎖定畫面互動 |
 
 ### Simulator 步驟
 ```bash
@@ -147,11 +147,11 @@ open SmartSchedule.xcodeproj
 
 - [ ] **Gemini 付費層級**：替 Gemini API 的 Google Cloud 專案開啟 Cloud Billing。免費層級下 Google 可能用請求內容改善產品；App 和隱私權政策都不能宣稱「不用於訓練」。App 經由 `server/worker/` 呼叫 Gemini，API key 不在 App 裡。
 - [ ] **Google OAuth 驗證**：`calendar.events` 和 `calendar.calendarlist.readonly` 都是敏感 scope。送審 consent screen（App 名稱、logo、首頁、隱私權政策、授權網域）、每個 scope 的用途說明，以及一段示範影片（OAuth 流程、新增行程、抽屜列出行事曆）。consent screen 還在 Testing 時，refresh token 7 天就會失效。
-- [ ] **App Store 隱私標籤**：申報傳給 Google Gemini 的資料（使用者內容，例如「其他使用者內容」，以及跟請求一起送出的行程內容；用途是 App 功能；不用於追蹤）。Google 日曆的資料只在裝置和使用者自己的 Google 帳號之間傳輸。
+- [ ] **App Store 隱私標籤**（與 `App/PrivacyInfo.xcprivacy` 一致）：Other User Content（請求內容和跟請求一起送出的行程，經 Smart Schedule 的伺服器（Cloudflare Worker）轉給 Google Gemini；iOS 18 另把未來兩天行程的標題、起訖時間與顏色存在伺服器，用來送動態島的 push-to-start）、Device ID（隨機的安裝 ID 與 push token），用途都是 App 功能、連結身分、不用於追蹤。隱私權政策要寫明 Cloudflare 是處理者、Google 是接收者。
 - [ ] **StoreKit**：在 App Store Connect 建立訂閱群組「Smart Schedule Pro」和跟 `Config/SmartSchedule.storekit` 相同 ID 的商品（`com.smartschedule.pro.monthly`、`com.smartschedule.pro.yearly`），簽署 Paid Apps 協議，加上各語系的訂閱名稱，用 sandbox 測試。
 - [ ] **App Review**：5.1.2(i) 同意說明在任何個人資料送到 Gemini 之前出現（全新安裝、Siri、通知擴充都要確認）；2.1 在審核備註說明「不登入先試用」，最好附測試用 Google 帳號；5.1.1(v) 說明「移除帳號」（撤銷授權）和「清除這台裝置上的所有資料」。
 - [ ] **實機確認**：Time Sensitive 在專注模式下能穿透、專注模式過濾條件開關時 `perform()` 有執行。
-- [ ] 把 `project.yml` 裡的佔位值 `SSPrivacyURL`、`SSSupportEmail`（必要時 `SSTermsURL`）換成正式的。
+- [ ] 把 `project.yml` 裡的佔位值 `SSPrivacyURL` 換成正式的隱私權政策網址（`SSSupportEmail` 已是 support@smart-schedules.com，`SSTermsURL` 用 Apple 標準 EULA）。
 
 ## 驗證狀態
 

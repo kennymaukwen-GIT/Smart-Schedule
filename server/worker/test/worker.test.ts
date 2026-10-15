@@ -91,11 +91,11 @@ describe("POST /attest", () => {
     assert.equal(h.kv.keysWithPrefix("chal:").length, 0, "challenge consumed");
   });
 
-  it("accepts the notification content extension's bundle ID", async () => {
-    const h = makeHarness({ rootCaPem: chain.root.pem });
-    const device = await attestDevice(h, "com.smartschedule.app.notification-content");
+  it("accepts every bundle ID listed in BUNDLE_IDS", async () => {
+    const h = makeHarness({ rootCaPem: chain.root.pem, env: { BUNDLE_IDS: `${BUNDLE_ID}, com.smartschedule.other` } });
+    const device = await attestDevice(h, "com.smartschedule.other");
     const record = JSON.parse((await h.kv.get(`key:${device.keyIdB64}`))!) as Record<string, unknown>;
-    assert.equal(record.appId, `${TEAM_ID}.com.smartschedule.app.notification-content`);
+    assert.equal(record.appId, `${TEAM_ID}.com.smartschedule.other`);
   });
 
   async function post(h: Harness, fields: Record<string, unknown>) {
@@ -137,9 +137,13 @@ describe("POST /attest", () => {
 
   it("rejects a bundle ID outside BUNDLE_IDS and a team ID mismatch with invalid_attestation", async () => {
     const h = makeHarness({ rootCaPem: chain.root.pem });
-    let r = await attestWith(h, "com.example.evil");
-    assert.equal(r.status, 401);
-    assert.deepEqual(await r.json(), { error: "invalid_attestation" });
+    // The notification extension never attests (App Attest does not work in extensions), so it is not listed.
+    for (const bundleId of ["com.example.evil", "com.smartschedule.app.notification-content"]) {
+      const r = await attestWith(h, bundleId);
+      assert.equal(r.status, 401, bundleId);
+      assert.deepEqual(await r.json(), { error: "invalid_attestation" });
+    }
+    let r: Response;
     r = await attestWith(h, BUNDLE_ID, `ZZZZZ99999.${BUNDLE_ID}`);
     assert.equal(r.status, 401);
     assert.deepEqual(await r.json(), { error: "invalid_attestation" });
@@ -495,7 +499,7 @@ describe("authentication", () => {
 });
 
 describe("Gemini proxy", () => {
-  it("forwards the exact body bytes, path and query (minus key), adds the API key and strips credentials", async () => {
+  it("forwards the exact body bytes, path and query (minus key), adds the API key and only content-type and accept", async () => {
     const h = makeHarness({ rootCaPem: chain.root.pem });
     const device = await attestDevice(h);
     h.setResponder(() => new Response("data: {\"candidates\":[]}\n\n", { status: 200, headers: { "content-type": "text/event-stream", "set-cookie": "a=b", "x-upstream": "1" } }));
@@ -512,6 +516,10 @@ describe("Gemini proxy", () => {
         "cf-ray": "8a1b2c3d4e5f-TPE",
         "cf-anything-new": "1",
         "x-forwarded-for": "198.51.100.1",
+        "user-agent": "SmartSchedule/42 CFNetwork/1568 Darwin/24.0.0",
+        "accept-language": "zh-TW,zh-Hant;q=0.9",
+        accept: "*/*",
+        "x-client-anything": "1",
       },
     });
     assert.equal(r.status, 200);
@@ -527,10 +535,11 @@ describe("Gemini proxy", () => {
     assert.deepEqual(await sha256(call.body!), await sha256(body));
     assert.equal(call.headers.get("x-goog-api-key"), "test-gemini-key");
     assert.equal(call.headers.get("content-type"), "application/json; charset=utf-8");
-    for (const stripped of ["authorization", "x-dev-token", "cookie", "cf-connecting-ip", "cf-ipcountry", "cf-ray", "cf-anything-new", "x-forwarded-for"]) {
-      assert.equal(call.headers.get(stripped), null, stripped);
-    }
-    call.headers.forEach((_, name) => assert.ok(!name.startsWith("cf-"), name));
+    assert.equal(call.headers.get("accept"), "*/*");
+    // Nothing that identifies the user, the device or the app build reaches Google.
+    const forwarded: string[] = [];
+    call.headers.forEach((_, name) => forwarded.push(name));
+    assert.deepEqual(forwarded.sort(), ["accept", "content-type", "x-goog-api-key"]);
   });
 
   it("returns upstream errors unchanged", async () => {
@@ -711,9 +720,9 @@ describe("POST /devices/push-to-start", () => {
   });
 
   it("keeps 403 forbidden between the development identity and attested ones, and across apps", async () => {
-    const h = makeHarness({ rootCaPem: chain.root.pem, env: { ALLOW_DEV_TOKEN: "true" } });
+    const h = makeHarness({ rootCaPem: chain.root.pem, env: { ALLOW_DEV_TOKEN: "true", BUNDLE_IDS: `${BUNDLE_ID},com.smartschedule.other` } });
     const app = await attestDevice(h);
-    const otherApp = await attestDevice(h, "com.smartschedule.app.notification-content");
+    const otherApp = await attestDevice(h, "com.smartschedule.other");
     const body = JSON.stringify({ deviceID: DEVICE, token: TOKEN, events: [event()] });
     assert.equal((await app.send("/devices/push-to-start", body)).status, 200);
 

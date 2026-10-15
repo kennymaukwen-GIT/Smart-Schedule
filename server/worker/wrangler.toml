@@ -29,16 +29,18 @@ name = "SS_RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 30, period = 60 }
 
-# Worker logs (console.log JSON lines, e.g. the reason an attestation was rejected).
+# Worker logs: only the Worker's own console.log JSON lines (e.g. the reason an attestation was rejected), which never
+# contain a request body, token or key. Invocation logs stay off: they would keep every request's URL and headers.
 [observability]
 enabled = true
 
+[observability.logs]
+invocation_logs = false
+
 [vars]
-# Your Apple Developer Team ID (10 characters, developer.apple.com › Membership details). Required: the App ID
-# checked during attestation is "<APPLE_TEAM_ID>.<bundleId>".
-APPLE_TEAM_ID = ""
-# Bundle IDs allowed to attest (comma-separated).
-BUNDLE_IDS = "com.smartschedule.app,com.smartschedule.app.notification-content"
+# Bundle IDs allowed to attest (comma-separated). Only the app: App Attest does not work in app extensions, so the
+# notification extension uses a session token (POST /session) instead.
+BUNDLE_IDS = "com.smartschedule.app"
 # Must match the app's com.apple.developer.devicecheck.appattest-environment entitlement:
 #   "production"  → App Store / TestFlight builds (aaguid "appattest" + 7 zero bytes)
 #   "development" → Xcode-installed builds        (aaguid "appattestdevelop")
@@ -48,9 +50,6 @@ ALLOW_DEV_TOKEN = "false"
 # Requests per identity (attested key, "dev", or client IP for /attest*) per UTC minute; also the number of failed
 # authentications one IP may make per minute before it is refused without its body being read.
 RATE_LIMIT_PER_MIN = "30"
-# APNs token-based auth: the .p8 key's Key ID and the Team ID that owns it (the key itself is a secret).
-APNS_KEY_ID = ""
-APNS_TEAM_ID = ""
 APNS_BUNDLE_ID = "com.smartschedule.app"
 # Must match the app build's aps-environment: "sandbox" (Xcode builds) or "production" (TestFlight / App Store).
 APNS_ENV = "production"
@@ -68,23 +67,39 @@ SESSION_DAILY_LIMIT = "200"
 # carriers put many users behind one IPv4 address.
 ATTEST_DAILY_PER_IP = "200"
 
-# Secrets — never in this file:
+# Secrets — never in this file. They are kept across deploys (a deploy replaces the vars above, not secrets):
 #   npx wrangler secret put GEMINI_API_KEY
-#   npx wrangler secret put SS_DEV_TOKEN        (only needed where ALLOW_DEV_TOKEN = "true")
+#   npx wrangler secret put APPLE_TEAM_ID       10 characters (developer.apple.com › Membership details). Required:
+#                                               the App ID checked during attestation is "<APPLE_TEAM_ID>.<bundleId>".
+#   npx wrangler secret put APNS_KEY_ID         the .p8 key's Key ID           } Live Activity push-to-start
+#   npx wrangler secret put APNS_TEAM_ID        the Team ID that owns the key  } (APNs token-based auth)
 #   npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
+#   npx wrangler secret put SS_DEV_TOKEN        only where ALLOW_DEV_TOKEN = "true"
+# A name cannot be both a var and a secret: these must not appear in [vars] (test/config-sync.test.ts checks).
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Development Worker for the simulator, which has no App Attest: Debug builds send X-Dev-Token instead (SS_DEV_TOKEN
-# in Config/Secrets.xcconfig, the same value as this Worker's SS_DEV_TOKEN secret). A Worker of its own
+# Development Worker for Debug builds. The simulator has no App Attest, so it sends X-Dev-Token (SS_DEV_TOKEN in
+# Config/Secrets.xcconfig, the same value as this Worker's SS_DEV_TOKEN secret); Xcode-installed builds on an iPhone
+# attest in App Attest's "development" environment, which only this Worker accepts. A Worker of its own
 # (smart-schedule-worker-dev), with its own KV namespace and secrets, so the production Worker never accepts a dev
-# token. Bindings and vars are not inherited from the top level, so all of them are repeated here.
+# token. Bindings, vars and observability are not inherited from the top level, so all of them are repeated here.
 #   npm run deploy:dev
 #   npx wrangler secret put GEMINI_API_KEY --env dev
 #   npx wrangler secret put SS_DEV_TOKEN --env dev
+#   npx wrangler secret put APPLE_TEAM_ID --env dev        (Debug builds on an iPhone)
+# Push-to-start from a Debug build on an iPhone (a sandbox APNs token): also set APNS_KEY_ID, APNS_TEAM_ID and
+# APNS_PRIVATE_KEY with --env dev, and crons = ["* * * * *"] below.
+# Local: `npm run dev` runs this environment on http://localhost:8787 with the secrets in a git-ignored .dev.vars.
 [env.dev]
 name = "smart-schedule-worker-dev"
 workers_dev = true
 preview_urls = false
+
+[env.dev.observability]
+enabled = true
+
+[env.dev.observability.logs]
+invocation_logs = false
 
 # No Live Activity pushes from the simulator; set crons = ["* * * * *"] when testing push-to-start on a device.
 [env.dev.triggers]
@@ -100,14 +115,10 @@ namespace_id = "1002"
 simple = { limit = 30, period = 60 }
 
 [env.dev.vars]
-# Needed only for Xcode-installed builds on a device (App Attest "development"); the simulator uses the dev token.
-APPLE_TEAM_ID = ""
-BUNDLE_IDS = "com.smartschedule.app,com.smartschedule.app.notification-content"
+BUNDLE_IDS = "com.smartschedule.app"
 APP_ATTEST_ENV = "development"
 ALLOW_DEV_TOKEN = "true"
 RATE_LIMIT_PER_MIN = "30"
-APNS_KEY_ID = ""
-APNS_TEAM_ID = ""
 APNS_BUNDLE_ID = "com.smartschedule.app"
 APNS_ENV = "sandbox"
 SESSION_TTL_SECONDS = "604800"

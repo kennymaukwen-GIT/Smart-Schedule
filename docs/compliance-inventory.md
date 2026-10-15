@@ -1,5 +1,10 @@
 # App Store 合規修正：Step 0 盤點（未改任何程式）
 
+> 歷史快照（基準 commit `22474d0`），網路與金鑰部分已過時：App 不再含 Gemini 金鑰，也不送 `x-goog-api-key`、不直接連 Google。
+> 現在 App 只讀 `GEMINI_BASE_URL`（`Config/Secrets.xcconfig` → Info.plist `SSGeminiBaseURL`），經 `server/worker/`
+> 呼叫 Gemini，送 `Authorization: Bearer`（App Attest）/ `Session`，Debug 的 Simulator 送 `X-Dev-Token`；金鑰只在 Worker 的
+> secret `GEMINI_API_KEY`。現行流程見 `docs/GEMINI_FUNCTION_CALLING.md` 與 `server/worker/README.md`。
+
 基準 commit `22474d0`：iOS CI run 38646401174 綠燈。`xcodegen generate` → `xcodebuild build -scheme SmartSchedule`（主 App 連同兩個 extension 依賴一起編）→ `xcodebuild test`：Executed 597 tests, 0 failures。
 
 ## 1. Live Activity 點擊目標

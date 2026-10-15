@@ -31,6 +31,11 @@ jobs:
       - name: Validate declarations and fixtures
         run: python -I scripts/validate_schema.py --print-payloads
 
+      # Keys, private keys, a concrete Worker host and personal email addresses belong in Config/Secrets.xcconfig,
+      # Worker secrets or placeholders, never in the repository.
+      - name: No keys, Worker hosts or personal emails in tracked files
+        run: python -I scripts/check_repo_hygiene.py
+
   worker:
     name: Worker typecheck + tests
     runs-on: ubuntu-latest
@@ -112,6 +117,35 @@ jobs:
           brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
           xcodegen --version || true
           xcodegen generate
+
+      # Config/Secrets.xcconfig (git-ignored) as Secrets.example.xcconfig lays it out, with placeholder hosts: Release
+      # builds get the production Worker and no dev token, Debug builds the development Worker, and the dev token only
+      # reaches Debug simulator builds. The file is removed again before the real build.
+      - name: Secrets.xcconfig layout resolves per configuration
+        run: |
+          set -euo pipefail
+          trap 'rm -f Config/Secrets.xcconfig' EXIT
+          printf '%s\n' \
+            'GEMINI_BASE_URL = https:/$()/prod.invalid/v1beta' \
+            'GEMINI_BASE_URL[config=Debug] = https:/$()/dev.invalid/v1beta' \
+            'SS_DEV_TOKEN[config=Debug][sdk=iphonesimulator*] = ci-dev-token' > Config/Secrets.xcconfig
+          setting() {  # configuration sdk name
+            xcodebuild -project SmartSchedule.xcodeproj -target SmartSchedule -configuration "$1" -sdk "$2" \
+              -showBuildSettings 2>/dev/null | awk -v k="$3" '$1 == k && $2 == "=" { sub(/^[^=]*= ?/, ""); print; exit }'
+          }
+          check() {  # configuration sdk name expected
+            got=$(setting "$1" "$2" "$3")
+            echo "$1 $2: $3 = '$got'"
+            [ "$got" = "$4" ] || { echo "::error::$1 $2: $3 is '$got', expected '$4'"; exit 1; }
+          }
+          check Release iphoneos GEMINI_BASE_URL https://prod.invalid/v1beta
+          check Release iphonesimulator GEMINI_BASE_URL https://prod.invalid/v1beta
+          check Debug iphoneos GEMINI_BASE_URL https://dev.invalid/v1beta
+          check Debug iphonesimulator GEMINI_BASE_URL https://dev.invalid/v1beta
+          check Debug iphonesimulator SS_DEV_TOKEN ci-dev-token
+          check Debug iphoneos SS_DEV_TOKEN ""
+          check Release iphonesimulator SS_DEV_TOKEN ""
+          check Release iphoneos SS_DEV_TOKEN ""
 
       - name: Pick simulator
         run: |

@@ -43,10 +43,11 @@ enum AttestationError: LocalizedError {
 enum ServerEndpoint {
     static var origin: URL? { origin(of: GeminiConfig.fromBundle.baseURL) }
 
+    /// https only; plain http only for a Worker on this Mac (`npm run dev`, which ATS allows).
     static func origin(of baseURL: String) -> URL? {
-        guard var components = URLComponents(string: baseURL), let host = components.host, !host.isEmpty,
-              components.scheme == "https" || components.scheme == "http",
-              !host.hasSuffix("googleapis.com") else { return nil }
+        guard var components = URLComponents(string: baseURL), let host = components.host?.lowercased(), !host.isEmpty,
+              components.scheme == "https" || (components.scheme == "http" && ["localhost", "127.0.0.1"].contains(host)),
+              host != "googleapis.com", !host.hasSuffix(".googleapis.com") else { return nil }
         components.path = ""
         components.query = nil
         components.fragment = nil

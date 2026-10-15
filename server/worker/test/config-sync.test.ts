@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { Env } from "../src/env.ts";
-import { DEFAULT_SESSION_MODELS, sessionModels } from "../src/env.ts";
+import { bundleIds, DEFAULT_BUNDLE_IDS, DEFAULT_SESSION_MODELS, sessionModels } from "../src/env.ts";
 
 /** A file of this repository, relative to its root (this file is server/worker/test/). */
 function repoFile(path: string): string {
@@ -71,5 +71,28 @@ describe("app ↔ Worker configuration", () => {
     assert.ok(!/^id[ \t]*=/m.test(dev.split("[[env.dev.kv_namespaces]]")[1]?.split("[")[0] ?? ""), "[env.dev] KV must not reuse an id");
     const namespaceIDs = [...environments.values()].map((toml) => match(toml, /^namespace_id[ \t]*=[ \t]*"(\d+)"/m, "namespace_id"));
     assert.equal(new Set(namespaceIDs).size, namespaceIDs.length, "rate limiter namespace_id must differ per environment");
+  });
+
+  it("the Team ID, APNs IDs and keys are secrets: never assigned in wrangler.toml, where a deploy would reset them", () => {
+    const toml = repoFile("server/worker/wrangler.toml");
+    for (const name of ["GEMINI_API_KEY", "SS_DEV_TOKEN", "APNS_PRIVATE_KEY", "APPLE_TEAM_ID", "APNS_KEY_ID", "APNS_TEAM_ID"]) {
+      assert.ok(!new RegExp(`^[ \\t]*${name}[ \\t]*=`, "m").test(toml), `${name} must not be in wrangler.toml: npx wrangler secret put ${name}`);
+    }
+  });
+
+  it("each environment attests the app's bundle ID, pushes to it on its APNs host, and keeps invocation logs off", () => {
+    const app = match(repoFile("project.yml"), /^  SmartSchedule:\n(?:(?!^  \S).*\n)*?[ \t]+PRODUCT_BUNDLE_IDENTIFIER:[ \t]*(\S+)/m, "SmartSchedule PRODUCT_BUNDLE_IDENTIFIER in project.yml");
+    const expected = new Map([["production", { attest: "production", apns: "production" }], ["dev", { attest: "development", apns: "sandbox" }]]);
+    const environments = wranglerEnvironments();
+    assert.deepEqual([...environments.keys()].sort(), [...expected.keys()].sort());
+    for (const [name, toml] of environments) {
+      const value = (key: string) => match(toml, new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*"([^"]*)"`, "m"), `${key} (${name})`);
+      assert.deepEqual(bundleIds({ BUNDLE_IDS: value("BUNDLE_IDS") } as unknown as Env), [app], `BUNDLE_IDS (${name})`);
+      assert.equal(value("APNS_BUNDLE_ID"), app, `APNS_BUNDLE_ID (${name})`);
+      assert.equal(value("APP_ATTEST_ENV"), expected.get(name)!.attest, `APP_ATTEST_ENV (${name})`);
+      assert.equal(value("APNS_ENV"), expected.get(name)!.apns, `APNS_ENV (${name})`);
+      assert.match(toml, /^\[(?:env\.[A-Za-z0-9_-]+\.)?observability\.logs\]\ninvocation_logs[ \t]*=[ \t]*false$/m, `invocation_logs = false (${name})`);
+    }
+    assert.deepEqual(DEFAULT_BUNDLE_IDS, [app]);
   });
 });

@@ -9,27 +9,12 @@ import { HttpError, log } from "./http.ts";
 
 export const GEMINI_ORIGIN = "https://generativelanguage.googleapis.com";
 
-/** Never forwarded: client credentials, cookies, hop-by-hop headers and client-identifying headers (plus every cf-*). */
-const STRIPPED_HEADERS = new Set([
-  "authorization",
-  "x-dev-token",
-  "cookie",
-  "x-goog-api-key",
-  "host",
-  "content-length",
-  "connection",
-  "keep-alive",
-  "proxy-authorization",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-  "cdn-loop",
-  "true-client-ip",
-  "x-forwarded-for",
-  "x-forwarded-proto",
-  "x-real-ip",
-]);
+/**
+ * The only client headers forwarded. Everything else stays here: credentials (Authorization, X-Dev-Token, cookies, a
+ * client's own x-goog-api-key), hop-by-hop headers, and whatever identifies the user or the device (User-Agent with
+ * the app build and iOS version, Accept-Language, cf-* location, forwarding addresses).
+ */
+const FORWARDED_HEADERS = new Set(["content-type", "accept"]);
 
 /** Removes every `key` parameter while leaving the rest of the query string byte-identical. */
 export function stripKeyParam(search: string): string {
@@ -60,8 +45,7 @@ export async function proxyGemini(request: Request, body: Uint8Array, env: Env, 
 
   const headers = new Headers();
   request.headers.forEach((value, name) => {
-    const lower = name.toLowerCase();
-    if (!STRIPPED_HEADERS.has(lower) && !lower.startsWith("cf-")) headers.set(name, value);
+    if (FORWARDED_HEADERS.has(name.toLowerCase())) headers.set(name, value);
   });
   headers.set("x-goog-api-key", env.GEMINI_API_KEY);
 

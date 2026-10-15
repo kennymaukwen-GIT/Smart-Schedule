@@ -8,8 +8,8 @@ enum AppConstants {
     static let backgroundRefreshTaskID = "com.smartschedule.refresh"
     static let controlKind = "com.smartschedule.control.summon"
 
-    /// Keep false until APNs + a backend exist. With `.token` the Live Activity can be updated
-    /// (and restarted after the 8-hour cap via push-to-start) from the server.
+    /// Per-activity update tokens (`.token`): the Worker has no route for them yet, so keep false. Push-to-start
+    /// (iOS 18, `PushToStartRegistrar` → POST /devices/push-to-start) works without this flag.
     static let liveActivityPushEnabled = false
 
     // MARK: Demo mode

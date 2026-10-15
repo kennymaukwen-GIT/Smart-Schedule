@@ -59,7 +59,7 @@ export async function handleAttest(request: Request, env: Env, deps: Deps): Prom
   const team = teamId(env);
   const environment = attestEnvironment(env);
   if (!team || !environment) {
-    log("error", "server_misconfigured", { reason: "APPLE_TEAM_ID or APP_ATTEST_ENV is not set correctly" });
+    log("error", "server_misconfigured", { reason: "the APPLE_TEAM_ID secret or the APP_ATTEST_ENV var is not set correctly" });
     throw new HttpError(500, "server_misconfigured");
   }
   const root = trustAnchor(deps.rootCaPem);

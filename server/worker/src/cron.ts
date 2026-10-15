@@ -93,7 +93,7 @@ export async function runCron(env: Env, deps: Deps): Promise<CronSummary> {
     return summary;
   }
   if (!env.APNS_KEY_ID?.trim() || !env.APNS_TEAM_ID?.trim() || !env.APNS_PRIVATE_KEY) {
-    log("error", "server_misconfigured", { reason: "APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY must be set" });
+    log("error", "server_misconfigured", { reason: "the APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY secrets must be set" });
     return summary;
   }
   const now = deps.now();

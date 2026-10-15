@@ -87,7 +87,11 @@ enum PushToStartRegistrar {
                                   defaults: UserDefaults?) async {
         guard let upload = upload ?? lock.withLock({ uploader }),
               var registration = pending(fileURL: fileURL) else { return }
-        if !consented || registration.token == nil { registration.events = [] }
+        // Without consent the server keeps nothing from this iPhone: no events, and no push token either.
+        if !consented || registration.token == nil {
+            registration.events = []
+            registration.token = nil
+        }
         let serverHasEvents = defaults?.bool(forKey: serverHasEventsKey) == true
         let needed = registration.events.isEmpty
             ? serverHasEvents

@@ -23,18 +23,18 @@ export interface Env {
   SS_KV: KV;
   /** Atomic per-location limiter (no KV writes). Optional: without it the KV counters below do the limiting. */
   SS_RATE_LIMITER?: RateLimiter;
-  // Secrets (wrangler secret put …)
+  // Secrets (wrangler secret put …): kept across deploys, never in the repository.
   GEMINI_API_KEY?: string;
   SS_DEV_TOKEN?: string;
   APNS_PRIVATE_KEY?: string;
-  // Vars (wrangler.toml [vars])
   APPLE_TEAM_ID?: string;
+  APNS_KEY_ID?: string;
+  APNS_TEAM_ID?: string;
+  // Vars (wrangler.toml [vars]; every deploy sets them from the file)
   BUNDLE_IDS?: string;
   APP_ATTEST_ENV?: string;
   ALLOW_DEV_TOKEN?: string;
   RATE_LIMIT_PER_MIN?: string;
-  APNS_KEY_ID?: string;
-  APNS_TEAM_ID?: string;
   APNS_BUNDLE_ID?: string;
   APNS_ENV?: string;
   SESSION_TTL_SECONDS?: string;
@@ -53,7 +53,8 @@ export interface Deps {
   sleep: (ms: number) => Promise<void>;
 }
 
-export const DEFAULT_BUNDLE_IDS = ["com.smartschedule.app", "com.smartschedule.app.notification-content"];
+/** Only the app attests: App Attest does not work in app extensions (the notification extension uses a session). */
+export const DEFAULT_BUNDLE_IDS = ["com.smartschedule.app"];
 
 export function bundleIds(env: Env): string[] {
   const raw = env.BUNDLE_IDS?.trim();

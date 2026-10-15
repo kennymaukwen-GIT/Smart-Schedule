@@ -10,7 +10,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json",
     "test": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test \"test/**/*.test.ts\"",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --env dev",
     "embed-root-ca": "sh scripts/embed-apple-root-ca.sh",
     "check-root-ca": "node scripts/check-root-ca.mjs",
     "deploy": "node scripts/check-root-ca.mjs && wrangler deploy --env=\"\"",

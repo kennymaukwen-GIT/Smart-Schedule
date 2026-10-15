@@ -65,7 +65,7 @@ export function makeHarness(
     GEMINI_API_KEY: "test-gemini-key",
     SS_DEV_TOKEN: "dev-secret-token",
     APPLE_TEAM_ID: TEAM_ID,
-    BUNDLE_IDS: "com.smartschedule.app,com.smartschedule.app.notification-content",
+    BUNDLE_IDS: "com.smartschedule.app",
     APP_ATTEST_ENV: "development",
     ALLOW_DEV_TOKEN: "false",
     RATE_LIMIT_PER_MIN: "30",

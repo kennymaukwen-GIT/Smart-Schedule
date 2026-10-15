@@ -10,9 +10,11 @@ struct GeminiConfig: Sendable {
     /// Gemini 3.x `thinkingLevel` ("low" | "high"). Nil = model default. Do not send to 2.x models.
     var thinkingLevel: String?
 
+    /// `SSGeminiBaseURL` comes from GEMINI_BASE_URL in Config/Secrets.xcconfig. Without it the base is empty and every
+    /// request fails with `AttestationError.notConfigured`: the app never calls Google itself.
     static var fromBundle: GeminiConfig {
         GeminiConfig(
-            baseURL: AppConstants.info("SSGeminiBaseURL") ?? "https://generativelanguage.googleapis.com/v1beta",
+            baseURL: AppConstants.info("SSGeminiBaseURL") ?? "",
             modelID: AppConstants.info("SSGeminiModelID") ?? "gemini-3.5-flash",
             apiKey: nil,
             thinkingLevel: "low" // parsing a sentence is latency-bound; plans still come out well-structured
@@ -144,8 +146,8 @@ final class GeminiClient: Sendable {
 
         let base = config.baseURL.hasSuffix("/") ? String(config.baseURL.dropLast()) : config.baseURL
         guard ServerEndpoint.origin(of: base) != nil else {
-            // Google itself would need an API key in the app.
-            throw GeminiError.malformed("GEMINI_BASE_URL must point at Smart Schedule's server")
+            // Not set, or Google itself, which would need an API key in the app.
+            throw AttestationError.notConfigured
         }
         guard let url = URL(string: "\(base)/models/\(config.modelID):generateContent") else {
             throw GeminiError.malformed("bad base URL")
@@ -176,6 +178,10 @@ final class GeminiClient: Sendable {
         case "rate_limited"?: throw AttestationError.rateLimited
         // The notification extension's model is not one the server accepts for it any more.
         case "session_scope"?: throw AttestationError.updateRequired
+        // No credential the server accepts: the extension has no session yet, or a Debug build on the simulator
+        // sends no X-Dev-Token (SS_DEV_TOKEN unset, or GEMINI_BASE_URL is not the development Worker).
+        case "attestation_required"?:
+            throw NetworkSession.isAppExtension ? AttestationError.sessionMissing : AttestationError.unsupported
         case .some: throw AttestationError.server(status: status)
         case nil: break
         }

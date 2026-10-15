@@ -46,16 +46,23 @@ cd server/worker
 npm i
 npx wrangler login
 
-# 1. Secrets
-npx wrangler secret put GEMINI_API_KEY
-npx wrangler secret put SS_DEV_TOKEN            # 只有 ALLOW_DEV_TOKEN="true" 的開發部署需要
-npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
-
-# 2. 編輯 wrangler.toml [vars]：APPLE_TEAM_ID、APNS_KEY_ID、APNS_TEAM_ID、APP_ATTEST_ENV、APNS_ENV …
-
-# 3. 部署（會先檢查 root CA 已嵌入）
+# 1. 部署（會先檢查 root CA 已嵌入；wrangler.toml 的 [vars] 不需要改）
 npm run deploy
+
+# 2. Secrets：存在 Cloudflare，之後每次部署都會保留，不會寫進 repo
+npx wrangler secret put GEMINI_API_KEY
+npx wrangler secret put APPLE_TEAM_ID           # 10 字元 Team ID（developer.apple.com › Membership details）
+npx wrangler secret put APNS_KEY_ID             # APNs .p8 的 Key ID（見「APNs .p8 設定」）
+npx wrangler secret put APNS_TEAM_ID            # 擁有該 .p8 的 Team ID
+npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
+npx wrangler secret list                        # 只列名稱，確認上面幾個都在
 ```
+
+**Team ID 與 APNs ID 是 secret，不是 var**：`wrangler deploy` 每次都用 `wrangler.toml` 的 `[vars]` 取代線上的 vars，
+寫在檔案裡就得把 Team ID commit 進 repo，留空則每次部署都把它清掉（`POST /attest` 回 `500 server_misconfigured`）。
+Secret 不受部署影響。同一個名稱不能同時是 var 和 secret，所以先部署（把舊版留在線上的空白 var 拿掉）再 `secret put`；
+`test/config-sync.test.ts` 會檢查這些名稱沒有再出現在 `wrangler.toml`。Apple 開發者帳號還沒核准時可以先不設，
+只是實機 attest 會回 500、push-to-start 不會送出，Simulator（dev token）不受影響。
 
 **KV namespace**：正式環境的 `[[kv_namespaces]]` 已寫上第一次部署自動建立的 namespace
 （`smart-schedule-worker-ss-kv`）的 `id`；`[env.dev]` 只寫 `binding`，第一次 `npm run deploy:dev` 會另外建立一個。
@@ -84,18 +91,24 @@ fork 這個 repo 時把正式環境的 `id` 那行刪掉，第一次部署就會
 `APP_ATTEST_ENV` 必須對應 App 的 `com.apple.developer.devicecheck.appattest-environment` entitlement，
 `APNS_ENV` 必須對應 App 的 `aps-environment`：
 
-| App build | `APP_ATTEST_ENV` | `APNS_ENV` | `ALLOW_DEV_TOKEN` |
-| --- | --- | --- | --- |
-| Xcode 安裝（development） | `development` | `sandbox` | 可為 `"true"`（Simulator 沒有 App Attest） |
-| TestFlight / App Store | `production` | `production` | **必須不是** `"true"` |
+| App build | Worker（`GEMINI_BASE_URL`） | `APP_ATTEST_ENV` | `APNS_ENV` | `ALLOW_DEV_TOKEN` |
+| --- | --- | --- | --- | --- |
+| Debug，Simulator | 開發版 | （沒有 App Attest，改送 `X-Dev-Token`） | — | `"true"` |
+| Debug，Xcode 裝到 iPhone | 開發版 | `development` | `sandbox` | `"true"` |
+| TestFlight / App Store | 正式版 | `production` | `production` | **必須不是** `"true"` |
+
+Release 設定從 Xcode 直接 Run 到 iPhone（或 Development export）時，App Attest 是 `production`、可以用正式版，
+但 `aps-environment` 仍是 development，push token 屬於 sandbox，正式版 Worker 送到正式 APNs 會被拒（`BadDeviceToken`）。
+push-to-start 請用 TestFlight 測，或用 Debug build 搭配開了 cron 與 APNs secrets 的開發版（見 `wrangler.toml` 的 `[env.dev]`）。
 
 開發與正式是兩個不同的 Worker：`wrangler.toml` 的 `[env.dev]` 是 `smart-schedule-worker-dev`（自己的 KV namespace、
 rate limiter 與 secrets，`ALLOW_DEV_TOKEN = "true"`、`APP_ATTEST_ENV = "development"`、`APNS_ENV = "sandbox"`、不跑 cron），
 正式 Worker 永遠不接受 dev token（`test/config-sync.test.ts` 會檢查）。
 
-### Simulator 用的開發版
+### Debug build 用的開發版
 
-Simulator 沒有 App Attest，Debug build 改送 `X-Dev-Token`，只有開發用 Worker 接受：
+Xcode 裝的 Debug build 在 iPhone 上以 App Attest 的 `development` 環境 attest，Simulator 沒有 App Attest、改送 `X-Dev-Token`，
+兩者都只有開發用 Worker 接受：
 
 ```sh
 cd server/worker
@@ -103,25 +116,29 @@ npm run deploy:dev                                   # 建立 smart-schedule-wor
 npx wrangler secret put GEMINI_API_KEY --env dev     # 貼上 Gemini 金鑰
 openssl rand -hex 32                                 # 產生一組 dev token，複製起來
 npx wrangler secret put SS_DEV_TOKEN --env dev       # 貼上剛才那組
-npm run check-key -- --worker                        # 填開發版網址與 dev token，確認整條路通
+npx wrangler secret put APPLE_TEAM_ID --env dev      # 只有 Debug build 裝到 iPhone 時需要
+npm run check-key -- --worker                        # 填開發版網址（可含 /v1beta）與 dev token，確認整條路通
 ```
 
-App 端（`Config/Secrets.xcconfig`，git-ignored）只讓 Simulator 用開發版：
+App 端（`Config/Secrets.xcconfig`，git-ignored；範本是 `Config/Secrets.example.xcconfig`）：Release 用正式版、Debug 用開發版。
+xcconfig 裡同一個設定以最後一個符合的為準，所以沒有條件的那行要放在前面：
 
 ```
 GEMINI_BASE_URL = https:/$()/smart-schedule-worker.<帳號子網域>.workers.dev/v1beta
-GEMINI_BASE_URL[sdk=iphonesimulator*] = https:/$()/smart-schedule-worker-dev.<帳號子網域>.workers.dev/v1beta
-SS_DEV_TOKEN[sdk=iphonesimulator*] = <同一組 dev token>
+GEMINI_BASE_URL[config=Debug] = https:/$()/smart-schedule-worker-dev.<帳號子網域>.workers.dev/v1beta
+SS_DEV_TOKEN[config=Debug][sdk=iphonesimulator*] = <同一組 dev token>
 ```
 
 Release build 的 `SS_DEV_TOKEN` 一律是空的（`project.yml`），所以 dev token 不會出現在送審的 App 裡。
+App 的 build 會檢查 `GEMINI_BASE_URL`：Release 沒設、指向 Google、或不是 `https://…/v1beta` 時直接 build 失敗，Debug 只警告。
+CI 也會用假的 `Secrets.xcconfig` 確認上面的寫法在 Debug/Release × 實機/Simulator 各自解析成正確的值。
 
 ---
 
 ## APNs .p8 設定
 
 1. Apple Developer › Certificates, Identifiers & Profiles › **Keys** › ＋，勾選 **Apple Push Notifications service (APNs)**，建立後下載 `AuthKey_<KEYID>.p8`（只能下載一次，請妥善保存，不要 commit；`.gitignore` 已排除 `*.p8`）。
-2. `APNS_KEY_ID` = 該 key 的 Key ID（10 字元）；`APNS_TEAM_ID` = 擁有該 key 的 Team ID。
+2. `npx wrangler secret put APNS_KEY_ID`（該 key 的 Key ID，10 字元）、`npx wrangler secret put APNS_TEAM_ID`（擁有該 key 的 Team ID）。
 3. `npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_<KEYID>.p8`（PEM `-----BEGIN PRIVATE KEY-----`，PKCS#8 P-256；若貼成一行含 `\n` 也可）。
 4. App ID `com.smartschedule.app` 要啟用 Push Notifications；topic 為 `${APNS_BUNDLE_ID}.push-type.liveactivity`。
 
@@ -146,8 +163,9 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `GEMINI_API_KEY` | secret | Gemini API key |
 | `SS_DEV_TOKEN` | secret | 開發用 token（只有 `ALLOW_DEV_TOKEN === "true"` 才生效，constant-time 比對） |
 | `APNS_PRIVATE_KEY` | secret | APNs `.p8` PEM 內容 |
-| `APPLE_TEAM_ID` | var | 10 字元 Team ID；appId = `<APPLE_TEAM_ID>.<bundleId>`。空白時 `/attest` 回 500 |
-| `BUNDLE_IDS` | var | 允許 attest 的 bundle ID（逗號分隔），預設 `com.smartschedule.app,com.smartschedule.app.notification-content` |
+| `APPLE_TEAM_ID` | secret | 10 字元 Team ID；appId = `<APPLE_TEAM_ID>.<bundleId>`。沒設時 `/attest` 回 500 |
+| `APNS_KEY_ID`, `APNS_TEAM_ID` | secret | APNs token auth（.p8 的 Key ID、擁有它的 Team ID） |
+| `BUNDLE_IDS` | var | 允許 attest 的 bundle ID（逗號分隔），預設 `com.smartschedule.app`（App Attest 不能在 extension 裡用，notification extension 改用 session） |
 | `APP_ATTEST_ENV` | var | `development`（aaguid `appattestdevelop`）或 `production`（`appattest` + 7 個 0x00） |
 | `ALLOW_DEV_TOKEN` | var | 只有字串 `"true"` 會啟用 `X-Dev-Token`（以及 dev 身分申請的 session） |
 | `RATE_LIMIT_PER_MIN` | var | 每個身分（attested key / `dev`；session 算在申請它的 key）每分鐘的 request 數，也是 `/attest*` 每個 IP（IPv6 以 /64 計）與每個 (IP, key) 的 Bearer body 讀取上限；須與 `[[ratelimits]]` 的 `simple.limit` 相同；預設 30 |
@@ -155,7 +173,6 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `SESSION_MODELS` | var | Session token 可呼叫的模型（逗號分隔，完整 ID，不接受 prefix），預設 `gemini-3.5-flash`。**必須包含所有仍在使用的 App 版本的 `GEMINI_MODEL_ID`**（`Config/Base.xcconfig`）：新 ID 要在送審使用它的 build 之前加入並部署 Worker（App Review 會測 notification extension）；舊 ID 等到沒有受支援的 build 再送它、或 Google 已關閉它時才移除。`test/config-sync.test.ts` 會檢查目前的 `GEMINI_MODEL_ID` 有列在這裡 |
 | `SESSION_DAILY_LIMIT` | var | 每個身分每 UTC 日以 session 呼叫 generateContent 的上限，預設 `200`（extension 每次回覆 1–3 次）；Bearer 不受影響 |
 | `ATTEST_DAILY_PER_IP` | var | 每個 IP bucket（IPv6 以 /64 計）每 UTC 日**成功** attest 的上限（= 新身分數），預設 `200`（行動網路常有許多使用者共用一個 IPv4） |
-| `APNS_KEY_ID`, `APNS_TEAM_ID` | var | APNs token auth |
 | `APNS_BUNDLE_ID` | var | 預設 `com.smartschedule.app` |
 | `APNS_ENV` | var | `sandbox` → `api.sandbox.push.apple.com`；`production` → `api.push.apple.com` |
 
@@ -418,6 +435,10 @@ Workers Free plan 的 KV 額度是每天 1,000 次寫入、1,000 次 list，**�
 - 未驗證的呼叫者在讀 body 之前就會被擋下（憑證、key、assertion 結構與 rpId 先檢查；Bearer 讀 body 另有每個 (IP, key) 的預算），
   而且影響不到同一 IP 上的其他使用者；有 Rate Limiting binding 時，未驗證的呼叫者不會造成 KV 計數寫入。
 - App Attest 驗證失敗只回通用錯誤碼，具體原因只寫進 Worker log；log 不含 secrets、push token、session token、event 標題、request body 或 client IP。
+  Workers Logs 只保存 Worker 自己寫的這些事件：invocation logs 關閉（`[observability.logs] invocation_logs = false`，兩個環境都是），
+  所以每個 request 的 URL 與 headers（含 `Authorization`、`X-Dev-Token`）不會被保存。
+- Gemini proxy 只轉送 `content-type` 與 `accept` 兩個 header（再加上伺服器的 `x-goog-api-key`）；`User-Agent`（含 App 版本與 iOS 版本）、
+  `Accept-Language`、`cf-*` 位置資訊與任何憑證都不會送到 Google。
 - `X-Dev-Token` 只有 `ALLOW_DEV_TOKEN` 恰為 `"true"` 且 `SS_DEV_TOKEN` 非空時才有效，以 SHA-256 digest 做 constant-time 比對。
 - Session token 只存雜湊；裝置擁有者讀得到它，所以只限 extension 那一個呼叫（`POST …/models/<SESSION_MODELS>:generateContent`、≤ 512 KB），
   並與申請者共用 rate limit（binding + 寫入必要的 KV 計數）與每日上限。這些都是**每個身分**的上限；裝置擁有者能自己產生新身分，
@@ -433,7 +454,21 @@ Workers Free plan 的 KV 額度是每天 1,000 次寫入、1,000 次 list，**�
 ```sh
 npm test          # node:test（Node 內建 type stripping，免額外 test runner）
 npm run typecheck # tsc：src 對 @cloudflare/workers-types、tests 另加 @types/node
-npm run dev       # wrangler dev（本機 KV；本機連不到 APNs）
+npm run dev       # wrangler dev --env dev：開發版設定跑在 http://localhost:8787（本機 KV；本機連不到 APNs）
+```
+
+`npm run dev` 的 secrets 放在 `server/worker/.dev.vars`（git-ignored，一行一個）：
+
+```
+GEMINI_API_KEY=<Gemini 金鑰>
+SS_DEV_TOKEN=<與 Secrets.xcconfig 的 SS_DEV_TOKEN 同一組>
+```
+
+Simulator 和 Mac 共用網路，在 `Config/Secrets.xcconfig` 最後加一行，Simulator 上的 Debug build 就會改連本機（`localhost` 不受 ATS 限制；
+App 只對 `localhost` / `127.0.0.1` 接受 `http`，其他一律要 `https`）：
+
+```
+GEMINI_BASE_URL[config=Debug][sdk=iphonesimulator*] = http:/$()/localhost:8787/v1beta
 ```
 
 測試涵蓋：CBOR（RFC 8949 範例、以獨立 encoder `cborg` 交叉驗證、各種錯誤輸入）；DER/X.509（與 OpenSSL `node:crypto` 交叉比對、截斷的憑證）；

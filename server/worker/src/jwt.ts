@@ -53,7 +53,7 @@ function usable(entry: CachedJwt | null, kid: string, iss: string, nowSeconds: n
 export async function apnsJwt(env: Env, deps: Deps): Promise<string> {
   const kid = env.APNS_KEY_ID?.trim();
   const iss = env.APNS_TEAM_ID?.trim();
-  if (!kid || !iss || !env.APNS_PRIVATE_KEY) throw new ConfigError("APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY must be set");
+  if (!kid || !iss || !env.APNS_PRIVATE_KEY) throw new ConfigError("the APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY secrets must be set");
   const nowSeconds = Math.floor(deps.now() / 1000);
 
   if (usable(memoryCache, kid, iss, nowSeconds)) return memoryCache.token;

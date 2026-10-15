@@ -6,7 +6,8 @@
 #                                             Worker does (x-goog-api-key). If Google refuses it, also tries the other
 #                                             ways Google accepts keys, to tell which kind of key it is.
 #   sh scripts/check-gemini-key.sh --worker   The whole path app → Worker → Gemini through the development Worker:
-#                                             asks for its URL (or WORKER_URL) and its SS_DEV_TOKEN (or SS_DEV_TOKEN).
+#                                             asks for its URL (or WORKER_URL; with or without /v1beta) and its
+#                                             SS_DEV_TOKEN (or SS_DEV_TOKEN).
 #
 # Prints only HTTP statuses, Google's error codes and the first words of the model's reply.
 set -eu
@@ -54,8 +55,9 @@ probe() {
 
 if [ "${1:-}" = "--worker" ]; then
   url=${WORKER_URL:-}
-  if [ -z "$url" ]; then printf 'Development Worker URL (https://…workers.dev): ' >&2; IFS= read -r url; fi
+  if [ -z "$url" ]; then printf 'Development Worker URL (https://…workers.dev, /v1beta optional): ' >&2; IFS= read -r url; fi
   url=${url%/}
+  url=${url%/v1beta} # the GEMINI_BASE_URL value from Config/Secrets.xcconfig works too
   token=${SS_DEV_TOKEN:-}
   [ -n "$token" ] || token=$(ask_secret "SS_DEV_TOKEN of that Worker (not shown): ")
   [ -n "$token" ] || { echo "No token given." >&2; exit 1; }
