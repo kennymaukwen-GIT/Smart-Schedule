@@ -3237,12 +3237,12 @@
         }
       }
     },
-    "On iOS 18, the titles and start times of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
+    "On iOS 18, the titles, start and end times and calendar colours of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 iOS 18 上，接下來兩天行程的標題與開始時間也會暫存在 Smart Schedule 的伺服器，讓每個行程在開始前出現在動態島。備註與地點不會儲存。"
+            "value" : "在 iOS 18 上，接下來兩天行程的標題、開始與結束時間和行事曆顏色也會暫存在 Smart Schedule 的伺服器，讓每個行程在開始前出現在動態島。備註與地點不會儲存。"
           }
         }
       }
@@ -4757,6 +4757,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "明天 %@"
+          }
+        }
+      }
+    },
+    "Too many requests. Wait a minute and try again." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要求太多了，請等一分鐘再試。"
           }
         }
       }

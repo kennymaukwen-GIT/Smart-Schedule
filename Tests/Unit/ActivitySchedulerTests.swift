@@ -156,6 +156,35 @@ final class ActivitySchedulerTests: XCTestCase {
         XCTAssertEqual(PushToStartRegistrar.capped("Dentist"), "Dentist")
     }
 
+    /// The same content always encodes to the same text: otherwise every pass in a new process would count as a
+    /// change and upload the registration again.
+    func testEmbeddedJSONHasSortedKeys() throws {
+        let meeting = event("m", TestClock.local(2026, 10, 15, 9))
+        let item = ActivityPlanner.items(events: [meeting], leadMinutes: 30, now: now)[0]
+        let state = LiveActivityStateBuilder.build(for: meeting, events: [meeting], lastLine: nil, asOf: item.triggerAt, clock: clock)
+        let entry = try PushToStartRegistrar.event(for: item, attributes: ScheduleActivityAttributes(eventID: "m"), state: state)
+        let sorted = JSONEncoder()
+        sorted.outputFormatting = [.sortedKeys]
+        var expected = state
+        expected.lastAssistantLine = nil
+        XCTAssertEqual(entry.contentStateJSON, String(decoding: try sorted.encode(expected), as: UTF8.self))
+        XCTAssertEqual(entry.attributesJSON, String(decoding: try sorted.encode(ScheduleActivityAttributes(eventID: "m")), as: UTF8.self))
+    }
+
+    /// iOS 18: events due within the server's retry window stay registered unless they are showing or were shown.
+    func testRecentlyDueEventsStayRegisteredForTheServersRetry() {
+        let soon = event("soon", TestClock.local(2026, 10, 14, 10, 40))        // trigger 10:10, still to come
+        let failed = event("failed", TestClock.local(2026, 10, 14, 10, 29))    // trigger 9:59, push not arrived
+        let showing = event("showing", TestClock.local(2026, 10, 14, 10, 29))  // trigger 9:59, on screen
+        let swiped = event("swiped", TestClock.local(2026, 10, 14, 10, 29))    // trigger 9:59, shown then swiped away
+        let old = event("old", TestClock.local(2026, 10, 14, 10, 25))          // trigger 9:55, past the window
+        let items = ActivityPlanner.items(events: [soon, failed, showing, swiped, old], leadMinutes: 30, now: now)
+        let kept = ActivityPlanner.pushToStartItems(
+            items, now: now, showing: ["showing"],
+            shownTriggers: ["swiped": TestClock.local(2026, 10, 14, 9, 59).timeIntervalSince1970])
+        XCTAssertEqual(Set(kept.map(\.eventID)), ["soon", "failed"])
+    }
+
     func testRegistrationIsReplacedWhole() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("push-to-start-\(UUID().uuidString).json")
         let defaults = UserDefaults(suiteName: "ActivitySchedulerTests")!
@@ -180,5 +209,13 @@ final class ActivitySchedulerTests: XCTestCase {
         XCTAssertTrue(replaced)
         XCTAssertEqual(PushToStartRegistrar.pending(fileURL: file)?.events.map(\.eventID), ["a"])
         XCTAssertEqual(PushToStartRegistrar.pending(fileURL: file)?.deviceID, registration.deviceID, "same install, same ID")
+
+        // A new process that has not read iOS's token yet keeps the registered one (no clearing upload).
+        let tokenNotReadYet = await PushToStartRegistrar.sync(token: nil, upcomingEvents: [entries[0]], fileURL: file, defaults: defaults)
+        XCTAssertFalse(tokenNotReadYet)
+        XCTAssertEqual(PushToStartRegistrar.pending(fileURL: file)?.token, "ab01")
+
+        // Never restored onto another iPhone with a backup: that phone would take this one's ID.
+        XCTAssertEqual(try file.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
     }
 }

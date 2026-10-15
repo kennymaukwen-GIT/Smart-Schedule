@@ -6,7 +6,8 @@ struct AIConsent: Codable, Hashable, Sendable {
     enum Status: String, Codable, Sendable { case notAsked, granted, declined, revoked }
     /// Bump when the disclosure (`AIConsentDisclosure`) changes materially: everyone is asked again.
     /// 2: names the transcript of spoken requests, and on iOS 18 the event titles and times kept on the server.
-    static let disclosureVersion = 2
+    /// 3: requests pass through Smart Schedule's server; on iOS 18 the end times and calendar colours are kept too.
+    static let disclosureVersion = 3
 
     var status: Status = .notAsked
     var version = 0                 // disclosure version the decision applies to
@@ -96,7 +97,7 @@ enum AIConsentDisclosure {
 
     static func serverNote(beforeIOS26: Bool) -> String? {
         guard beforeIOS26 else { return nil }
-        return String(localized: "On iOS 18, the titles and start times of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
+        return String(localized: "On iOS 18, the titles, start and end times and calendar colours of your events in the next two days are also kept on Smart Schedule's server, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
     }
 
     static var footnote: String {

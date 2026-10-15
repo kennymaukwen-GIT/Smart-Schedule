@@ -164,9 +164,16 @@ final class GeminiClient: Sendable {
         let (data, response) = try await AttestedRequest.send(request, body: body, attestation: attestation, session: session)
         let status = response?.statusCode ?? 0
         if (200..<300).contains(status) { return data }
-        if (status == 429 || status >= 500), attempt < 2 {
+        // Smart Schedule's server answers for itself with {"error": "<code>"}; Google's own errors pass through
+        // as {"error": {"message": …}}. The server's rate limit counts per minute: a retry seconds later only
+        // spends another request.
+        let serverCode = AttestedRequest.errorCode(data)
+        if (status == 429 || status >= 500), serverCode != "rate_limited", attempt < 2 {
             try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 800_000_000))
             return try await send(request, body: body, attempt: attempt + 1)
+        }
+        if let serverCode {
+            throw serverCode == "rate_limited" ? AttestationError.rateLimited : AttestationError.server(status: status)
         }
         let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])
             .flatMap { $0["error"] as? [String: Any] }

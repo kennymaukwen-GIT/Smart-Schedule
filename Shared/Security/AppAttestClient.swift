@@ -19,6 +19,8 @@ enum AttestationError: LocalizedError {
     /// `SSGeminiBaseURL` does not point at Smart Schedule's server.
     case notConfigured
     case server(status: Int)
+    /// The server's per-minute limit for this app.
+    case rateLimited
     case malformed
 
     var errorDescription: String? {
@@ -27,6 +29,7 @@ enum AttestationError: LocalizedError {
         case .sessionMissing: String(localized: "Open Smart Schedule once so the assistant can answer here.")
         case .notConfigured: "GEMINI_BASE_URL must point at Smart Schedule's server (server/worker)."
         case let .server(status): String(localized: "Smart Schedule's server didn't answer (\(status)). Try again later.")
+        case .rateLimited: String(localized: "Too many requests. Wait a minute and try again.")
         case .malformed: String(localized: "Smart Schedule's server sent something unexpected. Try again later.")
         }
     }

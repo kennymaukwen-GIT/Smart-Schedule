@@ -74,10 +74,10 @@ final class AIConsentStoreTests: XCTestCase {
         XCTAssertTrue(AIConsentDisclosure.items[0].contains("spoken requests as text"))
         // iOS 18 only: event titles and times kept on the server for the Dynamic Island; never notes or places.
         let note = try XCTUnwrap(AIConsentDisclosure.serverNote(beforeIOS26: true))
-        XCTAssertTrue(note.contains("titles and start times") && note.contains("server") && note.contains("iOS 18"), note)
+        XCTAssertTrue(note.contains("titles, start and end times and calendar colours") && note.contains("server") && note.contains("iOS 18"), note)
         XCTAssertTrue(note.contains("Notes and places are not stored"), note)
         XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: false))
-        XCTAssertEqual(AIConsent.disclosureVersion, 2, "everyone is asked again for the new disclosure")
+        XCTAssertEqual(AIConsent.disclosureVersion, 3, "everyone is asked again for the new disclosure")
         XCTAssertTrue(AIConsentDisclosure.items[1].contains("Titles, times, locations and notes"))
         XCTAssertTrue(AIConsentDisclosure.items[3].contains("time zone and language"))
         XCTAssertTrue(AIConsentDisclosure.lead.contains("Gemini API"))

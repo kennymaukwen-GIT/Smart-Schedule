@@ -61,12 +61,40 @@ final class GeminiProxyTests: XCTestCase {
         do {
             _ = try await client(attestation).generate(system: "system", history: [.user("hi")])
             XCTFail("expected an error")
-        } catch GeminiError.http(let status, _) {
-            XCTAssertEqual(status, 401)
+        } catch AttestationError.server(let status) {
+            XCTAssertEqual(status, 401, "the server's own error, shown as \"Try again later\"")
         } catch {
             XCTFail("unexpected \(error)")
         }
         XCTAssertEqual(ProxyStub.requests.count, 2)
+    }
+
+    /// The server's per-minute limit: no retries seconds later, and a localized message instead of its JSON.
+    func testTheServersRateLimitIsNotRetried() async {
+        ProxyStub.respond([(429, #"{"error":"rate_limited"}"#), (200, ProxyStub.okResponse)])
+        do {
+            _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
+            XCTFail("expected an error")
+        } catch AttestationError.rateLimited {
+            XCTAssertEqual(AttestationError.rateLimited.errorDescription, "Too many requests. Wait a minute and try again.")
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+        XCTAssertEqual(ProxyStub.requests.count, 1)
+    }
+
+    /// Google's own errors still pass through as before.
+    func testGooglesErrorsKeepTheirMessage() async {
+        ProxyStub.respond([(400, #"{"error":{"code":400,"message":"Invalid JSON payload"}}"#)])
+        do {
+            _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
+            XCTFail("expected an error")
+        } catch GeminiError.http(let status, let message) {
+            XCTAssertEqual(status, 400)
+            XCTAssertEqual(message, "Invalid JSON payload")
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
     }
 
     func testGoogleItselfIsNeverCalledFromTheApp() async {
@@ -291,6 +319,59 @@ final class GeminiProxyTests: XCTestCase {
         XCTAssertEqual(uploads.sent.count, 2)
     }
 
+    /// An upload already sending titles finishes before "Erase all data" clears the server, so it cannot store them
+    /// again afterwards.
+    func testEraseWaitsForAnUploadAlreadyUnderWay() async throws {
+        let (file, defaults) = try await registration("erase-race", events: [flight])
+        let gate = UploadGate()
+        let first = Task {
+            await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, upload: gate.upload, fileURL: file, defaults: defaults)
+        }
+        for _ in 0..<200 where gate.sent.isEmpty { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertEqual(gate.sent.count, 1, "the upload is under way")
+        let erase = Task { await PushToStartRegistrar.eraseAll(upload: gate.upload, fileURL: file, defaults: defaults) }
+        try await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(gate.sent.count, 1, "the erase waits for it")
+        gate.open()
+        await first.value
+        await erase.value
+        XCTAssertEqual(gate.sent.map { $0.events.count }, [1, 0], "cleared after the titles went up")
+        XCTAssertNil(PushToStartRegistrar.pending(fileURL: file))
+    }
+
+    /// Pending is set before the upload: a process ended during it (suspended, then terminated) sends it again
+    /// next time although the registration file no longer changes.
+    func testAnUploadStaysPendingUntilTheServerAccepts() async throws {
+        let (file, defaults) = try await registration("cut-short", events: [flight])
+        let seen = UploadRecorder()
+        let pendingDuringUpload = FlagProbe()
+        await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, upload: { registration in
+            pendingDuringUpload.value = defaults.bool(forKey: PushToStartRegistrar.uploadPendingKey)
+            return await seen.accept(registration)
+        }, fileURL: file, defaults: defaults)
+        XCTAssertTrue(pendingDuringUpload.value, "marked before the upload, so an end mid-upload leaves it pending")
+    }
+
+    /// A backup restored to another iPhone brings the flags (App Group defaults) but not the registration file:
+    /// that phone starts over under a new ID and leaves the old phone's registration alone.
+    func testARestoredBackupStartsOverWithoutTouchingTheOldPhone() async throws {
+        let (file, defaults) = try await registration("restore", events: [flight])
+        let uploads = UploadRecorder()
+        await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, upload: uploads.accept, fileURL: file, defaults: defaults)
+        let oldID = try XCTUnwrap(uploads.sent.last?.deviceID)
+        try FileManager.default.removeItem(at: file) // excluded from the backup
+
+        // iOS 26 on the new phone: nothing registered here, so nothing is cleared.
+        await PushToStartRegistrar.uploadIfNeeded(changed: false, consented: false, upload: uploads.accept, fileURL: file, defaults: defaults)
+        XCTAssertEqual(uploads.sent.count, 1)
+
+        // iOS 18 on the new phone: a new ID; no clearing upload under the old one.
+        await PushToStartRegistrar.sync(token: nil, upcomingEvents: [flight], fileURL: file, defaults: defaults)
+        XCTAssertNotEqual(PushToStartRegistrar.pending(fileURL: file)?.deviceID, oldID)
+        await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: false, upload: uploads.accept, fileURL: file, defaults: defaults)
+        XCTAssertEqual(uploads.sent.count, 1)
+    }
+
     private func stubSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ProxyStub.self]
@@ -320,6 +401,54 @@ private final class MemorySessionStore: SessionStoring, @unchecked Sendable {
 
     func load() -> ServerSession? { lock.withLock { session } }
     func save(_ session: ServerSession?) { lock.withLock { self.session = session } }
+}
+
+/// Holds the first upload until `open()`; later ones go straight through.
+private final class UploadGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var registrations: [PushToStartRegistrar.Registration] = []
+    private var isOpen = false
+    private var blocked: CheckedContinuation<Void, Never>?
+
+    var sent: [PushToStartRegistrar.Registration] { lock.withLock { registrations } }
+
+    var upload: @Sendable (PushToStartRegistrar.Registration) async -> Bool {
+        { [self] registration in
+            let holds = lock.withLock { () -> Bool in
+                registrations.append(registration)
+                return registrations.count == 1 && !isOpen
+            }
+            if holds {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    let resumeNow = lock.withLock { () -> Bool in
+                        if isOpen { return true }
+                        blocked = continuation
+                        return false
+                    }
+                    if resumeNow { continuation.resume() }
+                }
+            }
+            return true
+        }
+    }
+
+    func open() {
+        let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            isOpen = true
+            defer { blocked = nil }
+            return blocked
+        }
+        continuation?.resume()
+    }
+}
+
+private final class FlagProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    var value: Bool {
+        get { lock.withLock { flag } }
+        set { lock.withLock { flag = newValue } }
+    }
 }
 
 /// A clock a test moves forward.

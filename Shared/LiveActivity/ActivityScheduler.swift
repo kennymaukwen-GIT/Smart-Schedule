@@ -14,9 +14,21 @@ enum ActivityPlanner {
     /// Scheduled plus running activities at most: scheduled ones count toward the system's limit on simultaneous
     /// activities. Fill in from device testing: the count at which `ActivityAuthorizationError` is thrown, minus 2.
     static let maxPending = 8
-    /// A server's push-to-start may arrive this much before the trigger (it sends up to a minute ahead, and clocks
-    /// differ): such an activity is not "moved later".
+    /// The server sends a push-to-start at or after the trigger, but its clock and the iPhone's differ: an activity
+    /// that starts up to this much before the trigger by the iPhone's clock is not "moved later".
     static let earlyStartTolerance: TimeInterval = 180
+
+    /// iOS 18: what to register for push-to-start. Events still to come, and events due within the server's retry
+    /// window that are not showing and were not shown for this trigger: a push that failed is tried again for two
+    /// minutes, and the server's record of what it sent keeps one it delivered from starting twice.
+    static func pushToStartItems(_ items: [Item], now: Date, showing: Set<String>, shownTriggers: [String: Double]) -> [Item] {
+        items.filter { item in
+            item.triggerAt > now
+                || (item.triggerAt > now.addingTimeInterval(-PushToStartRegistrar.retryWindow)
+                    && !showing.contains(item.eventID)
+                    && shownTriggers[item.eventID] != item.triggerAt.timeIntervalSince1970)
+        }
+    }
 
     struct Item: Equatable {
         let event: ScheduleEvent
@@ -176,8 +188,9 @@ final class ActivityScheduler {
         } else {
             observePushToStartTokens()
             let upcoming = enabled
-                ? ActivityPlanner.items(events: events, leadMinutes: lead, now: now, limit: PushToStartRegistrar.maxEvents)
-                    .filter { $0.triggerAt > now }
+                ? ActivityPlanner.pushToStartItems(
+                    ActivityPlanner.items(events: events, leadMinutes: lead, now: now, limit: PushToStartRegistrar.maxEvents),
+                    now: now, showing: covered, shownTriggers: started)
                 : []
             // What the server stores: only the registered events (the week strip shows just those) and no assistant
             // reply. The app fills in the rest with its first update once the activity is running.

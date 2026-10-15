@@ -6,6 +6,8 @@ import SwiftUI
 struct PrivacySettingsView: View {
     @Environment(SettingsModel.self) private var model
     @State private var confirmsStop = false
+    /// Allow shows the same disclosure as the first use of the assistant, and grants only from its Allow.
+    @State private var asksConsent = false
 
     var body: some View {
         Form {
@@ -20,7 +22,7 @@ struct PrivacySettingsView: View {
                 if model.consent.isGranted {
                     Button("Stop sharing", role: .destructive) { confirmsStop = true }
                 } else {
-                    Button("Allow") { model.allowAI() }
+                    Button("Allow") { asksConsent = true }
                 }
                 NavigationLink {
                     ScrollView {
@@ -57,6 +59,14 @@ struct PrivacySettingsView: View {
         }
         .navigationTitle("AI & privacy")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $asksConsent) {
+            AIConsentSheet(onAllow: {
+                model.allowAI()
+                asksConsent = false
+            }, onNotNow: {
+                asksConsent = false
+            })
+        }
         .confirmationDialog("Stop sharing with Google Gemini?", isPresented: $confirmsStop, titleVisibility: .visible) {
             Button("Stop sharing", role: .destructive) { model.stopSharingAI() }
             Button("Cancel", role: .cancel) {}
