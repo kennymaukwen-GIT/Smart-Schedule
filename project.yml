@@ -100,13 +100,15 @@ targets:
       - name: Check GEMINI_BASE_URL
         basedOnDependencyAnalysis: false
         script: |
-          case "$GEMINI_BASE_URL" in
+          url=${GEMINI_BASE_URL%/}
+          case "$url" in
             *googleapis.com*) problem="points at Google, which would need an API key in the app" ;;
+            *"<"*|*">"*|*" "*) problem="still holds the <…> placeholder from Config/Secrets.example.xcconfig" ;;
             https://*/v1beta) problem="" ;;
             http://localhost:*/v1beta|http://127.0.0.1:*/v1beta)
               if [ "$CONFIGURATION" = "Release" ]; then problem="is a Worker on this Mac"; else problem=""; fi ;;
             "") problem="is not set" ;;
-            *) problem="is not https://<worker host>/v1beta (it is '$GEMINI_BASE_URL')" ;;
+            *) problem="is not https://<worker host>/v1beta (it is '$url')" ;;
           esac
           if [ -n "$problem" ]; then
             if [ "$CONFIGURATION" = "Release" ]; then

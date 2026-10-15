@@ -316,6 +316,25 @@ final class GeminiProxyTests: XCTestCase {
         XCTAssertEqual(working.sent.count, 1)
     }
 
+    /// The token only goes up with events: the upload that clears the last of them takes the token away too, so
+    /// withdrawing consent or erasing afterwards finds nothing left on the server.
+    func testThePushTokenNeverStaysOnTheServerWithoutEvents() async throws {
+        let (file, defaults) = try await registration("token-only", events: [flight])
+        let uploads = UploadRecorder()
+        await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, upload: uploads.accept, fileURL: file, defaults: defaults)
+        XCTAssertNotNil(uploads.sent.last?.token)
+
+        let changed = await PushToStartRegistrar.sync(token: Data([0x01]), upcomingEvents: [], fileURL: file, defaults: defaults)
+        await PushToStartRegistrar.uploadIfNeeded(changed: changed, consented: true, upload: uploads.accept, fileURL: file, defaults: defaults)
+        XCTAssertEqual(uploads.sent.count, 2)
+        XCTAssertEqual(uploads.sent.last?.events, [])
+        XCTAssertNil(uploads.sent.last?.token)
+
+        await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: false, upload: uploads.accept, fileURL: file, defaults: defaults)
+        await PushToStartRegistrar.eraseAll(upload: uploads.accept, fileURL: file, defaults: defaults)
+        XCTAssertEqual(uploads.sent.count, 2, "nothing left on the server to clear")
+    }
+
     func testNoTitlesGoUpBeforeIOSHandsOutAPushToken() async throws {
         let (file, defaults) = try await registration("notoken", events: [flight], token: nil)
         let uploads = UploadRecorder()

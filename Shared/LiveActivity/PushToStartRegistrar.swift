@@ -67,8 +67,8 @@ enum PushToStartRegistrar {
 
     /// Sends the registration whenever the server's copy may differ from what it should hold: it changed, the last
     /// upload failed, consent was just given (the server has none of it) or withdrawn (the server still has titles).
-    /// With consent and a push token it goes as it is; otherwise with no events, and only to clear what the server
-    /// holds.
+    /// With consent, a push token and events it goes as it is; otherwise with no events and no token, and only to clear
+    /// what the server holds.
     static func uploadIfNeeded(changed: Bool,
                                consented: Bool,
                                upload: (@Sendable (Registration) async -> Bool)? = nil,
@@ -87,8 +87,9 @@ enum PushToStartRegistrar {
                                   defaults: UserDefaults?) async {
         guard let upload = upload ?? lock.withLock({ uploader }),
               var registration = pending(fileURL: fileURL) else { return }
-        // Without consent the server keeps nothing from this iPhone: no events, and no push token either.
-        if !consented || registration.token == nil {
+        // Without consent the server keeps nothing from this iPhone: no events, and no push token either. The token only
+        // goes up with events, so once the server holds none it holds no token either and nothing is left to clear.
+        if !consented || registration.token == nil || registration.events.isEmpty {
             registration.events = []
             registration.token = nil
         }

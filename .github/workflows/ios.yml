@@ -129,9 +129,9 @@ jobs:
             'GEMINI_BASE_URL = https:/$()/prod.invalid/v1beta' \
             'GEMINI_BASE_URL[config=Debug] = https:/$()/dev.invalid/v1beta' \
             'SS_DEV_TOKEN[config=Debug][sdk=iphonesimulator*] = ci-dev-token' > Config/Secrets.xcconfig
-          setting() {  # configuration sdk name
+          setting() {  # configuration sdk name (awk reads to the end: exiting early would SIGPIPE xcodebuild under pipefail)
             xcodebuild -project SmartSchedule.xcodeproj -target SmartSchedule -configuration "$1" -sdk "$2" \
-              -showBuildSettings 2>/dev/null | awk -v k="$3" '$1 == k && $2 == "=" { sub(/^[^=]*= ?/, ""); print; exit }'
+              -showBuildSettings 2>/dev/null | awk -v k="$3" '!done && $1 == k && $2 == "=" { sub(/^[^=]*= ?/, ""); print; done = 1 }'
           }
           check() {  # configuration sdk name expected
             got=$(setting "$1" "$2" "$3")

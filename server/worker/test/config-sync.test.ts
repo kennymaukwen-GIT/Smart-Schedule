@@ -6,9 +6,9 @@ import { describe, it } from "node:test";
 import type { Env } from "../src/env.ts";
 import { bundleIds, DEFAULT_BUNDLE_IDS, DEFAULT_SESSION_MODELS, sessionModels } from "../src/env.ts";
 
-/** A file of this repository, relative to its root (this file is server/worker/test/). */
+/** A file of this repository, relative to its root (this file is server/worker/test/), with LF line endings. */
 function repoFile(path: string): string {
-  return readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
+  return readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 }
 
 function match(text: string, pattern: RegExp, what: string): string {

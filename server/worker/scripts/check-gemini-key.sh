@@ -56,8 +56,9 @@ probe() {
 if [ "${1:-}" = "--worker" ]; then
   url=${WORKER_URL:-}
   if [ -z "$url" ]; then printf 'Development Worker URL (https://…workers.dev, /v1beta optional): ' >&2; IFS= read -r url; fi
+  url=$(printf '%s' "$url" | sed 's/\$()//g') # the xcconfig form https:/$()/… works too
   url=${url%/}
-  url=${url%/v1beta} # the GEMINI_BASE_URL value from Config/Secrets.xcconfig works too
+  url=${url%/v1beta} # so does the GEMINI_BASE_URL value from Config/Secrets.xcconfig
   token=${SS_DEV_TOKEN:-}
   [ -n "$token" ] || token=$(ask_secret "SS_DEV_TOKEN of that Worker (not shown): ")
   [ -n "$token" ] || { echo "No token given." >&2; exit 1; }

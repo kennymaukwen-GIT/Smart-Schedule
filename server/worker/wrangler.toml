@@ -82,7 +82,8 @@ ATTEST_DAILY_PER_IP = "200"
 # Config/Secrets.xcconfig, the same value as this Worker's SS_DEV_TOKEN secret); Xcode-installed builds on an iPhone
 # attest in App Attest's "development" environment, which only this Worker accepts. A Worker of its own
 # (smart-schedule-worker-dev), with its own KV namespace and secrets, so the production Worker never accepts a dev
-# token. Bindings, vars and observability are not inherited from the top level, so all of them are repeated here.
+# token. Bindings and vars are not inherited from the top level, so all of them are repeated here. observability is
+# inherited, but an [env.dev.observability] table replaces the top-level one whole, so it is repeated in full too.
 #   npm run deploy:dev
 #   npx wrangler secret put GEMINI_API_KEY --env dev
 #   npx wrangler secret put SS_DEV_TOKEN --env dev

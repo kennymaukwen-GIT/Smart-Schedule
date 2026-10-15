@@ -310,9 +310,10 @@ Bearer 不受影響：它綁定單一 body 與只能用一次的 counter。要�
 
 ### `ANY /v1beta/*`
 轉送到 `https://generativelanguage.googleapis.com/v1beta/*`：保留 path 與 query（移除所有 `key` 參數，其餘逐字保留）、
-同一 method、**與驗證時雜湊的完全相同的 body bytes**（不解析、不修改 `generationConfig` 或任何欄位）、保留 content-type，
-加上 `x-goog-api-key`；移除 `Authorization`（Bearer 與 Session）、`X-Dev-Token`、`Cookie`、client 帶來的 `x-goog-api-key`、
-hop-by-hop headers、**所有 `cf-*` headers**（`cf-connecting-ip`、`cf-ipcountry`、`cf-ray` …）與 `x-forwarded-for` 等，不把使用者 IP 或位置傳給 Google。
+同一 method、**與驗證時雜湊的完全相同的 body bytes**（不解析、不修改 `generationConfig` 或任何欄位）。
+Client 的 header 只轉送 `content-type` 與 `accept`，再加上 `x-goog-api-key`；其他一律不轉送，包括 `Authorization`（Bearer 與 Session）、
+`X-Dev-Token`、`Cookie`、client 帶來的 `x-goog-api-key`、`User-Agent`、`Accept-Language`、hop-by-hop headers、**所有 `cf-*` headers**
+（`cf-connecting-ip`、`cf-ipcountry`、`cf-ray` …）與 `x-forwarded-for`，不把使用者 IP、位置或裝置資訊傳給 Google。
 回傳 upstream 的 status、body（串流，SSE 可用）與 content-type。上游連不到時 `502 upstream_unavailable`。
 Bearer 與 dev 依合約是完整的 `/v1beta/*` passthrough（body 上限 2 MB；App 送的是文字 prompt）；Session 只限上面的 scope（512 KB）。
 
