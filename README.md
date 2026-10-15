@@ -144,14 +144,14 @@ open SmartSchedule.xcodeproj
 
 ## 上架前檢查清單
 
-完整清單、1.0 已決定的事（不賣訂閱、年齡分級 18+、不在歐盟上架）和待決定事項（之後版本的訂閱價格和 Pro 要鎖什麼、隱私權政策網址）在 [`docs/SETTINGS.md`](docs/SETTINGS.md) 第 16 節。
+完整清單、1.0 已決定的事（不賣訂閱、年齡分級 18+、不在歐洲經濟區和瑞士上架）和待決定事項（之後版本的訂閱價格和 Pro 要鎖什麼、隱私權政策網址）在 [`docs/SETTINGS.md`](docs/SETTINGS.md) 第 16 節。
 
 - [ ] **Gemini 付費層級**：替 Gemini API 的 Google Cloud 專案開啟 Cloud Billing。免費層級下 Google 可能用請求內容改善產品；App 和隱私權政策都不能宣稱「不用於訓練」。App 經由 `server/worker/` 呼叫 Gemini，API key 不在 App 裡。
 - [ ] **Google OAuth 驗證**：`calendar.events` 和 `calendar.calendarlist.readonly` 都是敏感 scope。送審 consent screen（App 名稱、logo、首頁、隱私權政策、授權網域）、每個 scope 的用途說明，以及一段示範影片（OAuth 流程、新增行程、抽屜列出行事曆）。consent screen 還在 Testing 時，refresh token 7 天就會失效。步驟、要貼的英文和影片腳本見 [`docs/google-oauth-verification.md`](docs/google-oauth-verification.md)。
 - [ ] **App Store 隱私標籤**（與 `App/PrivacyInfo.xcprivacy` 一致）：Other User Content（請求內容和跟請求一起送出的行程，經 Smart Schedule 的伺服器（Cloudflare Worker）轉給 Google Gemini；iOS 18 另把未來 48 小時行程的標題、行程 ID、起訖時間與顏色存在伺服器，經 Apple 推播服務送動態島的 push-to-start；Google 帳號 email 不送給 Gemini）、Device ID（隨機的安裝 ID 與 push token），用途都是 App 功能、連結身分、不用於追蹤。隱私權政策要寫明 Cloudflare 是處理者、Google 是接收者。
 - [ ] **不賣訂閱（1.0）**：`AppConstants.subscriptionsEnabled` 保持 false；不要把任何 App 內購買項目或訂閱附加到 1.0 送審（App Store Connect 裡如果已經建立「Smart Schedule Pro」群組或商品，就留著不送審）；App 隱私問卷不勾 Purchases。之後要賣時再把旗標和 `ReleaseConfigurationTests`、`validate_schema.py` 第 7 項一起改，建立跟 `Config/SmartSchedule.storekit` 相同 ID 的商品（`com.smartschedule.pro.monthly`、`com.smartschedule.pro.yearly`），簽署 Paid Apps 協議，加上各語系的訂閱名稱，用 sandbox 測試，並把支援頁的訂閱問答和隱私權政策第 7 節改回來。
 - [ ] **年齡分級 18+**：在 App Store Connect 填年齡分級問卷，分級設為 18+（問卷算出來比較低就選較高的分級），因為 Gemini API 的條款要求使用者年滿 18 歲。隱私權政策和支援頁寫同樣的最低年齡。
-- [ ] **不在歐盟上架**：價格與供應狀況裡取消所有歐盟國家（27 個會員國）的 storefront，英國和其他地區照常上架。數位服務法（DSA）的交易商身分這類只適用歐盟的要求，等之後的版本加入歐盟時再處理。
+- [ ] **不在歐洲經濟區和瑞士上架**：價格與供應狀況裡取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登和瑞士；英國和其他地區照常上架。數位服務法（DSA）仍要先聲明一次「不是交易商」（見 `docs/app-store-metadata.md` §4.3），交易商驗證等之後的版本加入歐盟時再處理。
 - [ ] **App Review**：5.1.2(i) 同意說明在任何個人資料送到 Gemini 之前出現（全新安裝、Siri、通知擴充都要確認）；2.1 在審核備註說明「不登入先試用」，最好附測試用 Google 帳號；5.1.1(v) 說明「移除帳號」（撤銷授權）和「清除這台裝置上的所有資料」。
 - [ ] **實機確認**：Time Sensitive 在專注模式下能穿透、專注模式過濾條件開關時 `perform()` 有執行。
 - [ ] 部署 `site/`（首頁、隱私權政策、支援頁，見 [`site/README.md`](site/README.md)）到 smart-schedules.com：`SSPrivacyURL` 已設為 https://smart-schedules.com/privacy，網站上線前這個連結打不開；先填好頁面裡標黃的佔位值（開發者名稱、郵件服務、最低年齡）。

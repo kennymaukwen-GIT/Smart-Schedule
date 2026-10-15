@@ -5,7 +5,7 @@
 對照表在第 11 節。程式碼改了功能、或 AI 同意說明改版（`AIConsent.disclosureVersion`，目前是 **4**），這份文件要一起更新。
 
 1.0 已決定的事：年齡分級 **18+**（Gemini API 條款要求年滿 18 歲）、**不賣訂閱也沒有任何 App 內購買**、
-**不在歐盟上架**（英國和其他地區照常）、**Google 帳號的 email 不會傳給 Gemini**（同意說明第 4 版）。
+**不在歐洲經濟區（歐盟、挪威、冰島、列支敦斯登）和瑞士上架**（英國和其他地區照常）、**Google 帳號的 email 不會傳給 Gemini**（同意說明第 4 版）。
 
 `<!-- asc:… -->` 標記後面的區塊就是要貼的內容；`python3 -I <腳本> docs/app-store-metadata.md` 可以檢查字數上限
 （第 12 節）。方括號 `[…]` 是送審前要填的佔位值。
@@ -17,7 +17,7 @@
 - [ ] 把 `[開發者名稱 / Developer name]`、聯絡電話、測試帳號、備用驗證碼這些佔位值填好。網站（`site/public/`）上標黃的佔位值也要先填好再部署：Guideline 2.1 不接受佔位文字和打不開的網址，而 Support URL 必須通到真正的聯絡資訊。
 - [ ] smart-schedules.com 的首頁、`/privacy`、`/support` 都已上線（三個網址在這份文件裡都會用到）。
 - [ ] Smart Schedule 的伺服器（`server/worker/`）已部署成正式環境：`APP_ATTEST_ENV = "production"`、`APNS_ENV = "production"`，`SESSION_MODELS` 包含這個版本的 `GEMINI_MODEL_ID`。審核期間要一直開著（Guideline 2.1：「turn on your back-end service」）。
-- [ ] Gemini API 的 Google Cloud 專案已開啟 Cloud Billing（付費層級）。英國、瑞士和歐盟以外的 EEA 國家（例如挪威、冰島）都在上架範圍內，Gemini API 條款寫明「You may use only Paid Services when making API Clients available to users in the European Economic Area, Switzerland, or the United Kingdom」（[Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms)；這段文字來自搜尋摘錄，送審前到條款頁再確認一次）。
+- [ ] Gemini API 的 Google Cloud 專案已開啟 Cloud Billing（付費層級）。英國在上架範圍內，Gemini API 條款寫明「You may use only Paid Services when making API Clients available to users in the European Economic Area, Switzerland, or the United Kingdom」（[Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms)；這段文字來自搜尋摘錄，送審前到條款頁再確認一次）。
 - [ ] Google OAuth consent screen 已通過驗證並設為「In production」（步驟見 [`google-oauth-verification.md`](google-oauth-verification.md)）。還在 Testing 時，審核員會看到「Google 尚未驗證這個應用程式」，測試帳號也必須先加進 test users，而且 refresh token 7 天就失效。
 - [ ] 確認 Gemini API 在香港是否可用（第 4.4 節）。這會影響主要目標市場之一。
 
@@ -282,9 +282,9 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,o
 1.0 的 App 裡完全不會呼叫 StoreKit（`AppConstants.subscriptionsEnabled = false`，`ReleaseConfigurationTests` 和
 `scripts/validate_schema.py` 會擋下把它打開的改動），商店頁也就不會出現「App 內購買」。描述和截圖都不要提訂閱或 Pro。
 
-### 4.3 供應地區：不在歐盟上架
+### 4.3 供應地區：不在歐洲經濟區和瑞士上架（英國照常）
 
-價格與供應狀況（Pricing and Availability）› 國家或地區（Countries or Regions）：取消下面 **27 個歐盟會員國**，其他地區（包括英國、瑞士、挪威、冰島）保留。
+價格與供應狀況（Pricing and Availability）› 國家或地區（Countries or Regions）：取消下面 **27 個歐盟會員國**，再加上 **挪威 Norway、冰島 Iceland、列支敦斯登 Liechtenstein、瑞士 Switzerland**；其他地區（包括英國）保留。
 
 | | |
 |---|---|
@@ -295,7 +295,7 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,o
 
 - 預購（Pre-Order）：不要開。
 - 「iPhone and iPad Apps on Apple Silicon Macs」和「Apple Vision Pro」：建議都取消。App 依賴動態島、控制中心、即時動態和 App Attest，這些在 Mac 和 Vision Pro 上不是同樣的體驗，也沒有測過。
-- 不在歐盟上架，不會讓 App 脫離個資法規：英國（UK GDPR）、挪威和冰島（EEA，適用 GDPR）、瑞士（FADP）都在上架範圍內。隱私權政策已涵蓋它們（第 1 節的「控管者」、第 15 節的權利、主管機關和法律依據）；當地代表人要你決定，見第 4.4 節第 4 點。
+- 英國照常上架，適用英國 GDPR。隱私權政策已涵蓋（第 1 節的「控管者」、第 15 節的權利、ICO 和法律依據）；英國代表人見第 4.4 節第 4 點。
 
 **數位服務法（DSA）交易商身分。** Apple 的說明（[Manage EU Digital Services Act trader requirements](https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements)，2026-10-15 讀取）寫的是：
 
@@ -315,7 +315,7 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,o
    如果香港真的不在清單上，可以選：(a) 取消香港和澳門店面；(b) 調整 Worker 的部署位置（Cloudflare 的 Smart Placement 或指定區域的設定，部署前查 Cloudflare 文件），讓呼叫 Gemini 的請求從支援的地區送出，同時確認 Gemini 條款允許服務該地區的使用者；(c) 照常上架，香港使用者只能用行事曆、提醒和示範模式，AI 助理會顯示錯誤（不建議）。
 2. **中國大陸：建議取消。** Gemini API 不在中國大陸提供；Apple 說明部分 App 在中國大陸上架需要 ICP 備案號（[App information reference](https://developer.apple.com/help/app-store-connect/reference/app-information/)），生成式 AI 服務另外需要主管機關核准。
 3. **其他 Gemini API 不提供的地區**：把 Google 的可用地區清單和 App Store 的店面清單對照一次，清單外的地區照第 1 點的方式處理。
-4. **挪威、冰島、瑞士和英國的當地代表人。** 「不在歐盟上架」不會排除挪威和冰島（EEA，直接適用 GDPR）和瑞士（FADP）。開發者在當地沒有據點時，GDPR 第 27 條要求指定一位 EEA 境內的代表人，瑞士 FADP 第 14 條在類似條件下要求瑞士代表人，英國 GDPR 第 27 條對英國也一樣；豁免只適用於偶發而且低風險的處理，Smart Schedule 持續處理資料，很可能不適用（分析見 `site/README.md` 第 7 點）。請決定：(a) 指定代表人（有專門代為擔任的服務），把名稱和郵寄地址寫進隱私權政策第 1、19 節（中英文）；或 (b) 在價格與供應狀況也取消挪威、冰島和瑞士（不指定英國代表人，就連英國也取消）。這是法律判斷，建議問律師；網站和這份文件都還沒有寫代表人。
+4. **英國代表人。** 已決定：歐洲經濟區和瑞士不上架，所以不需要那邊的代表人；英國照常上架。開發者**在英國有據點（例如住在英國）**時不需要英國代表人；沒有的話，英國 GDPR 第 27 條要求指定一位（有專門代為擔任的服務），把名稱和郵寄地址寫進隱私權政策第 1、19 節（中英文）。豁免只適用於偶發而且低風險的處理，Smart Schedule 持續處理資料，很可能不適用（見 `site/README.md` 第 7 點）。
 
 ---
 
@@ -541,7 +541,7 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 2. **DSA：** README 和 `docs/SETTINGS.md` 第 16 節沒寫「不在歐盟上架仍要聲明一次 non-trader」，見第 4.3 節。
 3. **截圖必要尺寸：** Apple 現在把 6.3 吋（1206 × 2622）列為必要，見第 9.1 節。
 4. **香港的 Gemini API 可用性和 Worker 的執行位置**，見第 4.4 節。
-5. **挪威、冰島、英國和瑞士的當地代表人**，見第 4.4 節第 4 點。
+5. **英國代表人**（開發者不在英國時），見第 4.4 節第 4 點。
 
 ---
 

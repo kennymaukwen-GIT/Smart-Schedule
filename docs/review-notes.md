@@ -44,4 +44,4 @@
 - [ ] 1.0 不賣訂閱：`AppConstants.subscriptionsEnabled` 是 false（`ReleaseConfigurationTests`、`validate_schema.py` 第 7 項會檢查）；App Store Connect 不要把任何 App 內購買項目或訂閱附加到這個版本（已經建立的「Smart Schedule Pro」群組或商品就留著不送審）；App 隱私問卷不勾 Purchases（購買項目）。
 - [ ] 要不要在上面的 In-app purchases 段落後面加一句（你決定；Guideline 2.3.1 不允許隱藏的功能，這段程式碼在 1.0 碰不到）："The binary contains StoreKit code for a possible later subscription; it is switched off at build time and can only be turned on in a later version submitted for review."
 - [ ] 年齡分級：App Store Connect 的年齡分級設為 18+（Gemini API 的條款要求使用者年滿 18 歲；問卷算出來比較低就選較高的分級）；隱私權政策和支援頁寫同樣的最低年齡。
-- [ ] 供應地區：1.0 不在歐盟上架。價格與供應狀況裡取消所有歐盟國家（27 個會員國）的 storefront，英國和其他地區照常上架。
+- [ ] 供應地區：1.0 不在歐洲經濟區和瑞士上架。價格與供應狀況裡取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登和瑞士；英國和其他地區照常上架。

@@ -1589,7 +1589,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 ### Decided for version 1.0
 - **No subscription or in-app purchase.** `AppConstants.subscriptionsEnabled = false` hides the Smart Schedule Pro section (and the DEBUG "StoreKit testing" section), names the avatar "Accounts", leaves the subscription sentence out of the erase message and keeps StoreKit idle (§9). The StoreKit code stays for a later version. `ReleaseConfigurationTests` and `scripts/validate_schema.py` check 7 fail while the flag is true.
 - **Age rating 18+.** The Gemini API terms require users to be 18 or older.
-- **Not distributed in the EU.** All EU storefronts are excluded; the UK and the other regions are included.
+- **Not distributed in the EEA or Switzerland.** The 27 EU storefronts plus Norway, Iceland, Liechtenstein and Switzerland are excluded; the UK and the other regions are included.
 
 ### Open questions
 1. **Pricing** (a later version; 1.0 sells nothing): monthly and yearly prices, free trial or not, regional pricing. The `.storekit` file uses placeholders.
@@ -1610,7 +1610,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 - [ ] **Guideline 4.8**: Google sign-in only connects the user's Google Calendar (a client for that service), so Sign in with Apple is not required; say so in review notes if asked.
 - [ ] **No in-app purchases in 1.0**: keep `AppConstants.subscriptionsEnabled` false. Do not attach any in-app purchase or subscription to the 1.0 submission (if the "Smart Schedule Pro" group or its products already exist in App Store Connect, leave them unsubmitted), and declare no Purchases data in App Privacy. When a later version sells Pro: flip the flag in the same change as `ReleaseConfigurationTests` and check 7, create the products with the same ids, sign the Paid Apps agreement, add localized subscription names, review the Pro copy, test with sandbox and the `.storekit` file, and bring back the support page's subscription answers and privacy policy §7.
 - [ ] **Age rating 18+**: answer the age rating questionnaire in App Store Connect and set the rating to 18+ (choose the higher rating if the answers give less), because the Gemini API terms require users to be 18 or older. The privacy policy and support page state the same minimum age.
-- [ ] **Availability without the EU**: in Pricing and Availability, deselect every EU storefront (the 27 member states) and keep the UK and the other regions. The EU-only requirements, such as the Digital Services Act trader status, apply once a later version adds EU storefronts.
+- [ ] **Availability without the EEA and Switzerland**: in Pricing and Availability, deselect the 27 EU storefronts plus Norway, Iceland, Liechtenstein and Switzerland, and keep the UK and the other regions. Declare "not a trader" once for the Digital Services Act (docs/app-store-metadata.md §4.3); the trader verification applies once a later version adds EU storefronts.
 - [ ] **Time Sensitive** entitlement stays enabled; verify Focus break-through on device.
 - [ ] **Focus filter**: verify `perform()` on Focus on and off on a real device.
 - [ ] Deploy `site/` to smart-schedules.com so `SSPrivacyURL` (https://smart-schedules.com/privacy) resolves; fill in the highlighted placeholders first (site/README.md).
