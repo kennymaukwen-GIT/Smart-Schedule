@@ -7,6 +7,9 @@ import UserNotifications
 enum DataEraser {
     @MainActor
     static func eraseAll() async {
+        // No Live Activity is planned again from the cache while it is erased (the consent change below, a sync or
+        // a return to the front would otherwise start a pass); resumed once the data is gone.
+        ActivityScheduler.shared.suspend()
         await LiveActivityManager.shared.dismiss()
         // Consent goes first: a Live Activity pass that starts from here on can only clear the server, not upload.
         AIConsentStore.reset()
@@ -32,6 +35,7 @@ enum DataEraser {
             UserDefaults.standard.removePersistentDomain(forName: bundleID)
         }
         await ScheduleAssistant.shared.resetConversation()
+        ActivityScheduler.shared.resume()
         SharedChangeNotifier.post(.preferences)
         SharedChangeNotifier.post(.accounts)
         SharedChangeNotifier.post(.consent)

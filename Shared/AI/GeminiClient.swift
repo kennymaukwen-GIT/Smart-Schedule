@@ -172,8 +172,12 @@ final class GeminiClient: Sendable {
             try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 800_000_000))
             return try await send(request, body: body, attempt: attempt + 1)
         }
-        if let serverCode {
-            throw serverCode == "rate_limited" ? AttestationError.rateLimited : AttestationError.server(status: status)
+        switch serverCode {
+        case "rate_limited"?: throw AttestationError.rateLimited
+        // The notification extension's model is not one the server accepts for it any more.
+        case "session_scope"?: throw AttestationError.updateRequired
+        case .some: throw AttestationError.server(status: status)
+        case nil: break
         }
         let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])
             .flatMap { $0["error"] as? [String: Any] }

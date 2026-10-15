@@ -4902,6 +4902,16 @@
         }
       }
     },
+    "Update Smart Schedule to use the assistant here." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請更新 Smart Schedule，才能在這裡使用助理。"
+          }
+        }
+      }
+    },
     "Updated." : {
       "localizations" : {
         "zh-Hant" : {

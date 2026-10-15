@@ -74,7 +74,8 @@ enum PushToStartRegistrar {
                                upload: (@Sendable (Registration) async -> Bool)? = nil,
                                fileURL: URL = PushToStartRegistrar.defaultFileURL,
                                defaults: UserDefaults? = UserDefaults(suiteName: AppConstants.appGroupID)) async {
-        await serialized {
+        // Cancellable: a background refresh that runs out of time stops the upload (it stays pending).
+        await serialized(cancellable: true) {
             await uploadNow(changed: changed, consented: consented, upload: upload, fileURL: fileURL, defaults: defaults)
         }
     }
@@ -99,6 +100,7 @@ enum PushToStartRegistrar {
         // upload (suspended, then terminated) sends it again next time although the file no longer changes.
         if !registration.events.isEmpty { defaults?.set(true, forKey: serverHasEventsKey) }
         defaults?.set(true, forKey: uploadPendingKey)
+        if Task.isCancelled { return }
         let accepted = await upload(registration)
         defaults?.set(!accepted, forKey: uploadPendingKey)
         if accepted, registration.events.isEmpty { defaults?.set(false, forKey: serverHasEventsKey) }
@@ -123,8 +125,10 @@ enum PushToStartRegistrar {
         }
     }
 
-    /// Runs `work` after every upload or erase asked for before it has finished.
-    private static func serialized(_ work: @escaping @Sendable () async -> Void) async {
+    /// Runs `work` after every upload or erase asked for before it has finished. `cancellable`: cancelling the
+    /// caller cancels `work` too (it still runs after the earlier ones, then finds itself cancelled); an erase is
+    /// never cancelled.
+    private static func serialized(cancellable: Bool = false, _ work: @escaping @Sendable () async -> Void) async {
         let task: Task<Void, Never> = lock.withLock {
             let previous = tail
             let next = Task {
@@ -134,7 +138,11 @@ enum PushToStartRegistrar {
             tail = next
             return next
         }
-        await task.value
+        if cancellable {
+            await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+        } else {
+            await task.value
+        }
     }
 
     static func event(for item: ActivityPlanner.Item,

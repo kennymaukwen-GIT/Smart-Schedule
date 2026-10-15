@@ -21,6 +21,8 @@ enum AttestationError: LocalizedError {
     case server(status: Int)
     /// The server's per-minute limit for this app.
     case rateLimited
+    /// The server no longer accepts this version's request from the notification extension (its model).
+    case updateRequired
     case malformed
 
     var errorDescription: String? {
@@ -30,6 +32,7 @@ enum AttestationError: LocalizedError {
         case .notConfigured: "GEMINI_BASE_URL must point at Smart Schedule's server (server/worker)."
         case let .server(status): String(localized: "Smart Schedule's server didn't answer (\(status)). Try again later.")
         case .rateLimited: String(localized: "Too many requests. Wait a minute and try again.")
+        case .updateRequired: String(localized: "Update Smart Schedule to use the assistant here.")
         case .malformed: String(localized: "Smart Schedule's server sent something unexpected. Try again later.")
         }
     }

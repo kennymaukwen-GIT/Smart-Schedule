@@ -47,7 +47,7 @@ Authorization: Bearer <base64(App Attest key ID bytes ‖ assertion over SHA-256
 
 `GEMINI_BASE_URL` 是 Smart Schedule 的伺服器（`server/worker/`，`https://<worker>/v1beta`）：驗證 App Attest、限流後，把同一個 body 原封不動轉給 `https://generativelanguage.googleapis.com/v1beta/...`，由伺服器加上 Gemini key。App 裡沒有 key（`Shared/Security/AppAttestClient.swift`、`GeminiClient`）。模擬器沒有 App Attest，Debug 版改送 `X-Dev-Token`（伺服器要開 `ALLOW_DEV_TOKEN`）；Release 沒有這條路。伺服器回 401 `unknown_key` / `invalid_assertion` 時重新 attest 一次，`stale_counter`（兩個 request 交錯）時換一個新的 assertion 重送一次。
 
-App Attest 在 iOS 的 app extension 裡不能用（Apple 文件：`generateKey` 在 app extension 一律失敗，只有 watchOS extension 例外），所以通知擴充不 attest：App 用自己的 App Attest 身分向伺服器要一個 7 天的 session token（`POST /session`），存在 App 和擴充共用的 Keychain access group，擴充送 `Authorization: Session <token>`。伺服器只在 `/v1beta/*`（Gemini）接受它，失效時回 401 `invalid_session`，擴充就刪掉它，請使用者打開 App 一次。App 在回到前景、背景更新和 AI 同意改變時，剩不到 3 天就換一個新的（`AppAttestClient.refreshSessionIfNeeded`）；沒有 AI 同意時不要。
+App Attest 在 iOS 的 app extension 裡不能用（Apple 文件：`generateKey` 在 app extension 一律失敗，只有 watchOS extension 例外），所以通知擴充不 attest：App 用自己的 App Attest 身分向伺服器要一個 7 天的 session token（`POST /session`），存在 App 和擴充共用的 Keychain access group，擴充送 `Authorization: Session <token>`。伺服器只在 `POST /v1beta/models/<SESSION_MODELS>:generateContent` 接受它（body 最多 512 KB；其他路徑、方法或模型回 403 `session_scope`，App 顯示「請更新 Smart Schedule…」），失效時回 401 `invalid_session`，擴充就刪掉它，請使用者打開 App 一次。App 在回到前景、背景更新和 AI 同意改變時，剩不到 3 天就換一個新的（`AppAttestClient.refreshSessionIfNeeded`）；沒有 AI 同意時不要。
 ```json
 {
   "systemInstruction": { "parts": [{ "text": "You are Smart Schedule ...\n# Clock\nnow_local: 2026-10-13T10:15 (Tuesday)\ntime_zone: Europe/London (currently UTC+1.0)\n...\n# UPCOMING / BUSY (id | title | start | end | flags | notes: … when the event has notes)\nss0k3p | Online meeting with Joe | 2026-10-13T15:30 | 2026-10-13T16:30 | event | notes: Product quality review" }] },
@@ -190,7 +190,7 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
 
 ## 9. 模型設定
 
-- `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.5-flash`。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。
+- `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.5-flash`。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。換 ID 前先把它加進 Worker 的 `SESSION_MODELS`（`server/worker/wrangler.toml`）並部署，舊 ID 留到舊版 App 不再使用；remote config 能選的每個模型也都要在裡面，否則通知擴充的回覆會被拒。
 - `thinkingLevel: "low"`：只對 Gemini 3.x 有效。2.x 用的是 `thinkingBudget`，參數不相容。
 - **不設定 temperature**：Gemini 3 的官方建議是保持預設值 1.0，調低可能造成迴圈或品質下降。
 - 「send a link」（Artboard 5 的迴紋針）：Gemini API 的 changelog（2026-03）寫明，內建工具（如 `url_context`）可以和自訂 function 在同一次呼叫裡並用。建議把這件事放在 proxy 端做，讓模型直接讀活動頁面。舊模型則先跑一次 `url_context` 抽出文字，再呼叫 function。

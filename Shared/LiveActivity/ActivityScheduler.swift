@@ -102,6 +102,14 @@ final class ActivityScheduler {
     private var isObservingPushToStart = false
     private var isObservingActivities = false
     private var pushToStartToken: Data?
+    /// "Erase all data" is under way: passes plan nothing, whatever started them (a consent change, a sync, the
+    /// app returning to the front), so nothing is scheduled again from the cache that is about to go.
+    private var isSuspended = false
+
+    /// Called by "Erase all data" before it ends the activities; `resume()` once the data is gone.
+    func suspend() { isSuspended = true }
+
+    func resume() { isSuspended = false }
 
     private enum Decision {
         /// Still right: brought up to date.
@@ -133,7 +141,7 @@ final class ActivityScheduler {
         // Hidden and Focus-filtered calendars stay out of the island, like everywhere else on screen.
         let events = await store.visibleEvents(audience: .display)
         let lastLine = await store.snapshot().lastAssistantLine
-        let enabled = lead != nil && ActivityAuthorizationInfo().areActivitiesEnabled
+        let enabled = !isSuspended && lead != nil && ActivityAuthorizationInfo().areActivitiesEnabled
         let plan = enabled ? ActivityPlanner.items(events: events, leadMinutes: lead, now: now, limit: ActivityPlanner.maxPending) : []
         let planned = Dictionary(plan.map { ($0.eventID, $0) }, uniquingKeysWith: { first, _ in first })
         let known = Dictionary(events.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })

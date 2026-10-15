@@ -83,6 +83,19 @@ final class GeminiProxyTests: XCTestCase {
         XCTAssertEqual(ProxyStub.requests.count, 1)
     }
 
+    /// A model the server no longer takes from the notification extension: nothing to retry, the app needs an update.
+    func testARefusedSessionScopeAsksForAnUpdate() async {
+        ProxyStub.respond([(403, #"{"error":"session_scope"}"#)])
+        do {
+            _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
+            XCTFail("expected an error")
+        } catch AttestationError.updateRequired {
+            XCTAssertEqual(ProxyStub.requests.count, 1)
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+    }
+
     /// Google's own errors still pass through as before.
     func testGooglesErrorsKeepTheirMessage() async {
         ProxyStub.respond([(400, #"{"error":{"code":400,"message":"Invalid JSON payload"}}"#)])
@@ -337,6 +350,29 @@ final class GeminiProxyTests: XCTestCase {
         await erase.value
         XCTAssertEqual(gate.sent.map { $0.events.count }, [1, 0], "cleared after the titles went up")
         XCTAssertNil(PushToStartRegistrar.pending(fileURL: file))
+    }
+
+    /// A background refresh that runs out of time cancels its upload, even one still queued behind another: it is
+    /// not sent, and stays pending for the next run.
+    func testACancelledUploadIsNotSentAndStaysPending() async throws {
+        let (fileA, defaultsA) = try await registration("cancel-a", events: [flight])
+        let (fileB, defaultsB) = try await registration("cancel-b", events: [flight])
+        let gate = UploadGate()
+        let first = Task {
+            await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, upload: gate.upload, fileURL: fileA, defaults: defaultsA)
+        }
+        for _ in 0..<200 where gate.sent.isEmpty { try await Task.sleep(nanoseconds: 10_000_000) }
+        let queued = UploadRecorder()
+        let second = Task {
+            await PushToStartRegistrar.uploadIfNeeded(changed: true, consented: true, upload: queued.accept, fileURL: fileB, defaults: defaultsB)
+        }
+        second.cancel()
+        gate.open()
+        await first.value
+        await second.value
+        XCTAssertTrue(queued.sent.isEmpty, "cancelled: not sent")
+        XCTAssertTrue(defaultsB.bool(forKey: PushToStartRegistrar.uploadPendingKey), "retried on the next run")
+        XCTAssertEqual(gate.sent.count, 1, "the upload already under way was not affected")
     }
 
     /// Pending is set before the upload: a process ended during it (suspended, then terminated) sends it again
