@@ -4100,6 +4100,16 @@
         }
       }
     },
+    "Smart Schedule's server isn't ready yet. Try again later." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedule 的伺服器尚未準備好，請稍後再試。"
+          }
+        }
+      }
+    },
     "Smart Schedule's server sent something unexpected. Try again later." : {
       "localizations" : {
         "zh-Hant" : {
@@ -4736,6 +4746,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天 %@"
+          }
+        }
+      }
+    },
+    "Today's limit for replies here is used up. Open Smart Schedule to continue, or try again tomorrow." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天在這裡回覆的次數已用完。請打開 Smart Schedule 繼續，或明天再試。"
+          }
+        }
+      }
+    },
+    "Today's limit is used up. Try again tomorrow." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天的使用次數已用完，請明天再試。"
           }
         }
       }

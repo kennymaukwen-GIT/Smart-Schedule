@@ -71,7 +71,7 @@ final class GeminiProxyTests: XCTestCase {
 
     /// The server's per-minute limit: no retries seconds later, and a localized message instead of its JSON.
     func testTheServersRateLimitIsNotRetried() async {
-        ProxyStub.respond([(429, #"{"error":"rate_limited"}"#), (200, ProxyStub.okResponse)])
+        ProxyStub.respond([(429, #"{"error":"rate_limited"}"#, ["Retry-After": "42"]), (200, ProxyStub.okResponse, [:])])
         do {
             _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
             XCTFail("expected an error")
@@ -81,6 +81,64 @@ final class GeminiProxyTests: XCTestCase {
             XCTFail("unexpected \(error)")
         }
         XCTAssertEqual(ProxyStub.requests.count, 1)
+    }
+
+    /// A limit until the next UTC day (Retry-After of hours) says "tomorrow", not "wait a minute".
+    func testADailyLimitSaysTomorrow() async {
+        ProxyStub.respond([(429, #"{"error":"rate_limited"}"#, ["Retry-After": "36000"])])
+        do {
+            _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
+            XCTFail("expected an error")
+        } catch AttestationError.dailyLimit {
+            XCTAssertEqual(AttestationError.dailyLimit.errorDescription, "Today's limit is used up. Try again tomorrow.")
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+        XCTAssertEqual(ProxyStub.requests.count, 1)
+    }
+
+    /// server_misconfigured (a missing secret on the server): retrying cannot help, and it is not "didn't answer".
+    func testAServerThatIsNotSetUpIsNotRetried() async {
+        ProxyStub.respond([(500, #"{"error":"server_misconfigured"}"#), (200, ProxyStub.okResponse)])
+        do {
+            _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
+            XCTFail("expected an error")
+        } catch AttestationError.serverNotReady {
+            XCTAssertEqual(ProxyStub.requests.count, 1)
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+    }
+
+    /// 503 server_busy (a KV write collided): retried after its Retry-After, signed again.
+    func testABusyServerIsTriedAgain() async throws {
+        let attestation = FakeAttestation()
+        ProxyStub.respond([(503, #"{"error":"server_busy"}"#, ["Retry-After": "1"]), (200, ProxyStub.okResponse, [:])])
+        _ = try await client(attestation).generate(system: "system", history: [.user("hi")])
+        XCTAssertEqual(ProxyStub.requests.map { $0.headers["Authorization"] }, ["Bearer test-1", "Bearer test-2"])
+    }
+
+    /// Smart Schedule's own endpoints map the server's codes the same way.
+    func testServerClientPostsJSONAndExplainsTheServersErrors() async throws {
+        let server = ServerClient(origin: URL(string: "https://ss.example.dev"), attestation: FakeAttestation(),
+                                  session: stubSession())
+        ProxyStub.respond([(200, #"{"ok":true,"events":0}"#, [:]),
+                           (500, #"{"error":"server_misconfigured"}"#, [:]),
+                           (429, #"{"error":"rate_limited"}"#, ["Retry-After": "7200"])])
+        _ = try await server.post("devices/push-to-start", json: Data("{}".utf8))
+        let request = try XCTUnwrap(ProxyStub.requests.first)
+        XCTAssertEqual(request.url, "https://ss.example.dev/devices/push-to-start")
+        XCTAssertEqual(request.method, "POST")
+        XCTAssertEqual(request.headers["Content-Type"], "application/json")
+        XCTAssertEqual(request.headers["Authorization"], "Bearer test-1")
+        do {
+            _ = try await server.post("devices/push-to-start", json: Data("{}".utf8))
+            XCTFail("expected an error")
+        } catch AttestationError.serverNotReady {}
+        do {
+            _ = try await server.post("devices/push-to-start", json: Data("{}".utf8))
+            XCTFail("expected an error")
+        } catch AttestationError.dailyLimit {}
     }
 
     /// A model the server no longer takes from the notification extension: nothing to retry, the app needs an update.
@@ -567,6 +625,7 @@ private final class ProxyStub: URLProtocol {
 
     struct Recorded {
         let url: String
+        let method: String
         let headers: [String: String]
         let body: Data
     }
@@ -574,27 +633,29 @@ private final class ProxyStub: URLProtocol {
     private final class State: @unchecked Sendable {
         let lock = NSLock()
         var requests: [Recorded] = []
-        var responses: [(Int, String)] = []
+        var responses: [(Int, String, [String: String])] = []
     }
 
     private static let state = State()
 
     static var requests: [Recorded] { state.lock.withLock { state.requests } }
-    static func respond(_ responses: [(Int, String)]) { state.lock.withLock { state.responses = responses } }
+    static func respond(_ responses: [(Int, String)]) { respond(responses.map { ($0.0, $0.1, [:]) }) }
+    /// With response headers (Retry-After).
+    static func respond(_ responses: [(Int, String, [String: String])]) { state.lock.withLock { state.responses = responses } }
     static func reset() { state.lock.withLock { state.requests = []; state.responses = [] } }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        let recorded = Recorded(url: request.url?.absoluteString ?? "", headers: request.allHTTPHeaderFields ?? [:],
-                                body: Self.bodyData(of: request))
-        let (status, body) = Self.state.lock.withLock { () -> (Int, String) in
+        let recorded = Recorded(url: request.url?.absoluteString ?? "", method: request.httpMethod ?? "GET",
+                                headers: request.allHTTPHeaderFields ?? [:], body: Self.bodyData(of: request))
+        let (status, body, headers) = Self.state.lock.withLock { () -> (Int, String, [String: String]) in
             Self.state.requests.append(recorded)
-            return Self.state.responses.isEmpty ? (500, "{}") : Self.state.responses.removeFirst()
+            return Self.state.responses.isEmpty ? (500, "{}", [:]) : Self.state.responses.removeFirst()
         }
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
-                                       headerFields: ["Content-Type": "application/json"])!
+                                       headerFields: headers.merging(["Content-Type": "application/json"]) { $1 })!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(body.utf8))
         client?.urlProtocolDidFinishLoading(self)

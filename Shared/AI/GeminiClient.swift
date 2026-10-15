@@ -167,24 +167,16 @@ final class GeminiClient: Sendable {
         let status = response?.statusCode ?? 0
         if (200..<300).contains(status) { return data }
         // Smart Schedule's server answers for itself with {"error": "<code>"}; Google's own errors pass through
-        // as {"error": {"message": …}}. The server's rate limit counts per minute: a retry seconds later only
-        // spends another request.
+        // as {"error": {"message": …}}. Not retried: the server's rate limit (it counts per minute, or per day, so a
+        // retry seconds later only spends another request) and a server that is not set up. Otherwise its
+        // Retry-After (503 server_busy) is waited for, up to 5 seconds.
         let serverCode = AttestedRequest.errorCode(data)
-        if (status == 429 || status >= 500), serverCode != "rate_limited", attempt < 2 {
-            try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 800_000_000))
+        if status == 429 || status >= 500, serverCode != "rate_limited", serverCode != "server_misconfigured", attempt < 2 {
+            let delay = min(5, max(pow(2.0, Double(attempt)) * 0.8, AttestedRequest.retryAfter(response) ?? 0))
+            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             return try await send(request, body: body, attempt: attempt + 1)
         }
-        switch serverCode {
-        case "rate_limited"?: throw AttestationError.rateLimited
-        // The notification extension's model is not one the server accepts for it any more.
-        case "session_scope"?: throw AttestationError.updateRequired
-        // No credential the server accepts: the extension has no session yet, or a Debug build on the simulator
-        // sends no X-Dev-Token (SS_DEV_TOKEN unset, or GEMINI_BASE_URL is not the development Worker).
-        case "attestation_required"?:
-            throw NetworkSession.isAppExtension ? AttestationError.sessionMissing : AttestationError.unsupported
-        case .some: throw AttestationError.server(status: status)
-        case nil: break
-        }
+        if let failure = AttestedRequest.failure(status: status, data: data, response: response) { throw failure }
         let message = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])
             .flatMap { $0["error"] as? [String: Any] }
             .flatMap { $0["message"] as? String } ?? String(decoding: data.prefix(300), as: UTF8.self)

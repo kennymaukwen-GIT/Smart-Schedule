@@ -21,6 +21,12 @@ enum AttestationError: LocalizedError {
     case server(status: Int)
     /// The server's per-minute limit for this app.
     case rateLimited
+    /// A limit on the server that lasts until the next UTC day: the notification extension's replies, or new
+    /// installs attesting from one network.
+    case dailyLimit
+    /// The server answers but is not set up yet (`server_misconfigured`: a secret such as the Apple Team ID or the
+    /// Gemini key is missing). Retrying does not help until its owner fixes it.
+    case serverNotReady
     /// The server no longer accepts this version's request from the notification extension (its model).
     case updateRequired
     case malformed
@@ -32,6 +38,10 @@ enum AttestationError: LocalizedError {
         case .notConfigured: "GEMINI_BASE_URL must point at Smart Schedule's server (server/worker)."
         case let .server(status): String(localized: "Smart Schedule's server didn't answer (\(status)). Try again later.")
         case .rateLimited: String(localized: "Too many requests. Wait a minute and try again.")
+        case .dailyLimit: NetworkSession.isAppExtension
+            ? String(localized: "Today's limit for replies here is used up. Open Smart Schedule to continue, or try again tomorrow.")
+            : String(localized: "Today's limit is used up. Try again tomorrow.")
+        case .serverNotReady: String(localized: "Smart Schedule's server isn't ready yet. Try again later.")
         case .updateRequired: String(localized: "Update Smart Schedule to use the assistant here.")
         case .malformed: String(localized: "Smart Schedule's server sent something unexpected. Try again later.")
         }
@@ -219,33 +229,51 @@ actor AppAttestClient: AttestationProviding {
         return id
     }
 
-    private func attestNewKey() async throws -> String {
+    /// - Parameter challengeRetried: the server already refused one challenge (`invalid_challenge`: it expired while
+    ///   Apple attested the key, or was used up). That round is tried once more with a new challenge and a new key,
+    ///   since Apple attests a key only once.
+    private func attestNewKey(challengeRetried: Bool = false) async throws -> String {
         guard let origin else { throw AttestationError.notConfigured }
         let service = DCAppAttestService.shared
 
         var challengeRequest = URLRequest(url: origin.appendingPathComponent("attest/challenge"), timeoutInterval: 20)
         challengeRequest.httpMethod = "GET"
         let (challengeData, challengeResponse) = try await session.data(for: challengeRequest)
-        try Self.requireOK(challengeResponse)
+        try Self.requireOK(challengeData, challengeResponse)
         guard let challenge = (try? JSONDecoder().decode(Challenge.self, from: challengeData))?.challenge,
               let challengeBytes = Data(base64Encoded: challenge) else { throw AttestationError.malformed }
 
         let keyID = try await service.generateKey()
-        let attestation = try await service.attestKey(keyID, clientDataHash: Data(SHA256.hash(data: challengeBytes)))
+        let clientDataHash = Data(SHA256.hash(data: challengeBytes))
+        let attestation: Data
+        do {
+            attestation = try await service.attestKey(keyID, clientDataHash: clientDataHash)
+        } catch let error as DCError where error.code == .serverUnavailable {
+            // Apple's attestation service did not answer: Apple's advice is to try again with the same key.
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+            attestation = try await service.attestKey(keyID, clientDataHash: clientDataHash)
+        }
 
         var request = URLRequest(url: origin.appendingPathComponent("attest"), timeoutInterval: 20)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(Attestation(keyId: keyID, attestation: attestation.base64EncodedString(),
                                                                 challenge: challenge, bundleId: bundleID))
-        let (_, response) = try await session.data(for: request)
-        try Self.requireOK(response)
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if !challengeRetried, status == 401, AttestedRequest.errorCode(data) == "invalid_challenge" {
+            return try await attestNewKey(challengeRetried: true)
+        }
+        try Self.requireOK(data, response)
         return keyID
     }
 
-    private static func requireOK(_ response: URLResponse) throws {
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200..<300).contains(status) else { throw AttestationError.server(status: status) }
+    private static func requireOK(_ data: Data, _ response: URLResponse) throws {
+        let http = response as? HTTPURLResponse
+        let status = http?.statusCode ?? 0
+        guard (200..<300).contains(status) else {
+            throw AttestedRequest.failure(status: status, data: data, response: http) ?? AttestationError.server(status: status)
+        }
     }
 
     private struct Challenge: Decodable { let challenge: String }
@@ -283,6 +311,28 @@ enum AttestedRequest {
     static func errorCode(_ data: Data) -> String? {
         ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["error"] as? String
     }
+
+    /// The server's `Retry-After`, in seconds.
+    static func retryAfter(_ response: HTTPURLResponse?) -> TimeInterval? {
+        response?.value(forHTTPHeaderField: "Retry-After").flatMap { TimeInterval($0.trimmingCharacters(in: .whitespaces)) }
+    }
+
+    /// What an error the server answered for itself (`{"error":"<code>"}`) means for the user. Nil for a success and
+    /// for Google's own errors, which pass through as `{"error":{…}}`.
+    static func failure(status: Int, data: Data, response: HTTPURLResponse?) -> AttestationError? {
+        guard !(200..<300).contains(status), let code = errorCode(data) else { return nil }
+        switch code {
+        // Until the next minute, or until the next UTC day for the daily limits.
+        case "rate_limited": return (retryAfter(response) ?? 0) > 120 ? .dailyLimit : .rateLimited
+        case "server_misconfigured": return .serverNotReady
+        // The notification extension's model is not one the server accepts for it any more.
+        case "session_scope": return .updateRequired
+        // No credential the server accepts: the extension has no session yet, or a Debug build on the simulator
+        // sends no X-Dev-Token (SS_DEV_TOKEN unset, or GEMINI_BASE_URL is not the development Worker).
+        case "attestation_required": return NetworkSession.isAppExtension ? .sessionMissing : .unsupported
+        default: return .server(status: status)
+        }
+    }
 }
 
 /// Smart Schedule's own endpoints (everything but Gemini, which `GeminiClient` sends through `AttestedRequest`).
@@ -301,7 +351,9 @@ struct ServerClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let (data, response) = try await AttestedRequest.send(request, body: body, attestation: attestation, session: session)
         let status = response?.statusCode ?? 0
-        guard (200..<300).contains(status) else { throw AttestationError.server(status: status) }
+        guard (200..<300).contains(status) else {
+            throw AttestedRequest.failure(status: status, data: data, response: response) ?? AttestationError.server(status: status)
+        }
         return data
     }
 }
