@@ -87,7 +87,7 @@ smart-schedules.com 註冊在 Squarespace Domains（可能是從 Google Domains 
 - `example@gmail.com` 一律換成你自己的私人信箱。私人信箱不要寫進這個 repo 或網站。
 - `dig` 和 `curl` 指令在終端機執行；`dig` 也可以改用網頁 https://www.whatsmydns.net/ 或 https://dnsviz.net 檢查。
 
-大概的時間：第 0 步關 DNSSEC 後**至少等 24 小時**才能做第 2 步；第 2 步之後最多再等 24～48 小時變成 Active；第 4～6 步在 Active 之後做。
+大概的時間：第 0 步關 DNSSEC 後，要等舊的 DS 紀錄從註冊局消失、再多等 24 小時，才能做第 2 步（合計大約 2～3 天，見第 0 步的「要多久」）；第 2 步之後最多再等 24～48 小時變成 Active；第 4～6 步在 Active 之後做。
 
 #### 0. 開始前（在 Squarespace，先不換 nameserver）
 
@@ -102,22 +102,22 @@ smart-schedules.com 註冊在 Squarespace Domains（可能是從 Google Domains 
    - 最準的看法：DNS › DNS 設定（DNS Settings）› 自訂紀錄（Custom Records）裡類型（Type）是 `MX` 的紀錄。指向 `aspmx.l.google.com` 或其他 `*.google.com` 是 Google Workspace；指向 `mxa.mailgun.org`、`mxb.mailgun.org` 是 Squarespace（或 Google Domains）的郵件轉寄。
    - **有 Google Workspace 而且還在用：先停下來。** Cloudflare Email Routing 不能和 Google Workspace 的 MX 同時存在，第 5 步不能照做，要先決定用哪一個。
    - 只有 Squarespace 郵件轉寄：可以繼續。但第 2 步一換 nameserver 轉寄就停，所以第 3 步變 Active 後要馬上做第 5 步。Squarespace 的轉寄規則等 Cloudflare 那邊確認收得到信再刪。
-4. **抄下所有 DNS 紀錄。** DNS › DNS 設定（DNS Settings）。頁面分好幾個區塊：Squarespace Defaults、預設組合（preset，例如 Google Workspace）、郵件轉寄自動加的紀錄、自訂紀錄（Custom Records）。Squarespace **沒有匯出（Export）功能**，而且換 nameserver 後這些紀錄全部失效，所以：
+4. **抄下所有 DNS 紀錄。** DNS › DNS 設定（DNS Settings）。頁面分好幾個區塊：Squarespace Defaults、預設組合（preset，例如 Google Workspace）、郵件轉寄自動加的紀錄、第三方服務透過 Domain Connect 自動加的唯讀區塊（如果有）、自訂紀錄（Custom Records）。Squarespace **沒有匯出（Export）功能**，而且換 nameserver 後這些紀錄全部失效，所以：
    1. 每個區塊都截圖。
    2. 逐筆抄下 Host（主機）、Type（類型）、Priority（優先順序）、Data（值）。
    3. 第 1 步拿來和 Cloudflare 掃描匯入的結果逐筆比對。
    - **要搬到 Cloudflare：** `google-site-verification=…` 的 TXT；結尾是 `.googlehosted.com` 的 CNAME（從 Google Domains 搬來的網域，Squarespace 會自動加一筆）；其他你自己加的紀錄。還在用 Google Workspace 的話，它的 MX、DKIM（`google._domainkey`）、SPF 和驗證 TXT 也要搬。
    - **不要搬：** Squarespace Defaults（連 Squarespace 網站用的，根網域改由 Worker 負責）；Mailgun 的 MX，以及郵件轉寄用的 SPF 和 DMARC（改用 Cloudflare Email Routing）。
    - 網路上有第三方 Chrome 擴充功能「Squarespace DNS Exporter」可以匯出，但它不是官方工具，隱私沒有經過驗證，不建議使用。
-5. **關掉 DNSSEC（一定要在換 nameserver 之前）。** 網域設定頁 › DNS › DNSSEC › 關掉「DNS 安全性擴充」開關（DNS Security Extensions）。
+5. **關掉 DNSSEC（一定要在換 nameserver 之前）。** 網域設定頁 › DNS › DNSSEC › 關掉「DNS 安全性擴充」開關（DNS Security Extensions）› 在跳出的確認視窗按確認（Confirm）。Squarespace 說這會把 DNSSEC 資訊從註冊局移除，要 24～48 小時才會更新。
    - Squarespace 管理的 .com 網域預設會自動開 DNSSEC。從 Google Domains 搬來的網域官方沒寫，但有人回報 DNSSEC 跟著搬過來，請當成是開著的。
    - 看不到開關：刪掉 DNSSEC 面板裡 DS 紀錄（DS records）底下的每一筆，效果一樣。兩個都看不到、下面的檢查卻還有輸出，聯絡 Squarespace 客服。
    - 為什麼要先關：舊的 DS 還在快取裡就換 nameserver，會驗證失敗（SERVFAIL），整個網域連不上，或一直卡在 Pending。Squarespace 換 nameserver 的流程雖然也會順便關 DNSSEC，但不會等舊的快取過期。
 6. **WHOIS 隱私保持開著。** 網域設定頁 › WHOIS 隱私（Whois Privacy）開關。Squarespace 管理的網域大多免費附送、預設開啟；關掉等於同意把聯絡資料公開。
 
-**成功時會看到：** 截圖和紀錄清單都有了；DNSSEC 開關是關的；`dig DS smart-schedules.com +short` 沒有任何輸出（或 https://dnsviz.net 顯示沒有 DS）。
+**成功時會看到：** 截圖和紀錄清單都有了；DNSSEC 開關是關的；過了 24～48 小時後，`dig DS smart-schedules.com +short` 沒有任何輸出（或 https://dnsviz.net 顯示沒有 DS）。剛關掉時還有輸出是正常的。
 
-**要多久：** 關掉 DNSSEC 後**至少等 24 小時**（大約是 .com DS 紀錄的 TTL；Cloudflare 的說法是通常 24～48 小時），而且 `dig DS` 沒有輸出了，才做第 2 步。等的時候可以先做第 1 步。
+**要多久：** 兩段等待。(1) Squarespace 把 DS 從註冊局移除要 24～48 小時；(2) 移除後，各地 DNS 伺服器快取裡的舊 DS 最多還會留 24 小時（.com DS 紀錄的 TTL；Cloudflare 的說法是通常 24～48 小時）。所以等到 `dig DS smart-schedules.com +short` **第一次**沒有輸出（或 dnsviz 顯示沒有 DS）之後，**再多等 24 小時**，才做第 2 步。記下第一次沒有輸出的時間。關掉之前 `dig DS` 就已經沒有輸出的話（本來就沒開 DNSSEC），不用等。等的時候可以先做第 1 步。
 
 #### 1. 在 Cloudflare 加入網域
 
@@ -135,7 +135,7 @@ smart-schedules.com 註冊在 Squarespace Domains（可能是從 Google Domains 
 
 #### 2. 在 Squarespace 換成 Cloudflare 的 nameserver
 
-**先確認：** 第 0 步關 DNSSEC 已經過了至少 24 小時，`dig DS smart-schedules.com +short` 沒有輸出。
+**先確認：** `dig DS smart-schedules.com +short` 沒有輸出，而且從**第一次**沒有輸出算起已經過了至少 24 小時（見第 0 步的「要多久」）。
 
 1. 網域設定頁 › DNS › 網域 Nameserver（Domain Nameservers）› 使用自訂 nameserver（Use Custom Nameservers）› 輸入 Squarespace 密碼或兩步驟驗證碼（2FA）› 出現停用 DNSSEC 的提示時確認（confirm disabling DNSSEC）› 在 Nameserver 1 和 Nameserver 2 各貼上一個 Cloudflare 給的 nameserver › 儲存（Save）。
    - 只填 Cloudflare 那兩個，字要完全一樣，不要留 Squarespace 或其他家的（Squarespace 規定最少 2 個、最多 13 個）。
@@ -173,6 +173,7 @@ smart-schedules.com 註冊在 Squarespace Domains（可能是從 Google Domains 
    server/worker/node_modules/.bin/wrangler deploy -c site/wrangler.toml             # 正式部署
    ```
 
+   - 你的 Cloudflare 登入可以進好幾個帳號時，部署會先問「Select an account」：選跑 `smart-schedule-worker`、而且 smart-schedules.com 是 Active 的那個帳號。選錯帳號，Custom Domain 會建立失敗。
    - `wrangler.toml` 的 `[[routes]]`（`pattern = "smart-schedules.com"`、`custom_domain = true`）會建立 Custom Domain：Cloudflare 自動加一筆指向 Worker 的 DNS 紀錄（在 DNS Records 表裡是唯讀、Proxied 的，不要手動改），也自動簽發這個網域的憑證（Advanced Certificate，不另外收費）。
    - `@` 還有舊紀錄時，wrangler 會問「You already have DNS records that conflict for these Custom Domains: … Update them to point to this script instead?」。回答 No 會顯示「Publishing to Custom Domain "smart-schedules.com" was skipped, fix conflict and try again」：到 DNS › Records 刪掉 `@` 的 A／AAAA／CNAME，再部署一次。
    - **不要在腳本或 CI 裡跑部署指令。** 不是互動式終端機時，wrangler 不會問，直接覆蓋既有的 DNS 紀錄，連綁在別的 Worker 上的同名 Custom Domain 也會搶過來。
@@ -234,7 +235,7 @@ Google OAuth 的品牌驗證要求這個網域在 Search Console 驗證過，而
 
 #### 7.（選做）在 Cloudflare 重新開 DNSSEC
 
-這個專案沒有任何地方需要 DNSSEC，不做也不影響網站、Email Routing 或 Google 驗證。要做的話，等網站和 email 都正常後再做。很快就要做第 8 步的話可以先跳過：DNSSEC 紀錄會讓移出 Squarespace 失敗，轉到 Cloudflare Registrar 後 Cloudflare 會自動處理 DNSSEC。
+這個專案沒有任何地方需要 DNSSEC，不做也不影響網站、Email Routing 或 Google 驗證。要做的話，等網站和 email 都正常後再做。很快就要做第 8 步的話可以先跳過：移出 Squarespace 前要先把這裡加的 DS 紀錄刪掉（移轉進行中不能改 DNSSEC），轉到 Cloudflare Registrar 後 Cloudflare 會自動處理 DNSSEC。
 
 1. **先確認 Squarespace 能加 DS 紀錄。** Squarespace 的新增 DS 紀錄只適用「註冊商是 Squarespace Domains, LLC、而且用自訂 nameserver」的網域。到 https://lookup.icann.org/ 查 smart-schedules.com 的註冊商（Registrar）欄位；從 Google Domains 搬來的網域可能是 Squarespace Domains II LLC。Squarespace 網域設定頁 › DNS › DNSSEC 看不到新增紀錄（Add record）的話，就不要開。
 2. Cloudflare › 這個網域 › DNS › Settings › DNSSEC › Enable DNSSEC。對話框會列出 Key Tag、Algorithm（13）、Digest Type（2，SHA-256）和 Digest。關掉對話框後，可以在 DNSSEC 卡片點 DS record 再看。
@@ -253,12 +254,12 @@ Google OAuth 的品牌驗證要求這個網域在 Search Console 驗證過，而
 - 不在 60 天鎖定期內：新註冊、移入 Squarespace、或改過註冊人姓名／組織／email 之後 60 天內不能移出。2023–2024 年 Google Domains 整批搬到 Squarespace，早已超過 60 天。換 nameserver 和關 DNSSEC 不會觸發 60 天鎖定。
 - 剛在 Squarespace 續約的話，至少等 45 天，否則移轉加的那一年不算，等於同一年付兩次。
 - Cloudflare 帳號的 email 已驗證，而且設定了付款方式。
-- DNSSEC 已關、Squarespace 上沒有 DS 紀錄。做過第 7 步的話，先到 Squarespace › DNS › DNSSEC 刪掉 DS 紀錄。
+- Squarespace 上沒有 DS 紀錄（Squarespace 說移轉進行中不能開關 DNSSEC，所以要在申請移轉碼之前弄好）。做過第 7 步的話，先到 Squarespace › DNS › DNSSEC 刪掉 DS 紀錄，**但 Cloudflare 那邊的 DNSSEC 不要關**：DS 還在註冊局或快取裡時先關掉 Cloudflare 的簽章，整個網域會 SERVFAIL。轉進 Cloudflare Registrar 後，Cloudflare 會自動重新加上 DS。
 
 **Squarespace 端：**
 1. 網域設定頁 › 註冊資訊（Registration Information）：確認 email 是你現在收得到的，移轉碼會寄到那裡。要改姓名、組織或 email 時，勾選不要啟動 60 天移轉鎖定（Don't initiate 60-day transfer lock）。
 2. 網域設定頁 › 關掉網域鎖定（Domain Lock）開關。看到無法解除鎖定（Can't unlock domain）代表某個 60 天鎖定還沒過；找不到開關就直接做下一步。之後移轉還是因為鎖定失敗，Squarespace 建議把開關先開再關一次。
-3. 申請移轉碼（Request transfer code）› 輸入密碼或 2FA › 確認。24 小時內會收到 no-reply@squarespace.com 寄來、主旨「Auth code for smart-schedules.com」的信。**只申請一次**：重複申請會產生好幾組，只有最新的一組有效；移轉碼 5～14 天後過期，要轉的時候才申請。
+3. 申請移轉碼（Request transfer code）› 輸入密碼或 2FA › 確認。24 小時內會收到 no-reply@squarespace.com 寄來、主旨「Auth code for smart-schedules.com」的信。**只申請一次**：重複申請會產生好幾組，只有最新的一組有效。移轉碼會過期（.com 的有效天數官方沒寫清楚），所以要轉的時候才申請、收到就用。
 
 **Cloudflare 端：**
 4. Cloudflare › 網域註冊（Domain Registration）› 移轉網域（Transfer Domains）（https://dash.cloudflare.com/?to=/:account/registrar/transfer）› 選 smart-schedules.com › 貼上移轉碼 › 確認價格 › 填註冊人聯絡資料（Cloudflare 預設會在公開 WHOIS 遮蔽，但資料必須正確）› 確認付款。輸入移轉碼並確認時才扣款。**交出移轉碼後就不能取消。**
