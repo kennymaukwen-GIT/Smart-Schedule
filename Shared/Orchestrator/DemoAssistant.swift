@@ -23,8 +23,9 @@ actor DemoAssistant: ScheduleAssisting {
     private let fixedClock: WallClock?
     private let fixedPolicy: ReminderPolicy?
     private let rescheduleReminders: @Sendable (SharedStore) async -> Void
-    /// Title and day from a "what time?" question, so tapping the "14:00" suggestion completes that event.
-    private var pendingDraft: (title: String, day: Date?)?
+    /// Title, day and part of the day from a "what time?" question, so tapping the "14:00" suggestion (or saying
+    /// "兩點" after "明天下午…") completes that event.
+    private var pendingDraft: (title: String, day: Date?, period: DemoParser.DayPeriod?)?
     /// Which proposal was shown last, so "好" approves the newer of a draft plan and pending events.
     private var lastProposal: Proposal?
     /// The event this conversation last added, moved or noted: "加個備註：帶護照" without naming one goes there.
@@ -561,7 +562,7 @@ actor DemoAssistant: ScheduleAssisting {
         return reply
     }
 
-    // MARK: - (d) "Lunch with Andrew tomorrow 1pm" · (e) no time → ask
+    // MARK: - (d) "Lunch with Andrew tomorrow 1pm" · (e) no clock time (only a day, or "下午") → ask
 
     private func capture(_ text: String, pending: (title: String, day: Date?)?, language: DemoLanguage,
                          parser: DemoParser) async -> Reply {
@@ -570,31 +571,45 @@ actor DemoAssistant: ScheduleAssisting {
         var leftover = text
         let time = parser.extractTime(from: &leftover)
         let dayMatch = parser.extractDay(from: &leftover)
+        // Without a clock time, "下午" / "tomorrow evening" / "lunch" is not one: it narrows the question below.
+        let said = time == nil ? DemoParser.extractPeriod(from: &leftover) : nil
+        var period: DemoParser.DayPeriod? = said?.period
+        if period == nil, time == nil, dayMatch?.evening == true { period = .evening } // "tonight", 明晚
         var title = DemoParser.title(from: leftover)
         var day = dayMatch?.date
         if title.isEmpty, let pending {
             title = pending.title
             day = day ?? pending.day
+            period = period ?? pending.period
         }
         if title.isEmpty { title = language == .chinese ? "新行程" : "New event" }
 
         var reply = Reply()
         guard let time else {
-            pendingDraft = (title: title, day: day)
-            let when = day.map { parser.dayPhrase(for: $0, language: language) }
+            pendingDraft = (title: title, day: day, period: period)
+            // The part of the day goes in the question unless the title already says it ("午餐", "Lunch").
+            let named = said?.isInTitle == true ? nil : period
+            let dayText = day.map { parser.dayPhrase(for: $0, language: language) }
             reply.needsClarification = true
-            reply.suggestions = ["09:00", "14:00", "19:00"]
+            reply.suggestions = period?.suggestions ?? ["09:00", "14:00", "19:00"]
             switch language {
             case .chinese:
-                reply.append("\(when.map { $0 + "的" } ?? "")「\(title)」要排在幾點？")
+                let when = (dayText ?? "") + (named?.chinese ?? "")
+                reply.append("\(when.isEmpty ? "" : when + "的")「\(title)」要排在幾點？")
             case .english:
-                reply.append("What time should I schedule “\(title)”\(when.map { " " + $0 } ?? "")?")
+                let when = period == .evening && dayText == "today" ? "tonight" // also "Dinner" said for today
+                    : [dayText, named?.english].compactMap { $0 }.joined(separator: " ")
+                reply.append("What time should I schedule “\(title)”\(when.isEmpty ? "" : " " + when)?")
             }
             return reply
         }
 
         var hour = time.hour
-        if dayMatch?.evening == true, !time.hasMeridiem, hour < 12 { hour += 12 }
+        if dayMatch?.evening == true, !time.hasMeridiem, hour < 12 {
+            hour += 12
+        } else if !time.hasMeridiem, let period {
+            hour = period.hour(hour) // "兩點" answering "明天下午…要排在幾點？" is 14:00
+        }
         guard var start = clock.combine(day: day ?? calendar.startOfDay(for: now), time: (hour: hour, minute: time.minute)) else {
             reply.append(language == .chinese ? "看不懂這個時間。" : "I couldn't work out that time.")
             return reply
@@ -1817,6 +1832,67 @@ extension DemoParser {
                 text.replaceSubrange(match.range, with: " ")
                 return minutes
             }
+        }
+        return nil
+    }
+
+    /// A part of the day named without a clock time.
+    enum DayPeriod: Equatable {
+        case morning, lunch, afternoon, evening
+
+        /// What the "what time?" question offers: times inside this part of the day.
+        var suggestions: [String] {
+            switch self {
+            case .morning: ["08:00", "09:00", "10:00"]
+            case .lunch: ["12:00", "12:30", "13:00"]
+            case .afternoon: ["13:00", "14:00", "15:00"]
+            case .evening: ["18:00", "19:00", "20:00"]
+            }
+        }
+
+        /// A bare hour said for this part of the day: 2 in the afternoon is 14:00, 1 at lunch is 13:00.
+        func hour(_ hour: Int) -> Int {
+            switch self {
+            case .morning: hour
+            case .lunch: hour < 6 ? hour + 12 : hour
+            case .afternoon, .evening: hour < 12 ? hour + 12 : hour
+            }
+        }
+
+        var chinese: String {
+            switch self {
+            case .morning: "上午"
+            case .lunch: "中午"
+            case .afternoon: "下午"
+            case .evening: "晚上"
+            }
+        }
+
+        var english: String {
+            switch self {
+            case .morning: "morning"
+            case .lunch: "at lunch"
+            case .afternoon: "afternoon"
+            case .evening: "evening"
+            }
+        }
+    }
+
+    /// "下午", "in the afternoon", "tomorrow evening", "lunch": the part of the day a request names when it has no
+    /// clock time. Words that only say when leave the text; a meal stays, it is the event ("午餐", "Lunch with Ann").
+    static func extractPeriod(from text: inout String) -> (period: DayPeriod, isInTitle: Bool)? {
+        let periods: [(pattern: String, period: DayPeriod, isInTitle: Bool)] = [
+            (#"\b(?:in\s+the\s+)?morning\b|早上|上午|清晨|早晨"#, .morning, false),
+            (#"\b(?:in\s+the\s+)?afternoon\b|下午"#, .afternoon, false),
+            (#"\b(?:in\s+the\s+)?evening\b|\bat\s+night\b|晚上|傍晚"#, .evening, false),
+            (#"\bbreakfast\b|早餐|早飯|早饭"#, .morning, true),
+            (#"\blunch\b|午餐|午飯|午饭"#, .lunch, true),
+            (#"\bdinner\b|晚餐|晚飯|晚饭"#, .evening, true)
+        ]
+        for entry in periods {
+            guard let match = Self.match(entry.pattern, in: text) else { continue }
+            if !entry.isInTitle { text.replaceSubrange(match.range, with: " ") }
+            return (entry.period, entry.isInTitle)
         }
         return nil
     }

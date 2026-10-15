@@ -31,12 +31,14 @@ struct QuickCaptureView: View {
     private static let splitMinHeight: CGFloat = 256
     private static let splitMaxHeight: CGFloat = 460
     private static let splitGap: CGFloat = 10
-    /// Design 04's example inputs, in both languages on purpose.
-    private static let defaultSuggestions = [
-        "I want to be muscular in 6 month design me a daily routine",
-        "明天下午兩點跟 Joe 開線上會議",
-        "Show me my schedule for today"
-    ]
+    /// Design 04's example inputs, today's schedule first. Picked by language rather than translated, because the
+    /// demo assistant has to read them; the meeting stays in Chinese in English too, as in the design.
+    private static var defaultSuggestions: [String] {
+        ReplyFormatter.isChinese(ReplyFormatter.displayLocale)
+            ? ["今天有什麼行程", "我想在 6 個月內增肌", "明天下午兩點開線上會議"]
+            : ["Show me my schedule for today", "I want to be muscular in 6 month design me a daily routine",
+               "明天下午兩點開線上會議"]
+    }
 
     /// `initialMode` overrides the remembered scope (previews); nil opens in whatever the user picked last.
     /// `conversationExpanded` opens with the conversation pulled up (previews).

@@ -56,11 +56,47 @@ final class DemoAssistantReplyTests: XCTestCase {
         let assistant = makeAssistant()
         let chinese = try await ask(assistant, "明天午餐")
         XCTAssertEqual(chinese.text, "明天的「午餐」要排在幾點？")
-        XCTAssertEqual(chinese.suggestions, ["09:00", "14:00", "19:00"])
+        XCTAssertEqual(chinese.suggestions, ["12:00", "12:30", "13:00"], "lunchtime, not the whole day")
 
-        let answer = try await ask(assistant, "14:00")
+        let answer = try await ask(assistant, "12:30")
         XCTAssertEqual(answer.addedEvents.map(\.title), ["午餐"])
+        XCTAssertEqual(answer.addedEvents.first?.start, TestClock.local(2026, 10, 14, 12, 30))
+    }
+
+    /// Only a day, or only a part of the day, is not a time: nothing is added until the user says when.
+    func testADayOrAPartOfTheDayAloneIsAskedAbout() async throws {
+        let dayOnly = try await ask(makeAssistant(), "明天開線上會議")
+        XCTAssertEqual(dayOnly.text, "明天的「開線上會議」要排在幾點？")
+        XCTAssertEqual(dayOnly.suggestions, ["09:00", "14:00", "19:00"])
+        XCTAssertTrue(dayOnly.needsClarification)
+        XCTAssertTrue(dayOnly.addedEvents.isEmpty)
+
+        let assistant = makeAssistant()
+        let afternoon = try await ask(assistant, "明天下午開線上會議")
+        XCTAssertEqual(afternoon.text, "明天下午的「開線上會議」要排在幾點？")
+        XCTAssertEqual(afternoon.suggestions, ["13:00", "14:00", "15:00"])
+        XCTAssertTrue(afternoon.addedEvents.isEmpty)
+        // A bare hour answers in that part of the day.
+        let answer = try await ask(assistant, "兩點")
+        XCTAssertEqual(answer.addedEvents.map(\.title), ["開線上會議"])
         XCTAssertEqual(answer.addedEvents.first?.start, TestClock.local(2026, 10, 14, 14, 0))
+
+        let tonight = try await ask(makeAssistant(), "今晚吃火鍋")
+        XCTAssertEqual(tonight.text, "今天晚上的「吃火鍋」要排在幾點？")
+        XCTAssertEqual(tonight.suggestions, ["18:00", "19:00", "20:00"])
+
+        let english = try await ask(makeAssistant(), "Dentist tomorrow afternoon")
+        XCTAssertEqual(english.text, "What time should I schedule “Dentist” tomorrow afternoon?")
+        XCTAssertEqual(english.suggestions, ["13:00", "14:00", "15:00"])
+
+        let dinner = try await ask(makeAssistant(), "Dinner with Ann tonight")
+        XCTAssertEqual(dinner.text, "What time should I schedule “Dinner with Ann” tonight?")
+        XCTAssertEqual(dinner.suggestions, ["18:00", "19:00", "20:00"])
+
+        // A clock time is enough on its own.
+        let timed = try await ask(makeAssistant(), "明天下午兩點開線上會議")
+        XCTAssertEqual(timed.addedEvents.map(\.title), ["開線上會議"])
+        XCTAssertEqual(timed.addedEvents.first?.start, TestClock.local(2026, 10, 14, 14, 0))
     }
 
     /// The zh-Hant translations of the example prompts (Localizable.xcstrings) must do what the English ones do.
