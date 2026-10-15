@@ -90,6 +90,8 @@ export interface AttestationOptions {
   nonceOverride?: Uint8Array;
   leafNotBefore?: number;
   leafNotAfter?: number;
+  /** Sign the credential certificate with this key instead of the intermediate's (issuer name unchanged). */
+  leafSigningKey?: CryptoKey;
 }
 
 export interface Attestation {
@@ -132,7 +134,7 @@ export async function makeAttestation(o: AttestationOptions): Promise<Attestatio
     notBefore: new Date(o.leafNotBefore ?? o.now - 3600_000),
     notAfter: new Date(o.leafNotAfter ?? o.now + 3 * DAY),
     publicKey: credentialKeys.publicKey,
-    signingKey: o.chain.intermediate.keys.privateKey,
+    signingKey: o.leafSigningKey ?? o.chain.intermediate.keys.privateKey,
     signingAlgorithm: { name: "ECDSA", hash: "SHA-256" },
     extensions: [
       new x509.BasicConstraintsExtension(false, undefined, true),

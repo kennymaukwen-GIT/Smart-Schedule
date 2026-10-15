@@ -5,6 +5,8 @@ import type { AttestationInput } from "../src/attestation.ts";
 import { concat, sha256, utf8 } from "../src/encoding.ts";
 import type { AttestationOptions, Chain } from "./helpers/app-attest.ts";
 import { APP_ID, makeAttestation, makeChain, rawPublicKey } from "./helpers/app-attest.ts";
+import { generateEcKeyPair } from "./helpers/webcrypto.ts";
+import { encode as cborEncode } from "cborg";
 
 const NOW = Date.UTC(2026, 9, 15, 8, 0, 0);
 const CHALLENGE = crypto.getRandomValues(new Uint8Array(32));
@@ -99,6 +101,37 @@ describe("App Attest attestation verification", () => {
     await assert.rejects(
       verifyAttestation({ keyId: a.keyId, attestation: a.attestation, challenge: CHALLENGE, appId: APP_ID, environment: "development", root: loadRoot(chain.root.pem), now: NOW }),
       (e: unknown) => e instanceof AttestationError && /intermediate signature invalid/.test(e.message),
+    );
+  });
+
+  it("rejects a credential certificate signed by a key other than the intermediate's", async () => {
+    // x5c = [leaf naming the genuine intermediate as issuer but signed by a foreign key, genuine intermediate].
+    const foreign = await generateEcKeyPair("P-384");
+    await expectFailure(/^credential certificate signature invalid$/, { leafSigningKey: foreign.privateKey });
+  });
+
+  it("maps a truncated credential certificate to AttestationError", async () => {
+    const a = await makeAttestation({ chain, now: NOW, challenge: CHALLENGE });
+    const truncated = new Uint8Array([0x30, 0x19, 0x30, 0x08, 0xa0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x01, 0x01, 0x30, 0x0a, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02, 0x03, 0x01, 0x00]);
+    const attestation = cborEncode({
+      fmt: "apple-appattest",
+      attStmt: { x5c: [truncated, new Uint8Array(chain.intermediate.cert.rawData)], receipt: new Uint8Array(1) },
+      authData: a.authData,
+    });
+    await assert.rejects(
+      verifyAttestation({ keyId: a.keyId, attestation, challenge: CHALLENGE, appId: APP_ID, environment: "development", root: loadRoot(chain.root.pem), now: NOW }),
+      (e: unknown) => e instanceof AttestationError && /TBSCertificate\.signature/.test(e.message),
+    );
+  });
+
+  it("maps any unexpected exception to AttestationError (backstop)", async () => {
+    const a = await makeAttestation({ chain, now: NOW, challenge: CHALLENGE });
+    const brokenPoint = new Uint8Array(97);
+    brokenPoint[0] = 0x04; // not on the curve: WebCrypto's importKey throws a DOMException
+    const root = { ...loadRoot(chain.root.pem), publicKey: brokenPoint };
+    await assert.rejects(
+      verifyAttestation({ keyId: a.keyId, attestation: a.attestation, challenge: CHALLENGE, appId: APP_ID, environment: "development", root, now: NOW }),
+      (e: unknown) => e instanceof AttestationError && /^unexpected /.test(e.message),
     );
   });
 

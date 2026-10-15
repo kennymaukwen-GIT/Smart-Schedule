@@ -44,7 +44,12 @@ export interface ApnsResult {
   apnsId: string | null;
 }
 
-export function apnsRequest(env: Env, host: string, deviceToken: string, jwt: string, payload: string): { url: string; init: RequestInit } {
+/** APNs keeps a push for an offline device until the event starts, then drops it (never 0 = "deliver once"). */
+export function apnsExpiration(event: StoredEvent): number {
+  return Math.max(1, Math.floor(Date.parse(event.eventStart) / 1000));
+}
+
+export function apnsRequest(env: Env, host: string, deviceToken: string, jwt: string, payload: string, expiration: number): { url: string; init: RequestInit } {
   return {
     url: `https://${host}/3/device/${deviceToken}`,
     init: {
@@ -54,6 +59,7 @@ export function apnsRequest(env: Env, host: string, deviceToken: string, jwt: st
         "apns-push-type": "liveactivity",
         "apns-topic": `${env.APNS_BUNDLE_ID || "com.smartschedule.app"}.push-type.liveactivity`,
         "apns-priority": "10",
+        "apns-expiration": String(expiration),
         "content-type": "application/json",
       },
       body: payload,
@@ -61,8 +67,16 @@ export function apnsRequest(env: Env, host: string, deviceToken: string, jwt: st
   };
 }
 
-export async function sendPush(env: Env, deps: Deps, host: string, deviceToken: string, jwt: string, payload: string): Promise<ApnsResult> {
-  const { url, init } = apnsRequest(env, host, deviceToken, jwt, payload);
+export async function sendPush(
+  env: Env,
+  deps: Deps,
+  host: string,
+  deviceToken: string,
+  jwt: string,
+  payload: string,
+  expiration: number,
+): Promise<ApnsResult> {
+  const { url, init } = apnsRequest(env, host, deviceToken, jwt, payload, expiration);
   const response = await deps.fetch(url, init);
   const apnsId = response.headers.get("apns-id");
   if (response.status === 200) {

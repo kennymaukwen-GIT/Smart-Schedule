@@ -14,6 +14,9 @@ export class MemoryKV implements KV {
   readonly clock: () => number;
   /** Return true to make a put for this key throw (e.g. KV's 1 write/s limit). */
   failPut: ((key: string) => boolean) | null = null;
+  /** Runs before every get (to simulate a concurrent writer between a read and a write). */
+  onGet: ((key: string) => void | Promise<void>) | null = null;
+  readonly gets: string[] = [];
 
   constructor(clock: () => number) {
     this.clock = clock;
@@ -30,6 +33,8 @@ export class MemoryKV implements KV {
   }
 
   async get(key: string): Promise<string | null> {
+    this.gets.push(key);
+    await this.onGet?.(key);
     return this.live(key)?.value ?? null;
   }
 

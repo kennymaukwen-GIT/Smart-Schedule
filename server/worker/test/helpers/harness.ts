@@ -29,7 +29,7 @@ export interface Harness {
 
 export const START = Date.UTC(2026, 9, 15, 8, 0, 0); // 2026-10-15T08:00:00Z
 
-export function makeHarness(options: { rootCaPem?: string; env?: Partial<Env>; now?: number } = {}): Harness {
+export function makeHarness(options: { rootCaPem?: string; env?: Partial<Env>; now?: number; sleep?: (ms: number) => Promise<void> } = {}): Harness {
   const clock = { now: options.now ?? START };
   const kv = new MemoryKV(() => clock.now);
   const env: Env = {
@@ -60,7 +60,7 @@ export function makeHarness(options: { rootCaPem?: string; env?: Partial<Env>; n
     worker: createWorker({
       now: () => clock.now,
       rootCaPem: options.rootCaPem ?? "",
-      sleep: async () => {},
+      sleep: options.sleep ?? (async () => {}),
       fetch: async (input, init) => {
         const body = init?.body === undefined || init.body === null ? null : new Uint8Array(await new Response(init.body).arrayBuffer());
         const call: FetchCall = { url: input, method: init?.method ?? "GET", headers: new Headers(init?.headers), body };
@@ -68,8 +68,13 @@ export function makeHarness(options: { rootCaPem?: string; env?: Partial<Env>; n
         return harness.respond(call);
       },
     }),
-    request(path, init) {
-      return harness.worker.fetch(new Request(`https://worker.test${path}`, init), env, { waitUntil() {} });
+    request(path, init = {}) {
+      // Like Cloudflare, give a fixed-size body its Content-Length (readBody's primary path).
+      const headers = new Headers(init.headers);
+      if ((typeof init.body === "string" || init.body instanceof Uint8Array) && !headers.has("content-length")) {
+        headers.set("content-length", String(typeof init.body === "string" ? new TextEncoder().encode(init.body).length : init.body.byteLength));
+      }
+      return harness.worker.fetch(new Request(`https://worker.test${path}`, { ...init, headers }), env, { waitUntil() {} });
     },
     async runCron() {
       const pending: Promise<unknown>[] = [];

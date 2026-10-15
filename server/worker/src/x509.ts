@@ -117,7 +117,7 @@ function parseCertificateUnchecked(der: Uint8Array): Certificate {
   }
   i++;
   expectTag(fields[i++], TAG.INTEGER, "serialNumber");
-  const innerSigAlg = fields[i++]!;
+  const innerSigAlg = expectTag(fields[i++], TAG.SEQUENCE, "TBSCertificate.signature");
   if (!bytesEqual(innerSigAlg.raw, sigAlgEl!.raw)) throw new CertificateError("signature algorithm mismatch");
   const issuer = expectTag(fields[i++], TAG.SEQUENCE, "issuer").raw;
   const validity = children(expectTag(fields[i++], TAG.SEQUENCE, "validity"));

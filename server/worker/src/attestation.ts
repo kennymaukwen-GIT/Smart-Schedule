@@ -90,7 +90,11 @@ function extractNonce(credCert: Certificate): Uint8Array {
   }
 }
 
-/** Throws AttestationError (reason in the message) unless every check passes. */
+/**
+ * Throws AttestationError (reason in the message) unless every check passes. Every failure — including an
+ * unexpected exception while parsing hostile input — is an AttestationError, so a client always gets
+ * 401 invalid_attestation and never a 500.
+ */
 export async function verifyAttestation(input: AttestationInput): Promise<VerifiedAttestation> {
   try {
     return await verify(input);
@@ -99,7 +103,7 @@ export async function verifyAttestation(input: AttestationInput): Promise<Verifi
     if (e instanceof CborError || e instanceof CertificateError || e instanceof DerError) {
       throw new AttestationError(e.message);
     }
-    throw e;
+    throw new AttestationError(`unexpected ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`);
   }
 }
 

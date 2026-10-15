@@ -30,6 +30,7 @@ export interface Env {
   APNS_TEAM_ID?: string;
   APNS_BUNDLE_ID?: string;
   APNS_ENV?: string;
+  SESSION_TTL_SECONDS?: string;
 }
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -56,6 +57,14 @@ export function bundleIds(env: Env): string[] {
 export function rateLimitPerMinute(env: Env): number {
   const n = Number(env.RATE_LIMIT_PER_MIN);
   return Number.isInteger(n) && n > 0 ? n : 30;
+}
+
+export const DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 3600;
+
+/** Lifetime of an extension session token; KV needs at least 60 s. */
+export function sessionTtlSeconds(env: Env): number {
+  const n = Number(env.SESSION_TTL_SECONDS);
+  return Number.isInteger(n) && n >= 60 ? n : DEFAULT_SESSION_TTL_SECONDS;
 }
 
 export function attestEnvironment(env: Env): AttestEnvironment | null {

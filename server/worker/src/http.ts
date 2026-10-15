@@ -25,24 +25,52 @@ export class HttpError extends Error {
   }
 }
 
-/** Reads the whole body (exact bytes) or throws 413 when it is larger than `limit`. */
+/**
+ * Reads the whole body (exact bytes), never more than `limit` bytes.
+ *
+ * With Content-Length (what URLSession and Cloudflare send): rejects a declared size above `limit` before reading,
+ * allocates the buffer once, and answers 413 when more or fewer bytes arrive than declared. Without it (chunked):
+ * reads incrementally and stops at `limit`.
+ */
 export async function readBody(request: Request, limit: number): Promise<Uint8Array> {
-  const declared = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > limit) throw new HttpError(413, "payload_too_large");
-  if (!request.body) return new Uint8Array(0);
+  const header = request.headers.get("content-length");
+  if (!request.body) {
+    if (header !== null && header !== "0") throw new HttpError(413, "payload_too_large");
+    return new Uint8Array(0);
+  }
   const reader = request.body.getReader();
+  const fail = async (status: number, code: string): Promise<never> => {
+    await reader.cancel().catch(() => {});
+    throw new HttpError(status, code);
+  };
+
+  if (header !== null) {
+    if (!/^\d{1,10}$/.test(header)) return fail(400, "invalid_request");
+    const declared = Number(header);
+    if (declared > limit) return fail(413, "payload_too_large");
+    const out = new Uint8Array(declared);
+    let offset = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (offset + value.byteLength > declared) return fail(413, "payload_too_large");
+      out.set(value, offset);
+      offset += value.byteLength;
+    }
+    if (offset !== declared) throw new HttpError(413, "payload_too_large");
+    return out;
+  }
+
   const chunks: Uint8Array[] = [];
   let total = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > limit) {
-      await reader.cancel();
-      throw new HttpError(413, "payload_too_large");
-    }
+    if (total > limit) return fail(413, "payload_too_large");
     chunks.push(value);
   }
+  if (chunks.length === 1) return chunks[0]!;
   const out = new Uint8Array(total);
   let offset = 0;
   for (const c of chunks) {

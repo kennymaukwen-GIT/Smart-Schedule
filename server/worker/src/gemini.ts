@@ -9,7 +9,7 @@ import { HttpError, log } from "./http.ts";
 
 export const GEMINI_ORIGIN = "https://generativelanguage.googleapis.com";
 
-/** Never forwarded: client credentials, cookies, hop-by-hop headers and Cloudflare's client-identifying headers. */
+/** Never forwarded: client credentials, cookies, hop-by-hop headers and client-identifying headers (plus every cf-*). */
 const STRIPPED_HEADERS = new Set([
   "authorization",
   "x-dev-token",
@@ -24,12 +24,6 @@ const STRIPPED_HEADERS = new Set([
   "trailer",
   "transfer-encoding",
   "upgrade",
-  "cf-connecting-ip",
-  "cf-connecting-ipv6",
-  "cf-ipcountry",
-  "cf-ray",
-  "cf-visitor",
-  "cf-worker",
   "cdn-loop",
   "true-client-ip",
   "x-forwarded-for",
@@ -66,7 +60,8 @@ export async function proxyGemini(request: Request, body: Uint8Array, env: Env, 
 
   const headers = new Headers();
   request.headers.forEach((value, name) => {
-    if (!STRIPPED_HEADERS.has(name.toLowerCase())) headers.set(name, value);
+    const lower = name.toLowerCase();
+    if (!STRIPPED_HEADERS.has(lower) && !lower.startsWith("cf-")) headers.set(name, value);
   });
   headers.set("x-goog-api-key", env.GEMINI_API_KEY);
 

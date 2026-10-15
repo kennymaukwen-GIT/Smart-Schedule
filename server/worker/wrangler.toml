@@ -7,12 +7,12 @@ compatibility_date = "2026-09-15"
 [triggers]
 crons = ["* * * * *"]
 
-# One KV namespace for everything (key prefixes chal:, key:, rl:, p2s:, due:, sent:, apns:).
-# Create it with:   npx wrangler kv namespace create SS_KV
-# then paste the printed id here. Deploys fail while it is empty.
+# One KV namespace for everything (key prefixes chal:, key:, sess:, rl:, p2s:, p2sdead:, due:, claim:, sent:, apns:).
+# Without an id, `npx wrangler deploy` creates the namespace and binds it automatically (wrangler 4 provisioning).
+# To use a namespace you created yourself (`npx wrangler kv namespace create SS_KV`), uncomment the id line.
 [[kv_namespaces]]
 binding = "SS_KV"
-id = ""
+# id = "<paste from: npx wrangler kv namespace create SS_KV>"
 
 # Worker logs (console.log JSON lines, e.g. the reason an attestation was rejected).
 [observability]
@@ -30,7 +30,8 @@ BUNDLE_IDS = "com.smartschedule.app,com.smartschedule.app.notification-content"
 APP_ATTEST_ENV = "production"
 # "true" ONLY on a development deployment: then X-Dev-Token (= the SS_DEV_TOKEN secret) bypasses App Attest.
 ALLOW_DEV_TOKEN = "false"
-# Requests per identity (attested key, "dev", or client IP for /attest*) per UTC minute.
+# Requests per identity (attested key, "dev", or client IP for /attest*) per UTC minute; also the number of failed
+# authentications one IP may make per minute before it is refused without its body being read.
 RATE_LIMIT_PER_MIN = "30"
 # APNs token-based auth: the .p8 key's Key ID and the Team ID that owns it (the key itself is a secret).
 APNS_KEY_ID = ""
@@ -38,6 +39,8 @@ APNS_TEAM_ID = ""
 APNS_BUNDLE_ID = "com.smartschedule.app"
 # Must match the app build's aps-environment: "sandbox" (Xcode builds) or "production" (TestFlight / App Store).
 APNS_ENV = "production"
+# Lifetime of the session tokens POST /session issues for the notification extension (seconds, >= 60; 7 days).
+SESSION_TTL_SECONDS = "604800"
 
 # Secrets — never in this file:
 #   npx wrangler secret put GEMINI_API_KEY

@@ -1,21 +1,24 @@
 // POST /devices/push-to-start — whole-replace registration of the events a device wants Live Activities for.
 //
-// KV layout (see README):
-//   p2s:<deviceID>                                   registration { token, keyId, events, updatedAt, tokenInvalidAt? } (TTL 3 days)
-//   due:<YYYYMMDDHHmm>:<deviceID>:<eventID>          index for the cron, minute of triggerAt UTC (TTL until triggerAt + 1 h)
-//   sent:<deviceID>:<eventID>:<triggerAt epoch s>    sent marker, written by the cron (TTL 3 days), never by this route
+// KV layout (see README); <eventHash> = hex SHA-256 of the eventID (EventKit / Google IDs can be long and contain ':'):
+//   p2s:<deviceID>                                     registration { token, keyId, appId, events, updatedAt } (TTL 3 days)
+//   due:<YYYYMMDDHHmm>:<deviceID>:<eventHash>          index for the cron, minute of triggerAt UTC (TTL until triggerAt + 1 h)
+//   sent:<deviceID>:<eventHash>:<triggerAt epoch s>    sent marker, written by the cron (TTL 3 days), never by this route
+//   claim:<deviceID>:<eventHash>:<triggerAt epoch s>   in-flight marker while the cron sends (TTL 120 s)
+//   p2sdead:<deviceID>                                 a push token APNs rejected (cron only; TTL 3 days)
 
 import type { Identity } from "./auth.ts";
-import { utf8Length } from "./encoding.ts";
+import { keyRecordKey } from "./auth.ts";
+import { hex, sha256, utf8, utf8Length } from "./encoding.ts";
 import type { Deps, Env } from "./env.ts";
 import { HttpError, json, log, parseJson } from "./http.ts";
 
 export const REGISTRATION_TTL_SECONDS = 3 * 24 * 3600;
 export const SENT_TTL_SECONDS = 3 * 24 * 3600;
 const MAX_EVENTS = 50;
-const MAX_TITLE_CHARS = 200;
+const MAX_TITLE_CODE_POINTS = 200;
 const MAX_EMBEDDED_JSON_BYTES = 4096;
-const MAX_EVENT_ID_BYTES = 256;
+const MAX_EVENT_ID_BYTES = 1024;
 const MAX_LEAD_MINUTES = 1440;
 const TRIGGER_PAST_MS = 3600_000;
 const TRIGGER_FUTURE_MS = 49 * 3600_000;
@@ -32,15 +35,25 @@ export interface StoredEvent {
 
 export interface Registration {
   token: string | null;
-  /** The identity that first registered this deviceID: an attested keyId or "dev". */
+  /** The identity that last wrote this registration: an attested keyId or "dev" (for logs and the dev/app check). */
   keyId: string;
+  /** That identity's appId; null for "dev". */
+  appId?: string | null;
   events: StoredEvent[];
   updatedAt: string;
-  tokenInvalidAt?: string;
 }
 
 export function registrationKey(deviceID: string): string {
   return `p2s:${deviceID}`;
+}
+
+export function deadTokenKey(deviceID: string): string {
+  return `p2sdead:${deviceID}`;
+}
+
+/** Hex SHA-256 of an eventID: what the due:, sent: and claim: keys carry instead of the ID itself. */
+export async function eventHash(eventID: string): Promise<string> {
+  return hex(await sha256(utf8(eventID)));
 }
 
 /** UTC YYYYMMDDHHmm of an epoch-millisecond instant. */
@@ -50,18 +63,22 @@ export function minuteStamp(ms: number): string {
   return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}`;
 }
 
-export function dueKey(triggerAtMs: number, deviceID: string, eventID: string): string {
-  return `due:${minuteStamp(triggerAtMs)}:${deviceID}:${eventID}`;
+export function dueKey(triggerAtMs: number, deviceID: string, hash: string): string {
+  return `due:${minuteStamp(triggerAtMs)}:${deviceID}:${hash}`;
 }
 
-export function sentKey(deviceID: string, eventID: string, triggerAtMs: number): string {
-  return `sent:${deviceID}:${eventID}:${Math.floor(triggerAtMs / 1000)}`;
+export function sentKey(deviceID: string, hash: string, triggerAtMs: number): string {
+  return `sent:${deviceID}:${hash}:${Math.floor(triggerAtMs / 1000)}`;
 }
 
-/** Parses `due:<YYYYMMDDHHmm>:<deviceID>:<eventID>`; the eventID may itself contain ':' (EventKit identifiers do). */
-export function parseDueKey(name: string): { minute: string; deviceID: string; eventID: string } | null {
-  const m = /^due:(\d{12}):([A-Za-z0-9-]{1,64}):(.+)$/s.exec(name);
-  return m ? { minute: m[1]!, deviceID: m[2]!, eventID: m[3]! } : null;
+export function claimKey(deviceID: string, hash: string, triggerAtMs: number): string {
+  return `claim:${deviceID}:${hash}:${Math.floor(triggerAtMs / 1000)}`;
+}
+
+/** Parses `due:<YYYYMMDDHHmm>:<deviceID>:<eventHash>`. */
+export function parseDueKey(name: string): { minute: string; deviceID: string; hash: string } | null {
+  const m = /^due:(\d{12}):([A-Za-z0-9-]{1,64}):([0-9a-f]{64})$/.exec(name);
+  return m ? { minute: m[1]!, deviceID: m[2]!, hash: m[3]! } : null;
 }
 
 const ISO_8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
@@ -93,9 +110,42 @@ export interface ValidRegistration {
   deviceID: string;
   token: string | null;
   events: StoredEvent[];
+  /** Events left out, with the reason (never their content). */
+  skipped: { index: number; reason: string }[];
 }
 
-/** Validates the body; throws InvalidRegistration with the reason. Unknown fields are dropped, never stored. */
+/** One event, or the reason it is left out. A long title is shortened, not refused. */
+function validateEvent(raw: unknown, now: number): StoredEvent | string {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return "not an object";
+  const e = raw as Record<string, unknown>;
+  const { eventID, title, leadTime, attributesJSON, contentStateJSON } = e;
+  if (typeof eventID !== "string" || eventID.length === 0 || utf8Length(eventID) > MAX_EVENT_ID_BYTES || /[\u0000-\u001f\u007f]/.test(eventID)) {
+    return "eventID";
+  }
+  if (typeof title !== "string") return "title";
+  if (parseIsoDate(e.eventStart) === null) return "eventStart";
+  if (typeof leadTime !== "number" || !Number.isInteger(leadTime) || leadTime < 0 || leadTime > MAX_LEAD_MINUTES) return "leadTime";
+  const triggerAt = parseIsoDate(e.triggerAt);
+  if (triggerAt === null) return "triggerAt";
+  if (triggerAt < now - TRIGGER_PAST_MS || triggerAt > now + TRIGGER_FUTURE_MS) return "triggerAt out of range";
+  if (!isJsonObjectText(attributesJSON)) return "attributesJSON";
+  if (!isJsonObjectText(contentStateJSON)) return "contentStateJSON";
+  const codePoints = Array.from(title);
+  return {
+    eventID,
+    title: codePoints.length > MAX_TITLE_CODE_POINTS ? codePoints.slice(0, MAX_TITLE_CODE_POINTS).join("") : title,
+    eventStart: e.eventStart as string,
+    leadTime,
+    triggerAt: e.triggerAt as string,
+    attributesJSON,
+    contentStateJSON,
+  };
+}
+
+/**
+ * Body-level problems throw InvalidRegistration (→ 400); a bad event is only left out, so one odd calendar entry
+ * never blocks the whole upload. Unknown fields are dropped, never stored.
+ */
 export function validateRegistration(body: unknown, now: number): ValidRegistration {
   if (typeof body !== "object" || body === null || Array.isArray(body)) invalid("body is not an object");
   const b = body as Record<string, unknown>;
@@ -113,39 +163,14 @@ export function validateRegistration(body: unknown, now: number): ValidRegistrat
   if (!Array.isArray(b.events)) invalid("events is not an array");
   if (b.events.length > MAX_EVENTS) invalid("too many events");
 
-  const events = b.events.map((raw: unknown, i: number): StoredEvent => {
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) invalid(`events[${i}] is not an object`);
-    const e = raw as Record<string, unknown>;
-    const { eventID, title, leadTime, attributesJSON, contentStateJSON } = e;
-    if (
-      typeof eventID !== "string" ||
-      eventID.length === 0 ||
-      utf8Length(eventID) > MAX_EVENT_ID_BYTES ||
-      /[\u0000-\u001f\u007f]/.test(eventID)
-    ) {
-      invalid(`events[${i}].eventID`);
-    }
-    if (typeof title !== "string" || Array.from(title).length > MAX_TITLE_CHARS) invalid(`events[${i}].title`);
-    if (parseIsoDate(e.eventStart) === null) invalid(`events[${i}].eventStart`);
-    if (typeof leadTime !== "number" || !Number.isInteger(leadTime) || leadTime < 0 || leadTime > MAX_LEAD_MINUTES) {
-      invalid(`events[${i}].leadTime`);
-    }
-    const triggerAt = parseIsoDate(e.triggerAt);
-    if (triggerAt === null) invalid(`events[${i}].triggerAt`);
-    if (triggerAt < now - TRIGGER_PAST_MS || triggerAt > now + TRIGGER_FUTURE_MS) invalid(`events[${i}].triggerAt out of range`);
-    if (!isJsonObjectText(attributesJSON)) invalid(`events[${i}].attributesJSON`);
-    if (!isJsonObjectText(contentStateJSON)) invalid(`events[${i}].contentStateJSON`);
-    return {
-      eventID,
-      title,
-      eventStart: e.eventStart as string,
-      leadTime,
-      triggerAt: e.triggerAt as string,
-      attributesJSON,
-      contentStateJSON,
-    };
+  const events: StoredEvent[] = [];
+  const skipped: { index: number; reason: string }[] = [];
+  b.events.forEach((raw: unknown, index: number) => {
+    const result = validateEvent(raw, now);
+    if (typeof result === "string") skipped.push({ index, reason: result });
+    else events.push(result);
   });
-  return { deviceID, token, events };
+  return { deviceID, token, events, skipped };
 }
 
 export function parseRegistration(raw: string | null): Registration | null {
@@ -156,6 +181,39 @@ export function parseRegistration(raw: string | null): Registration | null {
   } catch {
     return null;
   }
+}
+
+/** appId of the identity that wrote `existing` (older records only name the key: look it up). */
+async function previousAppId(existing: Registration, env: Env): Promise<string | null> {
+  if (typeof existing.appId === "string") return existing.appId;
+  try {
+    const record = JSON.parse((await env.SS_KV.get(keyRecordKey(existing.keyId))) ?? "null") as { appId?: unknown } | null;
+    return typeof record?.appId === "string" ? record.appId : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The random 122-bit deviceID is the capability: any attested identity of the same app may take a registration
+ * over (an App Attest key rotation or a restore to a new phone must not lock the device out). Refused only when
+ * the development identity and an attested one would overwrite each other, or the apps differ.
+ */
+async function checkWriter(existing: Registration | null, identity: Identity, deviceID: string, env: Env): Promise<void> {
+  if (!existing) return;
+  const existingDev = existing.keyId === "dev";
+  const writerDev = identity.id === "dev";
+  if (existingDev !== writerDev) {
+    log("warn", "registration_forbidden", { deviceID, reason: "dev and attested identities cannot share a deviceID" });
+    throw new HttpError(403, "forbidden");
+  }
+  if (writerDev || existing.keyId === identity.id) return;
+  const appId = await previousAppId(existing, env);
+  if (appId !== null && appId !== identity.appId) {
+    log("warn", "registration_forbidden", { deviceID, reason: "registered by another app" });
+    throw new HttpError(403, "forbidden");
+  }
+  log("info", "registration_rebound", { deviceID, from: existing.keyId.slice(0, 12), to: identity.id.slice(0, 12), appId: identity.appId });
 }
 
 export async function handlePushToStart(body: Uint8Array, identity: Identity, env: Env, deps: Deps): Promise<Response> {
@@ -170,13 +228,11 @@ export async function handlePushToStart(body: Uint8Array, identity: Identity, en
     }
     throw e;
   }
+  if (valid.skipped.length) log("warn", "registration_events_skipped", { deviceID: valid.deviceID, skipped: valid.skipped });
 
   const kvKey = registrationKey(valid.deviceID);
   const existing = parseRegistration(await env.SS_KV.get(kvKey));
-  if (existing && existing.keyId !== identity.id) {
-    log("warn", "registration_forbidden", { deviceID: valid.deviceID });
-    throw new HttpError(403, "forbidden");
-  }
+  await checkWriter(existing, identity, valid.deviceID, env);
 
   // Index keys first, so a stored registration never names an event the cron cannot find. An index key that the
   // previous registration already wrote for the same (eventID, triggerAt) still exists (it lives until
@@ -186,12 +242,13 @@ export async function handlePushToStart(body: Uint8Array, identity: Identity, en
   for (const event of valid.events) {
     const triggerAt = Date.parse(event.triggerAt);
     if (alreadyIndexed.has(`${event.eventID}\u0000${triggerAt}`)) continue;
-    pending.set(dueKey(triggerAt, valid.deviceID, event.eventID), Math.max(60, Math.ceil((triggerAt + 3600_000 - now) / 1000)));
+    pending.set(dueKey(triggerAt, valid.deviceID, await eventHash(event.eventID)), Math.max(60, Math.ceil((triggerAt + 3600_000 - now) / 1000)));
   }
 
   const registration: Registration = {
     token: valid.token,
     keyId: identity.id,
+    appId: identity.appId,
     events: valid.events,
     updatedAt: new Date(now).toISOString(),
   };
@@ -203,6 +260,6 @@ export async function handlePushToStart(body: Uint8Array, identity: Identity, en
     log("error", "registration_write_failed", { deviceID: valid.deviceID, error: String(e) });
     throw new HttpError(503, "server_busy");
   }
-  log("info", "registration_stored", { deviceID: valid.deviceID, events: valid.events.length, hasToken: valid.token !== null });
+  log("info", "registration_stored", { deviceID: valid.deviceID, events: valid.events.length, skipped: valid.skipped.length, hasToken: valid.token !== null });
   return json(200, { ok: true, events: valid.events.length });
 }

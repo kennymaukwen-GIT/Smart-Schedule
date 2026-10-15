@@ -115,4 +115,13 @@ describe("X.509 parsing and chain verification", () => {
   it("rejects garbage as a certificate", () => {
     assert.throws(() => parseCertificate(hexBytes("3003020101")), CertificateError);
   });
+
+  it("rejects a truncated certificate (TBS = version + serial only) with CertificateError, not a TypeError", () => {
+    const truncated = hexBytes("3019" + "3008a003020102020101" + "300a06082a8648ce3d040302" + "030100");
+    assert.equal(truncated.length, 27);
+    assert.throws(
+      () => parseCertificate(truncated),
+      (e: unknown) => e instanceof CertificateError && /TBSCertificate\.signature/.test(e.message),
+    );
+  });
 });
