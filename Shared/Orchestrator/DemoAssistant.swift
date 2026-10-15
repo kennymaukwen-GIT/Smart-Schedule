@@ -564,7 +564,7 @@ actor DemoAssistant: ScheduleAssisting {
 
     // MARK: - (d) "Lunch with Andrew tomorrow 1pm" · (e) no clock time (only a day, or "下午") → ask
 
-    private func capture(_ text: String, pending: (title: String, day: Date?)?, language: DemoLanguage,
+    private func capture(_ text: String, pending: (title: String, day: Date?, period: DemoParser.DayPeriod?)?, language: DemoLanguage,
                          parser: DemoParser) async -> Reply {
         let calendar = clock.calendar
         let now = parser.now
