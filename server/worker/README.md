@@ -162,7 +162,7 @@ iOS 26 仍在 iPhone 上自行排程 Live Activity；iOS 18 只有在 App 執行
 1. Apple Developer › Certificates, Identifiers & Profiles › **Keys** › ＋，勾選 **Apple Push Notifications service (APNs)**，建立後下載 `AuthKey_<KEYID>.p8`（只能下載一次，請妥善保存，不要 commit；`.gitignore` 已排除 `*.p8`）。
 2. `npx wrangler secret put APNS_KEY_ID`（該 key 的 Key ID，10 字元）、`npx wrangler secret put APNS_TEAM_ID`（擁有該 key 的 Team ID）。
 3. `npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_<KEYID>.p8`（PEM `-----BEGIN PRIVATE KEY-----`，PKCS#8 P-256；若貼成一行含 `\n` 也可）。
-4. App ID `com.smartschedule.app` 要啟用 Push Notifications；topic 為 `${APNS_BUNDLE_ID}.push-type.liveactivity`。
+4. App ID `com.smartschedules.app` 要啟用 Push Notifications；topic 為 `${APNS_BUNDLE_ID}.push-type.liveactivity`。
 
 Provider token 是 ES256 JWT：header `{"alg":"ES256","kid":APNS_KEY_ID}`、claims `{"iss":APNS_TEAM_ID,"iat":…}`，以 WebCrypto 簽章。
 同一個 token 最多重用 50 分鐘（module scope + KV `apns:jwt` 共用；每次 cron 最多產生一個），符合 Apple「20–60 分鐘內更新」的要求；
@@ -187,7 +187,7 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `APNS_PRIVATE_KEY` | secret | APNs `.p8` PEM 內容 |
 | `APPLE_TEAM_ID` | secret | 10 字元 Team ID；appId = `<APPLE_TEAM_ID>.<bundleId>`。沒設時 `/attest` 回 500 |
 | `APNS_KEY_ID`, `APNS_TEAM_ID` | secret | APNs token auth（.p8 的 Key ID、擁有它的 Team ID） |
-| `BUNDLE_IDS` | var | 允許 attest 的 bundle ID（逗號分隔），預設 `com.smartschedule.app`（App Attest 不能在 extension 裡用，notification extension 改用 session） |
+| `BUNDLE_IDS` | var | 允許 attest 的 bundle ID（逗號分隔），預設 `com.smartschedules.app`（App Attest 不能在 extension 裡用，notification extension 改用 session） |
 | `APP_ATTEST_ENV` | var | `development`（aaguid `appattestdevelop`）或 `production`（`appattest` + 7 個 0x00） |
 | `ALLOW_DEV_TOKEN` | var | 只有字串 `"true"` 會啟用 `X-Dev-Token`（以及 dev 身分申請的 session） |
 | `RATE_LIMIT_PER_MIN` | var | 每個身分（attested key / `dev`；session 算在申請它的 key）每分鐘的 request 數，也是 `/attest*` 每個 IP（IPv6 以 /64 計）與每個 (IP, key) 的 Bearer body 讀取上限；須與 `[[ratelimits]]` 的 `simple.limit` 相同；預設 30 |
@@ -195,7 +195,7 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `SESSION_MODELS` | var | Session token 可呼叫的模型（逗號分隔，完整 ID，不接受 prefix），預設 `gemini-3.5-flash`。**必須包含所有仍在使用的 App 版本的 `GEMINI_MODEL_ID`**（`Config/Base.xcconfig`）：新 ID 要在送審使用它的 build 之前加入並部署 Worker（App Review 會測 notification extension）；舊 ID 等到沒有受支援的 build 再送它、或 Google 已關閉它時才移除。`test/config-sync.test.ts` 會檢查目前的 `GEMINI_MODEL_ID` 有列在這裡 |
 | `SESSION_DAILY_LIMIT` | var | 每個身分每 UTC 日以 session 呼叫 generateContent 的上限，預設 `200`（extension 每次回覆 1–3 次）；Bearer 不受影響 |
 | `ATTEST_DAILY_PER_IP` | var | 每個 IP bucket（IPv6 以 /64 計）每 UTC 日**成功** attest 的上限（= 新身分數），預設 `200`（行動網路常有許多使用者共用一個 IPv4） |
-| `APNS_BUNDLE_ID` | var | 預設 `com.smartschedule.app` |
+| `APNS_BUNDLE_ID` | var | 預設 `com.smartschedules.app` |
 | `APNS_ENV` | var | `sandbox` → `api.sandbox.push.apple.com`；`production` → `api.push.apple.com` |
 
 ---

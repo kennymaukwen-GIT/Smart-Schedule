@@ -55,7 +55,7 @@ targets:
       - Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedules.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: App/Info.plist
@@ -152,7 +152,7 @@ targets:
       - Shared/Localization   # each extension resolves strings from its own bundle
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.app.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedules.app.widgets
         SKIP_INSTALL: YES
     info:
       path: Widgets/Info.plist
@@ -189,7 +189,7 @@ targets:
       - Shared/Localization
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedule.app.notification-content
+        PRODUCT_BUNDLE_IDENTIFIER: com.smartschedules.app.notification-content
         SKIP_INSTALL: YES
     info:
       path: NotificationContent/Info.plist

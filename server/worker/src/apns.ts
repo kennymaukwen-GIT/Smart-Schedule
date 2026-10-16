@@ -57,7 +57,7 @@ export function apnsRequest(env: Env, host: string, deviceToken: string, jwt: st
       headers: {
         authorization: `bearer ${jwt}`,
         "apns-push-type": "liveactivity",
-        "apns-topic": `${env.APNS_BUNDLE_ID || "com.smartschedule.app"}.push-type.liveactivity`,
+        "apns-topic": `${env.APNS_BUNDLE_ID || "com.smartschedules.app"}.push-type.liveactivity`,
         "apns-priority": "10",
         "apns-expiration": String(expiration),
         "content-type": "application/json",

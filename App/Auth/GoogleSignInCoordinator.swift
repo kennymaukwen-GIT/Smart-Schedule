@@ -16,7 +16,7 @@ struct GoogleSignInResult: Sendable {
 ///
 /// Setup: Google Cloud Console → enable "Google Calendar API" → OAuth consent screen (add the scopes
 /// `calendar.events` and `calendar.calendarlist.readonly`) → Credentials → OAuth client ID, type **iOS**,
-/// bundle id `com.smartschedule.app`. Put the client id + reversed client id into Config/Secrets.xcconfig.
+/// bundle id `com.smartschedules.app`. Put the client id + reversed client id into Config/Secrets.xcconfig.
 @MainActor
 final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
     enum SignInError: LocalizedError {

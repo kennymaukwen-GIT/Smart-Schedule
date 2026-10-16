@@ -138,7 +138,7 @@ describe("POST /attest", () => {
   it("rejects a bundle ID outside BUNDLE_IDS and a team ID mismatch with invalid_attestation", async () => {
     const h = makeHarness({ rootCaPem: chain.root.pem });
     // The notification extension never attests (App Attest does not work in extensions), so it is not listed.
-    for (const bundleId of ["com.example.evil", "com.smartschedule.app.notification-content"]) {
+    for (const bundleId of ["com.example.evil", "com.smartschedules.app.notification-content"]) {
       const r = await attestWith(h, bundleId);
       assert.equal(r.status, 401, bundleId);
       assert.deepEqual(await r.json(), { error: "invalid_attestation" });

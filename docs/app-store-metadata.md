@@ -29,7 +29,7 @@
 
 | 欄位 | 填什麼 | 說明 |
 |---|---|---|
-| Bundle ID | `com.smartschedule.app` | `project.yml` |
+| Bundle ID | `com.smartschedules.app` | `project.yml` |
 | SKU | `[例如 smart-schedule-ios]` | 只給自己看，之後不能改 |
 | 主要語言（Primary Language） | English (U.S.) | 沒有對應語系的店面會顯示主要語言；英文比中文適合當全球的預設。再加一個 Chinese (Traditional) 語系。英文文字是美式拼法；如果另外加 English (U.K.) 語系，同一份要改兩處：關鍵字的「organizer」改成「organiser」，描述的「Control Center」改成「Control Centre」（Apple 英式介面的名稱）。 |
 | 類別（Category） | 主要：**Productivity（生產力）**；次要：**Business（商務）** | 行事曆和待辦都在 Productivity。次要也可以選 Utilities（工具程式）。不要選 Health & Fitness：長期計畫雖然能排健身課，但 App 本身是行事曆工具。 |

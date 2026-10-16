@@ -31,7 +31,7 @@ Smart Schedule 要求兩個 Google Calendar 的**敏感 scope**（`calendar.even
 | Developer contact information | `support@smart-schedules.com`（真實信箱，審查信寄到這裡） |
 | Audience › User type | **External**（不要選 Internal，見文件開頭的提醒） |
 | Audience › Publishing status | **In production**（第 3.5 節） |
-| Clients | 只有一個：類型 **iOS**、Bundle ID `com.smartschedule.app` |
+| Clients | 只有一個：類型 **iOS**、Bundle ID `com.smartschedules.app` |
 | Data access › scopes | `openid`、`.../auth/userinfo.email`、`.../auth/calendar.events`、`.../auth/calendar.calendarlist.readonly`（第 1 節） |
 | Limited Use 聲明 | 首頁 https://www.smart-schedules.com/ 的「AI and privacy」段落；隱私權政策第 11 節 https://www.smart-schedules.com/privacy#en-limited-use （中文 `#zh-limited-use`） |
 
@@ -58,7 +58,7 @@ Smart Schedule 要求兩個 Google Calendar 的**敏感 scope**（`calendar.even
 - [ ] **隱私權政策**：第 3 節逐一列出四個 scope 和用途，第 4 節說明 AI 送出什麼（和 App 的同意說明第 5 版逐字相同），第 5 節說明即時動態只在 iPhone 上產生，第 11 節 Limited Use，第 13 節保存期限，第 15 節刪除方式。
 - [ ] **App**：TestFlight 上的版本已包含同意說明第 5 版（`AIConsent.disclosureVersion` = 5，`CalendarAliases` 取代帳號 email，`AppConstants.pushToStartEnabled = false`），CI 的 `AccountEmailPrivacyTests` 通過。影片要用這個版本錄。
 - [ ] **Gemini 是付費層級**：Gemini API 的 Google Cloud 專案已連結有效的 Cloud Billing，AI Studio 的記錄（Logs）關閉、沒有選擇把資料集分享給 Google（[`site/README.md`](../site/README.md) 第 2 節）。這是下面「不用於訓練」那些句子成立的條件；免費層級時**不要送審**。英國也在上架範圍，Gemini 條款要求對英國使用者只能用付費服務，所以本來就必須是付費層級。
-- [ ] **Cloud 專案**：已啟用 Google Calendar API；Google Auth Platform › Clients 只有一個 iOS client（Bundle ID `com.smartschedule.app`，填好 Team ID）。測試時建立的 Web／Desktop client 先刪掉：Google 要求影片涵蓋專案裡所有 OAuth client。
+- [ ] **Cloud 專案**：已啟用 Google Calendar API；Google Auth Platform › Clients 只有一個 iOS client（Bundle ID `com.smartschedules.app`，填好 Team ID）。測試時建立的 Web／Desktop client 先刪掉：Google 要求影片涵蓋專案裡所有 OAuth client。
 - [ ] **測試用 Google 帳號**：專門用來錄影的帳號（文件裡寫成 `example@gmail.com`），不要有真實的個人資料。準備幾個明天以後的行程、兩個自己的行事曆（例如 My calendar、Gym），再由另一個帳號共用一個行事曆給它（例如 Family，權限「See all event details」），抽屜裡才看得到唯讀行事曆。
 - [ ] **信箱有人看**：support@smart-schedules.com（Google Workspace 的 Gmail 信箱）和 Cloud 專案擁有者的信箱（擁有者就是 support@ 時是同一個）。審查只用 email 聯絡專案的擁有者／編輯者和開發者聯絡信箱；第三方文章說來信的寄件地址以 `api-oauth-dev-verification-reply` 開頭（google.com），記得檢查垃圾郵件，並把它加進聯絡人。
 - [ ] **support@ 收發信正常**：Squarespace DNS 裡 Google 的 MX、SPF 和所有 `google-site-verification` TXT 都還在，加 `www` CNAME 時沒有動到（Google Admin Toolbox 的 Check MX，或 `dig MX smart-schedules.com`）；做完 Admin console 的「Complete email setup」（DKIM、DMARC，紀錄加在 Squarespace），回給審查員的信比較不會被當成垃圾郵件。步驟見 [`site/README.md`](../site/README.md) §3.6。
@@ -247,7 +247,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 `<PROJECT_ID>`、`<CLIENT_ID>` 換成實際值。旁白可以錄音，也可以做成英文字幕；兩者都有最好。
 
 **鏡頭 1｜片頭（0:00–0:10）**
-- 畫面：黑底字卡：`Smart Schedule – Google OAuth verification demo` / `Google Cloud project: <PROJECT_ID>` / `OAuth client: iOS, bundle ID com.smartschedule.app` / `Scopes: openid, email, calendar.events, calendar.calendarlist.readonly`。
+- 畫面：黑底字卡：`Smart Schedule – Google OAuth verification demo` / `Google Cloud project: <PROJECT_ID>` / `OAuth client: iOS, bundle ID com.smartschedules.app` / `Scopes: openid, email, calendar.events, calendar.calendarlist.readonly`。
 - 旁白：
   ```text
   This is Smart Schedule, an iPhone calendar app and AI scheduling assistant for Google Calendar. This video shows the Google sign-in and consent flow, and how the app uses each scope it requests: openid, email, calendar.events and calendar.calendarlist.readonly.
@@ -257,7 +257,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 - 畫面：Mac 瀏覽器，Google Auth Platform › Clients：只有一個 client；點開，放大 Client ID 全文、類型 iOS、Bundle ID。接著 Branding 頁：App name、logo、home page、privacy policy、authorized domain。
 - 旁白：
   ```text
-  The project has a single OAuth client: an iOS client for the bundle ID com.smartschedule.app. This is its client ID, the one the Smart Schedule app on the iPhone uses. The consent screen is branded Smart Schedule, with our home page and privacy policy on our verified domain, smart-schedules.com.
+  The project has a single OAuth client: an iOS client for the bundle ID com.smartschedules.app. This is its client ID, the one the Smart Schedule app on the iPhone uses. The consent screen is branded Smart Schedule, with our home page and privacy policy on our verified domain, smart-schedules.com.
   ```
 
 **鏡頭 3｜首頁和隱私權政策（0:35–1:00）**
@@ -410,7 +410,7 @@ Hello,
 
 Thank you. We have uploaded an updated demo video: <YouTube link> (unlisted).
 
-- OAuth client ID: Smart Schedule is a native iOS app (OAuth client type iOS, bundle ID com.smartschedule.app). On iOS the sign-in page opens in ASWebAuthenticationSession, Apple's system sign-in sheet, which shows only the host name, not the full URL. The video shows the project's only OAuth client and its client ID in Google Auth Platform > Clients (<mm:ss>), and the full authorization URL the app opens, with client_id=<CLIENT_ID> and all four scopes, logged in Xcode (<mm:ss>).
+- OAuth client ID: Smart Schedule is a native iOS app (OAuth client type iOS, bundle ID com.smartschedules.app). On iOS the sign-in page opens in ASWebAuthenticationSession, Apple's system sign-in sheet, which shows only the host name, not the full URL. The video shows the project's only OAuth client and its client ID in Google Auth Platform > Clients (<mm:ss>), and the full authorization URL the app opens, with client_id=<CLIENT_ID> and all four scopes, logged in Xcode (<mm:ss>).
 - Language: the consent flow is in English; the language menu at the bottom of Google's page shows English (United States) (<mm:ss>).
 - Consent screen: shows the app name Smart Schedule and exactly the scopes in our request (<mm:ss>).
 - Scope use: calendar.events (<mm:ss> read, <mm:ss> create, <mm:ss> edit and delete); calendar.calendarlist.readonly (<mm:ss>).

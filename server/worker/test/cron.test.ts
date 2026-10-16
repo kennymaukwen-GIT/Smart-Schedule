@@ -98,7 +98,7 @@ describe("cron push-to-start", () => {
     assert.equal(call.url, `https://api.sandbox.push.apple.com/3/device/${TOKEN}`);
     assert.equal(call.method, "POST");
     assert.equal(call.headers.get("apns-push-type"), "liveactivity");
-    assert.equal(call.headers.get("apns-topic"), "com.smartschedule.app.push-type.liveactivity");
+    assert.equal(call.headers.get("apns-topic"), "com.smartschedules.app.push-type.liveactivity");
     assert.equal(call.headers.get("apns-priority"), "10");
     assert.equal(call.headers.get("apns-expiration"), String(at("2026-10-15T09:00:00Z") / 1000));
     assert.equal(call.headers.get("content-type"), "application/json");

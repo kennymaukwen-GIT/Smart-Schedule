@@ -54,7 +54,7 @@ export interface Deps {
 }
 
 /** Only the app attests: App Attest does not work in app extensions (the notification extension uses a session). */
-export const DEFAULT_BUNDLE_IDS = ["com.smartschedule.app"];
+export const DEFAULT_BUNDLE_IDS = ["com.smartschedules.app"];
 
 export function bundleIds(env: Env): string[] {
   const raw = env.BUNDLE_IDS?.trim();

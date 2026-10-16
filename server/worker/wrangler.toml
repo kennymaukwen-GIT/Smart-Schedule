@@ -45,7 +45,7 @@ invocation_logs = false
 [vars]
 # Bundle IDs allowed to attest (comma-separated). Only the app: App Attest does not work in app extensions, so the
 # notification extension uses a session token (POST /session) instead.
-BUNDLE_IDS = "com.smartschedule.app"
+BUNDLE_IDS = "com.smartschedules.app"
 # Must match the app's com.apple.developer.devicecheck.appattest-environment entitlement:
 #   "production"  → App Store / TestFlight builds (aaguid "appattest" + 7 zero bytes)
 #   "development" → Xcode-installed builds        (aaguid "appattestdevelop")
@@ -55,7 +55,7 @@ ALLOW_DEV_TOKEN = "false"
 # Requests per identity (attested key, "dev", or client IP for /attest*) per UTC minute; also the number of failed
 # authentications one IP may make per minute before it is refused without its body being read.
 RATE_LIMIT_PER_MIN = "30"
-APNS_BUNDLE_ID = "com.smartschedule.app"
+APNS_BUNDLE_ID = "com.smartschedules.app"
 # Must match the app build's aps-environment: "sandbox" (Xcode builds) or "production" (TestFlight / App Store).
 # Only the cron uses it, and version 1.0 has neither (see [triggers]).
 APNS_ENV = "production"
@@ -123,11 +123,11 @@ namespace_id = "1002"
 simple = { limit = 30, period = 60 }
 
 [env.dev.vars]
-BUNDLE_IDS = "com.smartschedule.app"
+BUNDLE_IDS = "com.smartschedules.app"
 APP_ATTEST_ENV = "development"
 ALLOW_DEV_TOKEN = "true"
 RATE_LIMIT_PER_MIN = "30"
-APNS_BUNDLE_ID = "com.smartschedule.app"
+APNS_BUNDLE_ID = "com.smartschedules.app"
 APNS_ENV = "sandbox"
 SESSION_TTL_SECONDS = "604800"
 SESSION_MODELS = "gemini-3.5-flash"

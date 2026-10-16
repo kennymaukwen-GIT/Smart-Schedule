@@ -1,5 +1,5 @@
 {
-  "Simulator Target Bundle": "com.smartschedule.app",
+  "Simulator Target Bundle": "com.smartschedules.app",
   "aps": {
     "alert": {
       "title": "Online meeting with Joe",

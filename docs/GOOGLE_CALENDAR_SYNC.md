@@ -6,7 +6,7 @@
 
 1. Google Cloud Console：啟用 **Google Calendar API**。
 2. OAuth consent screen：加入 scope `https://www.googleapis.com/auth/calendar.events` 和 `https://www.googleapis.com/auth/calendar.calendarlist.readonly`，再加上 `openid` 和 `email`。`calendarlist.readonly` 是能列出使用者所有行事曆的最小 scope；`calendar.events` 本來就能讀寫使用者可存取的每個行事曆裡的事件，所以不需要更大的 scope。
-3. Credentials：建立 OAuth client ID，類型選 **iOS**，Bundle ID 填 `com.smartschedule.app`。把 client ID 和 reversed client ID 寫進 `Config/Secrets.xcconfig`。
+3. Credentials：建立 OAuth client ID，類型選 **iOS**，Bundle ID 填 `com.smartschedules.app`。把 client ID 和 reversed client ID 寫進 `Config/Secrets.xcconfig`。
 4. 登入流程：`ASWebAuthenticationSession` 加 PKCE（S256），redirect 是 `com.googleusercontent.apps.XXX:/oauth2redirect`。iOS 類型的 client **沒有 client secret**。授權網址由 `GoogleAuthorization.url(…)` 產生：`include_granted_scopes=true`；有 `login_hint`（新增帳號頁輸入的 email，或重新連接的帳號）時 `prompt=consent`，Google 直接走到那個帳號或填好 email 請使用者登入；沒有時 `prompt=consent select_account`（顯示帳號選擇器，才能加第二個帳號）。consent 確保拿得到 refresh token。email 裡的「+」送成 `%2B`。redirect 帶 `error=`（`access_denied`、`admin_policy_enforced` 等）時轉成 `GoogleSignInFailure`，用一句話告訴使用者（`docs/SETTINGS.md` §5.11）。
 5. 登入後從 token 回應的 `id_token` 解出 `sub` 和 `email`（`IDToken`：只解 payload，不驗簽章，因為 token 是我們自己用授權碼從 Google token endpoint 透過 TLS 換來的）。`scope` 欄位以空白分隔，就是實際授予的 scope。`GoogleSignInCoordinator.signIn(loginHint:)` 只回傳結果，不存任何東西，由 `AccountManager` 決定是新帳號、重新連接，還是選錯帳號。
 6. Token 存在 Keychain 的共享 group，**每個帳號一個 item**：service `com.smartschedule.tokens`、account `google.oauth.<sub>`，屬性是 `AfterFirstUnlock`，所以鎖定畫面上的 notification extension 也能自己 refresh。refresh 只是一個表單 POST 到 `oauth2.googleapis.com/token`，不需要 SDK。

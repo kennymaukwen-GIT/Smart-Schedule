@@ -11,7 +11,7 @@ import { exportKeyBytes, generateEcKeyPair } from "./webcrypto.ts";
 x509.cryptoProvider.set(crypto);
 
 export const TEAM_ID = "ABCDE12345";
-export const BUNDLE_ID = "com.smartschedule.app";
+export const BUNDLE_ID = "com.smartschedules.app";
 export const APP_ID = `${TEAM_ID}.${BUNDLE_ID}`;
 export const NONCE_OID = "1.2.840.113635.100.8.2";
 

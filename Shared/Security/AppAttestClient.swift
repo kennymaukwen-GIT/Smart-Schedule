@@ -114,7 +114,7 @@ actor AppAttestClient: AttestationProviding {
 
     init(origin: URL? = ServerEndpoint.origin,
          session: URLSession = NetworkSession.shared,
-         bundleID: String = Bundle.main.bundleIdentifier ?? "com.smartschedule.app",
+         bundleID: String = Bundle.main.bundleIdentifier ?? "com.smartschedules.app",
          isExtension: Bool = NetworkSession.isAppExtension,
          sessions: SessionStoring = KeychainSessionStore(),
          now: @escaping @Sendable () -> Date = { Date() }) {
