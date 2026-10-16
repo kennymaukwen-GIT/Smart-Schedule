@@ -15,7 +15,7 @@
 
 ## 0. 送審前一定要處理的事
 
-- [ ] 把 `[開發者名稱 / Developer name]`、聯絡電話、測試帳號、備用驗證碼這些佔位值填好。網站（`site/public/`）上標黃的佔位值也要先填好再部署：Guideline 2.1 不接受佔位文字和打不開的網址，而 Support URL 必須通到真正的聯絡資訊。
+- [ ] 把聯絡電話、測試帳號、備用驗證碼這些佔位值填好（開發者名稱已決定：SHENG HAN HSIEH，和 Apple 帳號的 Entity Name 一致）。網站（`site/public/`）的佔位值已在 2026-10-16 填好：Guideline 2.1 不接受佔位文字和打不開的網址，而 Support URL 必須通到真正的聯絡資訊。
 - [ ] https://www.smart-schedules.com 的首頁、`/privacy`、`/support` 都已上線、直接回 200（三個網址在這份文件裡都會用到）。一律用 **www**：網站放在 Cloudflare Pages，DNS 留在 Squarespace，只加一筆 `www` 的 CNAME；沒有 www 的根網域不提供網站（`site/README.md` §3）。
 - [ ] Smart Schedules 的伺服器（`server/worker/`）已部署成正式環境：`APP_ATTEST_ENV = "production"`，`GEMINI_API_KEY` 和 `APPLE_TEAM_ID` 兩個 secret 已設定，`SESSION_MODELS` 包含這個版本的 `GEMINI_MODEL_ID`。1.0 沒有 push-to-start，所以 `crons = []`，不需要 APNs 的 `.p8` 和 `APNS_*` secrets（`server/worker/README.md`「1.0：push-to-start 關閉」）。審核期間要一直開著（Guideline 2.1：「turn on your back-end service」）。
 - [ ] Gemini API 的 Google Cloud 專案已開啟 Cloud Billing（付費層級）。英國在上架範圍內，Gemini API 條款寫明「You may use only Paid Services when making API Clients available to users in the European Economic Area, Switzerland, or the United Kingdom」（[Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms)；這段文字來自搜尋摘錄，送審前到條款頁再確認一次）。
@@ -275,7 +275,7 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,diary,assistant,o
 | 欄位 | 填什麼 |
 |---|---|
 | 版本號 | `1.0.0`（要和 `MARKETING_VERSION` 一致，見 `project.yml`） |
-| 版權（Copyright） | `2026 [開發者名稱 / Developer name]`（不要自己加 ©，App Store Connect 會自動加；年份是取得權利的那一年） |
+| 版權（Copyright） | `2026 SHENG HAN HSIEH`（不要自己加 ©，App Store Connect 會自動加；年份是取得權利的那一年） |
 | What's New | 第一版沒有這個欄位 |
 | App 內購買項目 | **一個都不要附加。** 如果 App Store Connect 裡已經建立「Smart Schedules Pro」群組或商品，就留著不送審。 |
 

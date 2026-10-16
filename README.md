@@ -29,6 +29,7 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 ### 對話紀錄與回覆排版
 
 - **完整對話紀錄**：主畫面的對話區、Quick Capture 的對話面板（和主畫面共用同一份 `ChatViewModel.messages`）、長按通知的展開卡片，都保留整段對話，可以往上滑看之前的內容。使用者停在最底部時，新訊息會自動捲到底；往上滑在讀舊訊息時位置不變，底部出現「最新訊息 ↓」膠囊，點了才跳到最新（`App/Views/ConversationScrollView.swift`，通知擴充裡是 `NotificationMessageViews.swift` 的精簡版）。計畫卡片留在對話中原本的位置，舊版本顯示「已由第 N 版取代」並收合，點一下可以展開比較。建議膠囊只跟著最新一則回覆。
+- **往下滑收鍵盤**：鍵盤叫出時，在 App 任何地方（主畫面、Quick Capture、抽屜、行程頁、新增帳號等 sheet）手指往下滑 30 pt 以上、而且往下多於往旁邊，鍵盤就收起；點輸入框鍵盤再出現。做法是 window 上一個只旁觀的 pan 手勢（`App/Views/KeyboardDismissSwipe.swift`，和其他手勢同時辨識、不取消也不延遲它們的觸控，鍵盤收著時不啟動；從正在輸入的輸入框裡開始的拖曳留給輸入框），門檻判斷在 `Shared/Core/KeyboardDismissal.swift`（有單元測試）。對話區用 `.scrollDismissesKeyboard(.interactively)`，鍵盤可以跟著手指往下收；左右翻頁的日曆和膠囊列用 `.never`，橫向滑動不收鍵盤。打開抽屜時鍵盤也會收起。
 - **回覆不再是一整段文字**：`App/Views/AssistantMessageView.swift` 依照回覆帶的資料分別呈現。文字依空行分段，「• 」「- 」「1. 」開頭的行顯示成縮排清單，支援 **粗體**，15 pt、行距 4。新增的行程顯示成「已加入 Google 日曆」列（標題、日期時間、地點或 Meet）；查詢行程顯示成對齊的時間表（「12:30  午餐」）；長期計畫卡片是一張表：每個階段一個小標題，每堂課一列（星期幾 · 時間 · 時長 · 名稱），再加上提醒、檢查點，假設預設收合。模型的 `summary_for_user` 只寫一兩句目標和每週負荷，日期時間只出現在表格裡，不會重複。
 - `Reply.text` 仍然是完整的文字版本，給 Siri、通知內文和 Live Activity 使用；對話裡只顯示表格和列沒有涵蓋的部分（例如修改了什麼、時間重疊的提醒）。
 - **語言**：介面字串在 `Shared/Localization/Localizable.xcstrings`（英文為 key，附繁體中文），裝置語言是中文時顯示中文。日期用語系格式（「10月14日（週三）」），時間一律 24 小時制。Previews 裡有 zh-Hant 版本（`.environment(\.locale, …)`），日期、星期和 `Text` 標籤會跟著切換；要看 `String(localized:)` 產生的字串也變中文，請在 Scheme 的 App Language 選繁體中文再執行。
@@ -164,7 +165,7 @@ open SmartSchedule.xcodeproj
 - [ ] **App Store Connect**：建立 App（Bundle ID `com.smartschedules.app`），照 [`docs/app-store-metadata.md`](docs/app-store-metadata.md) 填 App 資訊、兩個語系的產品頁、App 隱私、年齡分級、供應地區和審核資訊（測試 Google 帳號、備用驗證碼）。
 - [ ] **TestFlight**：用 Distribute App 上傳 Release build（正式環境的 `GEMINI_BASE_URL`），先在 TestFlight 用正式 Worker 測過 AI 助理、長按通知回覆和 App Attest，再送審。
 - [ ] **截圖**：6.9 吋和 6.3 吋 iPhone 各一組、繁體中文和英文各一組，只用虛構資料（`docs/app-store-metadata.md` 第 9 節）。
-- [ ] **網站 https://www.smart-schedules.com**（首頁、隱私權政策、支援頁，見 [`site/README.md`](site/README.md) §3）：先填好頁面裡標黃的佔位值（開發者名稱、支援頁的回覆天數），再把 `site/` 部署成 Cloudflare Pages 專案，在 Pages 加上自訂網域 `www.smart-schedules.com`，然後在 Squarespace 的 DNS 加**一筆** CNAME（`www` → 專案的 `pages.dev` 主機名稱）。**DNS 不搬到 Cloudflare**，nameserver 和 DNSSEC 不動，Google Workspace 的 MX、SPF、DKIM、DMARC 和 `google-site-verification` 一筆都不動。`SSPrivacyURL` 已設為 https://www.smart-schedules.com/privacy，網站上線前這個連結打不開。根網域 smart-schedules.com 轉到 www 是選做（`site/README.md` §3.5，Squarespace 的網域轉址；要是開了，隱私權政策第 10 節要補一句 Squarespace 會處理轉址的連線）。
+- [ ] **網站 https://www.smart-schedules.com**（首頁、隱私權政策、支援頁，見 [`site/README.md`](site/README.md) §3）：佔位值已填好（開發者名稱 SHENG HAN HSIEH、支援頁回覆 3 個工作天），把 `site/` 部署成 Cloudflare Pages 專案，在 Pages 加上自訂網域 `www.smart-schedules.com`，然後在 Squarespace 的 DNS 加**一筆** CNAME（`www` → 專案的 `pages.dev` 主機名稱）。**DNS 不搬到 Cloudflare**，nameserver 和 DNSSEC 不動，Google Workspace 的 MX、SPF、DKIM、DMARC 和 `google-site-verification` 一筆都不動。`SSPrivacyURL` 已設為 https://www.smart-schedules.com/privacy，網站上線前這個連結打不開。根網域 smart-schedules.com 轉到 www 是選做（`site/README.md` §3.5，Squarespace 的網域轉址；要是開了，隱私權政策第 10 節要補一句 Squarespace 會處理轉址的連線）。
 - [ ] **support@ 郵件**：support@smart-schedules.com 是 Google Workspace 的 Gmail 信箱（隱私權政策第 9、12、13、17 節已寫明），在 Squarespace 完成 DKIM 和 DMARC（`site/README.md` §3.6），不用 Cloudflare Email Routing；Search Console 用網域資源 `smart-schedules.com` 驗證（§3.7，TXT 加在 Squarespace）。
 
 ## 驗證狀態
