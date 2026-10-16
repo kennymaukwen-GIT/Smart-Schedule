@@ -100,6 +100,7 @@ struct MonthPickerBar: View {
                 }
                 .padding(.horizontal, 4)
             }
+            .scrollDismissesKeyboard(.never) // sideways: keeps the keyboard up
             .onAppear { proxy.scrollTo(selected, anchor: .center) }
             .onChange(of: selection) { old, new in
                 var target = CalendarPaging.monthOffset(of: new, from: anchor, calendar: calendar)

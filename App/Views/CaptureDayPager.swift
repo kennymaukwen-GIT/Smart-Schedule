@@ -52,6 +52,8 @@ struct CaptureDayPager: View {
             }
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: $page)
+            // Paging keeps the keyboard up; a swipe down hides it (KeyboardDismissSwipe).
+            .scrollDismissesKeyboard(.never)
             .onScrollPhaseChange { _, phase in
                 if phase == .idle { settle() }
             }

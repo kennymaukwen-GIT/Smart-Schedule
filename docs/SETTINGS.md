@@ -53,7 +53,7 @@ The old big year `Text` above the chips is removed (the header title replaces it
 
 ### 2.2 Calendar drawer (hamburger = WHAT you see) (UI)
 
-A panel sliding in from the leading edge over a dimmed main screen (dim `Color.black.opacity(0.45)`, tap to close, drag left to close). Width `min(340, 84% of screen)`. Background `Theme.surface`. The panel hosts its own `NavigationStack` so calendar details push inside it.
+A panel sliding in from the leading edge over a dimmed main screen (dim `Color.black.opacity(0.45)`, tap to close, drag left to close). Opening it hides the keyboard (anywhere in the app, a swipe down hides it too: `App/Views/KeyboardDismissSwipe.swift`). Width `min(340, 84% of screen)`. Background `Theme.surface`. The panel hosts its own `NavigationStack` so calendar details push inside it.
 
 ```
 Smart Schedules                         ← large title, white

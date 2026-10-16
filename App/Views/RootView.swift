@@ -49,6 +49,11 @@ struct RootView: View {
         .animation(.spring(response: 0.42, dampingFraction: 0.82), value: router.quickCapture)
         .animation(.snappy, value: router.isDrawerOpen)
         .animation(.snappy, value: schedule.notice)
+        // Swipe down anywhere (sheets included) to hide the keyboard; the drawer opens without it.
+        .dismissesKeyboardOnSwipeDown()
+        .onChange(of: router.isDrawerOpen) { _, isOpen in
+            if isOpen { KeyboardDismissal.dismissKeyboard() }
+        }
         .sheet(item: Binding(
             get: { router.selectedEventID.flatMap(schedule.event(id:)) },
             set: { router.selectedEventID = $0?.id }

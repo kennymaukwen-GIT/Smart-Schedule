@@ -71,6 +71,8 @@ struct WeekAgendaCard: View {
             }
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: $currentPage)
+            // Paging keeps the keyboard up; a swipe down hides it (KeyboardDismissSwipe).
+            .scrollDismissesKeyboard(.never)
             .onScrollPhaseChange { _, phase in
                 if phase == .idle { settle() }
             }

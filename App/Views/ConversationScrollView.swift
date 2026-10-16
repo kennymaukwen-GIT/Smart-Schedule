@@ -39,6 +39,9 @@ struct ConversationScrollView<Content: View>: View {
                         .id(Self.bottomID)
                 }
             }
+            // Right above the input bar: the keyboard follows a finger dragged down into it, as in Messages, and
+            // scrolling back up through the history keeps it (a swipe down hides it anywhere: KeyboardDismissSwipe).
+            .scrollDismissesKeyboard(.interactively)
             .onScrollGeometryChange(for: ConversationViewport.self) { geometry in
                 ConversationViewport(isAtBottom: geometry.visibleRect.maxY >= geometry.contentSize.height - Self.slack,
                                      height: geometry.containerSize.height)

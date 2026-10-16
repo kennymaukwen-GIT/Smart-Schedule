@@ -297,7 +297,6 @@ struct QuickCaptureView: View {
                 .padding(.top, 2)
                 .padding(.bottom, 4)
             }
-            .scrollDismissesKeyboard(.interactively)
 
             if chat.showsConsentBanner {
                 ConsentBanner { chat.reviewConsent() }
@@ -378,6 +377,7 @@ struct QuickCaptureView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.never) // sideways: keeps the keyboard up
         }
         .frame(height: 32)
     }
