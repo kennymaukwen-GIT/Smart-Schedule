@@ -2,7 +2,7 @@
 
 Smart Schedules 的靜態網站：首頁、隱私權政策和支援頁，網址是 **https://www.smart-schedules.com**。Google OAuth 驗證、App Store Connect 和 App 裡的連結都指向這裡。
 
-部署方式（1.0）：**Cloudflare Pages 專案**（Direct Upload，只有靜態檔案，沒有 Functions），用 `server/worker` 已經裝好的 wrangler（4.146.0）從終端機上傳，和 `server/worker` 用同一個 Cloudflare 帳號。**DNS 留在 Squarespace，不搬到 Cloudflare**：nameserver 仍然是 `nsa1`～`nsa4.squarespacedns.com`，DNSSEC 照舊開著，Google Workspace 的郵件紀錄一筆都不動；唯一和網站有關的 DNS 變更是在 Squarespace 加**一筆 CNAME**（`www` → 專案的 `pages.dev` 主機名稱）。根網域 smart-schedules.com 不提供網站，可以選擇用 Squarespace 的網域轉址轉到 www（[§3.5](#35選做根網域-smart-schedulescom-轉到-www)）。步驟在 [§3](#3-網站上線wwwsmart-schedulescomcloudflare-pages--squarespace-一筆-cname不搬-dns)；之後如果要把 DNS 搬到 Cloudflare，見[附錄](#附錄之後若要把-dns-搬到-cloudflare10-不需要)（1.0 不需要）。
+部署方式（1.0）：**Cloudflare Pages 專案**（Direct Upload，只有靜態檔案，沒有 Functions），用 `server/worker` 已經裝好的 wrangler（4.151.1）從終端機上傳，和 `server/worker` 用同一個 Cloudflare 帳號。**DNS 留在 Squarespace，不搬到 Cloudflare**：nameserver 仍然是 `nsa1`～`nsa4.squarespacedns.com`，DNSSEC 照舊開著，Google Workspace 的郵件紀錄一筆都不動；唯一和網站有關的 DNS 變更是在 Squarespace 加**一筆 CNAME**（`www` → 專案的 `pages.dev` 主機名稱）。根網域 smart-schedules.com 不提供網站，可以選擇用 Squarespace 的網域轉址轉到 www（[§3.5](#35選做根網域-smart-schedulescom-轉到-www)）。步驟在 [§3](#3-網站上線wwwsmart-schedulescomcloudflare-pages--squarespace-一筆-cname不搬-dns)；之後如果要把 DNS 搬到 Cloudflare，見[附錄](#附錄之後若要把-dns-搬到-cloudflare10-不需要)（1.0 不需要）。
 
 ## 檔案
 
@@ -110,7 +110,7 @@ grep -rn 'https://smart-schedules\.com' site/public      # 網址都要是 https
 ```sh
 cd site                                       # 之後的指令都在 site/ 裡執行
 W=../server/worker/node_modules/.bin/wrangler
-$W --version                                  # 4.146.0
+$W --version                                  # 4.151.1
 $W whoami                                     # 確認是跑 smart-schedule-worker 的帳號；沒登入就先執行 $W login
 $W pages project create smart-schedules-site --production-branch main      # 只做一次
 $W pages deploy public --project-name smart-schedules-site --branch main --commit-dirty=true
@@ -122,7 +122,7 @@ $W pages deploy public --project-name smart-schedules-site --branch main --commi
 - **要在 `site/` 裡執行。** Pages 只讀目前資料夾的 `wrangler.toml`，不接受 `-c`／`--config`（會報錯「Pages does not support custom paths for the Wrangler configuration file」）；在 `site/` 裡執行時，wrangler 的快取也會放在 `site/.wrangler/`（git 已忽略）。在 repo 根目錄執行也能部署（`$W pages deploy site/public …`），但會在根目錄多出沒被忽略的 `.wrangler/`；在 `server/worker` 裡執行會讀到 API Worker 的 `wrangler.toml`，不要在那裡執行。
 - 上傳的只有 `public/` 的內容；`wrangler.toml`、`README.md`、`.gitignore` 不會上傳。
 - 你的 Cloudflare 登入可以進好幾個帳號時，會先問「Select an account」：選跑 `smart-schedule-worker` 的那個。
-- **wrangler 偵測到 AI agent 時的行為。** wrangler 4.146.0 在偵測到自己是被 AI 工具執行時，`pages project create` 會改成建立一個 Worker（印出「Delegating to the latest version of Cloudflare Pages, now part of Cloudflare Workers」），而不是 Pages 專案。在一般終端機執行不會發生。萬一看到這一行：到控制台 Workers & Pages 看有沒有多出叫 `smart-schedules-site` 的 Worker，有的話刪掉（Worker › 設定（Settings）› 刪除（Delete），請在畫面上確認），然後在一般終端機重新執行 `pages project create`；還是一樣才在那一行最後加上 `--force`（wrangler 4.146.0 有這個隱藏旗標，意思是直接建立 Pages 專案）。`--force` 只需要在 `project create` 用一次；專案存在之後，加了 `--branch` 的 `pages deploy` 不會被轉成 Worker。
+- **wrangler 偵測到 AI agent 時的行為。** wrangler 4.146.0 起（目前的 4.151.1 也一樣）在偵測到自己是被 AI 工具執行時，`pages project create` 會改成建立一個 Worker（印出「Delegating to the latest version of Cloudflare Pages, now part of Cloudflare Workers」），而不是 Pages 專案。在一般終端機執行不會發生。萬一看到這一行：到控制台 Workers & Pages 看有沒有多出叫 `smart-schedules-site` 的 Worker，有的話刪掉（Worker › 設定（Settings）› 刪除（Delete），請在畫面上確認），然後在一般終端機重新執行 `pages project create`；還是一樣才在那一行最後加上 `--force`（wrangler 4.146.0 起都有這個隱藏旗標，意思是直接建立 Pages 專案）。`--force` 只需要在 `project create` 用一次；專案存在之後，加了 `--branch` 的 `pages deploy` 不會被轉成 Worker。
 - **本機預覽：** 在 `site/` 裡執行 `$W pages dev`，打開 http://localhost:8788 。啟動時會列出 `SS_KV` 等 `server/worker` 的 binding（wrangler 從自己所在的 `server/worker` 讀到 API Worker 的設定），只在本機、和網站無關，可以忽略；本機的 `/_headers` 會回 502，上線後是 404，都不會提供那個檔案。
 
 **成功時會看到：** `curl -sI https://<專案>.pages.dev/privacy` 回 `200`（`<專案>.pages.dev` 換成剛才抄下的主機名稱）；控制台 Workers & Pages 有 `smart-schedules-site`，部署（Deployments）分頁最上面是 Production 的部署（請在畫面上確認）。

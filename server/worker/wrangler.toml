@@ -8,6 +8,10 @@ compatibility_date = "2026-09-15"
 # public URL of its own with the same secrets and KV.
 workers_dev = true
 preview_urls = false
+# Since wrangler 4.150.0, deploy uploads source maps (the full src/*.ts, comments included) unless this says otherwise.
+# Kept off so a deploy uploads only the bundle, as it did before; the bundle is not minified, so stack traces in
+# `wrangler tail` stay readable. [env.dev] inherits this setting.
+upload_source_maps = false
 
 # No cron in version 1.0: the app has no Live Activity push-to-start (AppConstants.pushToStartEnabled = false, no
 # aps-environment) and uploads no registrations, and without the APNS_* secrets every run would only log
