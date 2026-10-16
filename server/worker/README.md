@@ -52,9 +52,11 @@ npx wrangler login
 npm run deploy
 
 # 2. Secrets：存在 Cloudflare，之後每次部署都會保留，不會寫進 repo
-npx wrangler secret put GEMINI_API_KEY
-npx wrangler secret put APPLE_TEAM_ID           # 10 字元 Team ID（developer.apple.com › Membership details）
-npx wrangler secret list                        # 只列名稱，確認上面兩個都在
+#    --env="" 指正式環境（和 npm run deploy 一樣）；省略也會設到正式環境，只是 wrangler 會印一段「有多個環境」的警告
+npm run check-key                                # 先確認金鑰可用（輸入時不顯示）
+npx wrangler secret put GEMINI_API_KEY --env=""
+npx wrangler secret put APPLE_TEAM_ID --env=""   # 10 字元 Team ID（developer.apple.com › Membership details）
+npx wrangler secret list --env=""                # 只列名稱，確認上面兩個都在
 ```
 
 **1.0 不需要 APNs secrets**（`APNS_KEY_ID`、`APNS_TEAM_ID`、`APNS_PRIVATE_KEY`），也不必建立 `.p8`：1.0 沒有 push-to-start，
