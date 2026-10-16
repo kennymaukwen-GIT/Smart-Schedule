@@ -172,7 +172,7 @@ open SmartSchedule.xcodeproj
 
 | 項目 | 狀態 |
 |---|---|
-| Gemini schema lint（OpenAPI subset，9 個函式）、15 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文）、1.0 不賣訂閱（`AppConstants.subscriptionsEnabled` 是 false，用到 StoreKit 或訂閱文字的檔案都讀這個旗標） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
+| Gemini schema lint（OpenAPI subset，9 個函式）、16 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文）、1.0 不賣訂閱（`AppConstants.subscriptionsEnabled` 是 false，用到 StoreKit 或訂閱文字的檔案都讀這個旗標） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
 | Swift 編譯（App、Widgets、Notification extension） | ⏳ 設定、多帳號改動後待 CI 重新編譯（GitHub Actions 的 macOS runner：xcodegen 加 xcodebuild） |
 | 單元測試 | ⏳ 設定、多帳號改動後待 CI 重跑（hostless `SmartScheduleCoreTests`） |
 | 只能在實機上確認的行為（控制中心打開快速輸入、iOS 26 排程啟動的 Live Activity、iOS 18 打開 App 時出現的 Live Activity（1.0 沒有 push-to-start）、通知內 inline TextField、160 pt 高度） | ⏳ 清單在 `docs/ARCHITECTURE.md` 第 7 節 |

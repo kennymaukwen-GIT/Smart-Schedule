@@ -28,6 +28,9 @@
 9. Version 1.0 has no microphone or speech recognition of its own: no Swift file records audio or calls Apple's speech
    recognizer, and neither project.yml nor a .strings file declares NSMicrophoneUsageDescription or
    NSSpeechRecognitionUsageDescription. People type, use the keyboard's own dictation, or talk to Siri.
+10. A time counted from now (prompt rule 7: "1個小時後", "in an hour"): a fixture with "relative_minutes" says such a
+    time and creates one event that starts at now_local plus that many minutes (the next day past midnight), with no
+    time phrase in its title, reminder_minutes [0] (a reminder at the start) and no end.
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -376,6 +379,51 @@ def context_checks(root: dict, fixture: str) -> None:
             errors.append(f"{fixture}: a revision keeps plan_title unless the user renames it")
 
 
+# A time counted from now: "1個小時後", "半小時後", "一個半小時後", "10 分鐘後", "in an hour", "in half an hour",
+# "2 hours from now". Not a clock time followed by 後 ("三點後", "3點10分後"), and not "延後 1 小時" or "提前 2 小時提醒"
+# (no 後 right after the unit). English minutes need digits, so "in a minute" is not one.
+FROM_NOW_ZH = re.compile(
+    r"(?<![點点時时:：0-9零〇一二兩两三四五六七八九十])(?:(半)|([0-9]{1,3}|[零〇一二兩两三四五六七八九十]{1,4})\s*(?:個|个)?\s*(半)?)"
+    r"\s*(?:個|个)?\s*(小時|小时|鐘頭|钟头|分鐘|分钟)\s*(?:以後|以后|之後|之后|後|后)")
+FROM_NOW_EN = [re.compile(pattern, re.IGNORECASE) for pattern in (
+    r"\bin\s+(?:an?|one)\s+hour\s+and\s+a\s+half\b",
+    r"\bin\s+half\s+an\s+hour\b",
+    r"\bin\s+(?:an?|one)\s+hour\b",
+    r"\bin\s+(\d{1,3})\s*(?:h|hrs?|hours?)\b",
+    r"\bin\s+(\d{1,4})\s*(?:mins?|minutes?)\b",
+    r"\b(an?|one|\d{1,3})\s*(hours?|hrs?|minutes?|mins?)\s+from\s+now\b",
+)]
+
+
+def says_time_from_now(text: str) -> bool:
+    return bool(FROM_NOW_ZH.search(text)) or any(pattern.search(text) for pattern in FROM_NOW_EN)
+
+
+def relative_time_checks(root: dict, fixture: str) -> None:
+    """Prompt rule 7: a time counted from now ("1個小時後", "in an hour") starts at now_local plus that much, on the next
+    day past midnight; the title keeps no time phrase; the event reminds at its start (reminder_minutes [0])."""
+    delta = root.get("relative_minutes")
+    if delta is None:
+        return
+    call = root["expected_call"]
+    if call["name"] != "create_events" or len(call["args"]["events"]) != 1:
+        errors.append(f"{fixture}: relative_minutes fixtures create exactly one event")
+        return
+    event = call["args"]["events"][0]
+    if not says_time_from_now(root["utterance"]):
+        errors.append(f"{fixture}: the utterance says no time counted from now")
+    expected = (datetime.fromisoformat(root["now_local"]) + timedelta(minutes=delta)).strftime("%Y-%m-%dT%H:%M")
+    if event["start"] != expected:
+        errors.append(f"{fixture}: start {event['start']} is not now_local + {delta} min ({expected})")
+    # No \b around the time: in "買蛋23:50" there is no word boundary between the characters and the digits.
+    if says_time_from_now(event["title"]) or re.search(r"\d{1,2}:\d{2}", event["title"]):
+        errors.append(f"{fixture}: the title keeps the time phrase")
+    if event.get("reminder_minutes") != [0]:
+        errors.append(f"{fixture}: a time counted from now reminds at the start (reminder_minutes [0])")
+    if "end" in event:
+        errors.append(f"{fixture}: no end unless the user gave one; the default length applies")
+
+
 # The prompt builders: calendars reach Gemini only through CalendarAliases, never as "<name> | <email>".
 PROMPT_SOURCES = ["Shared/AI/AssistantPrompt.swift", "Shared/AI/NoteSuggestionPrompt.swift"]
 ACCOUNT_ADDRESS = re.compile(r"\b(accountEmail|promptLabel)\b")
@@ -607,6 +655,7 @@ def main() -> int:
         suggestion_checks(call["name"], call["args"], fixture, path.name)
         context_checks(fixture, path.name)
         privacy_checks(fixture, path.name)
+        relative_time_checks(fixture, path.name)
         print(f"✓ fixture {path.name}")
 
         if "--print-payloads" in sys.argv and call["name"] == "create_long_term_plan":

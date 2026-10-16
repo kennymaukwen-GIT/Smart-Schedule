@@ -411,6 +411,48 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertFalse(text.contains("'Use my school account from now on' → default_calendar"), text)
     }
 
+    // MARK: A time counted from now
+
+    func testTimeCountedFromNowRule() throws {
+        let text = prompt()
+        let lines = text.components(separatedBy: "\n")
+        let rule7 = try XCTUnwrap(lines.first { $0.hasPrefix("7. A new event (create_events) needs a clock time") }, text)
+        XCTAssertTrue(rule7.contains(#""in 30 minutes". A time counted from now ("in an hour""#), rule7)
+        XCTAssertTrue(rule7.contains("1個小時後"), rule7)
+        XCTAssertTrue(rule7.contains(#"at now_local 22:50, "1個小時後" → 23:50 and "兩小時後" → 00:50 the next day"#), rule7)
+        XCTAssertTrue(rule7.contains(#"("1個小時後買蛋給 Jocelyn" → "買蛋給 Jocelyn")"#), rule7)
+        XCTAssertTrue(rule7.contains("set reminder_minutes to [0], a reminder at the start"), rule7)
+        XCTAssertTrue(rule7.contains("(the one exception to rule 8)"), rule7)
+        XCTAssertTrue(rule7.contains(#"A clock time followed by "後" ("三點後", "after 3pm") is not counted from now"#), rule7)
+        XCTAssertTrue(rule7.contains(#"("push it an hour", "延後 1 小時") stays modify_event from its current start"#), rule7)
+        // The rest of rule 7 is unchanged: a day alone, or a part of the day, still asks what time.
+        XCTAssertTrue(rule7.contains(#"When the request gives only a day ("明天開會", "dentist on Friday")"#), rule7)
+        XCTAssertTrue(rule7.contains("do NOT pick a time and create nothing"), rule7)
+
+        // Rule 8 is unchanged.
+        let rule8 = try XCTUnwrap(lines.first { $0.hasPrefix("8. ") }, text)
+        XCTAssertTrue(rule8.hasPrefix("8. Omit reminder_minutes unless the user asks"), rule8)
+    }
+
+    func testDeclarationsDescribeTimeCountedFromNow() throws {
+        let url = try XCTUnwrap(Bundle(for: GeminiClient.self).url(forResource: "FunctionDeclarations", withExtension: "json"))
+        let declarations = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
+        let create = try XCTUnwrap(declarations.first { $0["name"] as? String == "create_events" })
+        let events = try XCTUnwrap(((create["parameters"] as? [String: Any])?["properties"] as? [String: Any])?["events"]
+                                   as? [String: Any])
+        let properties = try XCTUnwrap((events["items"] as? [String: Any])?["properties"] as? [String: Any])
+        func fieldDescription(_ name: String) throws -> String {
+            let field = try XCTUnwrap(properties[name] as? [String: Any], name)
+            return try XCTUnwrap(field["description"] as? String, name)
+        }
+        let title = try fieldDescription("title")
+        XCTAssertTrue(title.contains("no dates or times"), title)
+        XCTAssertTrue(title.contains("No time counted from now ('1個小時後', 'in an hour')."), title)
+        let reminders = try fieldDescription("reminder_minutes")
+        XCTAssertTrue(reminders.contains("only when the user asks for them"), reminders)
+        XCTAssertTrue(reminders.contains("Exception: a start counted from now → [0] (rule 7)."), reminders)
+    }
+
     func testLanguageLineFollowsReplyLanguage() {
         XCTAssertTrue(prompt().contains("user_language_hint: en — reply and title in the language the user wrote in."))
 

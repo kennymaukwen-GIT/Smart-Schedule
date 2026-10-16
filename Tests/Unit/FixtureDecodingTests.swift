@@ -83,6 +83,34 @@ final class FixtureDecodingTests: XCTestCase {
         XCTAssertEqual(args.events[1].durationMinutes, 30)
     }
 
+    func testTimeCountedFromNow() throws {
+        // "1個小時後買蛋給 Jocelyn" at 22:50: one task at 23:50, the phrase out of the title, a reminder at the start.
+        let name = "create_events.relative_time.json"
+        let root = try Fixtures.root(name)
+        let minutes = try XCTUnwrap(root["relative_minutes"] as? Int, name)
+        let nowLocal = try XCTUnwrap(root["now_local"] as? String, name)
+        let now = try XCTUnwrap(TestClock.clock.dateTime(nowLocal), nowLocal)
+        let args = try Fixtures.args(CreateEventsArgs.self, from: name)
+        XCTAssertEqual(args.events.count, 1)
+        let draft = try XCTUnwrap(args.events.first)
+        XCTAssertEqual(draft.title, "買蛋給 Jocelyn")
+        XCTAssertNil(draft.end)
+        XCTAssertEqual(draft.reminderMinutes, [0])
+
+        let mapper = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy())
+        let mapped = try mapper.event(from: draft, seed: "s|0", utterance: Fixtures.utterance(name))
+        let event = try XCTUnwrap(mapper.scheduleEvent(from: mapped.body))
+        XCTAssertEqual(event.title, "買蛋給 Jocelyn")
+        XCTAssertEqual(event.kind, .task)
+        XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
+        XCTAssertEqual(event.start, now.addingTimeInterval(TimeInterval(minutes * 60)))
+        XCTAssertEqual(event.end, TestClock.local(2026, 10, 14, 0, 20), "the task default of 30 minutes, past midnight")
+        // At the start, not the task default (60 minutes before).
+        XCTAssertEqual(CalendarEventMapper.reminderMinutes(of: mapped.body), [0])
+        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(mapped.body.reminders?.overrides?.map(\.minutes), [0])
+    }
+
     func testLongTermPlan() throws {
         let plan = try Fixtures.args(LongTermPlanArgs.self, from: "create_long_term_plan.muscle.json")
         XCTAssertEqual(plan.planTitle, "Muscle 6M")
