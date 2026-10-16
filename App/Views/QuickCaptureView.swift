@@ -146,9 +146,12 @@ struct QuickCaptureView: View {
                     Text(day.formatted(style.weekday(.abbreviated)).uppercased())
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white)
-                    Text(day.formatted(style.day()))
-                        .font(.system(size: 20, weight: .medium))
+                    // The bare number: `style.day()` is "16日" in Chinese, which doesn't fit the disc ("1…").
+                    Text(calendar.component(.day, from: day).formatted())
+                        .font(.system(size: 20, weight: .medium).monospacedDigit())
                         .foregroundStyle(.black)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .frame(width: 40, height: 40)
                         .background(Circle().fill(Color.white))
                 }
