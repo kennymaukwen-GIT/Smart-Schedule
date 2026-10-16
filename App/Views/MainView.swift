@@ -50,7 +50,9 @@ struct MainView: View {
         }
         .padding(.horizontal, 12)
         .background(Theme.canvas.ignoresSafeArea())
-        .refreshable { await schedule.refresh(.pull) }
+        // No `.refreshable` here: it reaches every scroll view inside (each month page, the conversation), so a
+        // sideways swipe that dipped down pulled the month page down and started a sync. Syncing is automatic
+        // (foreground, every 60 s, back online, background refresh); the drawer's status line syncs now by hand.
         .onChange(of: schedule.displayedMonth, initial: true) { _, month in
             // Every week the grid draws, however far from today.
             schedule.ensureEvents(covering: CalendarPaging.monthGridInterval(containing: month,

@@ -399,7 +399,8 @@ final class ScheduleViewModel {
 
     /// Sends what the outbox holds and brings in what changed in Google (`SyncEngine`), then shows the cache.
     /// When the cache changed, the engine's change handler (`AppRefresh.installSyncHooks`) has already rescheduled
-    /// reminders and refreshed the Live Activity; foreground and pull-to-refresh do it regardless.
+    /// reminders and refreshed the Live Activity; foreground and `.pull` (a tap on the drawer's status line) do it
+    /// regardless.
     /// Demo mode has no Google: the seeded data is shown again instead (timer and network ticks do nothing).
     func refresh(_ trigger: SyncTrigger = .pull) async {
         if isDemo || AppConstants.isDemoMode {

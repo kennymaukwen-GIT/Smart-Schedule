@@ -51,6 +51,8 @@ Order top to bottom: header row, month chips (the endless `MonthPickerBar`), mon
 
 The old big year `Text` above the chips is removed (the header title replaces it).
 
+No pull-to-refresh on the main screen: a `.refreshable` there reaches every scroll view inside (each month page of the grid, the conversation), so a sideways swipe on the grid that dipped down pulled the page down and started a sync. Syncing is automatic; the drawer's sync status line syncs now when tapped (`docs/GOOGLE_CALENDAR_SYNC.md` §10.1). The grid's month pages (and Quick Capture's WEEK and DAY pages) use `.scrollBounceBehavior(.basedOnSize, axes: .vertical)`: they scroll vertically only when their content does not fit.
+
 ### 2.2 Calendar drawer (hamburger = WHAT you see) (UI)
 
 A panel sliding in from the leading edge over a dimmed main screen (dim `Color.black.opacity(0.45)`, tap to close, drag left to close). Opening it hides the keyboard (anywhere in the app, a swipe down hides it too: `App/Views/KeyboardDismissSwipe.swift`). Width `min(340, 84% of screen)`. Background `Theme.surface`. The panel hosts its own `NavigationStack` so calendar details push inside it.

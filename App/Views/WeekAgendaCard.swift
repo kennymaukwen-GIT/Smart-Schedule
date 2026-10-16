@@ -238,6 +238,8 @@ private struct WeekPage: View {
                 }
                 .padding(.bottom, 30) // keeps the last chips clear of the Today pill and SCROLL
             }
+            // Scrolls only when the chips don't fit, so a sideways swipe can't drag a short week up or down.
+            .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         }
         .padding(.horizontal, 8)
         .padding(.top, 10)

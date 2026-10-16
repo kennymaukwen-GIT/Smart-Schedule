@@ -163,7 +163,8 @@ struct MonthGridView: View {
     }
 }
 
-/// The weeks of one month in the pager, scrolling vertically when they don't fit.
+/// The weeks of one month in the pager, scrolling vertically only when they don't fit: a page that fits never
+/// moves up or down, however a sideways swipe slants.
 private struct MonthWeeksPage: View {
     let month: Date
     let today: Date
@@ -194,6 +195,7 @@ private struct MonthWeeksPage: View {
                 }
             }
         }
+        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
     }
 }
 

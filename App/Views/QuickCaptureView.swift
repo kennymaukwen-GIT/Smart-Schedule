@@ -459,6 +459,8 @@ struct DayTimelineView: View {
                 }
             }
         }
+        // A page of the DAY pager: scrolls only when the hours don't fit, so a sideways swipe can't drag it.
+        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
     }
 
     /// "09:00" … "23:00", whatever the device's 12/24-hour setting (design 04).

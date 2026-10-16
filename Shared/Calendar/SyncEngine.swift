@@ -5,7 +5,8 @@ enum SyncTrigger: String, CaseIterable, Sendable {
     case foreground, timer, pull, background, outbox, network, notification, summon
 
     /// A calendar whose last full listing is older than this is listed in full; a younger one gets the cheap
-    /// "changed since" pass. 0: always in full (pull-to-refresh, background refresh).
+    /// "changed since" pass. 0: always in full (`pull`: a sync asked for by hand, the drawer's status line;
+    /// background refresh).
     var fullListingAfter: TimeInterval {
         switch self {
         case .pull, .background: 0

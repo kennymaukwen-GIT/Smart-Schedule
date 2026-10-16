@@ -244,7 +244,7 @@ Smart Schedules 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 
 
 | 觸發（`SyncTrigger`） | 誰呼叫 | 拉取方式 |
 |---|---|---|
-| `pull` | 下拉重新整理、狀態列的「點一下重試」 | 一定完整列出 |
+| `pull` | 手動同步：在抽屜的同步狀態列（「已同步 · 剛剛」、「無法連線到 Google · 點一下重試」等；同步中和示範模式不能點）點一下 | 一定完整列出 |
 | `background` | BGAppRefresh（`earliestBeginDate` 15 分鐘，實際時間由 iOS 決定） | 一定完整列出 |
 | `foreground` | App 回到前景、啟動 | 上次完整列出超過 15 分鐘才完整列出，否則變更增量 |
 | `timer` | App 在前景而且看得到時每 60 秒 | 變更增量；上次完整列出超過 30 分鐘就完整列出 |
@@ -252,6 +252,8 @@ Smart Schedules 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 
 | `outbox` | outbox 送出了東西之後、失敗項目按「重試」 | 同 `timer` |
 | `notification` | 通知內容擴充開啟提醒時（另外用 `events.get` 抓那一個事件） | 同 `timer` |
 | `summon` | 目前沒有觸發者（控制中心按鈕改為打開快速輸入）；保留給沒有 SyncEngine 的程式碼透過 `SyncRequests` 要求同步 | 同 `timer` |
+
+主畫面**沒有下拉重新整理**：SwiftUI 的 `.refreshable` 會傳到畫面裡的每一個捲動區（月曆的每個月份頁、對話），左右滑月份時手指稍微往下，就會把那一頁拉下來、出現轉圈並開始同步，所以拿掉了。同步本來就是自動的（上表其他列），要馬上完整同步就在抽屜的狀態列點一下（`pull`）。
 
 同步改變了 cache 時：重排提醒、更新 Live Activity（App 在啟動時用 `AppRefresh.installSyncHooks()` 掛上），並發出 `SharedChange.syncStatus`，其他 process 收到後重新讀取。
 
@@ -299,7 +301,7 @@ App Group 的 `sync-outbox.json`，App、Siri、通知擴充共用，跟 `Shared
 
 做法（`CalendarSync.pull`）：每個行事曆記一個 `SyncMark`（`SharedStore.Snapshot.syncMarks`）：上次完整列出的時間，以及 `changesSince` = 上次請求時 Google 的時鐘（第一頁回應的 HTTP `Date` header）減 60 秒，下一次就從這裡問，兩次之間不會漏。請求：`updatedMin=<changesSince>&showDeleted=true&singleEvents=true&timeMin=<範圍開始>&timeMax=<範圍結束>&maxResults=250`，最多 2 頁。套用（`IncrementalChanges.apply`）：`status=cancelled` → 移除那份副本（以及取消的系列的所有 instance）；其他 → 取代同一個 `EventRef` 的副本或新增；行事曆已經不在帳號清單裡就忽略；其他行事曆的副本不動。以下情況改成完整列出：沒有 `SyncMark`、上次完整列出太久（前景 15 分鐘，其他 30 分鐘）、`changesSince` 超過 7 天、超過 2 頁、410，以及出現已快取系列的**新** instance id（`IncrementalChanges.reshapesSeries`：系列在 Google 改了時間或延長時，instance id 帶著原始開始時間所以會換掉，舊的 instance 不會以 cancelled 回傳）。
 
-已知限制：被移到快取範圍**以外**的事件，在有範圍限制的增量請求裡不會出現（它的新時間不在範圍內），舊的那份會留到下一次完整列出（使用中最多 15／30 分鐘；下拉重新整理和背景更新一定完整列出）。這就是「完整列出是定期的事實來源」的意思。
+已知限制：被移到快取範圍**以外**的事件，在有範圍限制的增量請求裡不會出現（它的新時間不在範圍內），舊的那份會留到下一次完整列出（使用中最多 15／30 分鐘；在抽屜的狀態列點一下和背景更新一定完整列出）。這就是「完整列出是定期的事實來源」的意思。
 
 ### 10.5 刻意只存在這支 iPhone 上的東西
 
