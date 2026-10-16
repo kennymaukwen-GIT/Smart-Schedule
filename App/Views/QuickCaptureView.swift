@@ -2,7 +2,7 @@ import SwiftUI
 
 private let modeStorageKey = "quickCaptureMode"
 
-/// Quick Capture (design 04): what the user sees after tapping the island's input pill. The OS can't host a
+/// Quick Capture (design 04): what the user sees after tapping the island's Edit button. The OS can't host a
 /// keyboard in the island, so the app opens straight into this island-shaped card (keyboard already up) instead
 /// of the full month view, then gets out of the way. Top to bottom: focus date · DAY | WEEK | MONTH · month,
 /// the calendar in that scope (endless either way), the conversation (the app's whole chat history, scrollable

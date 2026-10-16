@@ -13,7 +13,7 @@
 - iOS 26: the app schedules each activity ahead with `Activity.request(…, start:)` for events in the next 48 hours, with the start alert iOS requires, so it appears on time even when the app is closed. iOS 18 cannot schedule an activity ahead, and version 1.0 does not start one from a server, so on iOS 18 the activity appears when the app is opened during the lead time or while the event is under way, and stays after the app is closed.
 - Everything happens on the iPhone, on both versions: Live Activities need no AI data sharing, and no event details are sent to our server for them.
 - The countdown uses `Text(timerInterval:)`, so the activity needs no updates from a server. `NSSupportsLiveActivitiesFrequentUpdates` is declared, but the app receives no updates from a server at all.
-- Tapping the Live Activity opens the app's quick-input screen (`smartschedule://compose`). Its microphone button opens the same screen with voice input.
+- Tapping the Live Activity opens the app's quick-input screen (`smartschedule://compose`). In the expanded Dynamic Island, the Edit button opens the same screen with the keyboard up.
 
 **Control Center control.** The "Smart Schedules" control opens the app directly on the quick-input screen with the keyboard up (`openAppWhenRun`). It does not start a Live Activity.
 

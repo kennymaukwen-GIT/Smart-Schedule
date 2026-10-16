@@ -524,7 +524,7 @@ Accounts: Smart Schedules has no accounts of its own, so there is no account to 
 | # | 畫面 | 怎麼拍 | 繁體中文說明 | English caption |
 |---|---|---|---|---|
 | 1 | 主畫面：月曆加上對話區，剛加入一個行程（「已加入 Google 日曆」那一列） | 輸入「明天下午 1 點跟 Andrew 吃午餐」／「Lunch with Andrew tomorrow 1pm」 | 說一句話，行程就排好／打字或用說的，助理幫你寫進 Google 日曆 | Plan your day in one sentence / Type or say it, and it goes into Google Calendar |
-| 2 | 鎖定畫面的即時動態（行程標題和倒數），可以疊一張展開的動態島（一週行程和輸入列） | 開始示範模式後馬上鎖定模擬器（⌘L）：範例「Online meeting with Joe」21 分鐘後開始 | 下一個行程，在動態島倒數／開始前 30、15、10 或 5 分鐘出現 | Your next event, counting down / Appears 30, 15, 10 or 5 minutes before it starts |
+| 2 | 鎖定畫面的即時動態（行程標題和倒數），可以疊一張展開的動態島（一週行程和「編輯」按鈕） | 開始示範模式後馬上鎖定模擬器（⌘L）：範例「Online meeting with Joe」21 分鐘後開始 | 下一個行程，在動態島倒數／開始前 30、15、10 或 5 分鐘出現 | Your next event, counting down / Appears 30, 15, 10 or 5 minutes before it starts |
 | 3 | 長期計畫卡（各階段、每堂課）和週檢視上的虛線預覽 | 輸入「我想在 6 個月內增肌」／「I want to be muscular in 6 months」 | 長期目標，拆成每週計畫／先看過，按「加入」才寫進日曆 | Big goals, broken into a weekly plan / Nothing is added until you tap Add |
 | 4 | 快速輸入的日檢視（24 小時時間軸、對話面板） | 從控制中心的 Smart Schedules 按鈕打開 | 控制中心一按，馬上輸入／日、週、月檢視隨時切換 | Quick Capture from Control Center / Switch between day, week and month |
 | 5 | 長按提醒後的對話（輸入「延後 30 分鐘」／「push this 30 minutes later」和助理的回覆） | 示範模式開始約 1 分鐘後會收到 Joe 會議的提醒；在鎖定畫面長按 | 長按提醒，直接改時間／不用打開 App | Reply to a reminder to reschedule / Right in the notification |

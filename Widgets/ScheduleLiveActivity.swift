@@ -5,7 +5,7 @@ import WidgetKit
 /// Dynamic Island + Lock Screen presentation (Artboards 2 & 3).
 ///
 /// Height budget: the expanded island and the Lock Screen view are capped at 160 pt by the system;
-/// anything taller is clipped. Layout below ≈ 36 (header row) + 64 (week) + 36 (input) + spacing.
+/// anything taller is clipped. Layout below ≈ 36 (header row) + 64 (week) + 36 (Edit button) + spacing.
 struct ScheduleLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ScheduleActivityAttributes.self) { context in
@@ -58,15 +58,15 @@ struct ScheduleLiveActivity: Widget {
 
 // MARK: - Expanded island body (Artboard 3)
 
-/// Week micro-calendar + input pill. The "text field" is a deep-link pill: Live Activities cannot host
-/// TextField or a keyboard. Tapping it opens Quick Capture (Artboard 4) with the keyboard already up.
+/// Week micro-calendar + an "Edit" button. Live Activities cannot host a TextField or a keyboard, so the button is a
+/// deep link: tapping it opens Quick Capture (Artboard 4) with the keyboard already up.
 struct ExpandedIslandView: View {
     let state: ScheduleActivityAttributes.ContentState
 
     var body: some View {
         VStack(spacing: 7) {
             IslandWeekStrip(state: state)
-            IslandInputPill()
+            IslandEditButton()
         }
         .padding(.top, 2)
     }
@@ -134,40 +134,19 @@ struct IslandChip: View {
     }
 }
 
-struct IslandInputPill: View {
+/// Full-width "Edit" capsule (zh-Hant 「編輯」 from the String Catalog). The whole capsule is one `Link` to
+/// `DeepLink.compose`, so a tap anywhere on it opens Quick Capture with the keyboard up.
+struct IslandEditButton: View {
     var body: some View {
-        HStack(spacing: 6) {
-            Link(destination: DeepLink.compose) {
-                Text("Type in any plan to add or change")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Link(destination: DeepLink.composeVoice) {
-                IslandRoundIcon(systemName: "mic.fill", filled: false)
-            }
-            Link(destination: DeepLink.compose) {
-                IslandRoundIcon(systemName: "paperplane.fill", filled: true)
-            }
+        Link(destination: DeepLink.compose) {
+            Text("Edit")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .frame(height: 36)
+                .background(Capsule().fill(Color.white.opacity(0.16)))
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 4)
-        .frame(height: 36)
-        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
-    }
-}
-
-struct IslandRoundIcon: View {
-    let systemName: String
-    let filled: Bool
-
-    var body: some View {
-        Image(systemName: systemName)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 28, height: 28)
-            .background(Circle().fill(filled ? Color.white.opacity(0.28) : Color.white.opacity(0.12)))
     }
 }
 
