@@ -1,11 +1,11 @@
 import AppIntents
 
 /// Zero-UI input for Siri, Spotlight, Shortcuts and the Action Button:
-/// "Hey Siri, add a plan in Smart Schedule" → Siri asks "What should I schedule?" → done, app never opens.
+/// "Hey Siri, add a plan in Smart Schedules" → Siri asks "What should I schedule?" → done, app never opens.
 /// A request without a clock time gets the assistant's "what time?" question, answered in the same exchange.
 struct AddPlanIntent: AppIntent {
-    static let title: LocalizedStringResource = "Add to Smart Schedule"
-    static let description = IntentDescription("Describe an event or a goal; Smart Schedule writes it to Google Calendar. Long-term plans wait in the app until you review them and tap Add.")
+    static let title: LocalizedStringResource = "Add to Smart Schedules"
+    static let description = IntentDescription("Describe an event or a goal; Smart Schedules writes it to Google Calendar. Long-term plans wait in the app until you review them and tap Add.")
     static let openAppWhenRun = false
 
     @Parameter(title: "Plan", requestValueDialog: "What should I schedule?")
@@ -36,7 +36,7 @@ struct AddPlanIntent: AppIntent {
             return .result(dialog: "\(Self.consentNeeded)") // revoked meanwhile
         }
         await LiveActivityManager.shared.refreshIfRunning()
-        let next = String(localized: "Open Smart Schedule to review it and tap Add.")
+        let next = String(localized: "Open Smart Schedules to review it and tap Add.")
         if let plan = reply.planDraft {
             // The draft is already in the App Group; the app shows its card with Add / Keep editing.
             return .result(dialog: "\(plan.summary) \(next)")
@@ -50,7 +50,7 @@ struct AddPlanIntent: AppIntent {
     }
 
     private static var consentNeeded: String {
-        String(localized: "Turn on AI data sharing in Smart Schedule's Settings first.")
+        String(localized: "Turn on AI data sharing in the Smart Schedules settings first.")
     }
 }
 

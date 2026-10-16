@@ -4,7 +4,7 @@ import XCTest
 /// scripts/validate_schema.py checks that every Swift file reaching StoreKit or showing subscription copy reads the
 /// flag.
 final class ReleaseConfigurationTests: XCTestCase {
-    /// 1.0 sells no subscription: the account sheet has no Smart Schedule Pro section, the avatar is "Accounts", the
+    /// 1.0 sells no subscription: the account sheet has no Smart Schedules Pro section, the avatar is "Accounts", the
     /// erase message does not mention subscriptions and StoreKit is never called. Turn it on only together with the
     /// products in App Store Connect, the reviewed Pro copy, the support FAQ and privacy policy §7, and this test.
     func testVersionOneSellsNoSubscription() {

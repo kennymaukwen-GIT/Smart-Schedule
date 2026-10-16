@@ -728,10 +728,10 @@ actor ScheduleAssistant {
         String(localized: "Saved on this iPhone. It will sync to Google Calendar as soon as Google can be reached.")
     }
 
-    /// "Saved to «Gym» (hidden in Smart Schedule)": for Siri and other text-only surfaces; the chat shows a card
+    /// "Saved to «Gym» (hidden in Smart Schedules)": for Siri and other text-only surfaces; the chat shows a card
     /// with Show instead.
     static func hiddenCalendarNote(_ name: String) -> String {
-        String(localized: "Saved to «\(name)» (hidden in Smart Schedule)")
+        String(localized: "Saved to «\(name)» (hidden in Smart Schedules)")
     }
 
     /// Marks the reply when new events went to a calendar this iPhone hides (its local visibility setting).

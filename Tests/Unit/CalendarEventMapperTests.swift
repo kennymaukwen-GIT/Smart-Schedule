@@ -20,7 +20,7 @@ final class CalendarEventMapperTests: XCTestCase {
 
         XCTAssertEqual(body.id, "ss0gt731rkolpbr2h5lmvb3fudbg")
         XCTAssertEqual(body.summary, "與Joe開會")
-        XCTAssertTrue(body.description?.hasPrefix("由 Smart Schedule 智慧助理自動排程：") == true)
+        XCTAssertTrue(body.description?.hasPrefix("由 Smart Schedules 智慧助理自動排程：") == true)
         XCTAssertEqual(body.description, CalendarEventMapper.provenancePrefix + utterance)
 
         XCTAssertEqual(body.start?.dateTime, "2026-10-14T14:00:00")

@@ -671,12 +671,12 @@
         }
       }
     },
-    "Add to Smart Schedule" : {
+    "Add to Smart Schedules" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "加入 Smart Schedule"
+            "value" : "加入 Smart Schedules"
           }
         }
       }
@@ -1207,12 +1207,12 @@
         }
       }
     },
-    "Choose which calendars show and alert while a Focus is on: open the Settings app, tap Focus, choose a Focus, then Add Filter › Smart Schedule." : {
+    "Choose which calendars show and alert while a Focus is on: open the Settings app, tap Focus, choose a Focus, then Add Filter › Smart Schedules." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "選擇專注模式開啟時要顯示並提醒哪些行事曆：打開「設定」App，點「專注模式」，選一個專注模式，再點「加入過濾條件」› Smart Schedule。"
+            "value" : "選擇專注模式開啟時要顯示並提醒哪些行事曆：打開「設定」App，點「專注模式」，選一個專注模式，再點「加入過濾條件」› Smart Schedules。"
           }
         }
       }
@@ -1318,12 +1318,12 @@
         }
       }
     },
-    "Connect Google Calendar in Smart Schedule first." : {
+    "Connect Google Calendar in Smart Schedules first." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先在 Smart Schedule 連接 Google 日曆。"
+            "value" : "請先在 Smart Schedules 連接 Google 日曆。"
           }
         }
       }
@@ -1822,12 +1822,12 @@
         }
       }
     },
-    "Describe an event or a goal; Smart Schedule writes it to Google Calendar. Long-term plans wait in the app until you review them and tap Add." : {
+    "Describe an event or a goal; Smart Schedules writes it to Google Calendar. Long-term plans wait in the app until you review them and tap Add." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "描述一個行程或目標，Smart Schedule 會寫入 Google 日曆。長期計畫會先留在 App 裡，等你確認並點「加入」。"
+            "value" : "描述一個行程或目標，Smart Schedules 會寫入 Google 日曆。長期計畫會先留在 App 裡，等你確認並點「加入」。"
           }
         }
       }
@@ -1945,12 +1945,12 @@
         }
       }
     },
-    "Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedule plans the next two days each time you open it." : {
+    "Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedules plans the next two days each time you open it." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每個有時間的行程會在開始前這段時間出現在動態島，結束後消失。每次打開 Smart Schedule，都會安排接下來兩天的行程。"
+            "value" : "每個有時間的行程會在開始前這段時間出現在動態島，結束後消失。每次打開 Smart Schedules，都會安排接下來兩天的行程。"
           }
         }
       }
@@ -2330,12 +2330,12 @@
         }
       }
     },
-    "Google Calendar alerts you on all your devices. Smart Schedule sends no reminders, so you can't reply to them." : {
+    "Google Calendar alerts you on all your devices. Smart Schedules sends no reminders, so you can't reply to them." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Google 日曆會在你所有的裝置上提醒你。Smart Schedule 不發送提醒，所以你無法直接回覆提醒。"
+            "value" : "Google 日曆會在你所有的裝置上提醒你。Smart Schedules 不發送提醒，所以你無法直接回覆提醒。"
           }
         }
       }
@@ -2393,22 +2393,22 @@
         }
       }
     },
-    "Google sign-in expired (%@). Open Smart Schedule to reconnect." : {
+    "Google sign-in expired (%@). Open Smart Schedules to reconnect." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Google 登入已過期（%@）。請打開 Smart Schedule 重新連接。"
+            "value" : "Google 登入已過期（%@）。請打開 Smart Schedules 重新連接。"
           }
         }
       }
     },
-    "Google sign-in for %@ expired. Open Smart Schedule to reconnect." : {
+    "Google sign-in for %@ expired. Open Smart Schedules to reconnect." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 的 Google 登入已過期。請打開 Smart Schedule 重新連接。"
+            "value" : "%@ 的 Google 登入已過期。請打開 Smart Schedules 重新連接。"
           }
         }
       }
@@ -2423,12 +2423,12 @@
         }
       }
     },
-    "Hide Smart Schedule" : {
+    "Hide Smart Schedules" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "隱藏 Smart Schedule"
+            "value" : "隱藏 Smart Schedules"
           }
         }
       }
@@ -2576,13 +2576,12 @@
         }
       }
     },
-    "Its calendars and events leave Smart Schedule on this iPhone. Nothing is deleted in Google Calendar." : {
-      "comment" : "Remove account confirmation message",
+    "Its calendars and events leave Smart Schedules on this iPhone. Nothing is deleted in Google Calendar." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這個帳號的日曆和行程會從這支 iPhone 的 Smart Schedule 移除，Google 日曆裡的資料不會被刪除。"
+            "value" : "這個帳號的日曆和行程會從這支 iPhone 的 Smart Schedules 移除，Google 日曆裡的資料不會被刪除。"
           }
         }
       }
@@ -3177,12 +3176,12 @@
         }
       }
     },
-    "Off: Smart Schedule sends no reminders for events in this calendar." : {
+    "Off: Smart Schedules sends no reminders for events in this calendar." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "關閉：Smart Schedule 不會為這個行事曆裡的行程發送提醒。"
+            "value" : "關閉：Smart Schedules 不會為這個行事曆裡的行程發送提醒。"
           }
         }
       }
@@ -3247,42 +3246,42 @@
         }
       }
     },
-    "On iOS 18, Smart Schedule's server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time." : {
+    "On iOS 18, an event appears only if you open Smart Schedules within that time before it starts or while it's under way. On iOS 26 and later, it appears on time even when the app is closed." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 iOS 18 上，每個行程由 Smart Schedule 的伺服器啟動，因此需要在「設定 › AI 與隱私」允許 AI 資料分享。未允許時，只有在這段時間內打開 App，行程才會出現。"
+            "value" : "在 iOS 18 上，只有在行程開始前的這段時間內或行程進行中打開 Smart Schedules，行程才會出現。在 iOS 26 以上版本，即使沒有打開 App，行程也會準時出現。"
           }
         }
       }
     },
-    "On iOS 18, an event appears only if you open Smart Schedule within that time before it starts or while it's under way. On iOS 26 and later, it appears on time even when the app is closed." : {
+    "On iOS 18, the Smart Schedules server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 iOS 18 上，只有在行程開始前的這段時間內或行程進行中打開 Smart Schedule，行程才會出現。在 iOS 26 以上版本，即使沒有打開 App，行程也會準時出現。"
+            "value" : "在 iOS 18 上，每個行程由 Smart Schedules 的伺服器啟動，因此需要在「設定 › AI 與隱私」允許 AI 資料分享。未允許時，只有在這段時間內打開 App，行程才會出現。"
           }
         }
       }
     },
-    "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on Smart Schedule's server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
+    "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on the Smart Schedules server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 iOS 18 上，接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色也會暫存在 Smart Schedule 的伺服器，並透過 Apple 的推播服務送出，讓每個行程在開始前出現在動態島。備註與地點不會儲存。"
+            "value" : "在 iOS 18 上，接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色也會暫存在 Smart Schedules 的伺服器，並透過 Apple 的推播服務送出，讓每個行程在開始前出現在動態島。備註與地點不會儲存。"
           }
         }
       }
     },
-    "On iPhone 15 Pro and later: open the Settings app › Action Button, swipe to Shortcut, then choose Add to Smart Schedule." : {
+    "On iPhone 15 Pro and later: open the Settings app › Action Button, swipe to Shortcut, then choose Add to Smart Schedules." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "iPhone 15 Pro 和後續機型：打開「設定」App › 動作按鈕，滑到「捷徑」，再選擇「加入 Smart Schedule」。"
+            "value" : "iPhone 15 Pro 和後續機型：打開「設定」App › 動作按鈕，滑到「捷徑」，再選擇「加入 Smart Schedules」。"
           }
         }
       }
@@ -3308,22 +3307,22 @@
         }
       }
     },
-    "Only for reminders sent by Smart Schedule." : {
+    "Only for reminders sent by Smart Schedules." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "只適用於 Smart Schedule 發送的提醒。"
+            "value" : "只適用於 Smart Schedules 發送的提醒。"
           }
         }
       }
     },
-    "Open Control Center, tap +, then Add a Control. Search for Smart Schedule and choose it." : {
+    "Open Control Center, tap +, then Add a Control. Search for Smart Schedules and choose it." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打開控制中心，點 ＋，再點「加入控制項目」。搜尋 Smart Schedule 並選擇它。"
+            "value" : "打開控制中心，點 ＋，再點「加入控制項目」。搜尋 Smart Schedules 並選擇它。"
           }
         }
       }
@@ -3338,22 +3337,22 @@
         }
       }
     },
-    "Open Smart Schedule once so the assistant can answer here." : {
+    "Open Smart Schedules once so the assistant can answer here." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先打開 Smart Schedule 一次，助理才能在這裡回覆。"
+            "value" : "請先打開 Smart Schedules 一次，助理才能在這裡回覆。"
           }
         }
       }
     },
-    "Open Smart Schedule to review it and tap Add." : {
+    "Open Smart Schedules to review it and tap Add." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打開 Smart Schedule 確認後點「加入」。"
+            "value" : "打開 Smart Schedules 確認後點「加入」。"
           }
         }
       }
@@ -3368,12 +3367,12 @@
         }
       }
     },
-    "Opens Smart Schedule ready to type a plan." : {
+    "Opens Smart Schedules ready to type a plan." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打開 Smart Schedule，直接輸入行程。"
+            "value" : "打開 Smart Schedules，直接輸入行程。"
           }
         }
       }
@@ -3540,12 +3539,12 @@
         }
       }
     },
-    "Recipient: Google, through the Gemini API. Requests pass through Smart Schedule's server, which doesn't keep them." : {
+    "Recipient: Google, through the Gemini API. Requests pass through the Smart Schedules server, which doesn't keep them." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "收件者：Google（透過 Gemini API）。要求會經過 Smart Schedule 的伺服器轉送，伺服器不會保存。"
+            "value" : "收件者：Google（透過 Gemini API）。要求會經過 Smart Schedules 的伺服器轉送，伺服器不會保存。"
           }
         }
       }
@@ -3596,6 +3595,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安靜時段內的提醒會無聲送達，不會遺漏任何一則。"
+          }
+        }
+      }
+    },
+    "Reminders from Smart Schedules let you reply, snooze or reschedule right in the notification. New events get no Google pop-ups, so your other devices won't alert you about them. Turn off notifications for the Google Calendar app on this iPhone to avoid duplicates." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedules 的提醒可以直接在通知裡回覆、延後或改時間。新行程不會設定 Google 彈出式通知，所以你的其他裝置不會提醒這些行程。關閉這支 iPhone 上 Google 日曆 App 的通知，可以避免重複提醒。"
           }
         }
       }
@@ -3860,13 +3869,12 @@
         }
       }
     },
-    "Saved to «%@» (hidden in Smart Schedule)" : {
-      "comment" : "A new event went to the default calendar, which is hidden in the app",
+    "Saved to «%@» (hidden in Smart Schedules)" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已存到「%@」（目前在 Smart Schedule 隱藏）"
+            "value" : "已存到「%@」（目前在 Smart Schedules 隱藏）"
           }
         }
       }
@@ -3882,12 +3890,12 @@
         }
       }
     },
-    "Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Open Quick Capture in Smart Schedule”." : {
+    "Say “Add a plan in Smart Schedules”, “Schedule something with Smart Schedules” or “Open Quick Capture in Smart Schedules”." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "對 Siri 說「Add a plan in Smart Schedule」、「Schedule something with Smart Schedule」或「Open Quick Capture in Smart Schedule」。"
+            "value" : "對 Siri 說「Add a plan in Smart Schedules」、「Schedule something with Smart Schedules」或「Open Quick Capture in Smart Schedules」。"
           }
         }
       }
@@ -3984,12 +3992,12 @@
         }
       }
     },
-    "Show in Smart Schedule" : {
+    "Show in Smart Schedules" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 Smart Schedule 中顯示"
+            "value" : "在 Smart Schedules 中顯示"
           }
         }
       }
@@ -4058,94 +4066,52 @@
         }
       }
     },
-    "Smart Schedule" : {
-      "comment" : "App name",
+    "Smart Schedules" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Smart Schedule"
+            "value" : "Smart Schedules"
           }
         }
       }
     },
-    "Smart Schedule needs access to your Google Calendar. Try again and leave the calendar permission ticked on Google's page." : {
-      "comment" : "Google sign-in: the calendar permission was left unticked on the consent screen",
+    "Smart Schedules needs access to your Google Calendar. Try again and leave the calendar permission ticked on Google's page." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Smart Schedule 需要存取你的 Google 日曆。請再試一次，並在 Google 的頁面保持勾選日曆權限。"
+            "value" : "Smart Schedules 需要存取你的 Google 日曆。請再試一次，並在 Google 的頁面保持勾選日曆權限。"
           }
         }
       }
     },
-    "Smart Schedule needs permission to see your calendar list." : {
+    "Smart Schedules needs permission to see your calendar list." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Smart Schedule 需要權限才能看到你的行事曆列表。"
+            "value" : "Smart Schedules 需要權限才能看到你的行事曆列表。"
           }
         }
       }
     },
-    "Smart Schedule notices reminders you keep dismissing and offers to stop them. Nothing changes until you tap." : {
+    "Smart Schedules notices reminders you keep dismissing and offers to stop them. Nothing changes until you tap." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Smart Schedule 會留意你一直略過的提醒，並詢問是否停止。在你點選之前，什麼都不會改變。"
+            "value" : "Smart Schedules 會留意你一直略過的提醒，並詢問是否停止。在你點選之前，什麼都不會改變。"
           }
         }
       }
     },
-    "Smart Schedule only" : {
+    "Smart Schedules only" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "只用 Smart Schedule"
-          }
-        }
-      }
-    },
-    "Smart Schedule's reminders let you reply, snooze or reschedule right in the notification. New events get no Google pop-ups, so your other devices won't alert you about them. Turn off notifications for the Google Calendar app on this iPhone to avoid duplicates." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smart Schedule 的提醒可以直接在通知裡回覆、延後或改時間。新行程不會設定 Google 彈出式通知，所以你的其他裝置不會提醒這些行程。關閉這支 iPhone 上 Google 日曆 App 的通知，可以避免重複提醒。"
-          }
-        }
-      }
-    },
-    "Smart Schedule's server didn't answer (%lld). Try again later." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smart Schedule 的伺服器沒有回應（%lld）。請稍後再試。"
-          }
-        }
-      }
-    },
-    "Smart Schedule's server isn't ready yet. Try again later." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smart Schedule 的伺服器尚未準備好，請稍後再試。"
-          }
-        }
-      }
-    },
-    "Smart Schedule's server sent something unexpected. Try again later." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smart Schedule 的伺服器傳回了無法辨識的內容。請稍後再試。"
+            "value" : "只用 Smart Schedules"
           }
         }
       }
@@ -4334,13 +4300,12 @@
         }
       }
     },
-    "Suggestions from Smart Schedule" : {
-      "comment" : "Event page: suggested notes came from the app's own rules (demo mode, offline)",
+    "Suggestions from Smart Schedules" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "來自 Smart Schedule 的建議"
+            "value" : "來自 Smart Schedules 的建議"
           }
         }
       }
@@ -4512,6 +4477,36 @@
         }
       }
     },
+    "The Smart Schedules server didn't answer (%lld). Try again later." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedules 的伺服器沒有回應（%lld）。請稍後再試。"
+          }
+        }
+      }
+    },
+    "The Smart Schedules server isn't ready yet. Try again later." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedules 的伺服器尚未準備好，請稍後再試。"
+          }
+        }
+      }
+    },
+    "The Smart Schedules server sent something unexpected. Try again later." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedules 的伺服器傳回了無法辨識的內容。請稍後再試。"
+          }
+        }
+      }
+    },
     "The assistant is off until you allow AI data sharing." : {
       "localizations" : {
         "zh-Hant" : {
@@ -4594,12 +4589,12 @@
         }
       }
     },
-    "This device can't prove it is running Smart Schedule, so the assistant is unavailable." : {
+    "This device can't prove it is running Smart Schedules, so the assistant is unavailable." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "這台裝置無法證明正在執行 Smart Schedule，因此無法使用助理。"
+            "value" : "這台裝置無法證明正在執行 Smart Schedules，因此無法使用助理。"
           }
         }
       }
@@ -4749,12 +4744,12 @@
         }
       }
     },
-    "To understand your requests, Smart Schedule sends them to Google's Gemini API. This includes:" : {
+    "To understand your requests, Smart Schedules sends them to Google's Gemini API. This includes:" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "為了理解你的要求，Smart Schedule 會把要求傳送到 Google 的 Gemini API，內容包括："
+            "value" : "為了理解你的要求，Smart Schedules 會把要求傳送到 Google 的 Gemini API，內容包括："
           }
         }
       }
@@ -4780,12 +4775,12 @@
         }
       }
     },
-    "Today's limit for replies here is used up. Open Smart Schedule to continue, or try again tomorrow." : {
+    "Today's limit for replies here is used up. Open Smart Schedules to continue, or try again tomorrow." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "今天在這裡回覆的次數已用完。請打開 Smart Schedule 繼續，或明天再試。"
+            "value" : "今天在這裡回覆的次數已用完。請打開 Smart Schedules 繼續，或明天再試。"
           }
         }
       }
@@ -4831,12 +4826,12 @@
         }
       }
     },
-    "Touch and hold the Lock Screen, tap Customize › Lock Screen, tap a control at the bottom and choose Smart Schedule." : {
+    "Touch and hold the Lock Screen, tap Customize › Lock Screen, tap a control at the bottom and choose Smart Schedules." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按住鎖定畫面，點「自訂」› 鎖定畫面，點下方的控制項目，再選擇 Smart Schedule。"
+            "value" : "按住鎖定畫面，點「自訂」› 鎖定畫面，點下方的控制項目，再選擇 Smart Schedules。"
           }
         }
       }
@@ -4872,22 +4867,22 @@
         }
       }
     },
-    "Turn on AI data sharing in Smart Schedule › Settings › AI & privacy to reply here." : {
+    "Turn on AI data sharing in Smart Schedules › Settings › AI & privacy to reply here." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先在 Smart Schedule › 設定 › AI 與隱私開啟 AI 資料分享，才能在這裡回覆。"
+            "value" : "請先在 Smart Schedules › 設定 › AI 與隱私開啟 AI 資料分享，才能在這裡回覆。"
           }
         }
       }
     },
-    "Turn on AI data sharing in Smart Schedule's Settings first." : {
+    "Turn on AI data sharing in the Smart Schedules settings first." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先在 Smart Schedule 的設定中開啟 AI 資料分享。"
+            "value" : "請先在 Smart Schedules 的設定中開啟 AI 資料分享。"
           }
         }
       }
@@ -4962,12 +4957,12 @@
         }
       }
     },
-    "Update Smart Schedule to use the assistant here." : {
+    "Update Smart Schedules to use the assistant here." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請更新 Smart Schedule，才能在這裡使用助理。"
+            "value" : "請更新 Smart Schedules，才能在這裡使用助理。"
           }
         }
       }
@@ -5268,12 +5263,12 @@
         }
       }
     },
-    "You may get two alerts for the same event, one from Google and one from Smart Schedule. Turning off notifications for the Google Calendar app on this iPhone avoids that." : {
+    "You may get two alerts for the same event, one from Google and one from Smart Schedules. Turning off notifications for the Google Calendar app on this iPhone avoids that." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "同一個行程可能會收到兩則提醒，一則來自 Google，一則來自 Smart Schedule。關閉這支 iPhone 上 Google 日曆 App 的通知就能避免。"
+            "value" : "同一個行程可能會收到兩則提醒，一則來自 Google，一則來自 Smart Schedules。關閉這支 iPhone 上 Google 日曆 App 的通知就能避免。"
           }
         }
       }
@@ -5288,13 +5283,12 @@
         }
       }
     },
-    "You sign in on Google's own page. Smart Schedule never sees your password and only gets access to your calendars." : {
-      "comment" : "Add Google account page: footnote",
+    "You sign in on Google's own page. Smart Schedules never sees your password and only gets access to your calendars." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "登入在 Google 的官方頁面完成，Smart Schedule 看不到你的密碼，只會取得你的日曆存取權。"
+            "value" : "登入在 Google 的官方頁面完成，Smart Schedules 看不到你的密碼，只會取得你的日曆存取權。"
           }
         }
       }

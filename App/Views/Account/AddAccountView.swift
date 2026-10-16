@@ -108,7 +108,7 @@ struct AddAccountView: View {
                 .disabled(isSigningIn)
                 .listRowBackground(Color.clear)
             } footer: {
-                Text("You sign in on Google's own page. Smart Schedule never sees your password and only gets access to your calendars.")
+                Text("You sign in on Google's own page. Smart Schedules never sees your password and only gets access to your calendars.")
             }
 
             if schedule.isDemo {

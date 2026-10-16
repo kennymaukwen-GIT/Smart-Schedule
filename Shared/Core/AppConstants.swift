@@ -29,7 +29,7 @@ enum AppConstants {
     /// scripts/validate_schema.py and ReleaseConfigurationTests fail while it is true.
     static let pushToStartEnabled = false
 
-    /// Smart Schedule Pro (StoreKit 2, App/Store). Version 1.0 sells nothing, so this stays false: the account sheet
+    /// Smart Schedules Pro (StoreKit 2, App/Store). Version 1.0 sells nothing, so this stays false: the account sheet
     /// has no Pro section, the avatar is "Accounts", the erase message does not mention subscriptions, and StoreKit is
     /// never called (no transaction listener, no product request, no entitlement check). A build-time constant on
     /// purpose: turning it on takes a new build and App Review. scripts/validate_schema.py and

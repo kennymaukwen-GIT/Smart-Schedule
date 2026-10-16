@@ -10,8 +10,8 @@
 
 ## 1. 先講清楚做不到的事
 
-**Google Calendar App 發出的通知，Smart Schedule 不能擴充，也讀不到。** iOS 的 Notification Content Extension 只會套用在「本 App 送出、而且 `categoryIdentifier` 列在 extension Info.plist 裡」的通知。所以 Artboard 1 中「MESSAGE SENT FROM GOOGLE CALENDAR」這一步要改寫成：
-> Google Calendar 的事件資料同步到 Smart Schedule，再由 Smart Schedule 自己發出提醒。這則提醒可以長按展開。
+**Google Calendar App 發出的通知，Smart Schedules 不能擴充，也讀不到。** iOS 的 Notification Content Extension 只會套用在「本 App 送出、而且 `categoryIdentifier` 列在 extension Info.plist 裡」的通知。所以 Artboard 1 中「MESSAGE SENT FROM GOOGLE CALENDAR」這一步要改寫成：
+> Google Calendar 的事件資料同步到 Smart Schedules，再由 Smart Schedules 自己發出提醒。這則提醒可以長按展開。
 
 其他 iOS 不允許、所以設定頁只能用文字說明的事：
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | 替使用者關掉 Google Calendar App 的通知 | App 不能改其他 App 的設定 | 「由誰發送提醒」的註腳提醒使用者自己去關，避免重複提醒 |
 | 動態島在 App 關著時，自動在每個行程前出現 | App 在背景不能 `Activity.request()` | iOS 26：`Activity.request(…, start:)` 排程啟動；iOS 18：1.0 只在 App 執行時（提前時間內或行程進行中）開始，之後關掉 App 也留著。APNs push-to-start（第 8 節）的程式保留給之後的版本（`AppConstants.pushToStartEnabled = false`） |
-| 直接打開系統「專注模式」設定頁 | 沒有公開的 URL | 設定頁說明路徑：設定 App › 專注模式 › 選一個模式 › 加入過濾條件 › Smart Schedule |
+| 直接打開系統「專注模式」設定頁 | 沒有公開的 URL | 設定頁說明路徑：設定 App › 專注模式 › 選一個模式 › 加入過濾條件 › Smart Schedules |
 | 在 App 裡加控制中心按鈕、動作按鈕、鎖定畫面捷徑 | 只有使用者能加 | 設定 › 捷徑與 Siri 的說明頁 |
 
 通知來源有兩種：
@@ -30,14 +30,14 @@
 
 ## 2. 由誰發送提醒（設定 › 通知）
 
-| 模式 | Smart Schedule 本地提醒 | 新增或修改的行程寫到 Google 的彈出提醒 | 每日摘要與計畫提醒 |
+| 模式 | Smart Schedules 本地提醒 | 新增或修改的行程寫到 Google 的彈出提醒 | 每日摘要與計畫提醒 |
 |---|---|---|---|
 | 兩者都用（預設，等於原本的行為） | 有 | `useDefault: false`，覆寫值 = 使用者要求的或該類別的預設 | 有 |
-| 只用 Smart Schedule | 有 | `useDefault: false`、**空的覆寫值**（其他裝置不會跳 Google 提醒）；私有屬性 `ssReminders` 記住原本想要的提醒，本機提醒照樣正確 | 有 |
+| 只用 Smart Schedules | 有 | `useDefault: false`、**空的覆寫值**（其他裝置不會跳 Google 提醒）；私有屬性 `ssReminders` 記住原本想要的提醒，本機提醒照樣正確 | 有 |
 | 只用 Google 日曆 | 沒有（重排時把已排的移除） | 同「兩者都用」 | 有 |
 
 - 切換模式不會回頭改寫已存在的行程（註腳寫的是「新行程」）。
-- `ReminderPolicy(preferences:)` 依模式設定 `writesGooglePopups`；`googleReminders` / `googleAllDayReminders` 在「只用 Smart Schedule」時回傳空覆寫值。
+- `ReminderPolicy(preferences:)` 依模式設定 `writesGooglePopups`；`googleReminders` / `googleAllDayReminders` 在「只用 Smart Schedules」時回傳空覆寫值。
 - 「只用 Google 日曆」時，提醒無法原地回覆，緊急程度、安靜時段、每日上限三個區塊在設定頁會停用。
 
 ## 3. 預設提醒、緊急程度、安靜時段
@@ -216,7 +216,7 @@ NSExtensionAttributes:
 - [ ] 在收合的 banner 直接回覆 → App 在背景處理 → 收到結果通知。
 - [ ] Inline TextField 能不能取得焦點（決定是否把它當主要輸入方式）。
 - [ ] 64 個上限：建立 30 個會議（每個 4 個提醒）後，最近的提醒、計畫提醒和摘要仍然都在排程裡。
-- [ ] 「只用 Smart Schedule」：新行程在 Google 日曆網頁版沒有彈出提醒，本機提醒照常。
+- [ ] 「只用 Smart Schedules」：新行程在 Google 日曆網頁版沒有彈出提醒，本機提醒照常。
 - [ ] 「只用 Google 日曆」：切換後待發的本機提醒全部消失，摘要仍在。
 - [ ] 安靜時段 22:00–07:00：06:30 的提醒無聲進通知中心，07:00 的照常響。
 - [ ] 時效性提醒在專注模式下仍會出現（需要 Time Sensitive entitlement）。

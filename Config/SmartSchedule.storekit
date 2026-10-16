@@ -16,17 +16,17 @@
       "id" : "21500001",
       "localizations" : [
         {
-          "description" : "Smart Schedule Pro",
-          "displayName" : "Smart Schedule Pro",
+          "description" : "Smart Schedules Pro",
+          "displayName" : "Smart Schedules Pro",
           "locale" : "en_US"
         },
         {
-          "description" : "Smart Schedule Pro",
-          "displayName" : "Smart Schedule Pro",
+          "description" : "Smart Schedules Pro",
+          "displayName" : "Smart Schedules Pro",
           "locale" : "zh_TW"
         }
       ],
-      "name" : "Smart Schedule Pro",
+      "name" : "Smart Schedules Pro",
       "subscriptions" : [
         {
           "adHocOffers" : [

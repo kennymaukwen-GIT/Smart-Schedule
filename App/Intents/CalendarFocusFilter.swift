@@ -1,6 +1,6 @@
 import AppIntents
 
-/// Focus filter: Settings › Focus › (a Focus) › Add Filter › Smart Schedule. While that Focus is on, only the chosen
+/// Focus filter: Settings › Focus › (a Focus) › Add Filter › Smart Schedules. While that Focus is on, only the chosen
 /// calendars show and send reminders. iOS runs `perform()` when the Focus turns on, and again with the parameter's
 /// default (nil) when it turns off, which clears the filter. Apps cannot open Focus settings themselves (no public
 /// URL), so Settings › Notifications explains the path.

@@ -178,7 +178,7 @@ enum SSProperty {
     static let planID = "ssPlanId"
     static let schema = "ssSchema"     // bump when the mapping changes
     /// The reminders Smart Schedule itself sends: "default" (the kind's defaults) or minutes like "60,10".
-    /// Google's own pop-ups may differ (none at all in "Smart Schedule only" mode).
+    /// Google's own pop-ups may differ (none at all in "Smart Schedules only" mode).
     static let localReminders = "ssReminders"
 }
 

@@ -6,14 +6,14 @@ struct ShortcutsGuideView: View {
     var body: some View {
         Form {
             guide("Control Center", systemImage: "switch.2",
-                  "Open Control Center, tap +, then Add a Control. Search for Smart Schedule and choose it.")
+                  "Open Control Center, tap +, then Add a Control. Search for Smart Schedules and choose it.")
             guide("Action Button", systemImage: "hand.tap",
-                  "On iPhone 15 Pro and later: open the Settings app › Action Button, swipe to Shortcut, then choose Add to Smart Schedule.")
+                  "On iPhone 15 Pro and later: open the Settings app › Action Button, swipe to Shortcut, then choose Add to Smart Schedules.")
             guide("Lock Screen", systemImage: "lock.iphone",
-                  "Touch and hold the Lock Screen, tap Customize › Lock Screen, tap a control at the bottom and choose Smart Schedule.")
+                  "Touch and hold the Lock Screen, tap Customize › Lock Screen, tap a control at the bottom and choose Smart Schedules.")
             Section {
                 Label {
-                    Text("Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Open Quick Capture in Smart Schedule”.")
+                    Text("Say “Add a plan in Smart Schedules”, “Schedule something with Smart Schedules” or “Open Quick Capture in Smart Schedules”.")
                 } icon: {
                     Image(systemName: "mic")
                 }

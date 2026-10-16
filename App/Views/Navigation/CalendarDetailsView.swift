@@ -27,7 +27,7 @@ struct CalendarDetailsView: View {
     private func form(_ calendar: CalendarInfo) -> some View {
         Form {
             Section {
-                Toggle("Show in Smart Schedule", isOn: Binding(
+                Toggle("Show in Smart Schedules", isOn: Binding(
                     get: { calendar.isVisible },
                     set: { schedule.setVisible($0, calendar: ref) }
                 ))
@@ -54,7 +54,7 @@ struct CalendarDetailsView: View {
             } header: {
                 Text("Notifications")
             } footer: {
-                Text("Off: Smart Schedule sends no reminders for events in this calendar.")
+                Text("Off: Smart Schedules sends no reminders for events in this calendar.")
             }
 
             Section {

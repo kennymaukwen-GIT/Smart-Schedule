@@ -1,6 +1,6 @@
 # www.smart-schedules.com 網站
 
-Smart Schedule 的靜態網站：首頁、隱私權政策和支援頁，網址是 **https://www.smart-schedules.com**。Google OAuth 驗證、App Store Connect 和 App 裡的連結都指向這裡。
+Smart Schedules 的靜態網站：首頁、隱私權政策和支援頁，網址是 **https://www.smart-schedules.com**。Google OAuth 驗證、App Store Connect 和 App 裡的連結都指向這裡。
 
 部署方式（1.0）：**Cloudflare Pages 專案**（Direct Upload，只有靜態檔案，沒有 Functions），用 `server/worker` 已經裝好的 wrangler（4.146.0）從終端機上傳，和 `server/worker` 用同一個 Cloudflare 帳號。**DNS 留在 Squarespace，不搬到 Cloudflare**：nameserver 仍然是 `nsa1`～`nsa4.squarespacedns.com`，DNSSEC 照舊開著，Google Workspace 的郵件紀錄一筆都不動；唯一和網站有關的 DNS 變更是在 Squarespace 加**一筆 CNAME**（`www` → 專案的 `pages.dev` 主機名稱）。根網域 smart-schedules.com 不提供網站，可以選擇用 Squarespace 的網域轉址轉到 www（[§3.5](#35選做根網域-smart-schedulescom-轉到-www)）。步驟在 [§3](#3-網站上線wwwsmart-schedulescomcloudflare-pages--squarespace-一筆-cname不搬-dns)；之後如果要把 DNS 搬到 Cloudflare，見[附錄](#附錄之後若要把-dns-搬到-cloudflare10-不需要)（1.0 不需要）。
 
@@ -73,12 +73,12 @@ grep -rn 'https://smart-schedules\.com' site/public      # 網址都要是 https
    - **DNS 留在 Squarespace，Google 的郵件紀錄一筆都不要動**（MX、SPF、`google-site-verification`，以及已經有的 DKIM、DMARC）。照 [§3.6](#36-google-workspace-郵件dkim-和-dmarc加在-squarespace) 在 Squarespace 的 DNS 完成 DKIM 和 DMARC（Google Admin console 的「Complete email setup」），並做那裡的收發測試。
    - 確認 CDPA 已經生效：用超級管理員（super admin）登入 Google Admin console（https://admin.google.com）› 帳戶（Account）› 帳戶設定（Account settings）› 法律與法規遵循（Legal and compliance）› 安全性與隱私權附加條款（Security and Privacy Additional Terms）› 雲端資料處理附錄（Cloud Data Processing Addendum）› 檢查並接受（Review and Accept）。Google 說 Workspace 合約已經納入 CDPA 時不必再接受，不確定就接受，沒有副作用（請在畫面上確認）。
    - 之後如果改用別的收信方式（例如取消 Workspace），政策第 9、12、13、17 節要一起改。
-6. **1.0 沒有 App 內購買。** 政策第 7 節「購買」寫 1.0 沒有任何 App 內購買或訂閱、App 不查詢購買記錄，第 12 節 Apple 那一項沒有「App 內購買」；支援頁的常見問題只留一題「有 App 內購買或訂閱嗎？」（`#zh-purchases`、`#en-purchases`），回答「沒有」。這要和 `AppConstants.subscriptionsEnabled = false`、App Store Connect 不附加任何購買項目一致。之後的版本開始賣 Smart Schedule Pro 時，在同一次發佈改回（舊的文字在 git 歷史裡）：政策第 7 節（由 Apple 銷售和收費、我們收不到付款資料、App 在 iPhone 上確認訂閱、清除資料不影響購買）和第 12 節的「App 內購買」；支援頁的「怎麼取消訂閱？」「怎麼回復購買項目？」（頭像 › 管理訂閱／回復購買項目、期間結束 24 小時前取消、退款到 reportaproblem.apple.com）、「多久會回覆」和「怎麼刪除我的資料？」裡訂閱的那一句，以及支援頁的 meta description。
+6. **1.0 沒有 App 內購買。** 政策第 7 節「購買」寫 1.0 沒有任何 App 內購買或訂閱、App 不查詢購買記錄，第 12 節 Apple 那一項沒有「App 內購買」；支援頁的常見問題只留一題「有 App 內購買或訂閱嗎？」（`#zh-purchases`、`#en-purchases`），回答「沒有」。這要和 `AppConstants.subscriptionsEnabled = false`、App Store Connect 不附加任何購買項目一致。之後的版本開始賣 Smart Schedules Pro 時，在同一次發佈改回（舊的文字在 git 歷史裡）：政策第 7 節（由 Apple 銷售和收費、我們收不到付款資料、App 在 iPhone 上確認訂閱、清除資料不影響購買）和第 12 節的「App 內購買」；支援頁的「怎麼取消訂閱？」「怎麼回復購買項目？」（頭像 › 管理訂閱／回復購買項目、期間結束 24 小時前取消、退款到 reportaproblem.apple.com）、「多久會回覆」和「怎麼刪除我的資料？」裡訂閱的那一句，以及支援頁的 meta description。
 7. **上架地區：1.0 不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架**（App Store Connect › 價格與供應狀況（Pricing and Availability）取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登、瑞士，以及香港、澳門（清單上可能寫 Macao，請在畫面上確認）、中國大陸（Gemini API 不在那裡提供）；**英國**和其他地區照常上架，見 `docs/app-store-metadata.md` §4.3）。政策照仍在上架範圍內的地區寫：第 1 節用「英國 GDPR 等個資法」的用語，第 15 節的地區舉例是英國、美國加州和台灣，申訴機關舉英國的 ICO，法律依據的標題是「適用英國 GDPR 或類似法律時」，第 17 節寫英國使用者適用的 DPF 英國延伸。權利（查詢、更正、刪除、限制、反對、可攜、撤回同意）和法律依據的內容不變，英國 GDPR 一樣適用。
    - **歐洲經濟區和瑞士的代表（GDPR 第 27 條、瑞士 FADP 第 14 條）：排除期間不需要。** 之後的版本加入這些 storefront 前，要指定代表、把名稱和郵寄地址寫進政策第 1、19 節（中英文），並把第 1、15 節的法規、地區舉例和申訴機關（挪威 Datatilsynet、冰島 Persónuvernd、瑞士 FDPIC 等）加回去。
    - **英國代表（英國 GDPR 第 27 條）：不需要。** 開發者在英國（網域 WHOIS 的註冊人國家是 GB），第 27 條只要求英國境外的控管者指定代表。要確認的是 ICO 的資料保護費（data protection fee）：上架前到 ico.org.uk 的「Do I need to pay the fee?」自我評估，依結果繳費或記下不用繳的理由，金額以 ICO 網站為準（`docs/app-store-metadata.md` §4.4 第 4 點）；政策第 1、19 節的控管者名稱要和繳費登記的名稱一致。
    - **挪威、冰島、列支敦斯登、瑞士、香港、澳門和中國大陸都不是歐盟**，只取消歐盟 storefront 不會排除它們，所以要一個一個另外勾掉。
-8. **App 名稱。** 首頁標題是「Smart Schedule」。如果 App Store 名稱因為撞名改成別的，首頁、Google OAuth 的 App name 和 App Store 名稱三者要一致。
+8. **App 名稱是「Smart Schedules」。** 「Smart Schedule」（沒有 s）在 App Store 已經有人用，所以三頁的標題、頁首、內文和 meta 都寫「Smart Schedules」，和 App Store 名稱、Google OAuth 的 App name、iPhone 主畫面上的名稱（`CFBundleDisplayName`）一致。之後名稱再改時，這四處要一起改。隱私權政策和支援頁引用的來源行「由 Smart Schedules 智慧助理自動排程：」要和 App 寫進 Google 日曆說明欄的文字（`CalendarEventMapper.provenancePrefix`）一字不差。
 9. App 上架後，在首頁加上 App Store 連結。
 10. **網址一律用 https://www.smart-schedules.com。** 網站只在 www 上提供；根網域 smart-schedules.com 最多轉址到 www（[§3.5](#35選做根網域-smart-schedulescom-轉到-www)，選做），所以任何正式填寫的網址都不要用根網域：Google OAuth 的 Application home page 和 privacy policy link（[§4](#4-google-auth-platformgoogle-cloud-控制台)）、App Store Connect 的 Privacy Policy URL、Support URL、Marketing URL 和 `project.yml` 的 `SSPrivacyURL`（[§5](#5-app-store-connect-和-app)）、三頁的 `<link rel="canonical">`（[§1](#1-發佈前要替換的佔位文字)）。Google OAuth 的授權網域（Authorized domains）和 Search Console 的網域資源仍然是 `smart-schedules.com`，涵蓋 www。
 
@@ -311,7 +311,7 @@ Google OAuth 的品牌驗證要求首頁和隱私權政策所在的網域已經�
 `calendar.events` 和 `calendar.calendarlist.readonly` 是敏感（sensitive）scope，不是受限（restricted）scope：要過品牌驗證和敏感 scope 審查。審查可能要好幾週，而且只依賴這個網站，不必等 Apple 開發者帳號，所以網站上線後就盡快送。
 
 1. **Branding**：
-   - App name：和首頁、App Store 名稱完全一致（目前是「Smart Schedule」）。
+   - App name：和首頁、App Store 名稱完全一致（「Smart Schedules」；「Smart Schedule」在 App Store 已經有人用）。
    - Logo：120×120，用 `public/logo.png`。
    - Application home page：`https://www.smart-schedules.com/`
    - Application privacy policy link：`https://www.smart-schedules.com/privacy`

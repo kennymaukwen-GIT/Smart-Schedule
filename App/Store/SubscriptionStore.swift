@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import StoreKit
 
-/// StoreKit 2 infrastructure for the "Smart Schedule Pro" subscription group. Nothing reads `isPro` to gate a
+/// StoreKit 2 infrastructure for the "Smart Schedules Pro" subscription group. Nothing reads `isPro` to gate a
 /// feature yet: pricing and what Pro unlocks are the owner's decision (docs/SETTINGS.md §16). Off in version 1.0
 /// (`AppConstants.subscriptionsEnabled`): `start()` returns at once and nothing else is reachable.
 ///

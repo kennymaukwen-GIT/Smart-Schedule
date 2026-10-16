@@ -81,7 +81,7 @@ enum AIConsentDisclosure {
     static var title: String { String(localized: "Use the AI assistant?") }
 
     static var lead: String {
-        String(localized: "To understand your requests, Smart Schedule sends them to Google's Gemini API. This includes:")
+        String(localized: "To understand your requests, Smart Schedules sends them to Google's Gemini API. This includes:")
     }
 
     /// Exactly what `AssistantPrompt` and `NoteSuggestionPrompt` send (docs/GEMINI_FUNCTION_CALLING.md §10.6): no
@@ -95,7 +95,7 @@ enum AIConsentDisclosure {
     }
 
     static var recipient: String {
-        String(localized: "Recipient: Google, through the Gemini API. Requests pass through Smart Schedule's server, which doesn't keep them.")
+        String(localized: "Recipient: Google, through the Gemini API. Requests pass through the Smart Schedules server, which doesn't keep them.")
     }
 
     /// iOS 18 cannot start a Live Activity on its own, so with push-to-start a server does it; on iOS 26 the iPhone
@@ -114,7 +114,7 @@ enum AIConsentDisclosure {
     /// version that turns it on (which also bumps `AIConsent.disclosureVersion`).
     static func serverNote(beforeIOS26: Bool, pushToStart: Bool) -> String? {
         guard beforeIOS26, pushToStart else { return nil }
-        return String(localized: "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on Smart Schedule's server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
+        return String(localized: "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on the Smart Schedules server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
     }
 
     /// Spoken requests: Apple's speech recognition makes the text the assistant gets (App/Voice/SpeechTranscriber).

@@ -63,7 +63,7 @@ struct NotificationSettingsView: View {
                 if sentBySmartSchedule {
                     Text("Automatic: Time Sensitive when 30 minutes or less before the start, otherwise Normal. Time Sensitive reminders break through Focus. Quiet reminders arrive silently in Notification Center.")
                 } else {
-                    Text("Only for reminders sent by Smart Schedule.")
+                    Text("Only for reminders sent by Smart Schedules.")
                 }
             }
             .disabled(!sentBySmartSchedule)
@@ -84,17 +84,17 @@ struct NotificationSettingsView: View {
                 Text("Dynamic Island")
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedule plans the next two days each time you open it.")
+                    Text("Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedules plans the next two days each time you open it.")
                     if AppConstants.pushToStartEnabled {
                         if AIConsentDisclosure.serverNote != nil {
                             // iOS 18 cannot schedule an activity: Smart Schedule's server starts it, with the titles
                             // that only AI consent lets leave the iPhone.
-                            Text("On iOS 18, Smart Schedule's server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time.")
+                            Text("On iOS 18, the Smart Schedules server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time.")
                         }
                     } else if !ActivityPlanner.schedulesOnDevice {
                         // Version 1.0 has no push-to-start: iOS 18 cannot schedule an activity, so one starts only
                         // when the app runs once it is due (ActivityScheduler). Nothing about events leaves the iPhone.
-                        Text("On iOS 18, an event appears only if you open Smart Schedule within that time before it starts or while it's under way. On iOS 26 and later, it appears on time even when the app is closed.")
+                        Text("On iOS 18, an event appears only if you open Smart Schedules within that time before it starts or while it's under way. On iOS 26 and later, it appears on time even when the app is closed.")
                     }
                 }
             }
@@ -104,7 +104,7 @@ struct NotificationSettingsView: View {
             } header: {
                 Text("Focus")
             } footer: {
-                Text("Choose which calendars show and alert while a Focus is on: open the Settings app, tap Focus, choose a Focus, then Add Filter › Smart Schedule.")
+                Text("Choose which calendars show and alert while a Focus is on: open the Settings app, tap Focus, choose a Focus, then Add Filter › Smart Schedules.")
             }
 
             if !model.pendingSuggestions.isEmpty {
@@ -121,7 +121,7 @@ struct NotificationSettingsView: View {
     private func sourceSection(_ source: ReminderSource) -> some View {
         Section {
             CheckmarkRow(isSelected: source == .smartSchedule, action: { setSource(.smartSchedule) }) {
-                Text("Smart Schedule only")
+                Text("Smart Schedules only")
             }
             CheckmarkRow(isSelected: source == .google, action: { setSource(.google) }) {
                 Text("Google Calendar only")
@@ -134,11 +134,11 @@ struct NotificationSettingsView: View {
         } footer: {
             switch source {
             case .smartSchedule:
-                Text("Smart Schedule's reminders let you reply, snooze or reschedule right in the notification. New events get no Google pop-ups, so your other devices won't alert you about them. Turn off notifications for the Google Calendar app on this iPhone to avoid duplicates.")
+                Text("Reminders from Smart Schedules let you reply, snooze or reschedule right in the notification. New events get no Google pop-ups, so your other devices won't alert you about them. Turn off notifications for the Google Calendar app on this iPhone to avoid duplicates.")
             case .google:
-                Text("Google Calendar alerts you on all your devices. Smart Schedule sends no reminders, so you can't reply to them.")
+                Text("Google Calendar alerts you on all your devices. Smart Schedules sends no reminders, so you can't reply to them.")
             case .both:
-                Text("You may get two alerts for the same event, one from Google and one from Smart Schedule. Turning off notifications for the Google Calendar app on this iPhone avoids that.")
+                Text("You may get two alerts for the same event, one from Google and one from Smart Schedules. Turning off notifications for the Google Calendar app on this iPhone avoids that.")
             }
         }
     }
@@ -169,7 +169,7 @@ struct NotificationSettingsView: View {
             if enabled {
                 Text("Reminders during quiet hours arrive silently. None are dropped.")
             } else {
-                Text("Only for reminders sent by Smart Schedule.")
+                Text("Only for reminders sent by Smart Schedules.")
             }
         }
         .disabled(!enabled)
@@ -232,7 +232,7 @@ struct NotificationSettingsView: View {
             if enabled {
                 Text("When a day has more, the most important are sent: events starting now, then deadlines, other event reminders, tasks and routines. The rest are listed in that day's morning briefing.")
             } else {
-                Text("Only for reminders sent by Smart Schedule.")
+                Text("Only for reminders sent by Smart Schedules.")
             }
         }
         .disabled(!enabled)
@@ -275,7 +275,7 @@ struct NotificationSettingsView: View {
         } header: {
             Text("Suggestions")
         } footer: {
-            Text("Smart Schedule notices reminders you keep dismissing and offers to stop them. Nothing changes until you tap.")
+            Text("Smart Schedules notices reminders you keep dismissing and offers to stop them. Nothing changes until you tap.")
         }
     }
 }

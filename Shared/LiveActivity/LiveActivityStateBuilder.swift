@@ -35,7 +35,7 @@ enum LiveActivityStateBuilder {
 
         var state = ScheduleActivityAttributes.ContentState(
             headline: next?.title ?? String(localized: "Nothing next — type a plan"),
-            shortHeadline: String((next?.title ?? "Smart Schedule").prefix(16)),
+            shortHeadline: String((next?.title ?? "Smart Schedules").prefix(16)),
             eventID: next?.id,
             countdownFrom: now,
             countdownTarget: next.map { $0.start > now ? $0.start : $0.end },

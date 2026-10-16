@@ -149,9 +149,12 @@ extension NoteSuggester {
         init(event: ScheduleEvent, notes rawNotes: String?, homeTimeZone: TimeZone) {
             let title = NoteSuggester.fold(event.title)
             let location = NoteSuggester.fold(event.location ?? "")
-            // Smart Schedule's provenance line keeps what the user said, which helps; its fixed prefix does not.
-            let notes = NoteSuggester.fold((rawNotes ?? "").replacingOccurrences(of: CalendarEventMapper.provenancePrefix,
-                                                                                with: " "))
+            // Smart Schedule's provenance line keeps what the user said, which helps; its fixed prefix (current or
+            // legacy) does not.
+            let unprefixed = CalendarEventMapper.provenancePrefixes.reduce(rawNotes ?? "") {
+                $0.replacingOccurrences(of: $1, with: " ")
+            }
+            let notes = NoteSuggester.fold(unprefixed)
             let all = [title, location, notes].joined(separator: "\n")
             let identity = title + "\n" + location
             let isOnline = event.meetURL != nil || Words.online.matches(title + "\n" + location)

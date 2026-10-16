@@ -6,16 +6,16 @@
 
 **How to review without a Google account.** On the first screen tap "Try without signing in". Demo mode has sample calendars and an offline assistant: no Google sign-in, nothing is sent to any AI service, and every feature below can be tried.
 
-**Live Activities / Dynamic Island.** Smart Schedule shows a Live Activity only for an event that is about to start or under way:
+**Live Activities / Dynamic Island.** Smart Schedules shows a Live Activity only for an event that is about to start or under way:
 
-- Each timed event gets its own Live Activity. It appears 30, 15, 10 or 5 minutes before the event starts (Settings › Notifications › Dynamic Island; default 30 minutes, or Off) and ends with the event: whenever Smart Schedule runs after the event (opening the app, a background refresh or a sync) it ends the activity, which then leaves the Lock Screen 10 minutes after the event ends. If the app does not run, iOS ends the activity at its 8-hour limit. No server is involved.
+- Each timed event gets its own Live Activity. It appears 30, 15, 10 or 5 minutes before the event starts (Settings › Notifications › Dynamic Island; default 30 minutes, or Off) and ends with the event: whenever Smart Schedules runs after the event (opening the app, a background refresh or a sync) it ends the activity, which then leaves the Lock Screen 10 minutes after the event ends. If the app does not run, iOS ends the activity at its 8-hour limit. No server is involved.
 - When no event is coming up, there is no Live Activity. The app never keeps one open as a permanent widget.
 - iOS 26: the app schedules each activity ahead with `Activity.request(…, start:)` for events in the next 48 hours, with the start alert iOS requires, so it appears on time even when the app is closed. iOS 18 cannot schedule an activity ahead, and version 1.0 does not start one from a server, so on iOS 18 the activity appears when the app is opened during the lead time or while the event is under way, and stays after the app is closed.
 - Everything happens on the iPhone, on both versions: Live Activities need no AI data sharing, and no event details are sent to our server for them.
 - The countdown uses `Text(timerInterval:)`, so the activity needs no updates from a server. `NSSupportsLiveActivitiesFrequentUpdates` is declared, but the app receives no updates from a server at all.
 - Tapping the Live Activity opens the app's quick-input screen (`smartschedule://compose`). Its microphone button opens the same screen with voice input.
 
-**Control Center control.** The "Smart Schedule" control opens the app directly on the quick-input screen with the keyboard up (`openAppWhenRun`). It does not start a Live Activity.
+**Control Center control.** The "Smart Schedules" control opens the app directly on the quick-input screen with the keyboard up (`openAppWhenRun`). It does not start a Live Activity.
 
 **Time Sensitive notifications.** Reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning summary and suggestions are Normal. People can change the urgency per kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off.
 
@@ -43,7 +43,7 @@
 - [ ] App Store Connect 的 App Privacy 問卷與 `PrivacyInfo.xcprivacy` 一致：Other User Content（App Functionality，連結身分，不追蹤）、Device ID（App Functionality，連結身分，不追蹤；指 App Attest 金鑰 ID，1.0 沒有 push-to-start 的安裝 ID 或 push token）。
 - [ ] 隱私權政策（`SSPrivacyURL` = https://www.smart-schedules.com/privacy，原始檔 `site/public/privacy.html`）已部署且打得開；佔位值都已填好。
 - [ ] 是否保留 `NSSupportsLiveActivitiesFrequentUpdates`：目前沒有任何頻繁更新，拿掉可以少一個被追問的點。
-- [ ] 1.0 不賣訂閱：`AppConstants.subscriptionsEnabled` 是 false（`ReleaseConfigurationTests`、`validate_schema.py` 第 7 項會檢查）；App Store Connect 不要把任何 App 內購買項目或訂閱附加到這個版本（已經建立的「Smart Schedule Pro」群組或商品就留著不送審）；App 隱私問卷不勾 Purchases（購買項目）。
+- [ ] 1.0 不賣訂閱：`AppConstants.subscriptionsEnabled` 是 false（`ReleaseConfigurationTests`、`validate_schema.py` 第 7 項會檢查）；App Store Connect 不要把任何 App 內購買項目或訂閱附加到這個版本（已經建立的「Smart Schedules Pro」群組或商品就留著不送審）；App 隱私問卷不勾 Purchases（購買項目）。
 - [ ] 要不要在上面的 In-app purchases 段落後面加一句（你決定；Guideline 2.3.1 不允許隱藏的功能，這段程式碼在 1.0 碰不到）："The binary contains StoreKit code for a possible later subscription; it is switched off at build time and can only be turned on in a later version submitted for review."
 - [ ] 年齡分級：App Store Connect 的年齡分級設為 18+（Gemini API 的條款要求使用者年滿 18 歲；問卷算出來比較低就選較高的分級）；隱私權政策和支援頁寫同樣的最低年齡。
 - [ ] 供應地區：1.0 不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架。價格與供應狀況裡取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登、瑞士、香港、澳門和中國大陸（後三個沒有 Gemini API）；英國和其他地區照常上架（`app-store-metadata.md` 第 4.3 節）。

@@ -60,13 +60,13 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: Smart Schedule
+        CFBundleDisplayName: Smart Schedules
         UILaunchScreen: {}
         UIUserInterfaceStyle: Dark
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
-        NSMicrophoneUsageDescription: Smart Schedule listens after you tap the mic so you can speak a plan instead of typing it.
+        NSMicrophoneUsageDescription: Smart Schedules listens after you tap the mic so you can speak a plan instead of typing it.
         NSSpeechRecognitionUsageDescription: Your spoken plan is transcribed to text before it is scheduled.
         BGTaskSchedulerPermittedIdentifiers: [com.smartschedule.refresh]
         # fetch: the BGAppRefresh task (App/Sync/AppRefresh.swift). No remote-notification: version 1.0 receives no
@@ -122,7 +122,7 @@ targets:
               echo "error: GEMINI_BASE_URL $problem. Set it in Config/Secrets.xcconfig: GEMINI_BASE_URL = https:/\$()/<worker host>/v1beta"
               exit 1
             fi
-            echo "warning: GEMINI_BASE_URL $problem: the assistant cannot reach Smart Schedule's server (demo mode still works)."
+            echo "warning: GEMINI_BASE_URL $problem: the assistant cannot reach the Smart Schedules server (demo mode still works)."
           fi
     dependencies:
       - target: SmartScheduleWidgets
@@ -130,7 +130,7 @@ targets:
     scheme:
       testTargets:
         - SmartScheduleCoreTests
-      # Local StoreKit testing for the Smart Schedule Pro products when run from Xcode (not bundled). Unused while
+      # Local StoreKit testing for the Smart Schedules Pro products when run from Xcode (not bundled). Unused while
       # AppConstants.subscriptionsEnabled is false (version 1.0 sells nothing).
       storeKitConfiguration: Config/SmartSchedule.storekit
 
@@ -157,7 +157,7 @@ targets:
     info:
       path: Widgets/Info.plist
       properties:
-        CFBundleDisplayName: Smart Schedule
+        CFBundleDisplayName: Smart Schedules
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
         SSKeychainAccessGroup: $(AppIdentifierPrefix)com.smartschedule.shared
@@ -194,7 +194,7 @@ targets:
     info:
       path: NotificationContent/Info.plist
       properties:
-        CFBundleDisplayName: Smart Schedule
+        CFBundleDisplayName: Smart Schedules
         NSExtension:
           NSExtensionPointIdentifier: com.apple.usernotifications.content-extension
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationViewController

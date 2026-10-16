@@ -273,7 +273,7 @@ private func suggestionsPagePreview(chinese: Bool = false,
     }
 }
 
-#Preview("Event page · suggestions from Smart Schedule (demo, offline)") {
+#Preview("Event page · suggestions from Smart Schedules (demo, offline)") {
     suggestionsPagePreview(phase: .loaded(fromRules: true, added: 0)) { PreviewEvents.gym(in: $0) }
 }
 

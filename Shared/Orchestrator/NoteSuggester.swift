@@ -146,7 +146,7 @@ enum NoteSuggester {
         var kept = current
         while let last = kept.last, last.isWhitespace { kept.removeLast() }
         guard !kept.isEmpty else { return line }
-        let onlyProvenance = kept.hasPrefix(CalendarEventMapper.provenancePrefix) && !kept.contains("\n")
+        let onlyProvenance = CalendarEventMapper.startsWithProvenance(kept) && !kept.contains("\n")
         return kept + (onlyProvenance ? "\n\n" : "\n") + line
     }
 

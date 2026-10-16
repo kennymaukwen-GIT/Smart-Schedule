@@ -9,7 +9,7 @@ import Foundation
 /// the app and the widget extension because the ControlWidget references the type.
 struct OpenQuickCaptureIntent: AppIntent {
     static let title: LocalizedStringResource = "Open Quick Capture"
-    static let description = IntentDescription("Opens Smart Schedule ready to type a plan.")
+    static let description = IntentDescription("Opens Smart Schedules ready to type a plan.")
     static var openAppWhenRun: Bool = true
 
     init() {}

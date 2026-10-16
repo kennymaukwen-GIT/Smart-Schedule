@@ -2,7 +2,7 @@ import StoreKit
 import SwiftUI
 
 /// The avatar's sheet: WHO you are. Connected Google accounts (reconnect, remove, add another on a pushed page) and,
-/// when `AppConstants.subscriptionsEnabled` (off in version 1.0), Smart Schedule Pro (status, restore, manage, terms).
+/// when `AppConstants.subscriptionsEnabled` (off in version 1.0), Smart Schedules Pro (status, restore, manage, terms).
 /// Subscriptions are infrastructure only: nothing is gated. Terms of Use and Privacy Policy are always in
 /// Settings › About.
 struct AccountSheet: View {
@@ -169,7 +169,7 @@ struct AccountSheet: View {
         }
     }
 
-    // MARK: Smart Schedule Pro
+    // MARK: Smart Schedules Pro
 
     private var proSection: some View {
         Section {
@@ -218,7 +218,7 @@ struct AccountSheet: View {
                 Button("Privacy Policy") { openURL(privacy) }
             }
         } header: {
-            Text(verbatim: "Smart Schedule Pro")
+            Text(verbatim: "Smart Schedules Pro")
         } footer: {
             Text("Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period. Manage or cancel them in your Apple Account settings.")
         }

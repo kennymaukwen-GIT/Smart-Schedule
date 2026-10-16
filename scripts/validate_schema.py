@@ -494,7 +494,7 @@ def strings_file_checks() -> None:
 
 STOREKIT_USE = re.compile(r"\bimport StoreKit\b|\bSubscriptionStore\b|\bmanageSubscriptionsSheet\b|\bAppStore\.sync\b"
                           r"|\bTransaction\.(?:updates|currentEntitlements)\b|\bProduct\.products\b")
-SUBSCRIPTION_COPY = re.compile(r'"[^"\n]*(?:[Ss]ubscription|Restore Purchases|Smart Schedule Pro)[^"\n]*"')
+SUBSCRIPTION_COPY = re.compile(r'"[^"\n]*(?:[Ss]ubscription|Restore Purchases|Smart Schedules? Pro)[^"\n]*"')
 SUBSCRIPTION_FLAG = "AppConstants.subscriptionsEnabled"
 
 

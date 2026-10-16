@@ -33,17 +33,17 @@ enum AttestationError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unsupported: String(localized: "This device can't prove it is running Smart Schedule, so the assistant is unavailable.")
-        case .sessionMissing: String(localized: "Open Smart Schedule once so the assistant can answer here.")
-        case .notConfigured: "GEMINI_BASE_URL must point at Smart Schedule's server (server/worker)."
-        case let .server(status): String(localized: "Smart Schedule's server didn't answer (\(status)). Try again later.")
+        case .unsupported: String(localized: "This device can't prove it is running Smart Schedules, so the assistant is unavailable.")
+        case .sessionMissing: String(localized: "Open Smart Schedules once so the assistant can answer here.")
+        case .notConfigured: "GEMINI_BASE_URL must point at the Smart Schedules server (server/worker)."
+        case let .server(status): String(localized: "The Smart Schedules server didn't answer (\(status)). Try again later.")
         case .rateLimited: String(localized: "Too many requests. Wait a minute and try again.")
         case .dailyLimit: NetworkSession.isAppExtension
-            ? String(localized: "Today's limit for replies here is used up. Open Smart Schedule to continue, or try again tomorrow.")
+            ? String(localized: "Today's limit for replies here is used up. Open Smart Schedules to continue, or try again tomorrow.")
             : String(localized: "Today's limit is used up. Try again tomorrow.")
-        case .serverNotReady: String(localized: "Smart Schedule's server isn't ready yet. Try again later.")
-        case .updateRequired: String(localized: "Update Smart Schedule to use the assistant here.")
-        case .malformed: String(localized: "Smart Schedule's server sent something unexpected. Try again later.")
+        case .serverNotReady: String(localized: "The Smart Schedules server isn't ready yet. Try again later.")
+        case .updateRequired: String(localized: "Update Smart Schedules to use the assistant here.")
+        case .malformed: String(localized: "The Smart Schedules server sent something unexpected. Try again later.")
         }
     }
 }

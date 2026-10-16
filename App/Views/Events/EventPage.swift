@@ -508,7 +508,8 @@ struct EventPageDraft: Equatable {
     /// Plain text: Google's description as `EventNotes` reads it, saved back as plain text. Without Smart Schedule's
     /// provenance line, which is kept apart and written back on save.
     var notes: String
-    /// "由 Smart Schedule 智慧助理自動排程：…": stays in Google Calendar, hidden from the notes editor.
+    /// "由 Smart Schedules 智慧助理自動排程：…" (or the older "由 Smart Schedule …"): stays in Google Calendar, hidden from
+    /// the notes editor.
     var provenance: String?
     /// nil: the kind's default reminders; [] none.
     var reminderMinutes: [Int]?

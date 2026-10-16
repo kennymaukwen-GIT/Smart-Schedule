@@ -278,7 +278,7 @@ struct PendingSyncGlyph: View {
 
 // MARK: - Saved to a hidden calendar
 
-/// "Saved to «Gym» (hidden in Smart Schedule)" with Show: a new event went to the default calendar, which this
+/// "Saved to «Gym» (hidden in Smart Schedules)" with Show: a new event went to the default calendar, which this
 /// iPhone hides. Google has it either way; Show makes the calendar visible here again.
 struct HiddenCalendarNotice: View {
     let calendarName: String
@@ -289,7 +289,7 @@ struct HiddenCalendarNotice: View {
             Image(systemName: "eye.slash")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary)
-            Text("Saved to «\(calendarName)» (hidden in Smart Schedule)")
+            Text("Saved to «\(calendarName)» (hidden in Smart Schedules)")
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)

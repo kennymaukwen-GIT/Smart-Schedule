@@ -73,6 +73,25 @@ final class EventNotesTests: XCTestCase {
         XCTAssertNil(EventNotes.joining(provenance: nil, userNotes: ""))
     }
 
+    /// Events written before the rename to "Smart Schedules" start with the older prefix: still the provenance line,
+    /// kept apart, written back unchanged and left out of the prompt. New events get the current prefix.
+    func testLegacyProvenancePrefixStillCounts() {
+        XCTAssertEqual(CalendarEventMapper.provenancePrefix, "由 Smart Schedules 智慧助理自動排程：")
+        XCTAssertEqual(CalendarEventMapper.legacyProvenancePrefix, "由 Smart Schedule 智慧助理自動排程：")
+        let legacy = CalendarEventMapper.legacyProvenancePrefix + "週五早上九點飛東京"
+        let full = legacy + "\n\n帶護照"
+        XCTAssertTrue(CalendarEventMapper.startsWithProvenance(full))
+        XCTAssertTrue(CalendarEventMapper.startsWithProvenance(CalendarEventMapper.provenancePrefix + "x"))
+        XCTAssertFalse(CalendarEventMapper.startsWithProvenance("Gate B\n" + legacy))
+        XCTAssertEqual(EventNotes.provenanceLine(full), legacy)
+        XCTAssertEqual(EventNotes.withoutProvenance(full), "帶護照")
+        XCTAssertEqual(EventNotes.joining(provenance: EventNotes.provenanceLine(full),
+                                          userNotes: EventNotes.withoutProvenance(full) ?? ""), full)
+        XCTAssertNil(EventNotes.promptLine(legacy))
+        XCTAssertEqual(EventNotes.appending("帶簡報", to: legacy), legacy + "\n\n帶簡報")
+        XCTAssertEqual(NoteSuggester.appending("帶護照", to: legacy), legacy + "\n\n• 帶護照")
+    }
+
     func testRoundTripThroughTheMapper() throws {
         let google = try JSONDecoder().decode(GCalEvent.self, from: Data(#"""
         {"id": "e1", "summary": "Flight", "description": "Gate <b>B</b><br>Bring &quot;passport&quot;",

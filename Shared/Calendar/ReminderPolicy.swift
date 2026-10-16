@@ -16,7 +16,7 @@ struct ReminderPolicy: Sendable {
     /// All-day events and plan milestones: minutes before 00:00 of the event day (900 = the day before at 09:00).
     /// [] = no reminder.
     var allDayDefaults: [Int] = [900]
-    /// False in "Smart Schedule only" mode: new and edited events get no Google pop-ups (empty overrides), so
+    /// False in "Smart Schedules only" mode: new and edited events get no Google pop-ups (empty overrides), so
     /// only Smart Schedule's interactive reminders alert.
     var writesGooglePopups = true
 

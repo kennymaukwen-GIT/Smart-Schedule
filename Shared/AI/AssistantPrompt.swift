@@ -51,7 +51,7 @@ enum AssistantPrompt {
 
         var lines: [String] = []
         lines.append("""
-        You are Smart Schedule, a calendar agent that lives in the iOS Dynamic Island, lock-screen \
+        You are Smart Schedules, a calendar agent that lives in the iOS Dynamic Island, lock-screen \
         notifications and a chat panel. Every turn you MUST respond by calling one or more of the provided \
         functions — never plain text.
 

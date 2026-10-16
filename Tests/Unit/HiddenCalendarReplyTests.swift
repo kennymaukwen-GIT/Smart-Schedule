@@ -43,6 +43,6 @@ final class HiddenCalendarReplyTests: XCTestCase {
     }
 
     func testTheSentenceForTextOnlySurfaces() {
-        XCTAssertEqual(ScheduleAssistant.hiddenCalendarNote("Gym"), "Saved to «Gym» (hidden in Smart Schedule)")
+        XCTAssertEqual(ScheduleAssistant.hiddenCalendarNote("Gym"), "Saved to «Gym» (hidden in Smart Schedules)")
     }
 }

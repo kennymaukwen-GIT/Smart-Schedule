@@ -1,4 +1,4 @@
-# Smart Schedule：系統架構與技術選型
+# Smart Schedules：系統架構與技術選型
 
 > 核心理念：常駐背景、不打擾、輸入極快。
 > 架構一句話：三個 process、一個 App Group、一條 AI 管線。凡是 iOS 不允許「原地」完成的事，都改成「看起來像原地」的路徑來完成。
@@ -16,16 +16,16 @@
 | 動態島不常駐 | Live Activity 只能代表「即將發生或進行中」的事件（HIG、Guideline 4.2）；一個最多活躍 8 小時，之後在鎖定畫面再留最多 4 小時 | 一個行程一個 activity，開始前 30／15／10／5 分鐘出現、結束後 10 分鐘消失（`ActivityScheduler`，見 docs/NOTIFICATIONS.md §8） |
 | 動態島顯示一週日曆 | ActivityKit 的內容（static 加 dynamic）不能超過 4 KB。畫面渲染時不能連網 | `LiveActivityStateBuilder` 先壓縮：每天最多 2 個 chip、標題截短，超過預算就自動降一級 |
 | 「21 MIN」倒數 | 不靠推播也會自己跳動的文字，只有 `Text(timerInterval:)` 和日期樣式 | `countdownFrom`／`countdownTarget`，由 builder 保證範圍永遠合法 |
-| 長按 Google 日曆送來的通知，原地展開（Artboard 1） | **App 不能擴充別的 App 的通知。** Google Calendar App 的推播，Smart Schedule 碰不到 | 改由 Smart Schedule 自己發提醒（本地通知或 APNs），並把 category 綁到 Content Extension。建議使用者關掉 Google Calendar iOS App 的通知（網頁和桌機上的 Google 彈窗照常保留） |
+| 長按 Google 日曆送來的通知，原地展開（Artboard 1） | **App 不能擴充別的 App 的通知。** Google Calendar App 的推播，Smart Schedules 碰不到 | 改由 Smart Schedules 自己發提醒（本地通知或 APNs），並把 category 綁到 Content Extension。建議使用者關掉 Google Calendar iOS App 的通知（網頁和桌機上的 Google 彈窗照常保留） |
 | 在通知裡直接輸入 | Content Extension 加上 `UNNotificationExtensionUserInteractionEnabled`，再用 `UNTextInputNotificationAction` 讓使用者打字。文字送出後，extension 內的 `didReceive(_:completionHandler:)` 直接處理，回傳 `.doNotDismiss` 讓卡片保持展開 | `NotificationContent/NotificationViewController.swift` |
 | 前一天、24 小時、1 小時、30 分鐘前提醒 | 每個 App 最多只能有 64 個待發的本地通知，超過的會被**默默丟掉** | `ReminderScheduler` 採滾動視窗：只排最近的觸發點，留 2 格給貪睡。Routine 預設只提醒一次 |
 | 和 Google 雙向同步 | BGAppRefresh 什麼時候跑由系統決定，不是即時通道 | `SyncEngine`：寫入失敗先進 App Group 待送佇列（連線、前景、BG refresh 時依序補送），修改帶 If-Match 防覆蓋；App 開著時每 60 秒抓「之後有變動的」，下拉、BG refresh（最早 15 分鐘）時整段重抓。要即時：後端 `events.watch`（webhook），再發 silent push 或遠端提醒（見 GOOGLE_CALENDAR_SYNC.md §10） |
-| 在 App 內呼叫 Gemini | 打包進 IPA 的 API key 幾分鐘就能被挖出來 | App 裡沒有 key：經 Smart Schedule 的 Cloudflare Worker（`server/worker/`）呼叫，Worker 驗證 App Attest、依金鑰限流後加上 key 轉給 Google。`GEMINI_BASE_URL` 指向 Worker |
+| 在 App 內呼叫 Gemini | 打包進 IPA 的 API key 幾分鐘就能被挖出來 | App 裡沒有 key：經 Smart Schedules 的 Cloudflare Worker（`server/worker/`）呼叫，Worker 驗證 App Attest、依金鑰限流後加上 key 轉給 Google。`GEMINI_BASE_URL` 指向 Worker |
 | Gemini 模型版本 | 2.5 系列已經過了公告的最早關機日（2026-10-16）；3.x 的模型 ID 換得很快 | `GEMINI_MODEL_ID` 由 xcconfig 注入，預設 `gemini-3.5-flash`。**上線前務必到 deprecations 頁確認**。換模型時先把新 ID 加進 Worker 的 `SESSION_MODELS` 並部署（舊 ID 留到舊版 App 不再使用），否則通知擴充的回覆會被拒（403 `session_scope`） |
 | Gemini 3 多輪 function calling | 要把 thought signature 原樣傳回，否則回 400 | `GeminiTurn` 把模型回傳的 content 以 raw JSON 原封保存（`Shared/AI/GeminiClient.swift`） |
 | 把個人資料傳給第三方 AI 前要先說明並取得同意（App Store 5.1.2(i)，2025 年 11 月） | 審核會在乾淨安裝、Siri、通知擴充裡各試一次 | `GeminiClient.generate` 在組 request 之前先檢查 `AIConsentStore.current.isGranted`，沒有同意就丟 `GeminiError.consentRequired`，一個閘門蓋住所有入口。App 顯示同意說明（`App/Views/Chat/AIConsentSheet.swift`），Siri 和通知改成告訴使用者到設定開啟。Demo 模式不呼叫 Gemini |
 | 動態島「在每個行程開始前自動出現」 | App 在背景不能 `Activity.request()` | iOS 26：`Activity.request(…, start:)` 排程啟動。iOS 18：1.0 只在 App 執行時開始（提前時間內或行程進行中打開 App），之後關掉 App 也留著。APNs push-to-start（`PushToStartRegistrar` 準備好整份資料，伺服器在觸發時間送出）的程式碼保留給之後的版本，1.0 關閉（`AppConstants.pushToStartEnabled = false`：不要 token、不上傳、沒有 `aps-environment`） |
-| 從 App 打開系統的專注模式設定 | 沒有公開的 URL 可以直接開到「專注模式」 | 提供 `SetFocusFilterIntent`（`App/Intents/CalendarFocusFilter.swift`），設定頁用文字說明路徑：設定 › 專注模式 › 選一個 › 加入過濾條件 › Smart Schedule |
+| 從 App 打開系統的專注模式設定 | 沒有公開的 URL 可以直接開到「專注模式」 | 提供 `SetFocusFilterIntent`（`App/Intents/CalendarFocusFilter.swift`），設定頁用文字說明路徑：設定 › 專注模式 › 選一個 › 加入過濾條件 › Smart Schedules |
 | App 介面語言 | iOS 自己管理每個 App 的語言，App 不能自行切換 | 設定 › 語言打開 `UIApplication.openSettingsURLString`（系統設定裡這個 App 的頁面） |
 | 控制中心、Action Button、鎖定畫面控制項、Siri 片語 | 只有使用者自己能加入，App 無法代勞 | 設定 › 捷徑與 Siri 寫出每一種的步驟（`ShortcutsGuideView`） |
 
@@ -113,13 +113,13 @@ flowchart LR
 ### 3.3 通知：UserNotificationsUI Content Extension
 - 細節見 [`NOTIFICATIONS.md`](NOTIFICATIONS.md)。
 - 長按通知後的對話、改時間、紅色確認刪除，都在 extension 裡直接呼叫 Gemini 與 Google Calendar 完成（不丟給 BGTask：系統可能數小時後才執行）。Extension 的網路走 `NetworkSession`（`Shared/Core/NetworkSession.swift`）：`.ephemeral`（不寫磁碟快取、cookie、憑證），每個 request 最多等 30 秒；主 App 仍用 `URLSession.shared`。兩次小型 JSON 請求遠低於 extension 的記憶體上限。
-- Extension 呼叫 Gemini 一樣經過 Smart Schedule 的伺服器，但 App Attest 在 app extension 裡不能用，所以它送的是 App 替它要來、放在共用 Keychain 的 session token（`Authorization: Session …`，7 天，伺服器只接受它呼叫 Gemini）。App 太久沒打開時 token 會過期，擴充就請使用者打開 App 一次（`Shared/Security/AppAttestClient.swift`）。
+- Extension 呼叫 Gemini 一樣經過 Smart Schedules 的伺服器，但 App Attest 在 app extension 裡不能用，所以它送的是 App 替它要來、放在共用 Keychain 的 session token（`Authorization: Session …`，7 天，伺服器只接受它呼叫 Gemini）。App 太久沒打開時 token 會過期，擴充就請使用者打開 App 一次（`Shared/Security/AppAttestClient.swift`）。
 - 如果改用遠端推播，可以另加 Notification Service Extension（`mutable-content: 1`），在送達前補上 category 和最新資料。
 
 ### 3.4 主 App：SwiftUI 加 Observation（`@Observable`）
 - iOS 18 起跳。`RootView` 疊出 Quick Capture overlay，動畫是 `.scale(anchor: .top)`，看起來像從動態島「長」出來。
 - 背景工作：`.backgroundTask(.appRefresh(...))`（SwiftUI 的 scene modifier）。
-- **Artboard 5 的導覽**：漢堡選單 = 看什麼（`CalendarDrawer`，從左邊滑出，內含自己的 `NavigationStack`，行事曆設定在抽屜裡推入）；頭像 = 我是誰（`AccountSheet`：Google 帳號；Smart Schedule Pro 區塊在 1.0 關閉）；General = App 怎麼運作（`SettingsView`）。`AppRouter` 管抽屜開關和這兩個 sheet，也接受 `smartschedule://settings`、`smartschedule://accounts`。月份 chips 和月曆格維持無限捲動；時區或每週起始日改變時，用 `.id(schedule.clockID)` 讓它們以 `displayedMonth` 重新排版。
+- **Artboard 5 的導覽**：漢堡選單 = 看什麼（`CalendarDrawer`，從左邊滑出，內含自己的 `NavigationStack`，行事曆設定在抽屜裡推入）；頭像 = 我是誰（`AccountSheet`：Google 帳號；Smart Schedules Pro 區塊在 1.0 關閉）；General = App 怎麼運作（`SettingsView`）。`AppRouter` 管抽屜開關和這兩個 sheet，也接受 `smartschedule://settings`、`smartschedule://accounts`。月份 chips 和月曆格維持無限捲動；時區或每週起始日改變時，用 `.id(schedule.clockID)` 讓它們以 `displayedMonth` 重新排版。
 - **View model**：`ScheduleViewModel`（可見行程、帳號、待確認的計畫和「先問我」行程、`clock`）、`ChatViewModel`（對話、卡片狀態、AI 同意流程、對話紀錄的讀寫）、`SettingsModel`（設定頁的偏好、紀錄、建議、同意狀態；每次修改都經過 `PreferencesStore.update(source: .settings)`，自動記進「助理記得的事」）。
 - **啟動順序**：先讀回對話紀錄 → `ScheduleViewModel.bootstrap()`（舊版單一帳號搬到多帳號 → 帳號 → 快取 → 同步）→ 對齊 App Group 裡的草稿和「先問我」批次 → 加入學到的建議卡片 → `summonIfDue`。回到前景時另外重新整理行事曆清單（超過 6 小時的）。
 
@@ -207,7 +207,7 @@ sequenceDiagram
 
 - [ ] 控制中心 → `OpenQuickCaptureIntent` 打開快速輸入（已鎖定和未鎖定都要測），動態島沒有新的 activity。
 - [ ] iOS 26：App 關著時，`Activity.request(…, start:)` 排程的 activity 在提前量準時出現（1.0 的 build 沒有 `aps-environment`，也要準時出現）；同時排 10／20／50 筆，記下第幾筆丟出 `ActivityAuthorizationError`，減 2 回填 `ActivityPlanner.maxPending`；排程後重開機，pending 是否存活。
-- [ ] iOS 18（1.0 沒有 push-to-start）：提前時間內或行程進行中打開 App，即時動態馬上出現，關掉 App 後還在；App 一直關著時不會出現。設定 › 通知 › 動態島 的說明出現 iOS 18 那一句（「On iOS 18, an event appears only if you open Smart Schedule…」）。AI 同意畫面沒有伺服器那一段。
+- [ ] iOS 18（1.0 沒有 push-to-start）：提前時間內或行程進行中打開 App，即時動態馬上出現，關掉 App 後還在；App 一直關著時不會出現。設定 › 通知 › 動態島 的說明出現 iOS 18 那一句（「On iOS 18, an event appears only if you open Smart Schedules…」）。AI 同意畫面沒有伺服器那一段。
 - [ ] 上傳 build 後 App Store Connect 有沒有寄 ITMS-90078 之類的推播 entitlement 警告（二進位檔裡還有關掉的 push-to-start 程式碼）：警告不是退件，記下來就好（請在畫面上確認）。
 - [ ] Content Extension 裡的 inline `TextField` 能不能取得鍵盤焦點。保底方案是系統的文字輸入 action。
 - [ ] 不同機型上 expanded island 是否超出 160 pt，例如 Pro Max 和標準尺寸、粗體字、動態字級。
@@ -218,7 +218,7 @@ sequenceDiagram
 - [ ] 乾淨安裝時，第一次送出訊息、Siri、長按通知回覆都先要求 AI 資料分享同意，同意前沒有任何 request 送到 Gemini。
 - [ ] 抽屜在不同機型上的寬度（`min(340, 84%)`）和往左滑關閉的手勢不會和清單捲動衝突。
 - [ ] App Attest：Debug（`appattest-environment` development，連開發版 Worker）與 TestFlight（production，連正式版 Worker）各裝一次，第一次用助理時 `GET /attest/challenge` → `POST /attest` 成功，之後的 Gemini request 帶 `Authorization: Bearer`；Release 版從不送 `X-Dev-Token`。兩個 Worker 都要先 `wrangler secret put APPLE_TEAM_ID`（沒設時 `POST /attest` 回 500）。
-- [ ] 通知擴充的 session（用 TestFlight／Release 版測）：App 回到前景或背景更新時，剩不到 3 天就 `POST /session` 換新；在伺服器刪掉該 `sess:` key 後長按通知回覆，看到「請先打開 Smart Schedule 一次…」，打開 App 後恢復。Debug 版在 Simulator 上 session 失效後改送 `X-Dev-Token`：`SS_DEV_TOKEN` 有值且開發 Worker 開了 `ALLOW_DEV_TOKEN` 時回覆照常成功，空白時顯示「請先打開 Smart Schedule 一次…」（伺服器回 `attestation_required`）。
+- [ ] 通知擴充的 session（用 TestFlight／Release 版測）：App 回到前景或背景更新時，剩不到 3 天就 `POST /session` 換新；在伺服器刪掉該 `sess:` key 後長按通知回覆，看到「請先打開 Smart Schedules 一次…」，打開 App 後恢復。Debug 版在 Simulator 上 session 失效後改送 `X-Dev-Token`：`SS_DEV_TOKEN` 有值且開發 Worker 開了 `ALLOW_DEV_TOKEN` 時回覆照常成功，空白時顯示「請先打開 Smart Schedules 一次…」（伺服器回 `attestation_required`）。
 - [ ] 「清除所有資料」在 1.0 不送任何 push-to-start 請求（`PushToStartRegistrar.forgetLocally`），伺服器 KV 裡沒有新的 `p2s:` key。
 
 **延後到開啟 push-to-start 的版本（1.0 不測）：**

@@ -242,7 +242,7 @@ final class GeminiProxyTests: XCTestCase {
         let headers = try await client.headers(for: Data("{}".utf8))
         XCTAssertEqual(headers, ["Authorization": "Session tok"])
 
-        // Expired: not sent. (Release throws sessionMissing, "Open Smart Schedule once…"; this Debug test bundle
+        // Expired: not sent. (Release throws sessionMissing, "Open Smart Schedules once…"; this Debug test bundle
         // has no SSDevToken, so nothing is added.)
         clock.now = clock.now.addingTimeInterval(2 * 86_400)
         let expired = try await client.headers(for: Data())

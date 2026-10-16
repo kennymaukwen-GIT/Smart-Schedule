@@ -23,7 +23,7 @@ extension NotificationChatModel {
     /// Preview-only: a goal typed into a reminder came back as a draft plan waiting for Add / Keep editing.
     static func planPreview(chinese: Bool = false) -> NotificationChatModel {
         let model = NotificationChatModel(assistant: DemoAssistant())
-        model.headerTitle = "Smart Schedule"
+        model.headerTitle = "Smart Schedules"
         model.headerBody = chinese ? "早安" : "Good morning"
         model.turns = [
             Turn(role: .user, text: chinese ? "我想在 3 個月內變強壯" : "I want to get stronger in 3 months"),
@@ -35,7 +35,7 @@ extension NotificationChatModel {
     /// Preview-only: "Ask me first" is on, so the coffee waits for Add / Edit.
     static func pendingEventsPreview(chinese: Bool = false) -> NotificationChatModel {
         let model = NotificationChatModel(assistant: DemoAssistant())
-        model.headerTitle = "Smart Schedule"
+        model.headerTitle = "Smart Schedules"
         model.headerBody = chinese ? "長按回覆" : "Hold to reply"
         var coffee = NotificationPreviewSamples().coffee(chinese: chinese)
         coffee.id = "draft-ev-preview0-0" // a draft id, as the assistant gives previews
@@ -73,7 +73,7 @@ extension NotificationChatModel {
     /// Preview-only: "Ask me first" added the session to "Gym", which this iPhone hides.
     static func hiddenCalendarPreview(chinese: Bool = false) -> NotificationChatModel {
         let model = NotificationChatModel(assistant: DemoAssistant())
-        model.headerTitle = "Smart Schedule"
+        model.headerTitle = "Smart Schedules"
         model.headerBody = chinese ? "長按回覆" : "Hold to reply"
         var session = NotificationPreviewSamples().coffee(chinese: chinese)
         session.title = chinese ? "健身" : "Gym"

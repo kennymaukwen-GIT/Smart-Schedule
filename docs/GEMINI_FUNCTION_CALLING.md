@@ -36,7 +36,7 @@
 | 新行程一定要有使用者說的**幾點**（prompt 規則 7） | 只說了哪一天（「明天開會」）或只說了時段（「明天下午」「今晚」「午餐」）時，不替使用者猜時間：`reply_to_user` 帶 `needs_clarification=true` 問「明天下午的「開會」要排在幾點？」，3 個建議時間落在那個時段裡（上午 08:00／09:00／10:00、中午 12:00／12:30／13:00、下午 13:00／14:00／15:00、晚上 18:00／19:00／20:00，沒說時段就 09:00／14:00／19:00）。早餐算上午、晚餐算晚上；重複的行程問的是重複本身（「每週一晚上」）。使用者回「兩點」時，在下午就是 14:00；回答只補上時間，其他說過的內容（重複、地點、線上會議、人、長度）都保留。一次有好幾個行程缺時間時，一個一個問，全部答完才一起建立。全天行程（生日、假日、旅行、「整天」）、待辦和截止日不用問。時段換算成時間（上午 09:00、午餐 12:30、下午 14:00、晚上 19:00）只用在長期計畫的課表和移動既有行程。回答後建立的行程，備註裡的來源寫「原本的要求 → 回答」（`ScheduleAssistant.clarifiedRequest`）。Siri 捷徑（`AddPlanIntent`）在同一次對話裡追問，最多兩輪。示範模式（`DemoAssistant`）沒有全天和待辦的判斷，凡是沒說幾點的新項目都會問；網頁原型的離線示範則和 Gemini 規則一樣，待辦、截止日和全天項目不問 |
 | `reminder_minutes` 「省略就用預設值」 | 只有使用者對**這一個**行程要求提醒時才填。預設值是使用者的設定（prompt 的 PREFERENCES 區塊），由 `ReminderPolicy(preferences:)` 套用 |
 | `assumptions[]` | 把模型做的假設（「假設你是初學者」「假設平日晚上有空」）攤開給使用者看，讓他能修正 |
-| UPCOMING 區塊（`id \| title \| start \| end \| flags`，有備註時再加 `\| notes: …`） | 一次提供四種資訊：衝突偵測、`modify` 和 `delete` 要用的 id 來源、`plan=` 對照，以及行程的備註（使用者問「護照帶了沒」「那個會要準備什麼」時看得到）。標題和備註裡的 `\|` 和換行會先移除，防止 prompt injection；備註縮成一行、最多 300 字（`AssistantPrompt.notesLimit`），Smart Schedule 自己寫的來源行（「由 Smart Schedule 智慧助理自動排程：…」）不放進去 |
+| UPCOMING 區塊（`id \| title \| start \| end \| flags`，有備註時再加 `\| notes: …`） | 一次提供四種資訊：衝突偵測、`modify` 和 `delete` 要用的 id 來源、`plan=` 對照，以及行程的備註（使用者問「護照帶了沒」「那個會要準備什麼」時看得到）。標題和備註裡的 `\|` 和換行會先移除，防止 prompt injection；備註縮成一行、最多 300 字（`AssistantPrompt.notesLimit`），Smart Schedules 自己寫的來源行（「由 Smart Schedules 智慧助理自動排程：…」，改名前的版本寫的「由 Smart Schedule 智慧助理自動排程：…」也算）不放進去 |
 
 ## 3. 實際送出的 request（簡化版）
 
@@ -46,12 +46,12 @@ Authorization: Bearer <base64(App Attest key ID bytes ‖ assertion over SHA-256
 （通知擴充：Authorization: Session <token>）
 ```
 
-`GEMINI_BASE_URL` 是 Smart Schedule 的伺服器（`server/worker/`，`https://<worker>/v1beta`）：驗證 App Attest、限流後，把同一個 body 原封不動轉給 `https://generativelanguage.googleapis.com/v1beta/...`，由伺服器加上 Gemini key。App 裡沒有 key（`Shared/Security/AppAttestClient.swift`、`GeminiClient`）。模擬器沒有 App Attest，Debug 版改送 `X-Dev-Token`（伺服器要開 `ALLOW_DEV_TOKEN`）；Release 沒有這條路。伺服器回 401 `unknown_key` / `invalid_assertion` 時重新 attest 一次，`stale_counter`（兩個 request 交錯）時換一個新的 assertion 重送一次。
+`GEMINI_BASE_URL` 是 Smart Schedules 的伺服器（`server/worker/`，`https://<worker>/v1beta`）：驗證 App Attest、限流後，把同一個 body 原封不動轉給 `https://generativelanguage.googleapis.com/v1beta/...`，由伺服器加上 Gemini key。App 裡沒有 key（`Shared/Security/AppAttestClient.swift`、`GeminiClient`）。模擬器沒有 App Attest，Debug 版改送 `X-Dev-Token`（伺服器要開 `ALLOW_DEV_TOKEN`）；Release 沒有這條路。伺服器回 401 `unknown_key` / `invalid_assertion` 時重新 attest 一次，`stale_counter`（兩個 request 交錯）時換一個新的 assertion 重送一次。
 
-App Attest 在 iOS 的 app extension 裡不能用（Apple 文件：`generateKey` 在 app extension 一律失敗，只有 watchOS extension 例外），所以通知擴充不 attest：App 用自己的 App Attest 身分向伺服器要一個 7 天的 session token（`POST /session`），存在 App 和擴充共用的 Keychain access group，擴充送 `Authorization: Session <token>`。伺服器只在 `POST /v1beta/models/<SESSION_MODELS>:generateContent` 接受它（body 最多 512 KB；其他路徑、方法或模型回 403 `session_scope`，App 顯示「請更新 Smart Schedule…」），失效時回 401 `invalid_session`，擴充就刪掉它，請使用者打開 App 一次。App 在回到前景、背景更新和 AI 同意改變時，剩不到 3 天就換一個新的（`AppAttestClient.refreshSessionIfNeeded`）；沒有 AI 同意時不要。
+App Attest 在 iOS 的 app extension 裡不能用（Apple 文件：`generateKey` 在 app extension 一律失敗，只有 watchOS extension 例外），所以通知擴充不 attest：App 用自己的 App Attest 身分向伺服器要一個 7 天的 session token（`POST /session`），存在 App 和擴充共用的 Keychain access group，擴充送 `Authorization: Session <token>`。伺服器只在 `POST /v1beta/models/<SESSION_MODELS>:generateContent` 接受它（body 最多 512 KB；其他路徑、方法或模型回 403 `session_scope`，App 顯示「請更新 Smart Schedules…」），失效時回 401 `invalid_session`，擴充就刪掉它，請使用者打開 App 一次。App 在回到前景、背景更新和 AI 同意改變時，剩不到 3 天就換一個新的（`AppAttestClient.refreshSessionIfNeeded`）；沒有 AI 同意時不要。
 ```json
 {
-  "systemInstruction": { "parts": [{ "text": "You are Smart Schedule ...\n# Clock\nnow_local: 2026-10-13T10:15 (Tuesday)\ntime_zone: Europe/London (currently UTC+1.0)\n...\n# UPCOMING / BUSY (id | title | start | end | flags | notes: … when the event has notes)\nss0k3p | Online meeting with Joe | 2026-10-13T15:30 | 2026-10-13T16:30 | event | notes: Product quality review" }] },
+  "systemInstruction": { "parts": [{ "text": "You are Smart Schedules ...\n# Clock\nnow_local: 2026-10-13T10:15 (Tuesday)\ntime_zone: Europe/London (currently UTC+1.0)\n...\n# UPCOMING / BUSY (id | title | start | end | flags | notes: … when the event has notes)\nss0k3p | Online meeting with Joe | 2026-10-13T15:30 | 2026-10-13T16:30 | event | notes: Product quality review" }] },
   "contents": [
     { "role": "user", "parts": [{ "text": "I want to be muscular in 6 month design me a daily routine" }] }
   ],
@@ -107,7 +107,7 @@ Fixture：[`Tests/fixtures/modify_event.add_note.json`](../Tests/fixtures/modify
 
 | 項目 | 做法 |
 |---|---|
-| 模型看到什麼 | UPCOMING 和 FOCUS 的每一列在有備註時多一欄 `notes: …`：一行、最多 300 字（太長以「…」結尾），換行變成 ` / `，`\|` 變成 `/`，Smart Schedule 寫的來源行不放 |
+| 模型看到什麼 | UPCOMING 和 FOCUS 的每一列在有備註時多一欄 `notes: …`：一行、最多 300 字（太長以「…」結尾），換行變成 ` / `，`\|` 變成 `/`，Smart Schedules 寫的來源行不放 |
 | `changes.notes` 的意思 | **只放新加的那句**（schema 的 description 寫明）。App（`CalendarEventMapper.patch(from:existing:)`）把它接在原本備註的下一行（`EventNotes.appending`；同一句已經有了就不重複），PATCH 送出整段 `description` |
 | 為什麼不讓模型送「整段新的備註」 | 模型只看到截短的一行，要它重寫整段一定會弄丟 300 字以後的內容和原本的換行。用「追加」就不可能誤刪；要改寫或清空備註，使用者在行程頁直接編輯 |
 | 衝突 | 跟其他欄位一樣：PATCH 帶 If-Match，412 時 `ConflictMerge` 只重送使用者這次改的欄位 |
@@ -191,10 +191,10 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
   4. 行事曆名稱和助理設定，但**不包括 Google 帳號的 email**；
   5. 時區和語言。
 
-  另外的段落：語音由 Apple 轉成文字（開啟「裝置端辨識」且支援該語言時在 iPhone 上，否則在 Apple 的伺服器）；註腳「點『允許』之前，不會傳送任何資料給 AI……示範模式從不連線到 AI」。iOS 18 的伺服器說明（接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色存在 Smart Schedule 的伺服器並透過 Apple 的推播服務送出）只在 `AppConstants.pushToStartEnabled` 為 true 時出現（`AIConsentDisclosure.serverNote`），1.0 在每個 iOS 版本都是 nil：伺服器不存任何行程。
+  另外的段落：語音由 Apple 轉成文字（開啟「裝置端辨識」且支援該語言時在 iPhone 上，否則在 Apple 的伺服器）；註腳「點『允許』之前，不會傳送任何資料給 AI……示範模式從不連線到 AI」。iOS 18 的伺服器說明（接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色存在 Smart Schedules 的伺服器並透過 Apple 的推播服務送出）只在 `AppConstants.pushToStartEnabled` 為 true 時出現（`AIConsentDisclosure.serverNote`），1.0 在每個 iOS 版本都是 nil：伺服器不存任何行程。
 - **絕對不要寫「不會被用來訓練」**：這只在 Gemini 付費方案成立。上線檢查清單：在 Gemini API 專案啟用 Cloud Billing（付費方案）。免費方案下 Google 可能用 prompt 改善產品。
 - 示範模式（`DemoAssistant`）不呼叫 Gemini，不需要同意。
-- Siri（`AddPlanIntent`）沒有同意時直接回「Turn on AI data sharing in Smart Schedule's Settings first.」，不呼叫助理。
+- Siri（`AddPlanIntent`）沒有同意時直接回「Turn on AI data sharing in the Smart Schedules settings first.」，不呼叫助理。
 
 ## 9. 模型設定
 
@@ -321,7 +321,7 @@ python3 -I scripts/validate_schema.py --print-payloads
 
 ### 12.1 內建規則
 
-看行程的標題、地點和備註（備註裡 Smart Schedule 的來源行只拿掉固定的開頭，使用者原本說的話留著），繁中、簡中和英文的關鍵字都認得；英文只比對完整的字（「gym」不會在「gymnastics」裡找到、「pool」不會在「carpool」裡找到），比對前先忽略大小寫、全形半形和重音。
+看行程的標題、地點和備註（備註裡 Smart Schedules 的來源行只拿掉固定的開頭，使用者原本說的話留著），繁中、簡中和英文的關鍵字都認得；英文只比對完整的字（「gym」不會在「gymnastics」裡找到、「pool」不會在「carpool」裡找到），比對前先忽略大小寫、全形半形和重音。
 
 | 類別 | 例子 | 建議（依實用程度排序，最多顯示 4 個） |
 |---|---|---|
@@ -376,8 +376,8 @@ ALREADY SUGGESTED: Bring passport; Check visa or entry documents; Pack a plug ad
 |---|---|
 | 同意 | 跟所有 Gemini 呼叫一樣經過 `GeminiClient.generate`：沒同意就丟 `GeminiError.consentRequired`，什麼都不送。行程頁跳出同意說明，按「允許」後再試一次 |
 | 回傳 | 先是規則的建議（`.rules`，就是頁面已經顯示的那些），再接 AI 新增的（`.ai`，最多 4 個）。AI 的項目會整理（去掉項目符號、編號、句點，超過 60 字的丟掉），和規則、行程已存的建議、備註**意思一樣**的不要（「Passport」和「Bring passport」算同一個） |
-| 沒有新的 | 回傳裡沒有 `.ai` 項目時，頁面顯示「來自 Smart Schedule 的建議」 |
-| 離線 | `URLError` 往上丟，頁面改用規則（`NoteSuggester`，最多 8 個），一樣顯示「來自 Smart Schedule 的建議」 |
+| 沒有新的 | 回傳裡沒有 `.ai` 項目時，頁面顯示「來自 Smart Schedules 的建議」 |
+| 離線 | `URLError` 往上丟，頁面改用規則（`NoteSuggester`，最多 8 個），一樣顯示「來自 Smart Schedules 的建議」 |
 | 示範模式 | `DemoAssistant.suggestNotes` 只用規則，最多 8 個（`NoteSuggester.requestLimit`），什麼都不送 |
 | 寫入 | 不寫入。點膠囊只改行程頁正在編輯的備註，按「儲存」才寫進 Google（和其他修改同一條路徑） |
 

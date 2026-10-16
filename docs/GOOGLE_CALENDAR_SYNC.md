@@ -21,7 +21,7 @@
 |---|---|---|
 | — | `id` | `GoogleEventID.make(seed:)`：取 SHA-256 前 128 bit，轉成 base32hex（`a–v`、`0–9`），前面加 `ss`。**同一個 seed 一定得到同一個 ID，重試時不會重複建立事件** |
 | `title` | `summary` | 計畫事件會加前綴：`Muscle 6M · Upper` |
-| 原始輸入的整句話 | `description` | `由 Smart Schedule 智慧助理自動排程：<原句>`（和 Artboard 5 的詳情頁一樣），後面空一行接 notes、目標、階段說明。Google 日曆照原樣顯示整段；App 的備註編輯框隱藏來源行、存檔時自動放回，其餘就是 App 裡的「備註」（純文字，使用者可以改或刪，見第 11 節）；沒有程式會把它解析回來，計畫靠 `ssPlanId` 找 |
+| 原始輸入的整句話 | `description` | `由 Smart Schedules 智慧助理自動排程：<原句>`（和 Artboard 5 的詳情頁一樣），後面空一行接 notes、目標、階段說明。Google 日曆照原樣顯示整段；App 的備註編輯框隱藏來源行、存檔時自動放回，其餘就是 App 裡的「備註」（純文字，使用者可以改或刪，見第 11 節）；沒有程式會把它解析回來，計畫靠 `ssPlanId` 找 |
 | `start` / `end` / `duration_minutes` | `start.dateTime` / `end.dateTime` 加 `timeZone` | 用牆上時間 `2026-10-14T14:00:00` 加 IANA 時區，**不帶 offset** |
 | `all_day` 或只給日期 | `start.date` / `end.date` | `end.date` 是**不包含的那一天**，所以要加 1 天 |
 | `recurrence` | `recurrence: ["RRULE:..."]` | 見第 4 節 |
@@ -42,7 +42,7 @@ Authorization: Bearer <access_token>
 {
   "id": "ss…26 base32hex chars…",
   "summary": "與Joe開會",
-  "description": "由 Smart Schedule 智慧助理自動排程：明天下午兩點跟 Joe 開線上會議",
+  "description": "由 Smart Schedules 智慧助理自動排程：明天下午兩點跟 Joe 開線上會議",
   "start": { "dateTime": "2026-10-14T14:00:00", "timeZone": "Europe/London" },
   "end":   { "dateTime": "2026-10-14T15:00:00", "timeZone": "Europe/London" },
   "reminders": { "useDefault": false, "overrides": [
@@ -96,15 +96,15 @@ Google 的限制：`overrides` **最多 5 個**，每個 `minutes` 介於 **0 �
 
 **由誰發送提醒（設定 › 通知）：**
 
-| 模式 | 寫給 Google 的 popup | Smart Schedule 自己的提醒 |
+| 模式 | 寫給 Google 的 popup | Smart Schedules 自己的提醒 |
 |---|---|---|
 | 兩者都用（預設） | `useDefault=false`，overrides = 指定的或預設的 | 有 |
-| 只用 Smart Schedule | `useDefault=false`、**`overrides: []`**：Google 不跳任何通知，其他裝置也不會 | 有（能長按回覆、延後、改時間） |
+| 只用 Smart Schedules | `useDefault=false`、**`overrides: []`**：Google 不跳任何通知，其他裝置也不會 | 有（能長按回覆、延後、改時間） |
 | 只用 Google 日曆 | 同「兩者都用」 | 沒有 |
 
 切換模式不會改寫既有事件，只影響之後新增或修改的事件。
 
-**`ssReminders`：** 因為「只用 Smart Schedule」時 Google 那邊是空的，Smart Schedule 把自己要發的提醒另外記在 `extendedProperties.private.ssReminders`：用的是該類型的預設值就寫 `"default"`，使用者指定的就寫分鐘數 `"60,10"`，在行程頁把提醒全部關掉就寫 `"none"`（Google 那邊同時送 `useDefault: false`、`overrides: []`）。每次建立事件、或修改提醒時都會寫（PATCH 只送這一個 key，Google 會合併 private 裡的其他 key）。讀回來時：`"default"` → `reminderMinutes = nil`（排提醒時用當下的預設值）；`"none"` → `[]`；分鐘數 → 那些分鐘；沒有這個 property 的事件（使用者在 Google 建立的）：`useDefault == true` → nil，有 overrides → 那些分鐘，`useDefault == false` 而且沒有 overrides → `[]`（使用者在 Google 關掉了提醒）。
+**`ssReminders`：** 因為「只用 Smart Schedules」時 Google 那邊是空的，Smart Schedules 把自己要發的提醒另外記在 `extendedProperties.private.ssReminders`：用的是該類型的預設值就寫 `"default"`，使用者指定的就寫分鐘數 `"60,10"`，在行程頁把提醒全部關掉就寫 `"none"`（Google 那邊同時送 `useDefault: false`、`overrides: []`）。每次建立事件、或修改提醒時都會寫（PATCH 只送這一個 key，Google 會合併 private 裡的其他 key）。讀回來時：`"default"` → `reminderMinutes = nil`（排提醒時用當下的預設值）；`"none"` → `[]`；分鐘數 → 那些分鐘；沒有這個 property 的事件（使用者在 Google 建立的）：`useDefault == true` → nil，有 overrides → 那些分鐘，`useDefault == false` 而且沒有 overrides → `[]`（使用者在 Google 關掉了提醒）。
 
 ## 6. 寫入策略與錯誤處理（`GoogleCalendarClient.swift`）
 
@@ -190,7 +190,7 @@ App Group 的 JSON 每次讀寫都是整個檔案，三個 process 都會讀，�
 | 畫面、通知、prompt | `ScheduleEvent.id`（Google 原本的 id） | `visibleEvents` 保證可見清單裡不會有兩個相同的 id，所以 SwiftUI、`ss.reminder.<id>.<minutes>`、`ssEventId`、UPCOMING 照舊。`event(id:)` 先回傳可見的那份，否則任何一份 |
 | 同一場會議 | `iCalUID` 加開始時間 | Google 給每位與會者行事曆裡的副本相同的 iCalUID（通常 id 也相同）；重複事件的每個 instance 共用 iCalUID，用開始時間分開 |
 
-Smart Schedule 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 UUID 或計畫 id 當 seed，不會跨行事曆撞號。Google 只要求 id 在單一行事曆內唯一；insert 收到 409 時在**同一個行事曆**裡 GET 回來（冪等性不變）。使用者在 Google 把事件搬到別的行事曆時 id 不變：舊行事曆下次列出時拿掉，新行事曆列出時加進來。
+Smart Schedules 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 UUID 或計畫 id 當 seed，不會跨行事曆撞號。Google 只要求 id 在單一行事曆內唯一；insert 收到 409 時在**同一個行事曆**裡 GET 回來（冪等性不變）。使用者在 Google 把事件搬到別的行事曆時 id 不變：舊行事曆下次列出時拿掉，新行事曆列出時加進來。
 
 ### 9.4 顯示與提醒（`EventVisibility`）
 
@@ -223,7 +223,7 @@ Smart Schedule 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 U
 
 ### 9.7 專注模式過濾條件（`CalendarFocusFilter`）
 
-`SetFocusFilterIntent`，參數是要顯示的行事曆（`CalendarEntity`，id 是 `CalendarRef.key`，標題是行事曆名稱，副標題是帳號 email）。使用者在「設定」App › 專注模式 › 某個專注模式 › 加入過濾條件 › Smart Schedule 選擇。專注模式開啟時 iOS 執行 `perform()`：`AccountStore.setFocusFilter(選的行事曆)` → 重排提醒 → 更新 Live Activity；關閉時 iOS 再以預設值（nil）執行一次，過濾條件就清掉。App 沒有公開的網址能直接打開專注模式設定，所以設定頁只說明路徑。**要在實機上確認開啟和關閉都有呼叫 `perform()`。**
+`SetFocusFilterIntent`，參數是要顯示的行事曆（`CalendarEntity`，id 是 `CalendarRef.key`，標題是行事曆名稱，副標題是帳號 email）。使用者在「設定」App › 專注模式 › 某個專注模式 › 加入過濾條件 › Smart Schedules 選擇。專注模式開啟時 iOS 執行 `perform()`：`AccountStore.setFocusFilter(選的行事曆)` → 重排提醒 → 更新 Live Activity；關閉時 iOS 再以預設值（nil）執行一次，過濾條件就清掉。App 沒有公開的網址能直接打開專注模式設定，所以設定頁只說明路徑。**要在實機上確認開啟和關閉都有呼叫 `perform()`。**
 
 ### 9.8 Demo 帳號
 
@@ -293,7 +293,7 @@ App Group 的 `sync-outbox.json`，App、Siri、通知擴充共用，跟 `Shared
 
 選擇 `updatedMin` 的理由：
 
-1. Smart Schedule 的快取只有滾動視窗（−7 到 +120 天）加上畫面捲到的範圍，而且上限 2000 筆。`syncToken` 不能帶 `timeMin`／`timeMax`，token 的基準等於整個行事曆：`singleEvents=true` 時沒有結束日的重複事件會展開成大量 instance，`singleEvents=false` 則要在本地完整實作 RRULE、EXDATE 和例外（`RecurrenceExpander` 只處理計畫用的每週規則）。
+1. Smart Schedules 的快取只有滾動視窗（−7 到 +120 天）加上畫面捲到的範圍，而且上限 2000 筆。`syncToken` 不能帶 `timeMin`／`timeMax`，token 的基準等於整個行事曆：`singleEvents=true` 時沒有結束日的重複事件會展開成大量 instance，`singleEvents=false` 則要在本地完整實作 RRULE、EXDATE 和例外（`RecurrenceExpander` 只處理計畫用的每週規則）。
 2. 滾動視窗的邊界每天移動，新進入視窗的日子本來就不在任何 token 的基準裡，還是要完整列出。
 3. `updatedMin` 可以限定在已經快取的範圍（每個行事曆的 coverage，通常一段），平常的回應是 0 筆，一個請求。
 
@@ -308,9 +308,9 @@ App Group 的 `sync-outbox.json`，App、Siri、通知擴充共用，跟 `Shared
 | 行事曆的顯示／隱藏、本機顏色、提醒開關、專注模式過濾條件 | 每台裝置各自的顯示偏好。**隱藏只是不顯示**，資料照常雙向同步 |
 | 設定（偏好、預設提醒、安靜時段、新行程的行事曆等）、「助理記得的事」、學到的建議 | App 自己的設定，Google 日曆沒有對應的欄位 |
 | 對話紀錄、AI 同意、計畫的每日提醒（nudge）、「先問我」還沒加入的行程、計畫草稿 | 還不是行事曆資料；按「加入」之後才寫進 Google |
-| Smart Schedule 自己的提醒 | 依據 Google 的事件和 `ssReminders` 在本機排程；「只用 Smart Schedule」模式下 Google 那邊不跳通知 |
+| Smart Schedules 自己的提醒 | 依據 Google 的事件和 `ssReminders` 在本機排程；「只用 Smart Schedules」模式下 Google 那邊不跳通知 |
 
-**新行程寫進被隱藏的行事曆：** 新增的行程（助理的 create_events、計畫的「加入」、「先問我」的「加入」）一律寫進設定的預設行事曆，不會改寫到別的行事曆，所以 Google 一定有。那個行事曆在 App 裡被隱藏時，回覆帶 `Reply.savedToHiddenCalendar`（和名稱），確認卡片顯示「已存到「X」（目前在 Smart Schedule 隱藏）」和「顯示」按鈕，按下就把那個行事曆設成顯示。Demo 模式的範例行事曆也一樣。
+**新行程寫進被隱藏的行事曆：** 新增的行程（助理的 create_events、計畫的「加入」、「先問我」的「加入」）一律寫進設定的預設行事曆，不會改寫到別的行事曆，所以 Google 一定有。那個行事曆在 App 裡被隱藏時，回覆帶 `Reply.savedToHiddenCalendar`（和名稱），確認卡片顯示「已存到「X」（目前在 Smart Schedules 隱藏）」和「顯示」按鈕，按下就把那個行事曆設成顯示。Demo 模式的範例行事曆也一樣。
 
 ### 10.6 Demo 模式
 
@@ -367,7 +367,7 @@ Calendar API 本身不收費，但有每日與每分鐘的配額，要依使用�
 
 - **讀**（mapper、outbox 疊加、Google 回傳）：`ScheduleEvent.notes` 一律是純文字。Google 日曆網頁版存的是 HTML：`<br>`、`<p>`、`</div>`、清單、標題、表格列變成換行，`<li>` 變成「• 」，`<a href="x">文字</a>` 變成「文字 (x)」（文字就是網址時只留網址），其他標籤拿掉，`&amp;` `&lt;` `&gt;` `&quot;` `&#39;` `&nbsp;` 和數字實體解碼；沒有標籤的純文字（例如「a < b」）原樣保留。前後空白去掉，連續空行最多留一行。
 - **寫**：行程頁送純文字（換行保留，前後空白去掉）。清空 = 送 `"description": ""`。沒動備註就不送，所以 Google 那邊的 HTML 不會被改寫；改了才會變成純文字。
-- **Smart Schedule 自己寫進 `description` 的東西**：第 2 節的來源行、建立時的 notes、計畫的目標和階段說明。Google 日曆照樣顯示（和 Artboard 5 一樣）。行程頁的備註編輯框不顯示來源行（`EventNotes.provenanceLine`），存檔時用 `EventNotes.joining` 放回第一行、空一行再接使用者的備註，所以 Google 那邊不會消失；其餘內容就是備註的一部分，照樣顯示、可以改或刪。想刪來源行要到 Google 日曆刪；沒有程式會解析它們（計畫靠 `ssPlanId`），所以刪掉不影響任何功能。助理的 prompt 不放來源行（第 11.5 節）。
+- **Smart Schedules 自己寫進 `description` 的東西**：第 2 節的來源行、建立時的 notes、計畫的目標和階段說明。Google 日曆照樣顯示（和 Artboard 5 一樣）。行程頁的備註編輯框不顯示來源行（`EventNotes.provenanceLine`；改名前的版本寫的「由 Smart Schedule 智慧助理自動排程：」也認得，見 `CalendarEventMapper.provenancePrefixes`），存檔時用 `EventNotes.joining` 放回第一行、空一行再接使用者的備註，所以 Google 那邊不會消失；其餘內容就是備註的一部分，照樣顯示、可以改或刪。想刪來源行要到 Google 日曆刪；沒有程式會解析它們（計畫靠 `ssPlanId`），所以刪掉不影響任何功能。助理的 prompt 不放來源行（第 11.5 節）。
 - 舊版快取裡的 `notes` 可能還是 HTML（這版之前沒轉換），下次完整列出那段日期時就換成純文字；在那之前行程頁顯示時也會先轉一次。
 
 ### 11.3 修改：只送改了的欄位（`CalendarEventMapper.patch(from: EventEdit, existing:)`）

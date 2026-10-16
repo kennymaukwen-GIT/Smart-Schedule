@@ -81,7 +81,7 @@ final class AppRouter {
 
     /// The sheets the main screen presents.
     enum Sheet: String, Identifiable {
-        /// The avatar: Google accounts (and Smart Schedule Pro when `AppConstants.subscriptionsEnabled`).
+        /// The avatar: Google accounts (and Smart Schedules Pro when `AppConstants.subscriptionsEnabled`).
         case accounts
         /// The drawer's General row.
         case settings
@@ -198,7 +198,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     batchID = batch.id
                 }
             } catch GeminiError.consentRequired {
-                answer = String(localized: "Turn on AI data sharing in Smart Schedule › Settings › AI & privacy to reply here.")
+                answer = String(localized: "Turn on AI data sharing in Smart Schedules › Settings › AI & privacy to reply here.")
             } catch {
                 answer = error.localizedDescription
             }
@@ -223,7 +223,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     /// shows its card while it is still the pending one.
     private static func postFollowUp(_ text: String, planID: String? = nil, batchID: String? = nil) async {
         let content = UNMutableNotificationContent()
-        content.title = "Smart Schedule"
+        content.title = "Smart Schedules"
         content.body = text
         content.categoryIdentifier = NotificationIDs.Category.compose // keep the conversation going in place
         var userInfo: [AnyHashable: Any] = [:]

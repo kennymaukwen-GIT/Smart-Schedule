@@ -56,7 +56,7 @@ The old big year `Text` above the chips is removed (the header title replaces it
 A panel sliding in from the leading edge over a dimmed main screen (dim `Color.black.opacity(0.45)`, tap to close, drag left to close). Width `min(340, 84% of screen)`. Background `Theme.surface`. The panel hosts its own `NavigationStack` so calendar details push inside it.
 
 ```
-Smart Schedule                          ← large title, white
+Smart Schedules                         ← large title, white
 ┌─────────────────────────────────────┐
 │ ⚙︎  General                       ›  │ → presents Settings (§2.5) as a sheet, drawer closes
 └─────────────────────────────────────┘
@@ -92,7 +92,7 @@ example@yourmail.com
 - **Tap the square** → `AccountStore.setVisible(!isVisible, calendar:)`, light haptic, calendars and reminders update (the store posts `.accounts`; §4.3). Accessibility: the square is a toggle button labelled "Show %@" / value on/off.
 - **Tap the row or chevron** → push Calendar details.
 - "Reconnect" (`exclamationmark.circle`, orange) → `AccountManager.reconnect(accountID:)`.
-- "Show all calendars" (`list.bullet`) → `AccountManager.reconnect(accountID:)` (re-consent adds the calendar-list scope). Footnote under the section: "Smart Schedule needs permission to see your calendar list." Shown only for accounts migrated from the single-account version.
+- "Show all calendars" (`list.bullet`) → `AccountManager.reconnect(accountID:)` (re-consent adds the calendar-list scope). Footnote under the section: "Smart Schedules needs permission to see your calendar list." Shown only for accounts migrated from the single-account version.
 - Section header "⋯" menu (SF Symbol `ellipsis.circle`, not on sample accounts) → "Remove account" (`person.crop.circle.badge.minus`, destructive) → the confirmation of §5.11.2. While "Sync first" runs for that account the menu is a small `ProgressView`.
 - "Add Google account" → closes the drawer and opens the Add Google account page (§2.4.1) as a sheet (`AppRouter.Sheet.addAccount`).
 - **Demo mode:** the sections come from `DemoData.accounts` (two sample accounts, §5.10) and behave the same (visibility, colour, notifications work locally). The last row reads "Connect Google Calendar" instead of "Add Google account" and opens the same page, which says that continuing ends demo mode; the demo is left (`stopDemo`) when the user continues.
@@ -181,9 +181,9 @@ Pushed inside the drawer. Navigation title = `displayName`.
 
 | Section | Row | Control | Default | Footnote |
 |---|---|---|---|---|
-| (header: account email) | "Show in Smart Schedule" | Toggle → `setVisible` | Google's `selected` (primary: on) | "Hidden calendars stay on this iPhone but are not shown and send no reminders." |
+| (header: account email) | "Show in Smart Schedules" | Toggle → `setVisible` | Google's `selected` (primary: on) | "Hidden calendars stay on this iPhone but are not shown and send no reminders." |
 | "Colour" | Swatch grid: "Calendar colour" (Google's colour, checkmark when no override) + the 11 `GoogleColor.palette` colours | → `setColorOverride(hex or nil)` | Google's colour | "Changes the colour on this iPhone only. Google Calendar keeps its own colour." |
-| "Notifications" | "Reminders" | Toggle → `setNotificationsEnabled` | on | "Off: Smart Schedule sends no reminders for events in this calendar." |
+| "Notifications" | "Reminders" | Toggle → `setNotificationsEnabled` | on | "Off: Smart Schedules sends no reminders for events in this calendar." |
 | "New events" | "Use for new events" | Toggle (on = this is `defaultWriteTarget`). Turning on → `PreferencesStore.update { $0.defaultCalendar = info.id; $0.defaultCalendarLabel = info.promptLabel }`; turning off → `$0.reset(.defaultCalendar)` | off | Writable: "New events from the assistant go to this calendar." Read-only (`!isWritable`): row disabled, footnote "You can't add events to this calendar." |
 | "About" | "Access" | value: "Owner" / "Can edit" / "View only" | – | – |
 | | "Time zone" | value: `timeZone` | – | – |
@@ -199,7 +199,7 @@ Pushed inside the drawer. Navigation title = `displayName`.
 - Demo mode on: row "Demo mode is on" with trailing button "Exit demo", then "Connect Google Calendar" (the add page).
 - Signed out and not demo: rows "Connect Google Calendar" (the add page) and "Try without signing in".
 
-**Section "Smart Schedule Pro"** (StoreKit infrastructure only, nothing is gated). Shown only when `AppConstants.subscriptionsEnabled`, which is false in version 1.0 (the DEBUG "StoreKit testing" section is hidden too). Terms of Use and Privacy Policy stay in Settings › About (§2.5.7).
+**Section "Smart Schedules Pro"** (StoreKit infrastructure only, nothing is gated). Shown only when `AppConstants.subscriptionsEnabled`, which is false in version 1.0 (the DEBUG "StoreKit testing" section is hidden too). Terms of Use and Privacy Policy stay in Settings › About (§2.5.7).
 - Row "Status": value `SubscriptionStore.statusText` ("Free", "Pro · Monthly", "Pro · Yearly"; when `expirationDate` is known, the second line "Renews %@" or "Expires %@" using `willAutoRenew`).
 - Button "Restore Purchases" → `SubscriptionStore.restore()`; shows a `ProgressView` while running; on success with no entitlement show "No purchases to restore." inline.
 - Button "Manage Subscription" → `.manageSubscriptionsSheet(isPresented:)`.
@@ -222,7 +222,7 @@ Gmail, school and work accounts on Google all work. If the address isn't a Googl
 │          Continue with Google        │  white, disabled until the address is complete
 └─────────────────────────────────────┘
       Choose from Google's account list       sign-in without a hint (Google's account chooser)
-You sign in on Google's own page. Smart Schedule never sees your password and only gets access to your calendars.
+You sign in on Google's own page. Smart Schedules never sees your password and only gets access to your calendars.
 ```
 
 - Inline check (`AccountEmail.isValid`), shown once the field loses focus or on return: "Enter a full email address, like example@gmail.com" (orange, replaces the hint line).
@@ -252,18 +252,18 @@ Every Settings write goes through `PreferencesStore.shared.update(source: .setti
 
 | Section | Row (label) | Control and values | Default | Footnote |
 |---|---|---|---|---|
-| "Who sends reminders" | "Smart Schedule only" / "Google Calendar only" / "Both" | Inline picker with checkmarks → `reminderSource` | "Both" | Depends on the choice: **Smart Schedule only**: "Smart Schedule's reminders let you reply, snooze or reschedule right in the notification. New events get no Google pop-ups, so your other devices won't alert you about them. Turn off notifications for the Google Calendar app on this iPhone to avoid duplicates." **Google Calendar only**: "Google Calendar alerts you on all your devices. Smart Schedule sends no reminders, so you can't reply to them." **Both**: "You may get two alerts for the same event, one from Google and one from Smart Schedule. Turning off notifications for the Google Calendar app on this iPhone avoids that." |
+| "Who sends reminders" | "Smart Schedules only" / "Google Calendar only" / "Both" | Inline picker with checkmarks → `reminderSource` | "Both" | Depends on the choice: **Smart Schedules only**: "Reminders from Smart Schedules let you reply, snooze or reschedule right in the notification. New events get no Google pop-ups, so your other devices won't alert you about them. Turn off notifications for the Google Calendar app on this iPhone to avoid duplicates." **Google Calendar only**: "Google Calendar alerts you on all your devices. Smart Schedules sends no reminders, so you can't reply to them." **Both**: "You may get two alerts for the same event, one from Google and one from Smart Schedules. Turning off notifications for the Google Calendar app on this iPhone avoids that." |
 | "Default reminders" | "Events" · "Deadlines" · "Tasks" · "Routines" | Push to a list editor: rows of offsets (reminder text, swipe to delete), "Add reminder" menu with At start, 5 min, 10 min, 15 min, 30 min, 1 hour, 2 hours, 1 day, 2 days, 1 week before; max 5 (button disabled at 5). Value shown on the row: `displayValue(for:)` e.g. "1 day, 1 h, 30 min, at start" | Events 1440, 60, 30, 0 · Deadlines 1440, 60 · Tasks 60 · Routines 30 | "Used when you don't ask for specific reminders. Google allows up to 5 per event." |
 | | "All-day events" | Push: toggle "Remind me" + time picker "The day before at" (24 h) | On, the day before at 09:00 | – |
 | "Urgency" | "Events" · "Deadlines" · "Tasks" · "Routines" | Push to a picker: "Automatic", "Time Sensitive", "Normal", "Quiet" | Automatic | "Automatic: Time Sensitive when 30 minutes or less before the start, otherwise Normal. Time Sensitive reminders break through Focus. Quiet reminders arrive silently in Notification Center." |
 | "Quiet hours" | "Quiet hours" toggle; "From" and "To" time pickers (24 h, shown only when on) | `quietHours` | Off, 22:00–07:00 | "Reminders during quiet hours arrive silently. None are dropped." |
 | "Daily briefing" | "Morning briefing" toggle + "Time"; "Evening preview" toggle + "Time" | `morningBriefing`, `eveningPreview` | Morning on at 07:30; evening off at 21:00 | "A summary of the day's events, prepared ahead and refreshed whenever your calendar changes. The evening preview covers tomorrow." |
 | "Daily limit" | "Limit reminders per day" toggle; Stepper "At most %lld a day" (1–50) | `dailyReminderCap` (nil = off) | Off (stepper starts at 10) | "When a day has more, the most important are sent: events starting now, then deadlines, other event reminders, tasks and routines. The rest are listed in that day's morning briefing." |
-| "Dynamic Island" | "Show next event" | Picker: "30 min before", "15 min before", "10 min before", "5 min before", "Off" → `liveActivityLeadMinutes` (30, 15, 10, 5, nil); a stored 60 or 120 from an older build reads as 30 (`AppPreferences.liveActivityLead`) | 30 min before | "Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedule plans the next two days each time you open it." With `AppConstants.pushToStartEnabled` false (version 1.0) and iOS 18 (`!ActivityPlanner.schedulesOnDevice`), a second line: "On iOS 18, an event appears only if you open Smart Schedule within that time before it starts or while it's under way. On iOS 26 and later, it appears on time even when the app is closed." Only with `pushToStartEnabled` and `AIConsentDisclosure.serverNote != nil` (a later version): "On iOS 18, Smart Schedule's server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time." |
-| "Focus" | "Focus filters" | Info row (no navigation) | – | "Choose which calendars show and alert while a Focus is on: open the Settings app, tap Focus, choose a Focus, then Add Filter › Smart Schedule." |
-| "Suggestions" (only when `PreferencesStore.pendingSuggestions()` is non-empty) | One row per suggestion: `LearnedSuggestion.question`, buttons "Stop it" / "Keep" | → `PreferencesStore.resolveSuggestion(id:accept:)` | – | "Smart Schedule notices reminders you keep dismissing and offers to stop them. Nothing changes until you tap." |
+| "Dynamic Island" | "Show next event" | Picker: "30 min before", "15 min before", "10 min before", "5 min before", "Off" → `liveActivityLeadMinutes` (30, 15, 10, 5, nil); a stored 60 or 120 from an older build reads as 30 (`AppPreferences.liveActivityLead`) | 30 min before | "Each timed event appears in the Dynamic Island this long before it starts and goes away after it ends. Smart Schedules plans the next two days each time you open it." With `AppConstants.pushToStartEnabled` false (version 1.0) and iOS 18 (`!ActivityPlanner.schedulesOnDevice`), a second line: "On iOS 18, an event appears only if you open Smart Schedules within that time before it starts or while it's under way. On iOS 26 and later, it appears on time even when the app is closed." Only with `pushToStartEnabled` and `AIConsentDisclosure.serverNote != nil` (a later version): "On iOS 18, the Smart Schedules server starts each one, which needs AI data sharing (Settings › AI & privacy). Without it, an event appears only when you open the app during that time." |
+| "Focus" | "Focus filters" | Info row (no navigation) | – | "Choose which calendars show and alert while a Focus is on: open the Settings app, tap Focus, choose a Focus, then Add Filter › Smart Schedules." |
+| "Suggestions" (only when `PreferencesStore.pendingSuggestions()` is non-empty) | One row per suggestion: `LearnedSuggestion.question`, buttons "Stop it" / "Keep" | → `PreferencesStore.resolveSuggestion(id:accept:)` | – | "Smart Schedules notices reminders you keep dismissing and offers to stop them. Nothing changes until you tap." |
 
-When `reminderSource == .google`, the sections Urgency, Quiet hours and Daily limit are disabled with the section footnote "Only for reminders sent by Smart Schedule." Default reminders stay enabled (they become Google pop-ups for new events).
+When `reminderSource == .google`, the sections Urgency, Quiet hours and Daily limit are disabled with the section footnote "Only for reminders sent by Smart Schedules." Default reminders stay enabled (they become Google pop-ups for new events).
 
 #### 2.5.2 Calendar & new events
 
@@ -306,10 +306,10 @@ In demo mode the calendar list comes from `DemoData.accounts`, so the page works
 #### 2.5.6 Shortcuts and Siri (static guide, UI)
 
 Title "Shortcuts and Siri". Sections with short steps (iOS does not let apps add these themselves):
-- "Control Center": "Open Control Center, tap +, then Add a Control. Search for Smart Schedule and choose it."
-- "Action Button": "On iPhone 15 Pro and later: open the Settings app › Action Button, swipe to Shortcut, then choose Add to Smart Schedule."
-- "Lock Screen": "Touch and hold the Lock Screen, tap Customize › Lock Screen, tap a control at the bottom and choose Smart Schedule."
-- "Siri": "Say “Add a plan in Smart Schedule”, “Schedule something with Smart Schedule” or “Show my schedule in Smart Schedule”."
+- "Control Center": "Open Control Center, tap +, then Add a Control. Search for Smart Schedules and choose it."
+- "Action Button": "On iPhone 15 Pro and later: open the Settings app › Action Button, swipe to Shortcut, then choose Add to Smart Schedules."
+- "Lock Screen": "Touch and hold the Lock Screen, tap Customize › Lock Screen, tap a control at the bottom and choose Smart Schedules."
+- "Siri": "Say “Add a plan in Smart Schedules”, “Schedule something with Smart Schedules” or “Open Quick Capture in Smart Schedules”."
 - Footnote: "iOS doesn't let apps add these for you."
 
 #### 2.5.7 About
@@ -340,8 +340,8 @@ When no account is connected and demo is off, the chat panel shows (replacing to
 
 | Surface | Without AI consent | With "Ask me first" pending events |
 |---|---|---|
-| Siri / Shortcuts (`AddPlanIntent`) | Dialog: "Turn on AI data sharing in Smart Schedule's Settings first." | Dialog: "<summary> Open Smart Schedule to review it and tap Add." |
-| Collapsed notification reply (`AppDelegate`) | Follow-up notification body: "Turn on AI data sharing in Smart Schedule › Settings › AI & privacy to reply here." | Follow-up "Press and hold to review it, then tap Add." with `userInfo[ssPendingBatchId]` |
+| Siri / Shortcuts (`AddPlanIntent`) | Dialog: "Turn on AI data sharing in the Smart Schedules settings first." | Dialog: "<summary> Open Smart Schedules to review it and tap Add." |
+| Collapsed notification reply (`AppDelegate`) | Follow-up notification body: "Turn on AI data sharing in Smart Schedules › Settings › AI & privacy to reply here." | Follow-up "Press and hold to review it, then tap Add." with `userInfo[ssPendingBatchId]` |
 | Notification content extension | Assistant turn: same text as above | Pending events card with "Add" and "Edit" (Edit focuses the inline field), shown while the batch is still `SharedStore.pendingEventBatch()` |
 
 ### 2.9 Briefing and reminder notifications (PREFS)
@@ -364,7 +364,7 @@ When no account is connected and demo is off, the chat panel shows (replacing to
 | Continue with Google | 前往 Google 登入 | Sync first | 先同步 |
 | Show all calendars | 顯示所有行事曆 | Try without signing in | 不登入先試用 |
 | Notifications | 通知 | Who sends reminders | 由誰發送提醒 |
-| Smart Schedule only | 只用 Smart Schedule | Google Calendar only | 只用 Google 日曆 |
+| Smart Schedules only | 只用 Smart Schedules | Google Calendar only | 只用 Google 日曆 |
 | Both | 兩者都用 | Default reminders | 預設提醒 |
 | Events | 行程 | Deadlines | 截止日 |
 | Tasks | 待辦事項 | Routines | 例行活動 |
@@ -1034,7 +1034,7 @@ struct GoogleSignInResult: Sendable {
 | `disconnectAll(revoke:)` | the above for every account, then `KeychainStore.deleteAll()` and `AccountStore.eraseAll()` (erase uses it). |
 | `refreshCalendarLists(force:)` | for each account with `canListCalendars` whose list is older than 6 h (or `force`): `GoogleCalendarClient(accountID:).listCalendars()` → `AccountStore.replaceCalendars` (keeps local settings of known calendars; new calendars get `isVisible = selected`, notifications on; removed calendars → `SharedStore.purge(calendar:)`). Called on app active (UI wiring) and when the drawer opens. |
 
-`AuthError` gains `case reconnectNeeded(email: String)` ("Google sign-in for %@ expired. Open Smart Schedule to reconnect."). On `invalid_grant` for an account, the provider deletes only that account's token and `AccountStore.setNeedsReconnect(true, accountID:)`; its cached events stay.
+`AuthError` gains `case reconnectNeeded(email: String)` ("Google sign-in for %@ expired. Open Smart Schedules to reconnect."). On `invalid_grant` for an account, the provider deletes only that account's token and `AccountStore.setNeedsReconnect(true, accountID:)`; its cached events stay.
 
 ### 5.3 Calendar list
 
@@ -1045,7 +1045,7 @@ struct GoogleSignInResult: Sendable {
 1. **Cache identity is `EventRef` (accountID, calendarID, eventID).** `SharedStore` upserts, merges and removes by `EventRef`, so the same Google id in two calendars is two cached copies.
 2. **Display identity is `ScheduleEvent.id` (the raw Google id), unchanged.** SwiftUI `Identifiable`, `router.selectedEventID`, notification ids (`ss.reminder.<id>.<minutes>`), `userInfo[ssEventId]` and the prompt's UPCOMING ids keep using it. `SharedStore.visibleEvents` guarantees the visible list never contains two events with the same `id` (§5.5), so these stay unambiguous; `event(id:)` returns the visible copy, else any cached copy.
 3. Same `id` in two calendars in practice means the same meeting (Google gives an invite the same event id and iCalUID in every attendee's calendar). Instance ids of a recurring series are `<seriesId>_<UTC start>` and follow the same rule.
-4. Ids Smart Schedule generates (`GoogleEventID.make(seed:)`) are seeded with a per-request UUID (events) or the plan id (plans), so they never collide across calendars. Google requires uniqueness only per calendar; a 409 on insert is answered by `GET` **in the same calendar** (unchanged idempotency).
+4. Ids Smart Schedules generates (`GoogleEventID.make(seed:)`) are seeded with a per-request UUID (events) or the plan id (plans), so they never collide across calendars. Google requires uniqueness only per calendar; a 409 on insert is answered by `GET` **in the same calendar** (unchanged idempotency).
 5. Demo (`demo-…`), draft (`draft-…`) and pre-migration events have `accountID == nil`; they are always visible (demo events only in demo mode, §5.6) and routed to the default target when written.
 6. An event the user moves to another calendar in Google keeps its id; the next listing of the old calendar drops it and the new calendar's listing adds it.
 
@@ -1116,7 +1116,7 @@ struct CalendarRouter: Sendable {
 ### 5.9 Mapper changes (ACCOUNTS, `CalendarEventMapper.swift` / `GoogleCalendarModels.swift`)
 
 - `GCalEvent` gains `iCalUID: String?` and `organizer: GCalPerson?` with `struct GCalPerson: Codable, Sendable { var email: String?; var isSelf: Bool? }` (`CodingKeys: isSelf = "self"`).
-- `SSProperty.localReminders = "ssReminders"`: written on every event Smart Schedule creates or patches with reminders: `"default"` when the kind's defaults were used, otherwise the explicit list `"60,10"`. Reading: `"default"` → `reminderMinutes = nil`; a list → those minutes. Without the property: Google `useDefault == true` → nil; overrides → their minutes; `useDefault == false` with no overrides → `[]` (the user turned reminders off in Google). This keeps local reminders right in "Smart Schedule only" mode, where Google gets empty overrides.
+- `SSProperty.localReminders = "ssReminders"`: written on every event Smart Schedules creates or patches with reminders: `"default"` when the kind's defaults were used, otherwise the explicit list `"60,10"`. Reading: `"default"` → `reminderMinutes = nil`; a list → those minutes. Without the property: Google `useDefault == true` → nil; overrides → their minutes; `useDefault == false` with no overrides → `[]` (the user turned reminders off in Google). This keeps local reminders right in "Smart Schedules only" mode, where Google gets empty overrides.
 - All reminder bodies go through `ReminderPolicy` (`googleReminders(for:requested:)` for timed, `googleAllDayReminders(requested:)` for all-day events and plan milestones). Remove the private constant use of `allDayReminder` for milestones.
 - Default duration: `.event` and `.routine` fall back to `defaultEventMinutes`; `.task` / `.deadline` keep 30.
 - New overload `scheduleEvent(from:in calendar: CalendarInfo)` stamps `accountID`, `calendarID`, `iCalUID`, `isOrganizer`, `usesCalendarColor` (true when `colorId == nil`) and uses the calendar's `googleColorHex` as the fallback colour. The existing `scheduleEvent(from:)` stays (function references in other files use it).
@@ -1138,7 +1138,7 @@ struct CalendarRouter: Sendable {
 | Case | When | Message | "Try again" |
 |---|---|---|---|
 | `blockedByAdmin` | redirect `error` or `error_subtype` = `access_denied`, `admin_policy_enforced`, `org_internal` | "Your school or company doesn't allow this app to use Google Calendar. Ask your admin, or use another account." | no (type another address) |
-| `calendarAccessMissing` | `AddAccountDecision.calendarAccessMissing` | "Smart Schedule needs access to your Google Calendar. Try again and leave the calendar permission ticked on Google's page." | yes |
+| `calendarAccessMissing` | `AddAccountDecision.calendarAccessMissing` | "Smart Schedules needs access to your Google Calendar. Try again and leave the calendar permission ticked on Google's page." | yes |
 | `unreachable` | a `URLError` (not `.cancelled`) from the token request | "Can't reach Google. Check your connection." | yes |
 | `refused(code:)` | any other redirect `error` | "Google sign-in didn't finish (%@). Try again." | yes |
 
@@ -1147,7 +1147,7 @@ Closing Google's page (`ASWebAuthenticationSessionError.canceledLogin`) is `AddO
 #### 5.11.2 Remove account (`ScheduleViewModel.prepareRemoval(of:)`, `syncBeforeRemoving(_:)`, `removeAccount(_:)`; `App/Views/Account/AccountNotices.swift`)
 
 - Where: the account sheet (row "⋯" menu and trailing swipe) and the drawer (account section header "⋯" menu). Not for the sample accounts.
-- Confirmation (`confirmationDialog`, `RemoveAccountDialog`): title "Remove %@?"; message "Its calendars and events leave Smart Schedule on this iPhone. Nothing is deleted in Google Calendar."; when `SyncOutbox.unsentCount(accountID:)` (that account's waiting and refused changes) is N > 0, a second paragraph "%lld changes haven't reached Google yet and will be lost." (plural; zh "還有 %lld 項變更尚未同步到 Google，移除後會遺失。") and a button "Sync first" (`SyncEngine.flushOutbox()`, then the confirmation again with the new count; offline the same changes are still waiting); buttons "Remove" (destructive), "Cancel".
+- Confirmation (`confirmationDialog`, `RemoveAccountDialog`): title "Remove %@?"; message "Its calendars and events leave Smart Schedules on this iPhone. Nothing is deleted in Google Calendar."; when `SyncOutbox.unsentCount(accountID:)` (that account's waiting and refused changes) is N > 0, a second paragraph "%lld changes haven't reached Google yet and will be lost." (plural; zh "還有 %lld 項變更尚未同步到 Google，移除後會遺失。") and a button "Sync first" (`SyncEngine.flushOutbox()`, then the confirmation again with the new count; offline the same changes are still waiting); buttons "Remove" (destructive), "Cancel".
 - Remove = `AccountManager.disconnect(accountID:)` (§5.2: revoke, Keychain item, cached events, outbox items, `lastSuccess`, default calendar choice, "Ask me first" batch, Focus filter entries; a Focus set up earlier that still names its calendars leaves them out when it turns on, `AccountStore.setFocusFilter`). Then the notice "Removed %@"; when new events went to a calendar of that account (the one picked in Settings, or automatically its primary calendar as the first account), a second line "New events now go to “%@”." naming the new target as "My calendar · example@yourmail.com" (`AccountRemovalEffects.newEventsTarget(before:after:removedAccountID:)`, `label(_:)`). Removing the last account returns to the welcome state (no accounts, `isSignedIn == false`: the chat panel and drawer show "Connect Google Calendar" and "Try without signing in").
 - Notices (`ScheduleViewModel.notice`, `NoticeBanner`): top of the main screen (over the drawer), or the bottom of the account sheet while it is open; tap to close; gone after 5 s.
 
@@ -1327,7 +1327,7 @@ When `dailyReminderCap = N`: group candidate reminders by the local day of their
 
 ### 7.8 Dynamic Island lead time
 
-`LiveActivityManager.summonIfDue(now:)` (called by the app when it becomes active): if an activity is running → `refreshIfRunning()`; else if `liveActivityLeadMinutes` is set and the next visible timed event is in progress or starts within it → `summon()`. The Control Center button keeps calling `summon()` unconditionally. Superseded by `ActivityScheduler` (see `docs/NOTIFICATIONS.md`): iOS 26 schedules each activity with `Activity.request(…, start:)`; iOS 18 registers the events with Smart Schedule's server (`server/worker/`), which sends an APNs push-to-start at each trigger, only with AI consent. Version 1.0 has push-to-start off (`AppConstants.pushToStartEnabled = false`): nothing is registered or uploaded, and on iOS 18 an activity starts only when the app runs within the lead time or while the event is under way (§16). `ContentState` gains `firstWeekday: Int?` (set by the builder from `clock.calendar.firstWeekday`) so the island's week strip letters follow "Week starts on"; `days` are 7 days from that weekday.
+`LiveActivityManager.summonIfDue(now:)` (called by the app when it becomes active): if an activity is running → `refreshIfRunning()`; else if `liveActivityLeadMinutes` is set and the next visible timed event is in progress or starts within it → `summon()`. The Control Center button keeps calling `summon()` unconditionally. Superseded by `ActivityScheduler` (see `docs/NOTIFICATIONS.md`): iOS 26 schedules each activity with `Activity.request(…, start:)`; iOS 18 registers the events with the Smart Schedules server (`server/worker/`), which sends an APNs push-to-start at each trigger, only with AI consent. Version 1.0 has push-to-start off (`AppConstants.pushToStartEnabled = false`): nothing is registered or uploaded, and on iOS 18 an activity starts only when the app runs within the lead time or while the event is under way (§16). `ContentState` gains `firstWeekday: Int?` (set by the builder from `clock.calendar.firstWeekday`) so the island's week strip letters follow "Week starts on"; `days` are 7 days from that weekday.
 
 ### 7.9 Focus filter (ACCOUNTS implements, PREFS reacts)
 
@@ -1358,10 +1358,10 @@ When `dailyReminderCap = N`: group candidate reminders by the local day of their
 ### 8.2 Disclosure wording (`AIConsentDisclosure`)
 
 - Title: "Use the AI assistant?"
-- Lead: "To understand your requests, Smart Schedule sends them to Google's Gemini API. This includes:"
+- Lead: "To understand your requests, Smart Schedules sends them to Google's Gemini API. This includes:"
 - Items (exactly what `AssistantPrompt` and `NoteSuggestionPrompt` send): "What you type or say to the assistant (spoken requests as text), including any names or email addresses you mention" · "Titles, times, notes and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder you reply to" · "For AI suggestions on an event: that event only, including its location" · "Your calendar names and assistant settings, but not your Google account email addresses" · "Your time zone and language"
-- Recipient: "Recipient: Google, through the Gemini API. Requests pass through Smart Schedule's server, which doesn't keep them."
-- Server note, iOS 18 only and only with `AppConstants.pushToStartEnabled` (`AIConsentDisclosure.serverNote`; nil on every iOS in version 1.0, the wording is kept for a later version): "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on Smart Schedule's server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored."
+- Recipient: "Recipient: Google, through the Gemini API. Requests pass through the Smart Schedules server, which doesn't keep them."
+- Server note, iOS 18 only and only with `AppConstants.pushToStartEnabled` (`AIConsentDisclosure.serverNote`; nil on every iOS in version 1.0, the wording is kept for a later version): "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on the Smart Schedules server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored."
 - Speech note (`AIConsentDisclosure.speechNote`, a mic label under the server note): "Apple turns speech into text: on your iPhone when On-device recognition is on and supports your language, otherwise on Apple's servers."
 - Footnote: "Nothing is sent to the AI until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode never contacts the AI."
 - Disclosure version 5 asks everyone again: version 1.0 has no Live Activity push-to-start, so the iOS 18 server note is gone (turning push-to-start on brings it back and needs another bump).
@@ -1382,7 +1382,7 @@ The notification extension, Siri and the collapsed-reply follow-up show the text
 
 ## 9. Subscription, export, erase (STORE_PRIVACY)
 
-**StoreKit 2** (`App/Store/SubscriptionStore.swift`, `@MainActor @Observable`): one auto-renewable group "Smart Schedule Pro", placeholder products `com.smartschedule.pro.monthly` (P1M) and `com.smartschedule.pro.yearly` (P1Y) in `Config/SmartSchedule.storekit` (StoreKit configuration JSON, wired into the run scheme by the integrator, §13). `start()` (once at launch) loads products, listens to `Transaction.updates` (finishing verified transactions) and recomputes entitlements from `Transaction.currentEntitlements`; `isPro` = any verified, unrevoked, unexpired transaction in the group. Nothing reads `isPro` to gate a feature.
+**StoreKit 2** (`App/Store/SubscriptionStore.swift`, `@MainActor @Observable`): one auto-renewable group "Smart Schedules Pro", placeholder products `com.smartschedule.pro.monthly` (P1M) and `com.smartschedule.pro.yearly` (P1Y) in `Config/SmartSchedule.storekit` (StoreKit configuration JSON, wired into the run scheme by the integrator, §13). `start()` (once at launch) loads products, listens to `Transaction.updates` (finishing verified transactions) and recomputes entitlements from `Transaction.currentEntitlements`; `isPro` = any verified, unrevoked, unexpired transaction in the group. Nothing reads `isPro` to gate a feature.
 
 **Version 1.0 sells nothing**: `AppConstants.subscriptionsEnabled = false`. The app does not call `start()` and `start()` returns at once, so there is no `Transaction.updates` listener, no product request and no entitlement check; the account sheet has no Pro section (§2.4). The code stays for a later version; `ReleaseConfigurationTests` and `scripts/validate_schema.py` check 7 keep the flag off (§14).
 
@@ -1567,7 +1567,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 
 ## 14. Tests each role adds (hostless, explicit file URLs, explicit `WallClock(timeZone: TestClock.zone)`)
 
-- **PREFS**: tolerant decoding (missing keys, unknown enum values, future version); `normalized` for every key incl. rejections; canonical round trip; ledger invariant (one per key, removed at default); receipt undo (and refusal after a later change); `update` diff; dismiss streak → suggestion at 5, reset on engagement, never twice; `ReminderPlanner`: urgency rules, quiet hours across midnight → passive, cap priority and overflow listing, briefing slots and ids, 64 budget; `ReminderPolicy(preferences:)`, empty overrides in Smart Schedule only mode; `WallClock(timeZone:firstWeekday:)` week math; Live Activity `firstWeekday`.
+- **PREFS**: tolerant decoding (missing keys, unknown enum values, future version); `normalized` for every key incl. rejections; canonical round trip; ledger invariant (one per key, removed at default); receipt undo (and refusal after a later change); `update` diff; dismiss streak → suggestion at 5, reset on engagement, never twice; `ReminderPlanner`: urgency rules, quiet hours across midnight → passive, cap priority and overflow listing, briefing slots and ids, 64 budget; `ReminderPolicy(preferences:)`, empty overrides in Smart Schedules only mode; `WallClock(timeZone:firstWeekday:)` week math; Live Activity `firstWeekday`.
 - **ACCOUNTS**: id-token payload decode; `EventVisibility` (hidden, muted, Focus, demo mode, unknown calendar fail-open, recolour, de-dup winner order, same raw id); `SharedStore` keyed by `EventRef` (same id in two calendars kept), per-calendar `replaceWindow` leaves other calendars alone, `coverage()` intersection, `purge(accountID:)`, pending batch slot; `AccountStore` local settings survive `replaceCalendars`, `resolveWritableCalendar`, `defaultWriteTarget` fallbacks; mapper `ssReminders` read/write, `scheduleEvent(from:in:)` stamping; the infinite-calendar range tests still pass.
 - **STORE_PRIVACY**: fixtures decode; prompt blocks; demo phrasings of §6.5; ask-first batch and commit idempotency; `GeminiClient` throws `consentRequired` without touching the session (inject a `URLSession` whose use fails the test, or check before `session` is used); consent store transitions; chat history retention and 200 cap, tolerant decoding; export contains no tokens.
 - **UI**: `CalendarPaging` with Monday-first calendars; header title formatting en/zh; existing localization tests.
@@ -1588,7 +1588,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 ## 16. Open questions for the owner, and the launch checklist
 
 ### Decided for version 1.0
-- **No subscription or in-app purchase.** `AppConstants.subscriptionsEnabled = false` hides the Smart Schedule Pro section (and the DEBUG "StoreKit testing" section), names the avatar "Accounts", leaves the subscription sentence out of the erase message and keeps StoreKit idle (§9). The StoreKit code stays for a later version. `ReleaseConfigurationTests` and `scripts/validate_schema.py` check 7 fail while the flag is true.
+- **No subscription or in-app purchase.** `AppConstants.subscriptionsEnabled = false` hides the Smart Schedules Pro section (and the DEBUG "StoreKit testing" section), names the avatar "Accounts", leaves the subscription sentence out of the erase message and keeps StoreKit idle (§9). The StoreKit code stays for a later version. `ReleaseConfigurationTests` and `scripts/validate_schema.py` check 7 fail while the flag is true.
 - **Age rating 18+.** The Gemini API terms require users to be 18 or older.
 - **Not distributed in the EEA, Switzerland, Hong Kong, Macau or mainland China.** The 27 EU storefronts plus Norway, Iceland, Liechtenstein and Switzerland are excluded, and so are Hong Kong, Macau and mainland China, where the Gemini API is not offered; the UK and the other regions are included (docs/app-store-metadata.md §4.3, §4.4).
 - **No Live Activity push-to-start.** `AppConstants.pushToStartEnabled = false`: no push-to-start token is requested or uploaded, nothing about events is stored on the server, and the app has no `aps-environment` entitlement and no `remote-notification` background mode, so no APNs key (`.p8`) is needed and the Worker's production `crons = []`. iOS 26 still schedules each Live Activity on the iPhone (`Activity.request(…, start:)`); on iOS 18 one appears only when the app runs within the lead time or while the event is under way. The code stays behind the flag for a later version; `ReleaseConfigurationTests` and `scripts/validate_schema.py` fail while it is true. Consent disclosure version 5 (§8.2).
@@ -1607,12 +1607,12 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 ### Launch checklist
 - [ ] **Gemini paid tier**: enable Cloud Billing on the Gemini API project before launch. On the free tier Google may use prompts to improve its products; the app must never claim otherwise.
 - [ ] **Google OAuth verification**: `calendar.events` and `calendar.calendarlist.readonly` are sensitive scopes. Submit the consent screen (app name, logo, home page, privacy policy, authorised domains), a scope justification and a **demo video** showing the OAuth flow and each scope in use (adding events, listing calendars in the drawer). While the screen is in Testing, refresh tokens expire after 7 days.
-- [ ] **App Store privacy labels** (must match `App/PrivacyInfo.xcprivacy`): Other User Content (request text and the events sent with it, which go through Smart Schedule's server, a Cloudflare Worker, to Google Gemini; the server keeps none of it and, with no push-to-start in version 1.0, stores no event data at all; no Google account email is sent to Gemini) and Device ID (the App Attest key ID sent with every request and kept by the server to verify requests and limit them per install; version 1.0 has no install ID or push token). Both App Functionality, linked to the user, not used for tracking. The privacy policy names Cloudflare as processor and Google as recipient. Google Calendar data itself travels directly between the device and the user's own Google account.
+- [ ] **App Store privacy labels** (must match `App/PrivacyInfo.xcprivacy`): Other User Content (request text and the events sent with it, which go through the Smart Schedules server, a Cloudflare Worker, to Google Gemini; the server keeps none of it and, with no push-to-start in version 1.0, stores no event data at all; no Google account email is sent to Gemini) and Device ID (the App Attest key ID sent with every request and kept by the server to verify requests and limit them per install; version 1.0 has no install ID or push token). Both App Functionality, linked to the user, not used for tracking. The privacy policy names Cloudflare as processor and Google as recipient. Google Calendar data itself travels directly between the device and the user's own Google account.
 - [ ] **Guideline 5.1.2(i)** (Nov 2025): the consent sheet appears before any personal data reaches Gemini; verify on a clean install, in Siri and in the notification extension.
 - [ ] **Guideline 2.1**: App Review notes explain "Try without signing in" (demo mode) and, if possible, provide a test Google account.
 - [ ] **Guideline 5.1.1(v)**: no app accounts exist; Remove account (with token revocation) and Erase all data cover data removal. Mention it in review notes.
 - [ ] **Guideline 4.8**: Google sign-in only connects the user's Google Calendar (a client for that service), so Sign in with Apple is not required; say so in review notes if asked.
-- [ ] **No in-app purchases in 1.0**: keep `AppConstants.subscriptionsEnabled` false. Do not attach any in-app purchase or subscription to the 1.0 submission (if the "Smart Schedule Pro" group or its products already exist in App Store Connect, leave them unsubmitted), and declare no Purchases data in App Privacy. When a later version sells Pro: flip the flag in the same change as `ReleaseConfigurationTests` and check 7, create the products with the same ids, sign the Paid Apps agreement, add localized subscription names, review the Pro copy, test with sandbox and the `.storekit` file, and bring back the support page's subscription answers and privacy policy §7.
+- [ ] **No in-app purchases in 1.0**: keep `AppConstants.subscriptionsEnabled` false. Do not attach any in-app purchase or subscription to the 1.0 submission (if the "Smart Schedules Pro" group or its products already exist in App Store Connect, leave them unsubmitted), and declare no Purchases data in App Privacy. When a later version sells Pro: flip the flag in the same change as `ReleaseConfigurationTests` and check 7, create the products with the same ids, sign the Paid Apps agreement, add localized subscription names, review the Pro copy, test with sandbox and the `.storekit` file, and bring back the support page's subscription answers and privacy policy §7.
 - [ ] **Age rating 18+**: answer the age rating questionnaire in App Store Connect and set the rating to 18+ (choose the higher rating if the answers give less), because the Gemini API terms require users to be 18 or older. The privacy policy and support page state the same minimum age.
 - [ ] **Availability without the EEA, Switzerland, Hong Kong, Macau and mainland China**: in Pricing and Availability, deselect the 27 EU storefronts plus Norway, Iceland, Liechtenstein and Switzerland, and Hong Kong, Macau and China mainland (no Gemini API there); keep the UK and the other regions. Declare "not a trader" once for the Digital Services Act (docs/app-store-metadata.md §4.3); the trader verification applies once a later version adds EU storefronts.
 - [ ] **Time Sensitive** entitlement stays enabled; verify Focus break-through on device.

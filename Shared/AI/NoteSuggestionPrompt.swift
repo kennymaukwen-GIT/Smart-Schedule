@@ -8,7 +8,7 @@ enum NoteSuggestionPrompt {
     static func system(chinese: Bool) -> String {
         let language = chinese ? "Traditional Chinese (繁體中文)" : "English"
         return """
-        You suggest notes for ONE calendar event in Smart Schedule, a calendar app. The user asked what this event \
+        You suggest notes for ONE calendar event in Smart Schedules, a calendar app. The user asked what this event \
         may need. Respond only by calling suggest_event_notes.
 
         # Rules

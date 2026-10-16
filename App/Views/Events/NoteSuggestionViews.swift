@@ -245,7 +245,7 @@ struct NoteSuggestionsRow: View {
             .accessibilityElement(children: .combine)
         case let .loaded(fromRules, added):
             if fromRules {
-                Label("Suggestions from Smart Schedule", systemImage: "checklist")
+                Label("Suggestions from Smart Schedules", systemImage: "checklist")
                     .font(.footnote)
                     .foregroundStyle(Theme.textSecondary)
             } else if added == 0 {

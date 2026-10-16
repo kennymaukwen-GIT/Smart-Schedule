@@ -9,10 +9,10 @@ struct SmartScheduleControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: AppConstants.controlKind) {
             ControlWidgetButton(action: OpenQuickCaptureIntent()) {
-                Label("Smart Schedule", systemImage: "clock")
+                Label("Smart Schedules", systemImage: "clock")
             }
         }
-        .displayName("Smart Schedule")
-        .description("Opens Smart Schedule ready to type a plan.")
+        .displayName("Smart Schedules")
+        .description("Opens Smart Schedules ready to type a plan.")
     }
 }

@@ -1,6 +1,6 @@
 # Google OAuth 驗證送審手冊（品牌驗證＋敏感 scope 驗證）
 
-Smart Schedule 要求兩個 Google Calendar 的**敏感 scope**（`calendar.events`、`calendar.calendarlist.readonly`），所以正式上線前要在 Google Auth Platform 完成兩件事：**品牌驗證**（App 名稱和 logo 才會出現在同意畫面）和**敏感 scope 驗證**。這份文件列出要填的每個欄位、要貼進表單的英文、示範影片的分鏡腳本、送審順序、常見退件原因，以及回覆審查信的範本。
+Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.events`、`calendar.calendarlist.readonly`），所以正式上線前要在 Google Auth Platform 完成兩件事：**品牌驗證**（App 名稱和 logo 才會出現在同意畫面）和**敏感 scope 驗證**。這份文件列出要填的每個欄位、要貼進表單的英文、示範影片的分鏡腳本、送審順序、常見退件原因，以及回覆審查信的範本。
 
 - 中文是說明；`text` 區塊裡的英文是要**原樣貼進 Google 表單或回信**的內容。
 - 依據的程式是 2026-10-16 的工作目錄（AI 同意說明第 5 版：Google 帳號 email 不送給 Gemini（第 4 版起）；1.0 不用 iOS 18 的即時動態 push-to-start，伺服器不存任何行程，同意畫面在 iOS 18 也沒有伺服器那一段）。網站在 **https://www.smart-schedules.com**（Cloudflare Pages，DNS 留在 Squarespace，見 [`site/README.md`](../site/README.md) §3）。程式的 scope、同意說明或網站改了，這份文件、表單和影片都要跟著改。
@@ -21,7 +21,7 @@ Smart Schedule 要求兩個 Google Calendar 的**敏感 scope**（`calendar.even
 
 | 欄位（Google Auth Platform） | 填什麼 |
 |---|---|
-| App name | `Smart Schedule`（和首頁、App Store、iPhone 上的名稱完全一致；不能含「Google」） |
+| App name | `Smart Schedules`（和首頁、App Store、iPhone 上的名稱完全一致；不能含「Google」。「Smart Schedule」在 App Store 已經有人用，所以名稱多一個 s：Branding 之前填過「Smart Schedule」的話要改掉，已經送審或核准時改名會重新審查（第 9 節）。Workspace 的組織名稱「Smart Schedule」是另一回事，不用跟著改） |
 | User support email | `support@smart-schedules.com`（Workspace 的真實信箱；用它登入才會出現在下拉選單，見 3.2） |
 | App logo | [`site/public/logo.png`](../site/public/logo.png)（120×120 PNG，約 3 KB，由 App 圖示縮小，和首頁同一張） |
 | Application home page | `https://www.smart-schedules.com` |
@@ -100,7 +100,7 @@ Verification Center 的「Prepare for verification」在品牌**驗證並發佈*
 
 ### 3.3 錄示範影片
 
-品牌發佈之後再錄，同意畫面才會顯示「Smart Schedule」和 logo（Google 說品牌未驗證時同意畫面只顯示網域）。腳本和技巧在第 6 節。上傳 YouTube，可見度設 **Unlisted（不公開）**，複製連結。
+品牌發佈之後再錄，同意畫面才會顯示「Smart Schedules」和 logo（Google 說品牌未驗證時同意畫面只顯示網域）。腳本和技巧在第 6 節。上傳 YouTube，可見度設 **Unlisted（不公開）**，複製連結。
 
 ### 3.4 Data access：宣告 scope、用途說明、影片
 
@@ -136,7 +136,7 @@ Verification Center 的「Prepare for verification」在品牌**驗證並發佈*
 ### 4.1 App 說明（Additional information 或審查員問「App 做什麼」時）
 
 ```text
-Smart Schedule is an iPhone calendar app and AI scheduling assistant for Google Calendar (iOS 18 or later). Users connect one or more Google accounts and see, add, change and delete their Google Calendar events in month, week and day views, with reminders and Live Activities on the iPhone. They can also type or say requests such as "lunch with Joe tomorrow at 12:30", and an optional AI assistant, used only after the user allows it in an in-app consent dialog, turns them into calendar events.
+Smart Schedules is an iPhone calendar app and AI scheduling assistant for Google Calendar (iOS 18 or later). Users connect one or more Google accounts and see, add, change and delete their Google Calendar events in month, week and day views, with reminders and Live Activities on the iPhone. They can also type or say requests such as "lunch with Joe tomorrow at 12:30", and an optional AI assistant, used only after the user allows it in an in-app consent dialog, turns them into calendar events.
 
 Calendar sync runs directly between the iPhone and the Google Calendar API. OAuth tokens are kept in the iOS Keychain and are only ever sent to Google (the Calendar API and Google's token and revoke endpoints). Users can remove an account in the app, which revokes the app's access at Google.
 
@@ -147,7 +147,7 @@ Privacy policy: https://www.smart-schedules.com/privacy (Google permissions: sec
 ### 4.2 `calendar.events`
 
 ```text
-Smart Schedule is a Google Calendar client for iPhone. It uses calendar.events to:
+Smart Schedules is a Google Calendar client for iPhone. It uses calendar.events to:
 1. Read events (events.list, events.get) in the user's calendars to show them in month, week and day views and in the event list, and to schedule reminders and Live Activities on the iPhone.
 2. Create events (events.insert) when the user adds them, for example by typing or saying "lunch with Joe tomorrow at 12:30" to the in-app assistant, or by tapping Add on events or a plan the assistant proposed.
 3. Change events (events.patch) when the user edits the title, time, location, reminders or notes on the event page, or asks the assistant to move an event.
@@ -172,7 +172,7 @@ Why a narrower scope is not enough: calendar.calendars.readonly reads a calendar
 4.2 約 2,300 字元、4.3 約 900 字元，下面這段不到 1,000 字元。
 
 ```text
-Smart Schedule is a Google Calendar client and AI scheduling assistant for iPhone.
+Smart Schedules is a Google Calendar client and AI scheduling assistant for iPhone.
 calendar.events: reads events for month, week and day views, reminders and Live Activities; creates, changes and deletes events when the user does so or asks the in-app assistant. Narrower scopes do not fit: readonly scopes cannot write, calendar.events.owned excludes calendars shared with the user, calendar.app.created covers only app-created calendars.
 calendar.calendarlist.readonly: calendarList.list only, to list the user's calendars (name, colour, access role) to show or hide them and pick where new events go. calendar.calendars.readonly cannot list calendars.
 Sync is direct between iPhone and Google. Only with in-app consent: limited event details (never account emails) pass through our server, which does not store them, to the paid Gemini API. Reminders and Live Activities are made on the iPhone; our server stores no calendar data. No ads, no sale, no AI training.
@@ -206,7 +206,7 @@ openid and email identify which Google account the user connected. The app reads
 ### 5.2 英文（貼進 Additional information，或回覆 AI 相關的提問）
 
 ```text
-How Smart Schedule's AI assistant uses Google user data
+How the Smart Schedules AI assistant uses Google user data
 
 The AI assistant is a user-facing feature: the user types or says a request such as "lunch with Joe tomorrow at 12:30", and the assistant creates or changes the event in the user's Google Calendar.
 
@@ -236,9 +236,9 @@ Other features: reminders and Live Activities are created on the iPhone from the
 ### 6.2 錄影前準備
 
 1. 品牌已發佈（3.2），iPhone 裝的是 TestFlight 上含同意說明第 5 版的版本。
-2. 到 https://myaccount.google.com/connections 把測試帳號對 Smart Schedule 的授權移除。App 帶 `include_granted_scopes=true`，帳號已授權過時 Google 可能只列出新增的 scope，同意畫面就不完整。
+2. 到 https://myaccount.google.com/connections 把測試帳號對 Smart Schedules 的授權移除。App 帶 `include_granted_scopes=true`，帳號已授權過時 Google 可能只列出新增的 scope，同意畫面就不完整。
 3. 刪除再重新安裝 App（或 設定 › Data › Erase all data on this device），讓「Connect Google Calendar」和 AI 同意畫面重新出現。
-4. 語言全部用英文：iPhone 設定 › 一般 › 語言與地區 › iPhone 語言 = English，或只把 設定 › App › Smart Schedule › 語言 設成 English（App 的設定 › Language 會打開這一頁）。Google 的登入頁跟著 iPhone 語言，底部的語言選單要顯示 English (United States)。Mac 上的 Google Calendar 網頁也用英文。
+4. 語言全部用英文：iPhone 設定 › 一般 › 語言與地區 › iPhone 語言 = English，或只把 設定 › App › Smart Schedules › 語言 設成 English（App 的設定 › Language 會打開這一頁）。Google 的登入頁跟著 iPhone 語言，底部的語言選單要顯示 English (United States)。Mac 上的 Google Calendar 網頁也用英文。
 5. iOS 18 或 iOS 26 的 iPhone 都可以錄：1.0 的同意畫面在兩種系統上相同（沒有伺服器那一段）。
 6. 打開勿擾模式，關掉通知預覽。
 
@@ -247,38 +247,38 @@ Other features: reminders and Live Activities are created on the iPhone from the
 `<PROJECT_ID>`、`<CLIENT_ID>` 換成實際值。旁白可以錄音，也可以做成英文字幕；兩者都有最好。
 
 **鏡頭 1｜片頭（0:00–0:10）**
-- 畫面：黑底字卡：`Smart Schedule – Google OAuth verification demo` / `Google Cloud project: <PROJECT_ID>` / `OAuth client: iOS, bundle ID com.smartschedules.app` / `Scopes: openid, email, calendar.events, calendar.calendarlist.readonly`。
+- 畫面：黑底字卡：`Smart Schedules – Google OAuth verification demo` / `Google Cloud project: <PROJECT_ID>` / `OAuth client: iOS, bundle ID com.smartschedules.app` / `Scopes: openid, email, calendar.events, calendar.calendarlist.readonly`。
 - 旁白：
   ```text
-  This is Smart Schedule, an iPhone calendar app and AI scheduling assistant for Google Calendar. This video shows the Google sign-in and consent flow, and how the app uses each scope it requests: openid, email, calendar.events and calendar.calendarlist.readonly.
+  This is Smart Schedules, an iPhone calendar app and AI scheduling assistant for Google Calendar. This video shows the Google sign-in and consent flow, and how the app uses each scope it requests: openid, email, calendar.events and calendar.calendarlist.readonly.
   ```
 
 **鏡頭 2｜OAuth client 和 Branding（0:10–0:35）**
 - 畫面：Mac 瀏覽器，Google Auth Platform › Clients：只有一個 client；點開，放大 Client ID 全文、類型 iOS、Bundle ID。接著 Branding 頁：App name、logo、home page、privacy policy、authorized domain。
 - 旁白：
   ```text
-  The project has a single OAuth client: an iOS client for the bundle ID com.smartschedules.app. This is its client ID, the one the Smart Schedule app on the iPhone uses. The consent screen is branded Smart Schedule, with our home page and privacy policy on our verified domain, smart-schedules.com.
+  The project has a single OAuth client: an iOS client for the bundle ID com.smartschedules.app. This is its client ID, the one the Smart Schedules app on the iPhone uses. The consent screen is branded Smart Schedules, with our home page and privacy policy on our verified domain, smart-schedules.com.
   ```
 
 **鏡頭 3｜首頁和隱私權政策（0:35–1:00）**
-- 畫面：打開 https://www.smart-schedules.com ，點「English」；捲到「Why Smart Schedule uses your Google Calendar」和「AI and privacy」，停在 Limited Use 那一句。點 Privacy Policy › English，捲到第 3 節（四個 scope），再到第 11 節。
+- 畫面：打開 https://www.smart-schedules.com ，點「English」；捲到「Why Smart Schedules uses your Google Calendar」和「AI and privacy」，停在 Limited Use 那一句。點 Privacy Policy › English，捲到第 3 節（四個 scope），再到第 11 節。
 - 旁白：
   ```text
   Our home page explains what the app does and why it needs Google Calendar, and states that our use of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements. The privacy policy lists each permission and how it is used, explains the optional AI assistant, and repeats the Limited Use commitment in section 11.
   ```
 
 **鏡頭 4｜語言（1:00–1:10）**
-- 畫面：iPhone 設定 › App › Smart Schedule › 語言：English（或 iPhone 語言是 English）。
+- 畫面：iPhone 設定 › App › Smart Schedules › 語言：English（或 iPhone 語言是 English）。
 - 旁白：
   ```text
   The iPhone and the app are set to English.
   ```
 
 **鏡頭 5｜開始登入（1:10–1:30）**
-- 畫面：打開 Smart Schedule → 點「Connect Google Calendar」→「Add Google account」頁，在「Google account email」輸入測試帳號 → 點「Continue with Google」→ iOS 提示「"Smart Schedule" Wants to Use "google.com" to Sign In」→ Continue。
+- 畫面：打開 Smart Schedules → 點「Connect Google Calendar」→「Add Google account」頁，在「Google account email」輸入測試帳號 → 點「Continue with Google」→ iOS 提示「"Smart Schedules" Wants to Use "google.com" to Sign In」→ Continue。
 - 旁白：
   ```text
-  On first launch I tap Connect Google Calendar and enter the Google account I want to connect. The app opens Google's own sign-in page in Apple's secure sign-in sheet. Smart Schedule never sees the password.
+  On first launch I tap Connect Google Calendar and enter the Google account I want to connect. The app opens Google's own sign-in page in Apple's secure sign-in sheet. Smart Schedules never sees the password.
   ```
 
 **鏡頭 5b｜授權網址裡的 client ID（選擇性，建議拍）**
@@ -290,28 +290,28 @@ Other features: reminders and Live Activities are created on the iPhone from the
   ```
 
 **鏡頭 6｜Google 登入頁（1:30–1:50）**
-- 畫面：Google 登入頁（email 已填好）；捲到底，讓左下角語言選單「English (United States)」入鏡（不是就切過去）；輸入密碼（擋住或在鏡頭外輸入）。出現「Google hasn't verified this app」時：點 Advanced → Go to Smart Schedule (unsafe)。
+- 畫面：Google 登入頁（email 已填好）；捲到底，讓左下角語言選單「English (United States)」入鏡（不是就切過去）；輸入密碼（擋住或在鏡頭外輸入）。出現「Google hasn't verified this app」時：點 Advanced → Go to Smart Schedules (unsafe)。
 - 旁白：
   ```text
   Google's sign-in page is in English; the language menu at the bottom shows English (United States). Because verification is still pending, Google shows its unverified-app notice, and I continue through Advanced.
   ```
 
 **鏡頭 7｜同意畫面（1:50–2:20）**
-- 畫面：「Smart Schedule wants access to your Google Account」，App 名稱、logo 和帳號都入鏡。每一行權限停 3 秒：「See the list of Google calendars you're subscribed to」、「View and edit events on all your calendars」，以及登入共用的 email 那一行。可以點 App 名稱顯示開發者資訊。勾選兩個行事曆權限（或 Select all）→ Continue。
+- 畫面：「Smart Schedules wants access to your Google Account」，App 名稱、logo 和帳號都入鏡。每一行權限停 3 秒：「See the list of Google calendars you're subscribed to」、「View and edit events on all your calendars」，以及登入共用的 email 那一行。可以點 App 名稱顯示開發者資訊。勾選兩個行事曆權限（或 Select all）→ Continue。
 - 旁白：
   ```text
-  The consent screen names Smart Schedule and asks for two Google Calendar permissions: to see the list of calendars the user is subscribed to, and to view and edit events on all their calendars. Signing in also shares the account's email address. I select both calendar permissions and continue.
+  The consent screen names Smart Schedules and asks for two Google Calendar permissions: to see the list of calendars the user is subscribed to, and to view and edit events on all their calendars. Signing in also shares the account's email address. I select both calendar permissions and continue.
   ```
 
 **鏡頭 8｜讀取行程：`calendar.events`（2:20–2:40）**
 - 畫面：回到 App，月曆出現測試帳號的行程；切到週、日檢視。旁邊（或接著）是 Mac 上的 Google Calendar 網頁，同樣的行程。
 - 旁白：
   ```text
-  Back in the app, Smart Schedule reads the events with the calendar.events scope and shows them in month, week and day views. They are the same events as in Google Calendar on the web.
+  Back in the app, Smart Schedules reads the events with the calendar.events scope and shows them in month, week and day views. They are the same events as in Google Calendar on the web.
   ```
 
 **鏡頭 9｜行事曆清單：`calendar.calendarlist.readonly` 和 `email`（2:40–3:10）**
-- 畫面：點左上角 ☰ 打開抽屜：帳號那一區的標題是帳號 email，下面是 My calendar、Gym、Family（唯讀）和各自的顏色。點 Gym 的色塊隱藏它，行程消失，再點一次恢復。點 My calendar 那一列，打開詳細頁，指出「Show in Smart Schedule」和「Use for new events」。Mac 上 Google Calendar 左側的「My calendars」「Other calendars」做對照。
+- 畫面：點左上角 ☰ 打開抽屜：帳號那一區的標題是帳號 email，下面是 My calendar、Gym、Family（唯讀）和各自的顏色。點 Gym 的色塊隱藏它，行程消失，再點一次恢復。點 My calendar 那一列，打開詳細頁，指出「Show in Smart Schedules」和「Use for new events」。Mac 上 Google Calendar 左側的「My calendars」「Other calendars」做對照。
 - 旁白：
   ```text
   The calendar.calendarlist.readonly scope lets the app list the user's calendars. The sidebar shows them under the account, which is identified by its email address from the email scope, with each calendar's name and colour as in Google Calendar. The user can hide or show each calendar and choose which calendar new events go to. The app only reads this list; it never changes the user's calendars.
@@ -325,10 +325,10 @@ Other features: reminders and Live Activities are created on the iPhone from the
   ```
 
 **鏡頭 11｜新增行程：`calendar.events` 寫入（3:50–4:15）**
-- 畫面：助理回覆和行程卡片；月曆明天出現「Lunch with Joe」。Mac 上重新整理 Google Calendar，打開這個行程：說明欄第一行是「由 Smart Schedule 智慧助理自動排程：」加上剛才的請求。
+- 畫面：助理回覆和行程卡片；月曆明天出現「Lunch with Joe」。Mac 上重新整理 Google Calendar，打開這個行程：說明欄第一行是「由 Smart Schedules 智慧助理自動排程：」加上剛才的請求。
 - 旁白：
   ```text
-  The assistant understood the request, and the app created the event with the calendar.events scope. Here it is in Google Calendar. The first line of the description, in Chinese, says that Smart Schedule's assistant scheduled it, followed by the user's request.
+  The assistant understood the request, and the app created the event with the calendar.events scope. Here it is in Google Calendar. The first line of the description, in Chinese, says that the Smart Schedules assistant scheduled it, followed by the user's request.
   ```
 
 **鏡頭 12｜修改和刪除：`calendar.events`（4:15–4:45）**
@@ -342,7 +342,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 - 畫面：☰ → General（設定）→ AI & privacy：狀態 Allowed、「What is sent」（和同意畫面同樣的文字）、Stop sharing（點開確認框再取消）。再回 ☰ → 帳號標題旁的「…」→ Remove account（顯示確認框；要的話確認，再到 myaccount.google.com/connections 顯示授權已移除）。
 - 旁白：
   ```text
-  In Settings, under AI and privacy, users can review what is sent and stop sharing at any time. Remove account revokes Smart Schedule's access at Google and deletes the account's token and cached events from the iPhone. Google Calendar itself is not changed.
+  In Settings, under AI and privacy, users can review what is sent and stop sharing at any time. Remove account revokes the app's access at Google and deletes the account's token and cached events from the iPhone. Google Calendar itself is not changed.
   ```
 
 **片尾（5:10–5:15）**：`www.smart-schedules.com · support@smart-schedules.com`。
@@ -363,7 +363,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 |---|---|
 | 網域沒驗證、首頁「not registered」 | 3.1：Search Console 的**網域**資源 `smart-schedules.com`（涵蓋 www），由專案 Owner／Editor 驗證，Squarespace DNS 裡 Workspace 和 Search Console 的 `google-site-verification` TXT 都保留 |
 | 審核員或使用者登入時被擋，只有 `@smart-schedules.com` 的帳號能登入 | Audience › User type 是 Internal：改成 External（3.5），發佈到 In production |
-| 首頁沒說明 App 用途、是登入頁、或 App 名稱和同意畫面不同 | 首頁開頭就是「Smart Schedule」和用途說明；Branding 的 App name 一字不差 |
+| 首頁沒說明 App 用途、是登入頁、或 App 名稱和同意畫面不同 | 首頁開頭就是「Smart Schedules」和用途說明；Branding 的 App name 一字不差 |
 | 首頁「unresponsive」 | 填 `https://www.smart-schedules.com`（不要 http、沒有 www 的根網域或會轉址的網址）；網站不要對機器人出驗證頁。論壇上也有網站正常仍被標記的案例，這時在 View issues 申請人工複查 |
 | 隱私權政策不在同一網域、沒從首頁連過去、沒說明怎麼存取／使用／保存／分享 Google 使用者資料 | `https://www.smart-schedules.com/privacy`，首頁有連結；第 3、4、5、11、13 節分別說明 |
 | 缺 Limited Use 聲明 | 首頁和政策第 11 節都有 Google 範本的那一句 |
@@ -392,14 +392,14 @@ Hello,
 
 Thank you for the review. Our resolution for project <PROJECT_ID>: Unable to use narrower scopes.
 
-calendar.events: Smart Schedule is a Google Calendar client. Users view events in all their calendars, including calendars other people share with them, and create, edit and delete events in the calendars they own or have "Make changes to events" access to. calendar.events.readonly and calendar.events.owned.readonly cannot write; calendar.events.owned does not cover calendars shared with the user; calendar.app.created covers only calendars the app creates; calendar.events.freebusy has no event details. We do not request the full calendar scope. The video shows reading (<mm:ss>), creating (<mm:ss>), editing and deleting (<mm:ss>) events.
+calendar.events: Smart Schedules is a Google Calendar client. Users view events in all their calendars, including calendars other people share with them, and create, edit and delete events in the calendars they own or have "Make changes to events" access to. calendar.events.readonly and calendar.events.owned.readonly cannot write; calendar.events.owned does not cover calendars shared with the user; calendar.app.created covers only calendars the app creates; calendar.events.freebusy has no event details. We do not request the full calendar scope. The video shows reading (<mm:ss>), creating (<mm:ss>), editing and deleting (<mm:ss>) events.
 
 calendar.calendarlist.readonly: used only for calendarList.list, to show the user's calendars with their names, colours and access roles so the user can choose which to show and where new events go (<mm:ss>). calendar.calendars.readonly cannot list calendars; it only reads a calendar whose ID is already known.
 
 Please let us know if you need more information.
 
 Best regards,
-Smart Schedule
+Smart Schedules
 support@smart-schedules.com
 ```
 
@@ -410,13 +410,13 @@ Hello,
 
 Thank you. We have uploaded an updated demo video: <YouTube link> (unlisted).
 
-- OAuth client ID: Smart Schedule is a native iOS app (OAuth client type iOS, bundle ID com.smartschedules.app). On iOS the sign-in page opens in ASWebAuthenticationSession, Apple's system sign-in sheet, which shows only the host name, not the full URL. The video shows the project's only OAuth client and its client ID in Google Auth Platform > Clients (<mm:ss>), and the full authorization URL the app opens, with client_id=<CLIENT_ID> and all four scopes, logged in Xcode (<mm:ss>).
+- OAuth client ID: Smart Schedules is a native iOS app (OAuth client type iOS, bundle ID com.smartschedules.app). On iOS the sign-in page opens in ASWebAuthenticationSession, Apple's system sign-in sheet, which shows only the host name, not the full URL. The video shows the project's only OAuth client and its client ID in Google Auth Platform > Clients (<mm:ss>), and the full authorization URL the app opens, with client_id=<CLIENT_ID> and all four scopes, logged in Xcode (<mm:ss>).
 - Language: the consent flow is in English; the language menu at the bottom of Google's page shows English (United States) (<mm:ss>).
-- Consent screen: shows the app name Smart Schedule and exactly the scopes in our request (<mm:ss>).
+- Consent screen: shows the app name Smart Schedules and exactly the scopes in our request (<mm:ss>).
 - Scope use: calendar.events (<mm:ss> read, <mm:ss> create, <mm:ss> edit and delete); calendar.calendarlist.readonly (<mm:ss>).
 
 Best regards,
-Smart Schedule
+Smart Schedules
 support@smart-schedules.com
 ```
 
@@ -429,19 +429,19 @@ Thank you. Here is where each requirement is met:
 
 - Home page: https://www.smart-schedules.com (no sign-in required). It names the app, describes what it does and why it needs Google Calendar, links to the privacy policy, and includes the Limited Use statement under "AI and privacy".
 - Privacy policy: https://www.smart-schedules.com/privacy, on the same domain and linked from the home page and the consent screen. Section 3 lists each Google permission and how it is used; section 4 explains what the optional AI assistant sends and when; section 5 that Live Activities are created on the iPhone; section 11 Google user data and Limited Use; section 13 retention; section 15 how users revoke access and delete data.
-- Limited Use statement: "Smart Schedule's use and transfer to any other app of information received from Google APIs will adhere to Google API Services User Data Policy, including the Limited Use requirements." (https://www.smart-schedules.com/privacy#en-limited-use)
+- Limited Use statement: "Smart Schedules' use and transfer to any other app of information received from Google APIs will adhere to Google API Services User Data Policy, including the Limited Use requirements." (https://www.smart-schedules.com/privacy#en-limited-use)
 - Domain: smart-schedules.com is verified in Google Search Console as a Domain property by an Owner of this project; it is our authorized domain, and the website is served on its www subdomain.
 
 <If we changed anything, describe it here.>
 
 Best regards,
-Smart Schedule
+Smart Schedules
 support@smart-schedules.com
 ```
 
 ### 8.5 範本：AI／資料傳輸的提問
 
-回信開頭寫「Thank you. Here is how Smart Schedule's AI assistant uses Google user data:」，接著貼第 5.2 節全文，最後補上影片裡同意畫面的時間點（鏡頭 10），以及「The Gemini API project is <GEMINI_PROJECT_ID>, with Cloud Billing enabled.」。
+回信開頭寫「Thank you. Here is how the Smart Schedules AI assistant uses Google user data:」，接著貼第 5.2 節全文，最後補上影片裡同意畫面的時間點（鏡頭 10），以及「The Gemini API project is <GEMINI_PROJECT_ID>, with Cloud Billing enabled.」。
 
 ### 8.6 範本：補件後追蹤
 
@@ -451,7 +451,7 @@ Hello,
 Following up on our reply of <date> for project <PROJECT_ID>. We have addressed the points in your last email (<one-line summary>). Please let us know if anything else is needed for the verification of calendar.events and calendar.calendarlist.readonly.
 
 Best regards,
-Smart Schedule
+Smart Schedules
 support@smart-schedules.com
 ```
 

@@ -77,7 +77,7 @@ struct RemoveAccountDialog: ViewModifier {
     }
 
     static func message(unsentChanges: Int) -> String {
-        let removed = String(localized: "Its calendars and events leave Smart Schedule on this iPhone. Nothing is deleted in Google Calendar.")
+        let removed = String(localized: "Its calendars and events leave Smart Schedules on this iPhone. Nothing is deleted in Google Calendar.")
         guard unsentChanges > 0 else { return removed }
         let lost = String(localized: "\(unsentChanges) changes haven't reached Google yet and will be lost.")
         return removed + "\n\n" + lost

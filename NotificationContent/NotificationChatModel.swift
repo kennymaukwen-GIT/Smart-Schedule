@@ -172,7 +172,7 @@ final class NotificationChatModel {
             } catch GeminiError.consentRequired {
                 // Asking for consent needs the app; nothing was sent.
                 turns.append(Turn(role: .assistant,
-                                  text: String(localized: "Turn on AI data sharing in Smart Schedule › Settings › AI & privacy to reply here.")))
+                                  text: String(localized: "Turn on AI data sharing in Smart Schedules › Settings › AI & privacy to reply here.")))
             } catch {
                 turns.append(Turn(role: .assistant, text: error.localizedDescription))
             }

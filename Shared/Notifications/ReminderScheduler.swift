@@ -108,7 +108,7 @@ actor ReminderScheduler {
 
     static func nudgeRequest(_ nudge: PlanNudge) -> UNNotificationRequest {
         let content = UNMutableNotificationContent()
-        content.title = "Smart Schedule"
+        content.title = "Smart Schedules"
         content.body = nudge.message
         content.categoryIdentifier = NotificationIDs.Category.compose // reply "skip today" in place
         content.userInfo = [NotificationIDs.UserInfo.planID: nudge.planID]

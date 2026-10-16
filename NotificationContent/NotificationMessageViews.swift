@@ -79,7 +79,7 @@ struct NotificationReminderChangeLine: View {
     }
 }
 
-/// "Saved to «Gym» (hidden in Smart Schedule)" with Show (the app's `HiddenCalendarNotice`).
+/// "Saved to «Gym» (hidden in Smart Schedules)" with Show (the app's `HiddenCalendarNotice`).
 struct NotificationHiddenCalendarNotice: View {
     let calendarName: String
     var onShow: () -> Void = {}
@@ -89,7 +89,7 @@ struct NotificationHiddenCalendarNotice: View {
             Image(systemName: "eye.slash")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary)
-            Text("Saved to «\(calendarName)» (hidden in Smart Schedule)")
+            Text("Saved to «\(calendarName)» (hidden in Smart Schedules)")
                 .font(.system(size: 12))
                 .foregroundStyle(.white.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)

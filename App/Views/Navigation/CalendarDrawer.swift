@@ -30,7 +30,7 @@ struct CalendarDrawer: View {
                 TimelineView(.everyMinute) { context in
                     list(now: context.date)
                 }
-                .navigationTitle("Smart Schedule")
+                .navigationTitle("Smart Schedules")
                 .navigationBarTitleDisplayMode(.large)
                 .navigationDestination(for: DrawerRoute.self) { route in
                     switch route {
@@ -128,7 +128,7 @@ struct CalendarDrawer: View {
             accountHeader(account)
         } footer: {
             if missesCalendarList {
-                Text("Smart Schedule needs permission to see your calendar list.")
+                Text("Smart Schedules needs permission to see your calendar list.")
             }
         }
     }

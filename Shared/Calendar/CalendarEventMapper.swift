@@ -25,8 +25,18 @@ struct CalendarEventMapper: Sendable {
     /// Length of timed `event` and `routine` items given no end or duration; tasks and deadlines keep 30 min.
     let defaultEventMinutes: Int
 
-    /// Matches the provenance line in Artboard 5's Google Calendar detail view.
-    static let provenancePrefix = "由 Smart Schedule 智慧助理自動排程："
+    /// Matches the provenance line in Artboard 5's Google Calendar detail view. New events get this one.
+    static let provenancePrefix = "由 Smart Schedules 智慧助理自動排程："
+    /// What builds before the rename to "Smart Schedules" wrote. Still recognised, so their events keep counting.
+    static let legacyProvenancePrefix = "由 Smart Schedule 智慧助理自動排程："
+    /// Every provenance prefix the app has written, the current one first.
+    static let provenancePrefixes = [provenancePrefix, legacyProvenancePrefix]
+
+    /// Whether `text` starts with a provenance prefix, the current or the legacy one.
+    static func startsWithProvenance(_ text: String) -> Bool {
+        provenancePrefixes.contains { text.hasPrefix($0) }
+    }
+
     static let schemaVersion = "1"
     /// `ReminderPolicy()`'s all-day default: relative to 00:00 of the event day, 900 = the day before at 09:00.
     static let allDayReminder = [900]
@@ -306,7 +316,7 @@ struct CalendarEventMapper: Sendable {
 
     /// What `ScheduleEvent.reminderMinutes` means: nil = the kind's defaults (from preferences when reminding),
     /// [] = none, otherwise these minutes. Smart Schedule's own marker wins over Google's pop-ups, which are empty
-    /// in "Smart Schedule only" mode ("none" = no reminders). Without it: Google's defaults → nil; overrides →
+    /// in "Smart Schedules only" mode ("none" = no reminders). Without it: Google's defaults → nil; overrides →
     /// their minutes; `useDefault == false` with no overrides → [] (reminders turned off in Google).
     static func reminderMinutes(of event: GCalEvent) -> [Int]? {
         if let marker = event.extendedProperties?.private?[SSProperty.localReminders] {

@@ -1,6 +1,6 @@
-# Smart Schedule Worker
+# Smart Schedules Worker
 
-Smart Schedule 的伺服器端（Cloudflare Worker，TypeScript，**零 runtime dependency**）：
+Smart Schedules 的伺服器端（Cloudflare Worker，TypeScript，**零 runtime dependency**）：
 
 - **Gemini proxy**：Gemini API key 只存在 Worker secret，App 不再內含 key。每個 request 都必須通過 **Apple App Attest**
   （或由 App 為其 extension 申請的 session token）驗證，body 原封不動（byte-for-byte）轉送。

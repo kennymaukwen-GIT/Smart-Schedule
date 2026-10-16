@@ -263,7 +263,7 @@ final class SuggestedNotesTests: XCTestCase {
                                                                 "eSIM or pocket Wi-Fi"])
         XCTAssertEqual(result.filter { $0.source == .ai }.count, 4)
 
-        // Nothing new, or no suggest_event_notes call: the rules alone ("Suggestions from Smart Schedule").
+        // Nothing new, or no suggest_event_notes call: the rules alone ("Suggestions from Smart Schedules").
         let other = try GeminiClient.parse(Data(#"""
         {"candidates": [{"content": {"parts": [{"functionCall": {"name": "reply_to_user", "args": {"message": "Hi"}}}]},
                          "finishReason": "STOP"}]}
@@ -314,7 +314,7 @@ final class SuggestedNotesTests: XCTestCase {
             _ = try await assistant.suggestNotes(for: tokyoTrip, now: now)
             XCTFail("expected a URLError")
         } catch is URLError {
-            // expected: the page answers from the rules ("Suggestions from Smart Schedule")
+            // expected: the page answers from the rules ("Suggestions from Smart Schedules")
         } catch {
             XCTFail("unexpected \(error)")
         }

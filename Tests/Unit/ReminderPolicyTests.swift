@@ -90,7 +90,7 @@ final class ReminderPolicyTests: XCTestCase {
         XCTAssertEqual(ReminderPolicy(preferences: preferences).allDayMinutes(requested: nil), [1080])
     }
 
-    /// "Smart Schedule only": Google gets `useDefault: false` with no overrides, so other devices stay quiet, while
+    /// "Smart Schedules only": Google gets `useDefault: false` with no overrides, so other devices stay quiet, while
     /// the intended list is still computed for Smart Schedule's own reminders.
     func testSmartScheduleOnlyWritesNoGooglePopups() {
         var preferences = AppPreferences()

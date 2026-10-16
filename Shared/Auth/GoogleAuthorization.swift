@@ -58,7 +58,7 @@ enum GoogleSignInFailure: LocalizedError, Equatable, Sendable {
         case .blockedByAdmin:
             String(localized: "Your school or company doesn't allow this app to use Google Calendar. Ask your admin, or use another account.")
         case .calendarAccessMissing:
-            String(localized: "Smart Schedule needs access to your Google Calendar. Try again and leave the calendar permission ticked on Google's page.")
+            String(localized: "Smart Schedules needs access to your Google Calendar. Try again and leave the calendar permission ticked on Google's page.")
         case .unreachable:
             String(localized: "Can't reach Google. Check your connection.")
         case let .refused(code):
