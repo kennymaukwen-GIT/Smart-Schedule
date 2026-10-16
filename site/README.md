@@ -19,10 +19,12 @@ site/
     _headers           安全性標頭（不會被當成頁面提供）
     robots.txt
     logo.png           120×120，由 App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png 縮小；OAuth 同意畫面的 logo 用同一張
+    home-bg.webp       首頁背景照片，1984×1110（約 260 KB）。照片由網站擁有者提供：用 Higgsfield 依參考圖編輯產生（Higgsfield 說明中心寫明不主張產出的所有權、不限制商用；參考圖本身的權利仍由擁有者負責）。已裁掉截圖左邊 14 px 的灰邊、去掉中繼資料。有疑慮時刪掉這兩個檔案，並刪掉 `index.html` `<style>` 最後那段照片用的 CSS，首頁就回到原本的樣式
+    home-bg-1200.webp  同一張照片的 1200×671 版（約 116 KB），手機等窄螢幕用；兩張都只有首頁使用
 ```
 
 - 每一頁都是繁體中文在前、英文在後，頁首有語言切換（`#zh`、`#en`，純錨點，不用 JavaScript）。審核員可以直接點「English」。
-- 沒有 JavaScript、外部字型、cookie 或追蹤。CSS 直接寫在每頁的 `<style>` 裡（四頁內容相同），依 `prefers-color-scheme` 切換淺色和深色。改樣式時四頁要一起改。
+- 沒有 JavaScript、外部字型、cookie 或追蹤。CSS 直接寫在每頁的 `<style>` 裡（四頁內容相同），依 `prefers-color-scheme` 切換淺色和深色。改樣式時四頁要一起改。首頁另外在 `<style>` 最後多一段（只在螢幕上）：背景照片加深色遮罩，兩種配色都顯示成深色頁面。
 - 不需要 `_redirects`，網址規則是 Pages 的預設行為：`/privacy` 提供 `privacy.html`；`/privacy.html` 和 `/privacy/` 308 轉到 `/privacy`；`/index.html` 308 轉到 `/`；不存在的路徑回 `404.html`、狀態 404。**`public/404.html` 一定要保留**：沒有最上層的 `404.html` 時，Pages 會把網站當成單頁應用程式，所有不存在的路徑都回首頁（200）。
 - 本機測試過（2026-10-15，wrangler 4.146.0 在 `site/` 執行 `wrangler pages dev`）：`/`、`/privacy`、`/support` 都是 200；`/privacy.html`、`/privacy/`、`/support.html` 是 308 → 去掉 `.html` 的網址，`/index.html` 是 308 → `/`；`/nope` 是 404（`404.html` 的內容）；`_headers` 的標頭（Content-Security-Policy、X-Frame-Options 等）有套用；`/README.md`、`/wrangler.toml` 是 404（沒有上傳）。之前也測過：手機寬度（375 px）沒有水平捲動，淺色和深色都正常，所有錨點都存在。
 
