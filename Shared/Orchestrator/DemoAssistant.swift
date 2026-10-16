@@ -2,7 +2,8 @@ import Foundation
 
 /// Offline stand-in for `ScheduleAssistant` in demo mode: no Google account, no Gemini key, no network.
 /// Keyword heuristics cover the artboard flows (long-term plan, "push it 30 min", delete, agenda,
-/// "title + day + time" capture, and "加個備註：…" notes). Every write goes to the local `SharedStore` only.
+/// "title + day + time" capture, a time counted from now ("1個小時後買蛋", "in an hour"), and "加個備註：…" notes).
+/// Every write goes to the local `SharedStore` only.
 ///
 /// Plans follow the same review loop as the real assistant: a goal produces a `PlanDraft` (nothing written);
 /// while it is pending, approval words add it, abandonment words drop it and anything else is read as a
@@ -77,6 +78,8 @@ actor DemoAssistant: ScheduleAssisting {
         pendingDraft = nil
 
         // "加個備註：…" goes first: the note itself may say anything ("以後都要帶護照", "move the meeting to 3pm").
+        // A time counted from now ("1個小時後買蛋", "in an hour") is next, before "from now on…", so 以後 in
+        // "兩個小時以後開會" is not a lasting instruction; with a move word ("延後 1 小時") it stays a shift.
         // "From now on…" comes next, so "8 點前不要提醒我" never becomes an 08:00 event.
         // A pending draft plan gets first look after that; it hands back anything clearly about other events.
         // Shift runs next: it only claims an utterance with a move word plus an amount (or a time and a focus
@@ -86,6 +89,8 @@ actor DemoAssistant: ScheduleAssisting {
             reply = await capture(text, pending: pending, language: language, parser: parser)
         } else if let noted = await addNote(text, focusEventID: focusEventID, language: language, parser: parser) {
             reply = noted
+        } else if !Self.isMoveRequest(lower), let fromNow = DemoParser.fromNow(in: text) {
+            reply = await capture(text, pending: nil, language: language, parser: parser, fromNow: fromNow)
         } else if let changed = await preferenceChange(text, lower: lower, language: language, parser: parser) {
             reply = changed
         } else if let decided = try await reviewPendingEvents(text, lower: lower, focusEventID: focusEventID, parser: parser) {
@@ -506,11 +511,15 @@ actor DemoAssistant: ScheduleAssisting {
     private func deletion(_ lower: String, now: Date, language: DemoLanguage) async -> Reply? {
         guard Self.isDeleteRequest(lower) else { return nil }
         let snapshot = await store.snapshot()
-        let events = snapshot.events.sorted { $0.start < $1.start }
+        // Sample data only: the cache can still hold hidden copies of the user's real events (and their plans'
+        // nudges), which demo mode must never offer to delete.
+        let events = snapshot.events.filter { DemoData.isDemoID($0.id) }.sorted { $0.start < $1.start }
+        let demoPlans = Set(events.compactMap(\.planID))
         var reply = Reply()
 
         let wantsPlan = ["plan", "計畫", "计划", "計劃", "routine"].contains { lower.contains($0) }
-        if wantsPlan, let planID = snapshot.nudges.last?.planID ?? events.last(where: { $0.planID != nil })?.planID {
+        if wantsPlan, let planID = snapshot.nudges.last(where: { demoPlans.contains($0.planID) })?.planID
+            ?? events.last(where: { $0.planID != nil })?.planID {
             let ids = events.filter { $0.planID == planID }.map(\.id)
             reply.pendingDeletion = ScheduleAssistant.PendingDeletion(eventIDs: ids, planID: planID,
                                                                       summary: String(localized: "the plan (\(ids.count) items)"))
@@ -567,10 +576,19 @@ actor DemoAssistant: ScheduleAssisting {
 
     // MARK: - (d) "Lunch with Andrew tomorrow 1pm" · (e) no clock time (only a day, or "下午") → ask
 
+    /// `fromNow` (from `DemoParser.fromNow`): "1個小時後買蛋給 Jocelyn" said at 22:50:37 is "買蛋給 Jocelyn" at 23:50,
+    /// with a reminder at the start and no "what time?" question, as Gemini's prompt rule 7 has it.
     private func capture(_ text: String, pending: TimeQuestion?, language: DemoLanguage,
-                         parser: DemoParser) async -> Reply {
+                         parser: DemoParser, fromNow: (minutes: Int, leftover: String)? = nil) async -> Reply {
         let calendar = clock.calendar
         let now = parser.now
+        if let fromNow {
+            let minute = calendar.dateInterval(of: .minute, for: now)?.start ?? now
+            var title = DemoParser.title(from: fromNow.leftover)
+            if title.isEmpty { title = language == .chinese ? "新行程" : "New event" }
+            return await addCaptured(title: title, start: minute.addingTimeInterval(TimeInterval(fromNow.minutes) * 60),
+                                     utterance: text, reminderMinutes: [0], now: now)
+        }
         var leftover = text
         let time: DemoParser.TimeOfDay?
         if pending != nil, let bare = DemoParser.bareHour(text) {
@@ -640,21 +658,31 @@ actor DemoAssistant: ScheduleAssisting {
             start = calendar.date(byAdding: .day, value: 7, to: start) ?? start
         }
 
+        return await addCaptured(title: title, start: start, utterance: request, reminderMinutes: nil, now: now)
+    }
+
+    /// The end of every capture: with "Ask me first" the event waits on a card, otherwise it is added now.
+    /// `reminderMinutes` nil = the kind's defaults.
+    private func addCaptured(title: String, start: Date, utterance: String, reminderMinutes: [Int]?,
+                             now: Date) async -> Reply {
         let kind = CalendarEventMapper.inferKind(title)
         let minutes = Self.defaultMinutes(for: kind, settings: settings)
-        let dayInterval = DateInterval(start: calendar.startOfDay(for: start), duration: 86_400)
+        let dayInterval = DateInterval(start: clock.calendar.startOfDay(for: start), duration: 86_400)
         let sameDay = await store.events(in: dayInterval)
 
         if settings.autonomy == .askFirst {
-            return await proposeBatch(title: title, start: start, minutes: minutes, kind: kind, utterance: request,
-                                      now: now, dayInterval: dayInterval, sameDay: sameDay)
+            return await proposeBatch(title: title, start: start, minutes: minutes, kind: kind, utterance: utterance,
+                                      reminderMinutes: reminderMinutes, now: now, dayInterval: dayInterval,
+                                      sameDay: sameDay)
         }
 
         let event = makeEvent(id: DemoData.idPrefix + "chat-" + UUID().uuidString.prefix(8).lowercased(),
-                              title: title, start: start, minutes: minutes, kind: kind, utterance: request)
+                              title: title, start: start, minutes: minutes, kind: kind, utterance: utterance,
+                              reminderMinutes: reminderMinutes)
         await store.upsert([event])
         lastEventID = event.id
 
+        var reply = Reply()
         reply.changed = true
         reply.created = [event]
         reply.addedEvents = [event]
@@ -675,9 +703,10 @@ actor DemoAssistant: ScheduleAssisting {
         }
     }
 
-    /// A captured event in the calendar new events go to (Settings or "以後用學校帳號").
+    /// A captured event in the calendar new events go to (Settings or "以後用學校帳號"). `reminderMinutes` nil = the
+    /// kind's defaults; [0] = at the start (a time counted from now).
     private func makeEvent(id: String, title: String, start: Date, minutes: Int, kind: ScheduleEvent.Kind,
-                           utterance: String) -> ScheduleEvent {
+                           utterance: String, reminderMinutes: [Int]? = nil) -> ScheduleEvent {
         let target = Self.demoTarget(for: settings)
         return ScheduleEvent(
             id: id,
@@ -691,7 +720,7 @@ actor DemoAssistant: ScheduleAssisting {
             location: nil,
             meetURL: nil,
             notes: CalendarEventMapper.provenancePrefix + utterance,
-            reminderMinutes: nil,
+            reminderMinutes: reminderMinutes,
             planID: nil,
             htmlLink: nil,
             isCompleted: false,
@@ -721,15 +750,16 @@ actor DemoAssistant: ScheduleAssisting {
 
     /// Same as capture, but nothing is written: the event waits on a card with Add and Edit.
     private func proposeBatch(title: String, start: Date, minutes: Int, kind: ScheduleEvent.Kind, utterance: String,
-                              now: Date, dayInterval: DateInterval, sameDay: [ScheduleEvent]) async -> Reply {
+                              reminderMinutes: [Int]?, now: Date, dayInterval: DateInterval,
+                              sameDay: [ScheduleEvent]) async -> Reply {
         let draft = EventDraft(title: title, start: clock.promptDateTimeString(start), durationMinutes: minutes,
-                               kind: kind.rawValue)
+                               kind: kind.rawValue, reminderMinutes: reminderMinutes)
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let argsJSON = (try? encoder.encode(CreateEventsArgs(events: [draft]))) ?? Data("{\"events\":[]}".utf8)
         let id = PendingEventBatch.newID()
         var preview = makeEvent(id: PendingEventBatch.previewID(batchID: id, index: 0), title: title, start: start,
-                                minutes: minutes, kind: kind, utterance: utterance)
+                                minutes: minutes, kind: kind, utterance: utterance, reminderMinutes: reminderMinutes)
         // Previews belong to no calendar, like plan previews: always drawn, never hidden.
         preview.accountID = nil
         preview.calendarID = nil
@@ -758,7 +788,7 @@ actor DemoAssistant: ScheduleAssisting {
             let kind = ScheduleEvent.Kind(rawValue: draft.kind ?? "") ?? .event
             events.append(makeEvent(id: DemoData.idPrefix + "chat-\(suffix)-\(index)", title: draft.title, start: start,
                                     minutes: draft.durationMinutes ?? Self.defaultMinutes(for: kind, settings: settings),
-                                    kind: kind, utterance: batch.utterance))
+                                    kind: kind, utterance: batch.utterance, reminderMinutes: draft.reminderMinutes))
         }
         await store.upsert(events)
         if let last = events.last { lastEventID = last.id }
@@ -1465,6 +1495,63 @@ private struct DemoParser {
             Range(result.range(at: index), in: text).map { String(text[$0]) }
         }
         return RegexMatch(range: range, groups: groups)
+    }
+}
+
+// MARK: - A time counted from now: "1個小時後買蛋給 Jocelyn", "in an hour buy eggs"
+
+extension DemoParser {
+    /// The minutes (1…1440) of a time counted from now and the text without it: 1個小時後 / 一小時後 = 60,
+    /// 一個半小時後 = 90, 半小時後 = 30, 120 分鐘後 = 120, "in an hour" = 60, "in an hour and a half" = 90,
+    /// "in 30 minutes" = 30, "2 hours from now" = 120. Not a clock time followed by 後 ("三點後", "3點10分後"), an
+    /// amount without 後 ("延後 1 小時", "提前 2 小時提醒"), "in a minute" (English minutes need digits) or more than a day.
+    static func fromNow(in text: String) -> (minutes: Int, leftover: String)? {
+        func found(_ minutes: Int?, _ match: RegexMatch) -> (minutes: Int, leftover: String)? {
+            guard let minutes, (1...1440).contains(minutes) else { return nil }
+            var leftover = text
+            leftover.replaceSubrange(match.range, with: " ")
+            return (minutes, leftover.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        // Groups: 1 a bare 半, 2 the amount, 3 半 after it, 4 the unit. The lookbehind keeps 點/時/digits out, so
+        // "兩點半後" and "3點10分後" are clock times.
+        let chinese = #"(?<![點点時时:：0-9零〇一二兩两三四五六七八九十])(?:(半)|([0-9]{1,3}|[零〇一二兩两三四五六七八九十]{1,4})\s*(?:個|个)?\s*(半)?)\s*(?:個|个)?\s*(小時|小时|鐘頭|钟头|分鐘|分钟)\s*(?:以後|以后|之後|之后|後|后)"#
+        if let match = Self.match(chinese, in: text) {
+            let hours = ["小時", "小时", "鐘頭", "钟头"].contains(match.group(4) ?? "")
+            let half = match.group(3) != nil
+            let minutes: Int?
+            if match.group(1) != nil {
+                minutes = hours ? 30 : nil // 半小時後; 半分鐘後 is no time
+            } else if let amount = Self.number(match.group(2) ?? "") {
+                minutes = hours ? amount * 60 + (half ? 30 : 0) : (half ? nil : amount)
+            } else {
+                minutes = nil
+            }
+            return found(minutes, match)
+        }
+        let english: [(pattern: String, minutes: (RegexMatch) -> Int?)] = [
+            (#"\bin\s+(?:an?|one)\s+hour\s+and\s+a\s+half\b"#, { _ in 90 }),
+            (#"\bin\s+half\s+an\s+hour\b"#, { _ in 30 }),
+            (#"\bin\s+(?:an?|one)\s+hour\b"#, { _ in 60 }),
+            (#"\bin\s+(\d{1,3})\s*(?:h|hrs?|hours?)\b"#, { Int($0.group(1) ?? "").map { $0 * 60 } }),
+            (#"\bin\s+(\d{1,4})\s*(?:mins?|minutes?)\b"#, { Int($0.group(1) ?? "") }),
+            (#"\b(an?|one|\d{1,3})\s*(hours?|hrs?|minutes?|mins?)\s+from\s+now\b"#, { match in
+                let amount = (match.group(1) ?? "").lowercased()
+                let count: Int? = ["a", "an", "one"].contains(amount) ? 1 : Int(amount)
+                let perUnit = (match.group(2) ?? "").lowercased().hasPrefix("h") ? 60 : 1
+                return count.map { $0 * perUnit }
+            })
+        ]
+        for entry in english {
+            if let match = Self.match(entry.pattern, in: text) { return found(entry.minutes(match), match) }
+        }
+        return nil
+    }
+}
+
+extension DemoAssistant {
+    /// `DemoParser.fromNow`, for unit tests (the parser is private to this file).
+    static func fromNow(in text: String) -> (minutes: Int, leftover: String)? {
+        DemoParser.fromNow(in: text)
     }
 }
 

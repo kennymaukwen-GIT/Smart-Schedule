@@ -1253,7 +1253,7 @@ No Google account email reaches the model (docs/GEMINI_FUNCTION_CALLING.md §10.
 
 ### 6.5 DemoAssistant (offline)
 
-Preference detection runs **first** in `DemoAssistant.handle` (before draft review, shift, plan, delete, agenda and capture), so "8 點前不要提醒我" never becomes an 08:00 event. It needs a lasting marker (以後, 從現在開始, 別再, 不要再, 每次, 一律, from now on, always, never, don't ever, every time) **or** one of the phrasings below. Required (each with a unit test):
+Preference detection runs **early** in `DemoAssistant.handle`: after "加個備註：…" notes and times counted from now ("1個小時後買蛋", "in an hour", so 以後 in "兩個小時以後開會" is not a lasting marker), before draft review, shift, plan, delete, agenda and capture, so "8 點前不要提醒我" never becomes an 08:00 event. It needs a lasting marker (以後, 從現在開始, 別再, 不要再, 每次, 一律, from now on, always, never, don't ever, every time) **or** one of the phrasings below. Required (each with a unit test):
 
 | Utterance | Changes |
 |---|---|
