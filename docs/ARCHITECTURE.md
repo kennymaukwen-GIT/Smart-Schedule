@@ -81,7 +81,7 @@ flowchart LR
 **為什麼有三個 target：**
 | Target | 內容 | 不放進其他 target 的理由 |
 |---|---|---|
-| `SmartSchedule`（App） | SwiftUI 主畫面、Quick Capture、Google 登入（PKCE）、語音、BGTask、App Intents | `ASWebAuthenticationSession` 和 `UIApplication` 在 extension 裡不能用 |
+| `SmartSchedule`（App） | SwiftUI 主畫面、Quick Capture、Google 登入（PKCE）、BGTask、App Intents | `ASWebAuthenticationSession` 和 `UIApplication` 在 extension 裡不能用 |
 | `SmartScheduleWidgets` | Live Activity（動態島＋鎖定畫面）、Control Center 控制項 | Widget extension 有記憶體上限，所以只編譯 Models、Storage、LiveActivity、Intents、DesignSystem，不放 AI 和網路程式碼 |
 | `SmartScheduleNotificationContent` | 「長按展開」的對話 UI 和完整的 AI → Calendar 管線 | 必須能在鎖定畫面上獨立完成寫入（Gemini 要用 App 在 7 天內替它換好的 session，見 3.3） |
 
@@ -107,7 +107,7 @@ flowchart LR
   - Compact：⏰ 加短標題（leading），倒數（trailing）。
   - Expanded：`.leading` 放時鐘、`.center` 放標題、`.trailing` 放「21 MIN」膠囊；`.bottom` 放一週微型日曆和「編輯」按鈕。
   - Minimal：只有 ⏰。
-- 互動：`Link` 用於 deep link（「編輯」按鈕 → `smartschedule://compose`；動態島沒有麥克風，App 仍接受 `?mode=voice`）；`Button(intent:)` 用於不開 App 的動作。
+- 互動：`Link` 用於 deep link（「編輯」按鈕 → `smartschedule://compose`；動態島沒有麥克風；App 仍接受 `?mode=voice`，但和 `compose` 一樣只打開快速輸入，1.0 沒有語音輸入）；`Button(intent:)` 用於不開 App 的動作。
 - 推播：`pushType: .token` 搭配 `NSSupportsLiveActivitiesFrequentUpdates`；APNs 的 `apns-push-type: liveactivity`，topic 是 `<bundle>.push-type.liveactivity`。1.0 不用任何推播：`AppConstants.liveActivityPushEnabled` 和 `pushToStartEnabled` 都是 false，`Activity.request` 用 `pushType: nil`，App 沒有 `aps-environment` 也沒有 `remote-notification` 背景模式。
 
 ### 3.3 通知：UserNotificationsUI Content Extension
@@ -141,8 +141,8 @@ flowchart LR
 
 - **帳號**：新增帳號頁讓使用者輸入 email，`AccountManager.addAccount(email:)` 把它當 `login_hint` 用 `GoogleSignInCoordinator.signIn(loginHint:)` 登入（沒有輸入時 `prompt=consent select_account`，scope 多了 `calendar.calendarlist.readonly`），登入的帳號和輸入的 email 不同時先不存，從 ID token 取出 `sub` 和 email，token 存成 Keychain 的 `google.oauth.<sub>`，帳號和行事曆清單存進 `AccountStore`（`accounts.json`）。舊版的單一 `google.oauth` 會在 `bootstrap()` 第一步搬過去（`migrateLegacyAccountIfNeeded`）。某個帳號的 refresh token 失效時只把那個帳號標成 `needsReconnect`，其他帳號照常同步。
 - **同步**：`CalendarSync` 對每個帳號的每個行事曆各自重列 −7～+120 天（最多同時 4 個），失敗只影響那個行事曆；快取裡的行程以 `EventRef`（帳號、行事曆、id）區分。畫面、提醒和 Live Activity 都讀 `SharedStore.visibleEvents`，由 `EventVisibility` 套用隱藏的行事曆、關掉提醒的行事曆、專注模式過濾條件和示範模式，並把同一個會議在兩個帳號的副本合成一個（主辦人的副本優先）。
-- **寫入**：所有寫入都經過 `CalendarRouter`。新行程寫到預設行事曆（設定 › 行事曆與新行程，或用說的「以後用學校帳號」），修改和刪除寫到該副本自己的行事曆；唯讀行事曆在送出 request 前就回 `RouterError.readOnly`。
-- **偏好設定**：`PreferencesStore`（`preferences.json`）是唯一來源，`current()` 可以同步讀取，所以 `WallClock()`、`ReminderPolicy(preferences:)`、mapper 都在每次使用時讀最新的值。設定頁經過 `SettingsModel` → `PreferencesStore.update(source: .settings)`；用說的經過 `update_preferences` → `PreferencesStore.apply`（同一套驗證）。兩條路都會在「助理記得的事」留一行（每個 key 最多一行，回到預設值就移除），回傳的 receipt 讓對話卡片可以復原。寫入後發 `.preferences` 變更通知：`ScheduleViewModel` 重建 `WallClock`、`ReminderScheduler.reschedule()`（由 `ReminderPlanner` 決定提醒來源、緊急程度、安靜時段、每日摘要和每日上限）、更新 Live Activity。
+- **寫入**：所有寫入都經過 `CalendarRouter`。新行程寫到預設行事曆（設定 › 行事曆與新行程，或告訴助理「以後用學校帳號」），修改和刪除寫到該副本自己的行事曆；唯讀行事曆在送出 request 前就回 `RouterError.readOnly`。
+- **偏好設定**：`PreferencesStore`（`preferences.json`）是唯一來源，`current()` 可以同步讀取，所以 `WallClock()`、`ReminderPolicy(preferences:)`、mapper 都在每次使用時讀最新的值。設定頁經過 `SettingsModel` → `PreferencesStore.update(source: .settings)`；在對話裡改的經過 `update_preferences` → `PreferencesStore.apply`（同一套驗證）。兩條路都會在「助理記得的事」留一行（每個 key 最多一行，回到預設值就移除），回傳的 receipt 讓對話卡片可以復原。寫入後發 `.preferences` 變更通知：`ScheduleViewModel` 重建 `WallClock`、`ReminderScheduler.reschedule()`（由 `ReminderPlanner` 決定提醒來源、緊急程度、安靜時段、每日摘要和每日上限）、更新 Live Activity。
 - **AI 同意**：`AIConsentStore`（App Group UserDefaults `SSAIConsent`，含說明文字的版本）是 `GeminiClient.generate` 唯一的閘門。App 第一次送出訊息時顯示同意說明，按「允許」後原訊息直接送出；Siri 和通知擴充只回一句「請到設定開啟」。撤回或拒絕後，設定和輸入列上方的提示列可以重新開啟。送給 Gemini 的行事曆和帳號都經過 `CalendarAliases`（「My calendar | Account 2」），不含 Google 帳號的 email；使用者的訊息、行程文字和錯誤訊息裡的帳號 email 也先換成佔位字，模型寫回來的佔位字在 iPhone 上換回地址；移除帳號時清掉助理的對話，因為後面帳號的編號會變（`docs/GEMINI_FUNCTION_CALLING.md` §10.6）。
 - **訂閱、匯出、清除**：`SubscriptionStore`（StoreKit 2，只提供 `isPro`；1.0 不賣訂閱，`AppConstants.subscriptionsEnabled = false` 讓啟動時不呼叫 StoreKit、頭像頁沒有 Pro 區塊）；`DataExporter` 匯出設定、紀錄、帳號的行事曆名稱、快取行程和對話（不含 token）；`DataEraser` 依序取消通知、結束 Live Activity、撤銷並刪除每個帳號的 token、清掉所有 App Group 檔案和匯出的暫存檔。
 
@@ -172,7 +172,7 @@ sequenceDiagram
 
 **長期計畫多一步審閱：** `create_long_term_plan` 只產生草稿（`PlanDraft`，存在 `SharedStore.pendingPlan`），App 顯示計畫卡片和日曆預覽，什麼都還沒寫進 Google。使用者按 **Add** 才由 `commitPlan` 寫入；按 **Keep editing** 就說要改什麼，Gemini 回一份完整的修訂版（同一個 plan id、revision 加 1），再給同樣的兩個按鈕，直到 Add 為止。打字「好」「looks good」等同 Add（`confirm_plan add`），「不要了」會丟棄草稿（`confirm_plan discard`）。單一事件預設照舊立刻寫入；設定 › 助理選「先問我」時，單一事件也先停在「尚未加入行事曆」卡片（`PendingEventBatch`，App Group 單一欄位，Siri 和通知擴充共用），按「加入」才寫入。細節見 [`GEMINI_FUNCTION_CALLING.md`](GEMINI_FUNCTION_CALLING.md) 第 5 節和 [`SETTINGS.md`](SETTINGS.md) 第 6 節。
 
-**用說的改設定：** 「以後」「從現在開始」「別再」這類長期指示走第 8 個函式 `update_preferences`。App 驗證後套用，對話裡出現「設定已更新」卡片（可以復原），並記進「助理記得的事」。只針對某一個行程的提醒仍然用 `modify_event`／`create_events`。
+**用一句話改設定：** 「以後」「從現在開始」「別再」這類長期指示走第 8 個函式 `update_preferences`。App 驗證後套用，對話裡出現「設定已更新」卡片（可以復原），並記進「助理記得的事」。只針對某一個行程的提醒仍然用 `modify_event`／`create_events`。
 
 **延遲預算（目標值，要在實機上量）：** Gemini Flash（`thinkingLevel: low`）約 1 到 2.5 秒，Calendar insert 約 0.3 到 0.7 秒，本地處理不到 50 毫秒，總計目標不超過 3 秒。長期計畫是 4 路並行 insert，每多一批 4 個 series 大約多 0.5 秒。
 
@@ -216,6 +216,7 @@ sequenceDiagram
 - [ ] 專注模式過濾條件：開啟和關閉專注模式時 `CalendarFocusFilter.perform()` 都有被呼叫。
 - [ ] 時效性提醒能穿過專注模式；「安靜」等級和安靜時段內的提醒只進通知中心、沒有聲音。
 - [ ] 乾淨安裝時，第一次送出訊息、Siri、長按通知回覆都先要求 AI 資料分享同意，同意前沒有任何 request 送到 Gemini。
+- [ ] 1.0 沒有語音輸入：快速輸入、主畫面對話和長按通知都沒有麥克風按鈕；`smartschedule://compose?mode=voice` 打開一般的快速輸入（鍵盤已叫出）；整個 App 不會跳出麥克風或語音辨識的權限提示；設定 › 助理沒有「語音輸入」區塊。鍵盤上的聽寫鍵照常可用。
 - [ ] 抽屜在不同機型上的寬度（`min(340, 84%)`）和往左滑關閉的手勢不會和清單捲動衝突。
 - [ ] App Attest：Debug（`appattest-environment` development，連開發版 Worker）與 TestFlight（production，連正式版 Worker）各裝一次，第一次用助理時 `GET /attest/challenge` → `POST /attest` 成功，之後的 Gemini request 帶 `Authorization: Bearer`；Release 版從不送 `X-Dev-Token`。兩個 Worker 都要先 `wrangler secret put APPLE_TEAM_ID`（沒設時 `POST /attest` 回 500）。
 - [ ] 通知擴充的 session（用 TestFlight／Release 版測）：App 回到前景或背景更新時，剩不到 3 天就 `POST /session` 換新；在伺服器刪掉該 `sess:` key 後長按通知回覆，看到「請先打開 Smart Schedules 一次…」，打開 App 後恢復。Debug 版在 Simulator 上 session 失效後改送 `X-Dev-Token`：`SS_DEV_TOKEN` 有值且開發 Worker 開了 `ALLOW_DEV_TOKEN` 時回覆照常成功，空白時顯示「請先打開 Smart Schedules 一次…」（伺服器回 `attestation_required`）。

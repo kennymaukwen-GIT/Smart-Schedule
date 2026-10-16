@@ -53,7 +53,8 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 - **新增 Google 帳號**（`App/Views/Account/AddAccountView.swift`）：抽屜、頭像的帳號頁、歡迎畫面的「新增 Google 帳號」／「連接 Google 日曆」都會打開這一頁。輸入自己的 email（例如 example@gmail.com），格式不完整會直接提示；按「前往 Google 登入」後，這個 email 會當作 Google 登入頁的 `login_hint`（Google 直接選好或填好這個帳號），使用者還是在 Google 自己的頁面登入、同意授權——只靠 email 沒辦法連結帳號，Smart Schedules 也看不到密碼。Google 回來後，App 比對 ID token 裡的 email 和輸入的 email（Gmail 會忽略大小寫、點和 `+標籤`）：相同就存下帳號、抓行事曆清單，顯示「已連接 example@gmail.com」，抽屜馬上出現它的行事曆；不同的話**先不存**，問「你登入的是 X，不是 Y。」，可以選「加入 X」、「改用 Y 重新登入」或「取消」（撤銷剛拿到的授權）；已經連接過的帳號只會更新，不會重複。Gmail、學校或公司的 Google Workspace 帳號都可以；學校或公司不允許時、沒有勾選日曆權限時、沒有網路時，都會用一句話說明怎麼辦。也可以按「從 Google 帳號清單選擇」不輸入 email。示範模式中繼續會先結束示範模式（頁面上有說明）。
 - **移除帳號**：頭像的帳號頁（每列的「⋯」選單或向左滑）和抽屜（帳號標題旁的「⋯」）都有「移除帳號」。確認視窗說明這個帳號的日曆和行程只會從這支 iPhone 的 Smart Schedules 移除，Google 日曆裡的資料不會被刪除；如果這個帳號還有變更沒送到 Google，會寫出「還有 N 項變更尚未同步到 Google，移除後會遺失。」並提供「先同步」。移除會撤銷 Google 授權、刪除 Keychain 裡的 token、清掉這個帳號的快取行程和待送出的變更、把它的行事曆從專注模式過濾條件拿掉；如果新行程原本存到這個帳號，會改回自動並顯示「新行程改存到「X」。」。移除最後一個帳號就回到歡迎畫面。
 - **AI 資料分享同意**（App Store 5.1.2(i)）：第一次送出訊息前先跳出說明，列出會傳給 Google Gemini API 的內容（輸入或說出的話、今天起 14 天內最多 40 個行程的標題、時間、備註和 Google 行程 ID、「AI 建議」那一個行程的地點、行事曆名稱和助理設定、時區和語言），按「允許」才送出；按「暫時不要」助理就不會呼叫 Gemini，輸入列上方會說明怎麼開啟。**Google 帳號的 email 不會送給 Gemini**：行事曆以「Account 1」「Account 2」區分，行程文字和錯誤訊息裡的帳號 email 先換成佔位字（[`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) §10.6）。說明改版時（目前第 5 版：1.0 不用 iOS 18 的 push-to-start，所以 iOS 18 也沒有伺服器那一段）每個人都會再被問一次。設定 › AI 與隱私可以查看和撤回。示範模式不需要同意。
-- **用說的改設定**：「以後 8 點前不要提醒我」「健身提前 2 小時提醒」「以後用學校帳號」會變成設定，對話裡出現「設定已更新」卡片（舊值 → 新值，可以復原），也記在設定 › AI 與隱私 ›「助理記得的事」，每一條都能刪除（回到預設值）。
+- **用一句話改設定**：「以後 8 點前不要提醒我」「健身提前 2 小時提醒」「以後用學校帳號」會變成設定，對話裡出現「設定已更新」卡片（舊值 → 新值，可以復原），也記在設定 › AI 與隱私 ›「助理記得的事」，每一條都能刪除（回到預設值）。
+- **只能打字**：1.0 沒有 App 內的語音輸入：沒有麥克風按鈕，不要求麥克風和語音辨識權限。想用說的，用鍵盤的聽寫或 Siri（`AddPlanIntent`），App 收到的都是文字。`DeepLink.composeVoice`（`smartschedule://compose?mode=voice`）保留，打開的是一般的快速輸入；`AppPreferences` 的 `speechLanguage`、`speechOnDevice` 也保留（沒有畫面使用），Shared 的公開 API 不變。
 - **先問我**：設定 › 助理 › 加入行程選「先問我」時，單一行程會先停在「尚未加入行事曆」卡片，按「加入」才寫入，按「編輯」說要改什麼。
 - **從習慣學習**：連續略過同一種預設提醒 5 次，對話裡會問要不要停掉；按「停止」才會改。
 - **對話紀錄**會保留（最多 200 則，7 天／30 天／永久），可以清除、匯出（JSON）或「清除這台裝置上的所有資料」。
@@ -73,7 +74,7 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 ## 專案結構
 
 ```
-App/                    主 App target（SwiftUI、Quick Capture、Google 登入、語音、Siri intents、BG refresh）
+App/                    主 App target（SwiftUI、Quick Capture、Google 登入、Siri intents、BG refresh）
   Views/Navigation/     Artboard 5 標頭、行事曆抽屜、行事曆設定
   Views/Events/         抽屜的「行程」區、全部行程、行程頁（可編輯、備註、備註建議）
   Views/Account/        帳號（訂閱區塊在 1.0 隱藏）
@@ -122,7 +123,7 @@ git clone https://github.com/kennymaukwen-GIT/Smart-Schedule.git && cd Smart-Sch
 xcodegen generate && open SmartSchedule.xcodeproj
 ```
 1. 裝置選 **iPhone 17 Pro**（要有動態島的機型）。第一次會下載 iOS 模擬器，約 8.5 GB。
-2. **Demo 模式**：Product → Scheme → Edit Scheme → Run → Arguments，加入 `-SSDemoMode YES`。不加的話，也可以在 App 內點「Try without signing in」（不登入先試用），或打開設定 › 示範模式。示範模式有兩個範例帳號，抽屜、行事曆顯示與否、用說的改設定都能離線試。
+2. **Demo 模式**：Product → Scheme → Edit Scheme → Run → Arguments，加入 `-SSDemoMode YES`。不加的話，也可以在 App 內點「Try without signing in」（不登入先試用），或打開設定 › 示範模式。示範模式有兩個範例帳號，抽屜、行事曆顯示與否、用一句話改設定都能離線試。
 3. 按 ⌘R。主畫面會載入示範行程；回到主畫面（⇧⌘H）可以看到動態島，按住動態島會展開。
 4. **控制中心**：在模擬器右上角往下拖 → ＋ → 加入「Smart Schedules」。
 5. **長按通知**：按 ⌘L 鎖定模擬器，把 `Tests/Simulator/reminder.apns` 拖進模擬器視窗，然後按住通知，輸入 `push this 30 minutes later`。

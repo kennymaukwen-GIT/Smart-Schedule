@@ -145,7 +145,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><a href="#zh-live">動態島與即時動態</a></li>
   <li><a href="#zh-attest">App 驗證、裝置識別碼與伺服器安全</a></li>
   <li><a href="#zh-purchases">購買</a></li>
-  <li><a href="#zh-apple">Siri、語音輸入和其他 Apple 服務</a></li>
+  <li><a href="#zh-apple">Siri、鍵盤聽寫和其他 Apple 服務</a></li>
   <li><a href="#zh-contacting">你聯絡我們時</a></li>
   <li><a href="#zh-website">本網站</a></li>
   <li><a href="#zh-limited-use">Google 使用者資料與「有限使用」</a></li>
@@ -214,7 +214,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 
 <h3>一次對話請求包含什麼</h3>
 <ul>
-  <li>你輸入的文字，或你說的話轉成的文字，包括其中提到的任何姓名或 email 地址（你已連接的 Google 帳號的地址除外，見下文）。</li>
+  <li>你輸入的文字，或 Apple 把你對 Siri 說、用鍵盤聽寫的話轉成的文字，包括其中提到的任何姓名或 email 地址（你已連接的 Google 帳號的地址除外，見下文）。</li>
   <li>你當地的日期時間、時區和裝置語言。</li>
   <li>你的助理設定。</li>
   <li>你可以新增行程的行事曆名稱，以及哪一個是新行程的預設行事曆。這裡不包含你 Google 帳號的 email 地址：連接了好幾個 Google 帳號時，用「Account 1」「Account 2」這類代稱（依你加入帳號的順序）區分帳號；名稱本身是 email 地址的行事曆（例如別人共用給你的行事曆）改稱「Shared calendar」。</li>
@@ -256,10 +256,10 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <h2 id="zh-purchases">7. 購買</h2>
 <p>Smart Schedules 1.0 沒有任何 App 內購買或訂閱，App 也不會查詢你的購買記錄，所以我們不會收到或處理任何購買或付款資料。下載 App 由 Apple 透過 App Store 處理，適用 <a href="https://www.apple.com/tw/legal/privacy/">Apple 隱私權政策</a>。如果之後的版本提供購買項目，我們會先更新本政策。</p>
 
-<h2 id="zh-apple">8. Siri、語音輸入和其他 Apple 服務</h2>
+<h2 id="zh-apple">8. Siri、鍵盤聽寫和其他 Apple 服務</h2>
 <ul>
   <li><strong>Siri 與捷徑：</strong>你用說的時，Apple 處理你的語音，再把文字交給 App；這段文字依第 4 節的規則處理。</li>
-  <li><strong>語音輸入：</strong>你點麥克風按鈕時，Apple 的語音辨識會開始把你的話轉成文字，直到你再點一次麥克風按鈕或送出為止。預設在 iPhone 上辨識；如果你關閉 設定 › 助理 › 裝置端辨識，或你的語言沒有裝置端模型，聲音會送到 Apple 轉成文字。只有轉好的文字會交給助理。</li>
+  <li><strong>鍵盤聽寫：</strong>Smart Schedules 本身不使用麥克風和語音辨識，也不會要求這兩項權限。你用 iPhone 鍵盤上的聽寫鍵輸入時，是 Apple 把你的話轉成文字；App 只收到轉好的文字，和打字一樣依第 4 節的規則處理。</li>
   <li><strong>App Attest：</strong>見第 6 節。</li>
   <li><strong>分析資料：</strong>如果你選擇與 App 開發者分享（iPhone 設定 › 隱私權與安全性 › 分析與改進項目），Apple 可能提供我們當機報告和使用統計；Apple 不會附上你的姓名或聯絡方式。</li>
 </ul>
@@ -283,12 +283,12 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 </ul>
 
 <h2 id="zh-sharing">12. 誰會收到資料</h2>
-<p>我們不出售、不出租你的個人資料，也不為了廣告分享；我們不會跨 App 或網站追蹤你。Smart Schedules 不含任何廣告、分析、當機回報或追蹤軟體，不使用廣告識別碼，也不存取你的位置、聯絡人或 iPhone 內建的「行事曆」App。</p>
+<p>我們不出售、不出租你的個人資料，也不為了廣告分享；我們不會跨 App 或網站追蹤你。Smart Schedules 不含任何廣告、分析、當機回報或追蹤軟體，不使用廣告識別碼，不使用麥克風，也不存取你的位置、聯絡人或 iPhone 內建的「行事曆」App。</p>
 <p>協助我們提供服務的對象：</p>
 <ul>
   <li><strong>Cloudflare, Inc.</strong>：執行我們的伺服器、它的儲存和記錄，以及本網站。它依其<a href="https://www.cloudflare.com/cloudflare-customer-dpa/">資料處理附錄（DPA）</a>作為我們的處理者。</li>
   <li><strong>Google LLC</strong>：Gemini API（AI 請求，只有在你允許時）。Google 依其<a href="https://business.safety.google/processorterms/">處理者資料處理附錄</a>（Data Processing Addendum for Products Where Google is a Data Processor）和付費服務條款作為我們的處理者，這些條款不允許它用你的請求改善自己的產品（見第 4 節）。另外，Google 日曆和 Google 登入是你直接使用的 Google 服務，適用 Google 隱私權政策。</li>
-  <li><strong>Apple Inc.</strong>：App Attest、App Store、Siri 和語音辨識，適用 Apple 自己的條款。</li>
+  <li><strong>Apple Inc.</strong>：App Attest、App Store 和 Siri，適用 Apple 自己的條款。</li>
   <li><strong>Google</strong>（Google Workspace）：客服信箱 support@smart-schedules.com 使用的 Gmail，接收和保存客服信件，也用來寄出我們的回信（第 9 節）。Google 依 Google Workspace 適用的<a href="https://cloud.google.com/terms/data-processing-addendum">雲端資料處理附錄</a>（Cloud Data Processing Addendum）作為我們的處理者。</li>
 </ul>
 <p>上述每個服務提供者都依契約或其本身的條款，以不低於本政策的程度保護你的資料，並只用它來向我們或你提供服務。</p>
@@ -332,7 +332,6 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><strong>匯出：</strong>設定 › 資料 › 匯出我的資料。產生一個 JSON 檔案，包含設定、助理記得的事、帳號和行事曆、快取的行程、聊天記錄和 AI 資料分享的狀態（絕不包含登入權杖）。</li>
   <li><strong>清除：</strong>設定 › 資料 › 清除這台裝置上的所有資料。這會停止即時動態、撤回 AI 資料分享、移除通知、向 Google 要求撤銷授權並刪除所有登入權杖，再刪除帳號、快取的行程、待送出的變更、設定、聊天記錄和匯出檔。撤銷授權需要網路連線；如果當時離線，請到 Google 帳號移除 Smart Schedules 的存取權。伺服器上剩下的資料見第 6、13 節。</li>
   <li><strong>聊天記錄：</strong>設定 › 資料 › 保留聊天記錄／清除聊天記錄。</li>
-  <li><strong>語音只在裝置上辨識：</strong>設定 › 助理 › 裝置端辨識。</li>
   <li><strong>刪除行程本身：</strong>在 Google 日曆裡刪除。</li>
 </ul>
 <h3>寫信給我們</h3>
@@ -387,7 +386,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
   <li><a href="#en-live">Dynamic Island and Live Activities</a></li>
   <li><a href="#en-attest">App Attest, device identifiers and server security</a></li>
   <li><a href="#en-purchases">Purchases</a></li>
-  <li><a href="#en-apple">Siri, speech input and other Apple services</a></li>
+  <li><a href="#en-apple">Siri, keyboard dictation and other Apple services</a></li>
   <li><a href="#en-contacting">When you contact us</a></li>
   <li><a href="#en-website">This website</a></li>
   <li><a href="#en-limited-use">Google user data and Limited Use</a></li>
@@ -456,7 +455,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 
 <h3>What a chat request contains</h3>
 <ul>
-  <li>What you type, or what you say transcribed to text, including any names or email addresses in it (except the addresses of the Google accounts you connected; see below).</li>
+  <li>What you type, or the text Apple makes from what you say to Siri or with the keyboard's dictation, including any names or email addresses in it (except the addresses of the Google accounts you connected; see below).</li>
   <li>Your local date and time, time zone and device language.</li>
   <li>Your assistant settings.</li>
   <li>The names of the calendars you can add events to, and which one new events go to by default. They do not include your Google account email addresses: with several Google accounts, the accounts are told apart by names such as "Account 1" and "Account 2" (in the order you added them), and a calendar whose name is an email address (such as a calendar someone shared with you) is called "Shared calendar".</li>
@@ -498,10 +497,10 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 <h2 id="en-purchases">7. Purchases</h2>
 <p>Smart Schedules 1.0 has no in-app purchases or subscriptions, and the app does not check your purchase history, so we receive and process no purchase or payment data. Apple handles downloads of the app through the App Store, under the <a href="https://www.apple.com/legal/privacy/">Apple Privacy Policy</a>. If a later version offers purchases, we will update this policy first.</p>
 
-<h2 id="en-apple">8. Siri, speech input and other Apple services</h2>
+<h2 id="en-apple">8. Siri, keyboard dictation and other Apple services</h2>
 <ul>
   <li><strong>Siri and Shortcuts:</strong> when you speak, Apple processes your voice and gives the app the text, which then follows the rules in section 4.</li>
-  <li><strong>Speech input:</strong> when you tap the microphone button, Apple's speech recognition turns what you say into text until you tap the microphone button again or send. By default this happens on your iPhone. If you turn off Settings › Assistant › On-device recognition, or your language has no on-device model, the audio is sent to Apple to be transcribed. Only the resulting text goes to the assistant.</li>
+  <li><strong>Keyboard dictation:</strong> Smart Schedules itself does not use the microphone or speech recognition, and does not ask for either permission. When you use the dictation key on the iPhone keyboard, Apple turns what you say into text; the app receives only the text, which follows the rules in section 4 just like typing.</li>
   <li><strong>App Attest:</strong> see section 6.</li>
   <li><strong>Analytics:</strong> if you have chosen to share with app developers (iPhone Settings › Privacy &amp; Security › Analytics &amp; Improvements), Apple may give us crash reports and usage statistics. Apple does not include your name or contact details.</li>
 </ul>
@@ -525,12 +524,12 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 </ul>
 
 <h2 id="en-sharing">12. Who receives data</h2>
-<p>We do not sell or rent your personal data, or share it for advertising, and we do not track you across apps or websites. Smart Schedules contains no advertising, analytics, crash-reporting or tracking software, does not use the advertising identifier, and does not access your location, your contacts or the iPhone's built-in Calendar app.</p>
+<p>We do not sell or rent your personal data, or share it for advertising, and we do not track you across apps or websites. Smart Schedules contains no advertising, analytics, crash-reporting or tracking software, does not use the advertising identifier or the microphone, and does not access your location, your contacts or the iPhone's built-in Calendar app.</p>
 <p>Service providers that help us run Smart Schedules:</p>
 <ul>
   <li><strong>Cloudflare, Inc.</strong> runs our server, its storage and logs, and this website, as our processor under its <a href="https://www.cloudflare.com/cloudflare-customer-dpa/">Data Processing Addendum</a>.</li>
   <li><strong>Google LLC</strong> provides the Gemini API (AI requests, only with your permission), as our processor under its <a href="https://business.safety.google/processorterms/">Data Processing Addendum for Products Where Google is a Data Processor</a> and its paid-service terms, which do not allow it to use your requests to improve its products (see section 4). Separately, Google Calendar and Google sign-in are Google services you use directly, under the Google Privacy Policy.</li>
-  <li><strong>Apple Inc.</strong> provides App Attest, the App Store, Siri and speech recognition, under Apple's own terms.</li>
+  <li><strong>Apple Inc.</strong> provides App Attest, the App Store and Siri, under Apple's own terms.</li>
   <li><strong>Google</strong> (Google Workspace) provides Gmail for our support mailbox, support@smart-schedules.com, which receives and stores support messages and sends our replies (section 9), as our processor under the <a href="https://cloud.google.com/terms/data-processing-addendum">Cloud Data Processing Addendum</a> that applies to Google Workspace.</li>
 </ul>
 <p>Each of these providers is bound by contract or by its own terms to protect your data at least as well as this policy describes, and to use it only to provide its service to us or to you.</p>
@@ -574,7 +573,6 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
   <li><strong>Export:</strong> Settings › Data › Export my data creates a JSON file with your settings, what the assistant remembers, accounts and calendars, cached events, chat history and AI data-sharing status (never sign-in tokens).</li>
   <li><strong>Erase:</strong> Settings › Data › Erase all data on this device stops Live Activities, withdraws AI data sharing, removes notifications, asks Google to revoke access and deletes every sign-in token, then deletes accounts, cached events, pending changes, settings, chat history and exports. Revoking access needs an internet connection; if you were offline, remove Smart Schedules under Third-party apps &amp; services in your Google Account. For what remains on the server, see sections 6 and 13.</li>
   <li><strong>Chat history:</strong> Settings › Data › Keep chat history / Clear chat history.</li>
-  <li><strong>Keep speech on the device:</strong> Settings › Assistant › On-device recognition.</li>
   <li><strong>Delete the events themselves:</strong> in Google Calendar.</li>
 </ul>
 <h3>By email</h3>

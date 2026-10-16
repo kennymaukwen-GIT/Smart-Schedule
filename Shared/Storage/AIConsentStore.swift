@@ -13,6 +13,9 @@ struct AIConsent: Codable, Hashable, Sendable {
     /// 5: version 1.0 has no Live Activity push-to-start (`AppConstants.pushToStartEnabled` false), so the iOS 18 note
     /// on event titles kept on Smart Schedule's server and sent through Apple's push service is gone
     /// (`AIConsentDisclosure.serverNote`). Turning push-to-start on brings that note back: bump again then.
+    /// Still 5 after the app's own microphone was removed before 1.0 shipped (2026-10-16): only `speechNote` changed
+    /// (Siri and the keyboard's dictation instead of the On-device recognition setting); the lead, the five items and
+    /// the recipient, quoted word for word in the privacy policy's section 4, are unchanged.
     static let disclosureVersion = 5
 
     var status: Status = .notAsked
@@ -117,9 +120,10 @@ enum AIConsentDisclosure {
         return String(localized: "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on the Smart Schedules server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
     }
 
-    /// Spoken requests: Apple's speech recognition makes the text the assistant gets (App/Voice/SpeechTranscriber).
+    /// Spoken requests: the app has no microphone or speech recognition of its own. Speech reaches it only as text,
+    /// from Siri (the App Intents) or the keyboard's dictation, both Apple's.
     static var speechNote: String {
-        String(localized: "Apple turns speech into text: on your iPhone when On-device recognition is on and supports your language, otherwise on Apple's servers.")
+        String(localized: "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. Smart Schedules only receives the text.")
     }
 
     static var footnote: String {

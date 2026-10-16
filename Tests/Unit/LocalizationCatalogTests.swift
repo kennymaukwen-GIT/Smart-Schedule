@@ -96,4 +96,12 @@ final class LocalizationCatalogTests: XCTestCase {
         XCTAssertEqual(String(format: zh("Replaced by revision %lld", in: table), 2), "已由第 2 版取代")
         XCTAssertEqual(String(format: zh("Daily reminder %@", in: table), "07:30"), "每天 07:30 提醒")
     }
+
+    /// The consent sheet's speech line (AIConsentDisclosure.speechNote): 1.0 has no microphone, so speech reaches the
+    /// app only as text from Siri or the keyboard's dictation.
+    func testConsentSpeechNote() throws {
+        let table = try chineseTable()
+        XCTAssertEqual(zh(AIConsentDisclosure.speechNote, in: table),
+                       "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字，Smart Schedules 只會收到文字。")
+    }
 }

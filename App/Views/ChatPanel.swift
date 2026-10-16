@@ -183,17 +183,14 @@ struct ChatMessageRow: View {
     }
 }
 
-/// Shared input bar (Artboards 2–5): optional paperclip, field, mic, send.
+/// Shared input bar (Artboards 2–5): optional paperclip, field, send. No mic of its own: dictation is the keyboard's.
 struct ComposerBar: View {
     @Binding var text: String
     var placeholder: LocalizedStringKey
     var showsAttachment = false
     var isBusy = false
     var focus: FocusState<Bool>.Binding
-    var startsRecording = false
     var onSend: () -> Void
-
-    @State private var transcriber = SpeechTranscriber()
 
     var body: some View {
         HStack(spacing: 8) {
@@ -214,19 +211,6 @@ struct ComposerBar: View {
                 .onSubmit(onSend)
 
             Button {
-                Task { await transcriber.toggle() }
-            } label: {
-                Image(systemName: transcriber.isRecording ? "waveform" : "mic.fill")
-                    .symbolEffect(.variableColor.iterative, isActive: transcriber.isRecording)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(Color.white.opacity(transcriber.isRecording ? 0.35 : 0.12)))
-            }
-            .accessibilityLabel(transcriber.isRecording ? "Stop dictation" : "Dictate")
-
-            Button {
-                if transcriber.isRecording { transcriber.stop() }
                 onSend()
             } label: {
                 Image(systemName: isBusy ? "hourglass" : "paperplane.fill")
@@ -243,12 +227,6 @@ struct ComposerBar: View {
         .frame(minHeight: 50)
         .background(Capsule().fill(Theme.surfaceRaised))
         .overlay(Capsule().strokeBorder(Theme.hairline))
-        .onChange(of: transcriber.transcript) { _, transcript in
-            if !transcript.isEmpty { text = transcript }
-        }
-        .task {
-            if startsRecording { await transcriber.start() }
-        }
     }
 
     /// "send a link" — e.g. an event page. Gemini reads the URL text; for full page context add the

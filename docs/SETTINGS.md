@@ -1,6 +1,6 @@
 # Settings, accounts and preferences: the build contract
 
-> 摘要（給專案擁有者）：這份文件是「Artboard 5 新介面 + 設定功能」的唯一規格。漢堡選單管「看什麼」（多個 Google 帳號與各自的行事曆、顯示與否），右上角頭像管「我是誰」（帳號；訂閱在 1.0 隱藏），General 管「App 怎麼運作」（通知、輸入、AI 與隱私、資料）。另外加入「用說的改設定」（Gemini 第 8 個函式 `update_preferences`，含復原與「助理記得的事」清單），以及從你略過提醒的習慣中學習、但一定先問你。Gmail、Google Tasks、「Apps from Google」不做。第 16 節列出 1.0 已決定的事（不賣訂閱、年齡分級 18+、不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架、不用 iOS 18 的即時動態 push-to-start、網站在 https://www.smart-schedules.com、開發者在英國）、還需要你決定的事（之後版本的價格與 Pro 要鎖什麼、使用條款）與上架前檢查清單。
+> 摘要（給專案擁有者）：這份文件是「Artboard 5 新介面 + 設定功能」的唯一規格。漢堡選單管「看什麼」（多個 Google 帳號與各自的行事曆、顯示與否），右上角頭像管「我是誰」（帳號；訂閱在 1.0 隱藏），General 管「App 怎麼運作」（通知、輸入、AI 與隱私、資料）。另外加入「用一句話改設定」（Gemini 第 8 個函式 `update_preferences`，含復原與「助理記得的事」清單），以及從你略過提醒的習慣中學習、但一定先問你。Gmail、Google Tasks、「Apps from Google」不做。第 16 節列出 1.0 已決定的事（不賣訂閱、年齡分級 18+、不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架、不用 iOS 18 的即時動態 push-to-start、網站在 https://www.smart-schedules.com、開發者在英國）、還需要你決定的事（之後版本的價格與 Pro 要鎖什麼、使用條款）與上架前檢查清單。
 
 This document is the single source of truth for four builder roles working **in parallel without talking to each other**: **PREFS**, **ACCOUNTS**, **STORE_PRIVACY** and **UI**. (A fifth role, WEB, owns only `/tmp/claude-0/-home-user-Smart-Schedule/f62996b1-de28-53ea-ac33-8a14b9469534/scratchpad/build/**` and nothing in this repository.) An integrator merges the results, edits `project.yml` and the String Catalog, and builds on CI.
 
@@ -282,8 +282,8 @@ In demo mode the calendar list comes from `DemoData.accounts`, so the page works
 |---|---|---|---|---|
 | "Replies" | "Reply language" | "Match what I type" / "繁體中文" / "English" → `replyLanguage` | Match what I type | – |
 | "Adding events" | "Add directly" / "Ask me first" | Inline picker → `autonomy` | Add directly | "Ask me first: single events wait on a card with Add and Edit. Long-term plans always wait for your review." |
-| "Voice input" | "Speech language" | "Automatic", "中文（台灣）", "English (UK)", "English (US)" → `speechLanguage` | Automatic | – |
-| | "On-device recognition" | Toggle → `speechOnDevice` | On | "When on, speech in languages this iPhone supports is recognised on the device and never leaves it. Other languages use Apple's servers." Plus a status line: "Supported for this language" / "Not supported for this language" from `SFSpeechRecognizer(locale:)?.supportsOnDeviceRecognition`. |
+
+Version 1.0 has no voice input, so this page has no "Voice input" section. `speechLanguage` and `speechOnDevice` stay in `AppPreferences` (§3, Shared API unchanged): still decoded, saved and exported, but nothing shows or reads them.
 
 #### 2.5.4 AI & privacy (consent from STORE_PRIVACY, ledger from PREFS)
 
@@ -380,7 +380,6 @@ When no account is connected and demo is off, the chat panel shows (replacing to
 | Follow this iPhone | 跟隨這支 iPhone | Assistant | 助理 |
 | Reply language | 回覆語言 | Match what I type | 跟我輸入的語言相同 |
 | Add directly | 直接加入 | Ask me first | 先問我 |
-| Speech language | 語音辨識語言 | On-device recognition | 裝置端辨識 |
 | AI & privacy | AI 與隱私 | AI data sharing | AI 資料分享 |
 | What the assistant remembers | 助理記得的事 | You said: “%@” | 你說：「%@」 |
 | Learned from your habits | 從你的習慣學到 | Changed in Settings | 在設定中更改 |
@@ -535,7 +534,7 @@ extension AppPreferences {
 
 ### 3.2 Preference keys (PREFS) — same file
 
-`PreferenceKey` is the set the assistant may change by voice and the ledger tracks. Raw values are the `update_preferences` enum strings.
+`PreferenceKey` is the set the assistant may change on request (source `.voice`: typed in the chat or said to Siri) and the ledger tracks. Raw values are the `update_preferences` enum strings.
 
 ```swift
 enum PreferenceKey: String, Codable, CaseIterable, Sendable {
@@ -1362,9 +1361,10 @@ When `dailyReminderCap = N`: group candidate reminders by the local day of their
 - Items (exactly what `AssistantPrompt` and `NoteSuggestionPrompt` send): "What you type or say to the assistant (spoken requests as text), including any names or email addresses you mention" · "Titles, times, notes and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder you reply to" · "For AI suggestions on an event: that event only, including its location" · "Your calendar names and assistant settings, but not your Google account email addresses" · "Your time zone and language"
 - Recipient: "Recipient: Google, through the Gemini API. Requests pass through the Smart Schedules server, which doesn't keep them."
 - Server note, iOS 18 only and only with `AppConstants.pushToStartEnabled` (`AIConsentDisclosure.serverNote`; nil on every iOS in version 1.0, the wording is kept for a later version): "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on the Smart Schedules server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored."
-- Speech note (`AIConsentDisclosure.speechNote`, a mic label under the server note): "Apple turns speech into text: on your iPhone when On-device recognition is on and supports your language, otherwise on Apple's servers."
+- Speech note (`AIConsentDisclosure.speechNote`, a text-bubble label under the server note): "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. Smart Schedules only receives the text." (zh-Hant 「你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字，Smart Schedules 只會收到文字。」) The app itself has no microphone or speech recognition.
 - Footnote: "Nothing is sent to the AI until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode never contacts the AI."
 - Disclosure version 5 asks everyone again: version 1.0 has no Live Activity push-to-start, so the iOS 18 server note is gone (turning push-to-start on brings it back and needs another bump).
+- Version 5's speech note was reworded before 1.0 shipped, without a bump (1.0 is unreleased): the app dropped its own speech input, so the note names Siri and the keyboard's dictation instead of On-device recognition.
 - Disclosure version 4 asked everyone again: no account email reaches Gemini any more (calendars are "Account 1", "Account 2"), and the items name the 14-day / 40-event window, Google event IDs, places only for AI suggestions, Apple's push service and Apple's speech recognition. (Version 3 added the server pass-through in the recipient line and the end times and colours.)
 - Never claim that Google does not use the data for training (that is only true on Gemini's paid tier; see §16).
 
@@ -1419,7 +1419,7 @@ Each file belongs to exactly one role. A role may create new files only at the p
 - New: `Shared/Models/PendingEventBatch.swift`, `Shared/Storage/AIConsentStore.swift`, `Shared/Storage/ChatHistoryStore.swift`, `Shared/Storage/DataExport.swift` (optional), `App/Store/SubscriptionStore.swift`, `App/Privacy/DataExporter.swift`, `App/Privacy/DataEraser.swift`, `Config/SmartSchedule.storekit`, `Tests/fixtures/update_preferences.*.json`, `Tests/fixtures/modify_event.one_off_reminder.json`, `Tests/Unit/DemoAssistantPreferenceTests.swift`, `Tests/Unit/PendingEventBatchTests.swift`, `Tests/Unit/AIConsentStoreTests.swift`, `Tests/Unit/ChatHistoryStoreTests.swift`.
 
 ### UI
-- Edit: `App/SmartScheduleApp.swift` (incl. `AppRouter`, `AppDelegate`), `App/Views/*` (every existing file, including the infinite-calendar ones: AssistantMessageView, CalendarPagerParts, CaptureCalendarParts, CaptureDayPager, CaptureModePicker, ChatPanel, ConversationScrollView, EventDetailSheet, MainView, MonthGridView, MonthScrollCard, PlanPreviewCard, QuickCaptureView, RootView, WeekAgendaCard), `App/ViewModels/ChatViewModel.swift`, `App/ViewModels/ScheduleViewModel.swift`, `App/Voice/SpeechTranscriber.swift`, `App/Previews/AppPreviews.swift`, `App/Resources/**`, `NotificationContent/*`, `Widgets/*`, `Shared/DesignSystem/Theme.swift`, `Shared/Core/CalendarPaging.swift`, `Tests/Unit/CalendarPagingTests.swift`, `Tests/Unit/LocalizationCatalogTests.swift`, `docs/ARCHITECTURE.md`, `README.md`.
+- Edit: `App/SmartScheduleApp.swift` (incl. `AppRouter`, `AppDelegate`), `App/Views/*` (every existing file, including the infinite-calendar ones: AssistantMessageView, CalendarPagerParts, CaptureCalendarParts, CaptureDayPager, CaptureModePicker, ChatPanel, ConversationScrollView, EventDetailSheet, MainView, MonthGridView, MonthScrollCard, PlanPreviewCard, QuickCaptureView, RootView, WeekAgendaCard), `App/ViewModels/ChatViewModel.swift`, `App/ViewModels/ScheduleViewModel.swift`, `App/Previews/AppPreviews.swift`, `App/Resources/**`, `NotificationContent/*`, `Widgets/*`, `Shared/DesignSystem/Theme.swift`, `Shared/Core/CalendarPaging.swift`, `Tests/Unit/CalendarPagingTests.swift`, `Tests/Unit/LocalizationCatalogTests.swift`, `docs/ARCHITECTURE.md`, `README.md`.
 - New files allowed in: `App/Views/Navigation/` (AppHeader, CalendarDrawer, CalendarDetailsView), `App/Views/Account/` (AccountSheet, AddAccountView, AccountNotices), `App/Views/Settings/` (SettingsView, NotificationSettingsView, ReminderListEditor, CalendarSettingsView, AssistantSettingsView, PrivacySettingsView, DataSettingsView, ShortcutsGuideView, AboutView), `App/Views/Chat/` (AIConsentSheet, ConsentBanner, SettingsUpdatedCard, LearnedSuggestionCard, PendingEventsCard), `App/ViewModels/` (e.g. SettingsModel), `NotificationContent/` (e.g. NotificationPendingEventsCard).
 
 ### Integrator (nobody else)
@@ -1520,7 +1520,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 | `Shared/DesignSystem/Theme.swift` | `static func weekdayLetters(firstWeekday: Int) -> [String]` (keep the static array) | UI (widget, grids) | |
 | `App/SmartScheduleApp.swift` | wiring list below | – | |
 
-**UI wiring duties** (calls into other roles): at launch `SubscriptionStore.shared.start()`, only when `AppConstants.subscriptionsEnabled` (not in 1.0); `ScheduleViewModel.bootstrap()` runs the migration first; on `.active`: `AccountManager.shared.refreshCalendarLists()`, `LiveActivityManager.shared.summonIfDue()`, append learned suggestion cards; observe `.preferences` (rebuild clock, `ReminderScheduler.reschedule()`, `LiveActivityManager.refreshIfRunning()`), `.accounts` (reload accounts and visible events, reschedule), `.consent` (banner); `AppDelegate` and `NotificationViewController` call `ReminderEngagement.record(response)` for every response; `AppDelegate` handles `GeminiError.consentRequired` and pending batches (§2.8); `ScheduleViewModel.events` comes from `visibleEvents()`; `displayEvents` and `events(on:)` include `pendingEvents.previewEvents` like plan previews; `SpeechTranscriber` builds `SFSpeechRecognizer(locale:)` from `speechLanguage` per recording and sets `requiresOnDeviceRecognition = speechOnDevice && recognizer.supportsOnDeviceRecognition`; every date shown follows `clock.timeZone` (set `Date.FormatStyle.timeZone`, or `.environment(\.timeZone, clock.timeZone)` at the root).
+**UI wiring duties** (calls into other roles): at launch `SubscriptionStore.shared.start()`, only when `AppConstants.subscriptionsEnabled` (not in 1.0); `ScheduleViewModel.bootstrap()` runs the migration first; on `.active`: `AccountManager.shared.refreshCalendarLists()`, `LiveActivityManager.shared.summonIfDue()`, append learned suggestion cards; observe `.preferences` (rebuild clock, `ReminderScheduler.reschedule()`, `LiveActivityManager.refreshIfRunning()`), `.accounts` (reload accounts and visible events, reschedule), `.consent` (banner); `AppDelegate` and `NotificationViewController` call `ReminderEngagement.record(response)` for every response; `AppDelegate` handles `GeminiError.consentRequired` and pending batches (§2.8); `ScheduleViewModel.events` comes from `visibleEvents()`; `displayEvents` and `events(on:)` include `pendingEvents.previewEvents` like plan previews; every date shown follows `clock.timeZone` (set `Date.FormatStyle.timeZone`, or `.environment(\.timeZone, clock.timeZone)` at the root).
 
 **As built** (choices the contract left open): `MonthGridView` has a `showsTitle` parameter (the main screen hides the grid card's month title because the header names the month); `ChatViewModel.Message` has `date` (for `ChatRecord.date`); `ScheduleViewModel.signIn()` became `addAccount(email:)` (with `addPendingAccount`, `discardPendingAccount`), plus `reconnect`, `removeAccount` (with `prepareRemoval(of:)`, `syncBeforeRemoving`), `notice`, `setVisible`, `setColorOverride`, `setNotificationsEnabled`, `setDefaultCalendar`, `calendar(_:)`, `defaultWriteTarget`, `avatarInitial`, `clockID` and `reloadPendingEvents()`; "What the assistant remembers" is a section of AI & privacy, not a separate page.
 
@@ -1580,7 +1580,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 - Endless month chips, month grid, week and day pagers, `ensureEvents(covering:)`, the cache cap, demo ranges.
 - Plan review (Add / Keep editing), ghost occurrences, plan cards in the notification extension.
 - Hold-to-reply reminders, snooze, the collapsed-reply path, plan nudges.
-- Demo mode end to end with no network (now including demo accounts, preferences by voice and ask-first).
+- Demo mode end to end with no network (now including demo accounts, preferences changed in the chat and ask-first).
 - `python3 -I scripts/validate_schema.py --print-payloads` and all unit tests on CI.
 
 ---
@@ -1594,6 +1594,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 - **No Live Activity push-to-start.** `AppConstants.pushToStartEnabled = false`: no push-to-start token is requested or uploaded, nothing about events is stored on the server, and the app has no `aps-environment` entitlement and no `remote-notification` background mode, so no APNs key (`.p8`) is needed and the Worker's production `crons = []`. iOS 26 still schedules each Live Activity on the iPhone (`Activity.request(…, start:)`); on iOS 18 one appears only when the app runs within the lead time or while the event is under way. The code stays behind the flag for a later version; `ReleaseConfigurationTests` and `scripts/validate_schema.py` fail while it is true. Consent disclosure version 5 (§8.2).
 - **Website at https://www.smart-schedules.com.** A Cloudflare Pages project, reached through one CNAME `www` at Squarespace DNS; the DNS is not moved to Cloudflare and the Google Workspace mail records are never touched (site/README.md §3). Privacy policy https://www.smart-schedules.com/privacy, support https://www.smart-schedules.com/support. The Google OAuth authorized domain stays `smart-schedules.com`.
 - **Developer established in the UK.** No UK GDPR Art. 27 representative is needed; whether the ICO data protection fee applies is a launch-checklist item.
+- **No in-app speech input.** Quick Capture, the chat and the notification extension are typed only: no microphone button, no Speech or AVAudio code, no `NSMicrophoneUsageDescription` or `NSSpeechRecognitionUsageDescription`, and Settings › Assistant has no "Voice input" section. People can still speak through Siri (`AddPlanIntent`) or the keyboard's dictation, which hand the app text. `DeepLink.composeVoice` (`?mode=voice`) stays and opens Quick Capture like `DeepLink.compose`; `speechLanguage` and `speechOnDevice` stay in `AppPreferences`, unused. The consent text stays version 5 (1.0 is unreleased); only its speech note changed (§8.2).
 
 ### Open questions
 1. **Pricing** (a later version; 1.0 sells nothing): monthly and yearly prices, free trial or not, regional pricing. The `.storekit` file uses placeholders.
@@ -1601,7 +1602,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 3. **Terms of Use**: Apple's standard EULA (current) or custom terms. (The privacy policy URL is decided: https://www.smart-schedules.com/privacy.)
 4. **Support email**: support@smart-schedules.com (decided), shown in Settings › About and App Store Connect.
 5. **Defaults for the two new features**: morning briefing on at 07:30 and Dynamic Island auto-start 30 min before the next event when the app opens. Keep them on, or ship off?
-6. **Per-event calendar choice by voice** ("add it to my school calendar") is not in this scope (only the lasting default is). Add a `calendar` field to `create_events` later?
+6. **Per-event calendar choice in a request** ("add it to my school calendar") is not in this scope (only the lasting default is). Add a `calendar` field to `create_events` later?
 7. **Gemini proxy**: done. `server/worker` (Cloudflare Worker) holds the key; the app reads only `GEMINI_BASE_URL` and the consent text and privacy labels name the server.
 
 ### Launch checklist
@@ -1620,3 +1621,4 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 - [ ] Deploy `site/` as the Cloudflare Pages project and add the one CNAME `www` → `<project>.pages.dev` at Squarespace DNS, so `SSPrivacyURL` (https://www.smart-schedules.com/privacy) resolves; do not move the DNS or touch the Google Workspace mail records; fill in the highlighted placeholders first (site/README.md §1, §3).
 - [ ] **UK**: the developer is established in the UK, so no UK GDPR Art. 27 representative is needed. Check on ico.org.uk ("Do I need to pay the fee?") whether the ICO data protection fee applies, and pay it if so (amount as the ICO site states).
 - [ ] **No push in 1.0**: the App ID needs no Push Notifications capability and the archive has no `aps-environment`; the Worker needs only the `GEMINI_API_KEY` and `APPLE_TEAM_ID` secrets, with production `crons = []` (server/worker/README.md).
+- [ ] **No microphone in 1.0**: the archive's Info.plist has no `NSMicrophoneUsageDescription` or `NSSpeechRecognitionUsageDescription`, App Privacy declares no Audio Data, and no microphone or speech-recognition permission prompt appears anywhere on a clean install.

@@ -6,7 +6,7 @@
 
 1.0 已決定的事：年齡分級 **18+**（Gemini API 條款要求年滿 18 歲）、**不賣訂閱也沒有任何 App 內購買**、
 **不在歐洲經濟區（歐盟、挪威、冰島、列支敦斯登）、瑞士、香港、澳門和中國大陸上架**（英國和其他地區照常）、**Google 帳號的 email 不會傳給 Gemini**（同意說明第 4 版起）、
-**不用 iOS 18 的即時動態 push-to-start**（`AppConstants.pushToStartEnabled = false`：伺服器不存任何行程、App 不用遠端推播（APNs）；同意說明第 5 版）、**開發者在英國**（不需要英國 GDPR 第 27 條的代表人）。
+**不用 iOS 18 的即時動態 push-to-start**（`AppConstants.pushToStartEnabled = false`：伺服器不存任何行程、App 不用遠端推播（APNs）；同意說明第 5 版）、**開發者在英國**（不需要英國 GDPR 第 27 條的代表人）、**沒有 App 內的語音輸入**（不用麥克風和語音辨識；Siri 和鍵盤的聽寫是 Apple 的系統功能，App 只收到文字）。
 
 `<!-- asc:… -->` 標記後面的區塊就是要貼的內容；`python3 -I <腳本> docs/app-store-metadata.md` 可以檢查字數上限
 （第 12 節）。方括號 `[…]` 是送審前要填的佔位值。
@@ -22,6 +22,7 @@
 - [ ] Google OAuth consent screen 已通過驗證並設為「In production」（步驟見 [`google-oauth-verification.md`](google-oauth-verification.md)）。還在 Testing 時，審核員會看到「Google 尚未驗證這個應用程式」，測試帳號也必須先加進 test users，而且 refresh token 7 天就失效。
 - [ ] 價格與供應狀況已取消歐洲經濟區、瑞士、香港、澳門和中國大陸（第 4.3 節；後三個是因為 Gemini API 不在那裡提供，第 4.4 節）。
 - [ ] 到 ICO 網站的「Do I need to pay the fee?」確認要不要繳資料保護費（data protection fee），金額以 ICO 網站為準（第 4.4 節第 4 點）。
+- [ ] 上傳的 build 的 Info.plist 沒有 `NSMicrophoneUsageDescription` 和 `NSSpeechRecognitionUsageDescription`（`plutil -p SmartSchedule.app/Info.plist | grep -E 'NSMicrophone|NSSpeech'` 什麼都不印）：1.0 沒有麥克風和語音辨識，App 隱私問卷也不勾 Audio Data（第 5.3 節）。
 
 ---
 
@@ -79,21 +80,21 @@ Smart Schedules 智慧行程助理
 
 <!-- asc:zh-Hant/promo -->
 ```text
-打字或說一句話，行程就加進你的 Google 日曆。長期目標會拆成計畫，先給你看過、按「加入」才寫入；快開始的行程會在動態島倒數。
+輸入一句話，行程就加進你的 Google 日曆。長期目標會拆成計畫，先給你看過、按「加入」才寫入；快開始的行程會在動態島倒數。
 ```
 
 ### 2.4 描述（Description，最多 4000 字元）
 
 <!-- asc:zh-Hant/description -->
 ```text
-Smart Schedules 是搭配 Google 日曆的 iPhone AI 行程助理。打字或說一句話，例如「明天下午兩點和 Joe 開線上會議」、「團隊會議延後 30 分鐘」、「我想在半年內變壯」，助理就幫你排進行事曆。
+Smart Schedules 是搭配 Google 日曆的 iPhone AI 行程助理。輸入一句話，例如「明天下午兩點和 Joe 開線上會議」、「團隊會議延後 30 分鐘」、「我想在半年內變壯」，助理就幫你排進行事曆。
 
 ■ 一句話排好行程
-• 用日常語言新增、移動、改名或刪除行程，打字或用說的都可以。
+• 用日常語言新增、移動、改名或刪除行程。
 • 沒說時間的話，助理會先問你，不會自己亂猜。
 • 長期目標會拆成分階段的計畫：固定的練習時段、檢查點和每日提醒。先在日曆上預覽，按「加入」才寫進 Google 日曆；想改哪裡直接說，助理會給你新的版本。
 • 想每個行程都先過目？打開「先問我」，單一行程也會等你按「加入」。
-• 用說的就能改設定，例如「以後 8 點前不要提醒我」、「健身提前 2 小時提醒」。改完可以在對話裡馬上復原，之後也能在「助理記得的事」刪除。
+• 一句話就能改設定，例如「以後 8 點前不要提醒我」、「健身提前 2 小時提醒」。改完可以在對話裡馬上復原，之後也能在「助理記得的事」刪除。
 
 ■ 隨時一鍵叫出
 • 控制中心和鎖定畫面的控制項目，一按就打開快速輸入，鍵盤已經準備好。有動作按鈕的 iPhone，也可以把它設定成「加入 Smart Schedules」。
@@ -131,12 +132,12 @@ Smart Schedules 是搭配 Google 日曆的 iPhone AI 行程助理。打字或說
 
 ### 2.5 關鍵字（Keywords，最多 100 位元組，逗號後不加空格）
 
-中文字在 UTF-8 是 3 個位元組，所以大約只能放 30 個中文字。名稱和副標題裡的字（Smart、Schedules、行程）已經會被搜尋，不再重複。名稱只有「Smart Schedules」，「AI」「助理」不在名稱裡；想讓這兩個詞也被搜尋，可以改用備用名稱 1，或換掉下面的某個關鍵字（已經 99 位元組）。
+中文字在 UTF-8 是 3 個位元組，所以大約只能放 30 個中文字。名稱和副標題裡的字（Smart、Schedules、行程）已經會被搜尋，不再重複。名稱只有「Smart Schedules」，「AI」「助理」不在名稱裡：「助理」放在關鍵字裡（取代原本的「語音」，1.0 沒有 App 內的語音輸入）；想讓「AI」也被搜尋，可以改用備用名稱 1，或換掉下面的某個關鍵字（已經 99 位元組）。
 「計畫」（台灣）和「計劃」（香港常用）兩種寫法都放；1.0 不在香港上架，「計劃」留著不影響其他關鍵字，要換成別的詞也可以。不放其他 App 或公司的名稱（包括 Google、Gemini）。
 
 <!-- asc:zh-Hant/keywords -->
 ```text
-行事曆,日曆,提醒,待辦,計畫,計劃,規劃,語音,會議,習慣,目標,時間管理,日程
+行事曆,日曆,提醒,待辦,計畫,計劃,規劃,助理,會議,習慣,目標,時間管理,日程
 ```
 
 ### 2.6 網址
@@ -185,21 +186,21 @@ Plan your day in one sentence
 
 <!-- asc:en/promo -->
 ```text
-Type or say a plan and it lands in your Google Calendar. Long-term goals become a plan you review first, and upcoming events count down in the Dynamic Island.
+Type a plan and it lands in your Google Calendar. Long-term goals become a plan you review first, and upcoming events count down in the Dynamic Island.
 ```
 
 ### 3.4 Description (4000 characters max)
 
 <!-- asc:en/description -->
 ```text
-Smart Schedules is an AI scheduling assistant for iPhone that works with your Google Calendar. Type or say what you need, like "online meeting with Joe tomorrow at 2 pm", "push the team sync 30 minutes" or "I want to get stronger in six months", and the assistant puts it in your calendar.
+Smart Schedules is an AI scheduling assistant for iPhone that works with your Google Calendar. Type what you need, like "online meeting with Joe tomorrow at 2 pm", "push the team sync 30 minutes" or "I want to get stronger in six months", and the assistant puts it in your calendar.
 
 PLAN IN A SENTENCE
-• Add, move, rename or delete events in everyday language, typed or spoken.
+• Add, move, rename or delete events in everyday language.
 • If you don't say a time, the assistant asks instead of guessing.
 • Long-term goals become a phased plan with regular sessions, checkpoints and a daily nudge. Preview it on your calendar first; nothing is added until you tap Add. Say what to change and the assistant makes a new version.
 • Want to approve everything? Turn on "Ask me first" and single events wait for your Add too.
-• Change settings by saying so: "from now on, don't remind me before 8", "remind me 2 hours before gym". Undo a change right in the chat, or delete it later in "What the assistant remembers".
+• Change settings just by asking: "from now on, don't remind me before 8", "remind me 2 hours before gym". Undo a change right in the chat, or delete it later in "What the assistant remembers".
 
 ONE TAP AWAY
 • A Control Center and Lock Screen control opens Quick Capture with the keyboard ready. On iPhones with the Action Button, you can set it to "Add to Smart Schedules".
@@ -237,11 +238,11 @@ Privacy Policy: https://www.smart-schedules.com/privacy
 
 ### 3.5 Keywords (100 bytes max, no spaces after commas)
 
-Words already in the name and subtitle (smart, schedules, plan, day, sentence) are left out, and so are other apps' and companies' names. The name is just "Smart Schedules", so "AI" and "planner" are not in it; to be found for them too, use backup name 1 or swap one of the keywords below (the list is at the 100-byte limit).
+Words already in the name and subtitle (smart, schedules, plan, day, sentence) are left out, and so are other apps' and companies' names. The name is just "Smart Schedules", so "AI" and "planner" are not in it; to be found for them too, use backup name 1 or swap one of the keywords below (the list is at the 100-byte limit). "diary" replaces "voice": 1.0 has no in-app speech input.
 
 <!-- asc:en/keywords -->
 ```text
-calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,organizer,daily,event
+calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,diary,assistant,organizer,daily,event
 ```
 
 ### 3.6 URLs
@@ -258,10 +259,10 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,voice,assistant,o
 |---|---|---|---|
 | 名稱（主要／備用 1／備用 2） | 15／23／22 字元 | 15／27／29 字元 | 30 字元 |
 | 副標題 | 13 字元 | 29 字元 | 30 字元 |
-| 宣傳文字 | 65 字元 | 158 字元 | 170 字元 |
-| 描述 | 1,658 字元 | 3,753 字元 | 4,000 字元 |
+| 宣傳文字 | 63 字元 | 151 字元 | 170 字元 |
+| 描述 | 1,646 字元 | 3,731 字元 | 4,000 字元 |
 | 關鍵字 | 99 位元組 | 100 位元組 | 100 位元組 |
-| 審核備註（第 8.2 節） | — | 3,868 位元組（填入備用驗證碼後要重算） | 4,000 位元組 |
+| 審核備註（第 8.2 節） | — | 3,843 位元組（填入備用驗證碼後要重算） | 4,000 位元組 |
 
 精確數字用第 12 節的腳本算；改了文字就重跑一次。
 
@@ -347,7 +348,7 @@ Apple 的定義（[App privacy details](https://developer.apple.com/app-store/ap
 
 | 資料 | 去哪裡、留多久 | 歸類 | 程式碼 |
 |---|---|---|---|
-| 使用者輸入或說出的請求（語音先轉成文字）；最多 40 個、今天起 14 天內行程的標題、時間、備註和 Google 行程 ID；回覆的那則提醒的行程；行事曆名稱（以「Account 1」這類代稱區分帳號）和助理設定；時區和語言；「AI 建議」那一個行程的地點 | 經 Smart Schedules 伺服器（Cloudflare Worker）原封不動轉給 Google Gemini API，伺服器不保存；Google 為偵測濫用最多保存 55 天（[Gemini API 使用政策](https://ai.google.dev/gemini-api/docs/usage-policies)，付費層級也一樣） | Other User Content（第三方保存超過即時處理所需，所以算 collect；每個請求都帶這個安裝的 App Attest 金鑰 ID，所以宣告為連結到使用者） | `Shared/AI/AssistantPrompt.swift`、`Shared/AI/NoteSuggestionPrompt.swift`、`Shared/AI/GeminiClient.swift`、`server/worker/src/gemini.ts` |
+| 使用者輸入的請求（對 Siri 說或用鍵盤聽寫的，App 收到的也是 Apple 轉好的文字）；最多 40 個、今天起 14 天內行程的標題、時間、備註和 Google 行程 ID；回覆的那則提醒的行程；行事曆名稱（以「Account 1」這類代稱區分帳號）和助理設定；時區和語言；「AI 建議」那一個行程的地點 | 經 Smart Schedules 伺服器（Cloudflare Worker）原封不動轉給 Google Gemini API，伺服器不保存；Google 為偵測濫用最多保存 55 天（[Gemini API 使用政策](https://ai.google.dev/gemini-api/docs/usage-policies)，付費層級也一樣） | Other User Content（第三方保存超過即時處理所需，所以算 collect；每個請求都帶這個安裝的 App Attest 金鑰 ID，所以宣告為連結到使用者） | `Shared/AI/AssistantPrompt.swift`、`Shared/AI/NoteSuggestionPrompt.swift`、`Shared/AI/GeminiClient.swift`、`server/worker/src/gemini.ts` |
 | App Attest 金鑰 ID（這個安裝在 Secure Enclave 產生的金鑰，每個請求都帶）；給通知擴充用的 session（只存 token 的雜湊） | 伺服器以金鑰 ID 保存公開金鑰和計數器，用來驗證每個請求、依安裝限制請求次數，沒有到期時間；session 7 天 | Device ID（用途：驗證、防濫用，屬於 App Functionality） | `Shared/Security/AppAttestClient.swift`、`server/worker/src/attest-routes.ts`、`session.ts` |
 | 連線 IP（IPv4，或 IPv6 的 /64） | 只用來限制 `/attest` 的頻率，每日計數保存 2 天 | Device ID。Apple 要求依用途歸類 IP；這裡的用途是防濫用 | `server/worker/src/ratelimit.ts` |
 | 伺服器日誌：金鑰 ID、App 識別碼、HTTP 狀態和錯誤代碼 | Workers Logs 最多 7 天，不含請求內容、標題、token 或 IP | 已包含在 Device ID（App Functionality：安全與服務穩定） | `server/worker/src/http.ts` 的 `log()`；`wrangler.toml` 關掉 invocation logs |
@@ -360,7 +361,7 @@ Apple 的定義（[App privacy details](https://developer.apple.com/app-store/ap
 |---|---|
 | Contact Info › Email Address | Google 帳號的 email 只存在 iPhone（Keychain、`accounts.json`），只在 OAuth 登入時當 `login_hint` 送給 Google 自己。同意說明第 4 版起，帳號 email 不會以帳號資訊送到伺服器或 Gemini：使用者的請求和行程文字裡的帳號 email 都換成佔位字（`Shared/AI/CalendarAliases.swift`、`Shared/Models/PromptRedaction.swift`，測試在 `Tests/Unit/AccountEmailPrivacyTests.swift`）。使用者自己打進請求裡的其他 email（例如邀請對象）也屬於 Other User Content。 |
 | Google 日曆的行程本身 | 行程在 iPhone 和使用者自己的 Google 帳號之間直接同步（`Shared/Calendar/GoogleCalendarClient.swift`），開發者拿不到；App 裡沒有任何 Google 的 SDK，所以 Google 不是 Apple 定義的「third-party partner」（加進 App 的程式碼的提供者）。送到伺服器和 Gemini 的那部分已算在 Other User Content。 |
-| User Content › Audio Data | 語音由 Apple 的語音辨識轉成文字（關掉「裝置端辨識」或語言不支援時會送到 Apple 的伺服器）。Apple：「You are not responsible for disclosing data collected by Apple.」離開 iPhone 的只有文字。 |
+| User Content › Audio Data | App 不使用麥克風和語音辨識：Info.plist 沒有 `NSMicrophoneUsageDescription`、`NSSpeechRecognitionUsageDescription`，程式裡沒有 Speech 或 AVAudio。使用者對 Siri 說話或用鍵盤聽寫時由 Apple 轉成文字，App 只收到文字；Apple：「You are not responsible for disclosing data collected by Apple.」 |
 | Purchases | 1.0 完全不呼叫 StoreKit。 |
 | Contacts | 沒有使用 Contacts framework。 |
 | Location（Precise / Coarse） | 沒有使用 CoreLocation；行程地點是使用者內容（Other User Content），IP 不用來推算位置。 |
@@ -469,7 +470,7 @@ DATA DELETION (5.1.1(v))
 Remove account (avatar › ⋯ next to the account, or swipe left; or ☰ › ⋯ next to the address) revokes Google access and deletes its tokens and cached events. ☰ › General › Data › "Erase all data on this device" revokes every Google account, withdraws AI permission and deletes all local data. Events in Google Calendar are not deleted.
 
 OTHER
-No in-app purchases or subscriptions. Rated 18+ because Google's Gemini API terms require users to be 18 or older. The microphone is used only after tapping the mic button, to turn speech into text.
+No in-app purchases or subscriptions. Rated 18+ because Google's Gemini API terms require users to be 18 or older. The app does not use the microphone or speech recognition.
 ```
 
 ### 8.3 審核員追問時可以用的回答（英文，不受 4000 位元組限制）
@@ -485,7 +486,7 @@ NSSupportsLiveActivitiesFrequentUpdates: declared, but Live Activities get no up
 
 What our server keeps: AI requests are passed to Google's Gemini API and not stored, and no calendar data is stored at all (Live Activities are made on the iPhone). The server keeps the App Attest key record used to verify the app.
 
-Speech: the microphone and speech recognition are used only after the person taps the mic button, until they tap it again or send. With "On-device recognition" on (the default) and a supported language, audio stays on the iPhone; otherwise Apple's speech service transcribes it. Only the text is used by the assistant.
+Speech: the app has no microphone or speech-recognition feature and asks for neither permission. People can speak a request to Siri ("Add a plan in Smart Schedules") or use the keyboard's dictation key; Apple turns the speech into text, and the app only receives the text.
 
 Siri: "Add a plan in Smart Schedules" runs without opening the app. It checks AI permission first and answers "Turn on AI data sharing in the Smart Schedules settings first." when it is missing. Long-term plans made through Siri wait in the app until the person taps Add. In demo mode Siri uses the offline demo assistant.
 
@@ -523,7 +524,7 @@ Accounts: Smart Schedules has no accounts of its own, so there is no account to 
 
 | # | 畫面 | 怎麼拍 | 繁體中文說明 | English caption |
 |---|---|---|---|---|
-| 1 | 主畫面：月曆加上對話區，剛加入一個行程（「已加入 Google 日曆」那一列） | 輸入「明天下午 1 點跟 Andrew 吃午餐」／「Lunch with Andrew tomorrow 1pm」 | 說一句話，行程就排好／打字或用說的，助理幫你寫進 Google 日曆 | Plan your day in one sentence / Type or say it, and it goes into Google Calendar |
+| 1 | 主畫面：月曆加上對話區，剛加入一個行程（「已加入 Google 日曆」那一列） | 輸入「明天下午 1 點跟 Andrew 吃午餐」／「Lunch with Andrew tomorrow 1pm」 | 一句話，行程就排好／輸入一句話，助理幫你寫進 Google 日曆 | Plan your day in one sentence / Type it, and it goes into Google Calendar |
 | 2 | 鎖定畫面的即時動態（行程標題和倒數），可以疊一張展開的動態島（一週行程和「編輯」按鈕） | 開始示範模式後馬上鎖定模擬器（⌘L）：範例「Online meeting with Joe」21 分鐘後開始 | 下一個行程，在動態島倒數／開始前 30、15、10 或 5 分鐘出現 | Your next event, counting down / Appears 30, 15, 10 or 5 minutes before it starts |
 | 3 | 長期計畫卡（各階段、每堂課）和週檢視上的虛線預覽 | 輸入「我想在 6 個月內增肌」／「I want to be muscular in 6 months」 | 長期目標，拆成每週計畫／先看過，按「加入」才寫進日曆 | Big goals, broken into a weekly plan / Nothing is added until you tap Add |
 | 4 | 快速輸入的日檢視（24 小時時間軸、對話面板） | 從控制中心的 Smart Schedules 按鈕打開 | 控制中心一按，馬上輸入／日、週、月檢視隨時切換 | Quick Capture from Control Center / Switch between day, week and month |
@@ -533,7 +534,7 @@ Accounts: Smart Schedules has no accounts of its own, so there is no account to 
 | 8 | 設定 › 通知（安靜時段、早晨摘要、每日上限、動態島） | 打開安靜時段和早晨摘要 | 提醒方式，由你決定／安靜時段、每日上限、早晨摘要 | Reminders on your terms / Quiet hours, a daily limit, a morning briefing |
 | 9（選用） | AI 同意說明「要使用 AI 助理嗎？」 | 已連接帳號、尚未同意時送出第一則訊息 | AI 看到什麼，由你決定／按「允許」之前，不會傳送任何資料給 AI | You decide what the AI sees / Nothing is sent until you tap Allow |
 
-App 預覽影片（App Preview）可以不做。要做的話，用同樣的流程錄 15–30 秒：控制中心 → 快速輸入 → 說一句話 → 行程出現在月曆 → 動態島倒數。
+App 預覽影片（App Preview）可以不做。要做的話，用同樣的流程錄 15–30 秒：控制中心 → 快速輸入 → 輸入一句話 → 行程出現在月曆 → 動態島倒數。
 
 ---
 
@@ -556,7 +557,7 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 | 沒說時間會先問 | `reply_to_user`（`needs_clarification`）；`App/Intents/AddPlanIntent.swift` 讓 Siri 追問最多兩次 |
 | 長期計畫先預覽，按「加入」才寫入，可以要求修改 | `create_long_term_plan`、`confirm_plan`；`App/Views/PlanPreviewCard.swift`；README「長期計畫：先審閱，按 Add 才加入」 |
 | 「先問我」 | `AssistantAutonomy.askFirst`（`Shared/Models/AppPreferences.swift`）、`App/Views/Settings/AssistantSettingsView.swift` |
-| 用說的改設定、復原、「助理記得的事」 | `update_preferences`；`App/Views/Chat/SettingsUpdatedCard.swift`；`App/Views/Settings/PrivacySettingsView.swift` |
+| 用一句話改設定、復原、「助理記得的事」 | `update_preferences`；`App/Views/Chat/SettingsUpdatedCard.swift`；`App/Views/Settings/PrivacySettingsView.swift` |
 | 控制中心、鎖定畫面控制項打開快速輸入；動作按鈕 | `Widgets/SmartScheduleControl.swift`、`Shared/Intents/OpenQuickCaptureIntent.swift`、`App/Views/Settings/ShortcutsGuideView.swift` |
 | Siri 與捷徑，不用打開 App | `AddPlanIntent`（`openAppWhenRun = false`）、`SmartScheduleShortcuts` |
 | 即時動態：開始前 30／15／10／5 分鐘出現、倒數、這一週、結束後消失 | `AppPreferences.liveActivityLeadChoices = [30, 15, 10, 5]`；`Shared/LiveActivity/ActivityScheduler.swift`；`Widgets/ScheduleLiveActivity.swift`（`IslandWeekStrip`、`Text(timerInterval:)`） |
@@ -579,7 +580,7 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 | iOS 18 以上；繁體中文和英文 | `project.yml`（`deploymentTarget iOS 18.0`）；`Shared/Localization/Localizable.xcstrings` |
 
 刻意**沒有**寫進商店文字的：主畫面小工具（沒有）、貼上連結就讀網頁內容（迴紋針只把網址文字貼進輸入框，Gemini 只看到網址文字）、
-訂閱或 Pro、iPad 或 Mac、特定的 Gemini 模型版本。
+訂閱或 Pro、iPad 或 Mac、特定的 Gemini 模型版本、語音輸入（1.0 沒有麥克風；Siri 和鍵盤的聽寫是系統功能）。
 
 ---
 

@@ -314,7 +314,7 @@ private func quickCapturePreview(_ mode: CalendarScope,
                                              alsoLoading: focusDay.map(PreviewDates.around))
     return ZStack(alignment: .top) {
         Color.black.ignoresSafeArea()
-        QuickCaptureView(startsWithVoice: false, initialMode: mode, conversationExpanded: conversationExpanded,
+        QuickCaptureView(initialMode: mode, conversationExpanded: conversationExpanded,
                          onClose: {})
     }
     .environment(schedule)
@@ -425,7 +425,7 @@ private struct MonthGridPreview: View {
     let schedule = ScheduleViewModel.preview(focusDay: plan.startDate, pendingPlan: plan)
     ZStack(alignment: .top) {
         Color.black.ignoresSafeArea()
-        QuickCaptureView(startsWithVoice: false, initialMode: .week, onClose: {})
+        QuickCaptureView(initialMode: .week, onClose: {})
     }
     .environment(schedule)
     .environment(ChatViewModel.planPreview(schedule: schedule))
@@ -1063,7 +1063,7 @@ enum PreviewSync {
     let schedule = PreviewSync.schedule()
     ZStack(alignment: .top) {
         Color.black.ignoresSafeArea()
-        QuickCaptureView(startsWithVoice: false, initialMode: .week, onClose: {})
+        QuickCaptureView(initialMode: .week, onClose: {})
     }
     .environment(schedule)
     .environment(ChatViewModel.preview(schedule: schedule))

@@ -66,8 +66,6 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
-        NSMicrophoneUsageDescription: Smart Schedules listens after you tap the mic so you can speak a plan instead of typing it.
-        NSSpeechRecognitionUsageDescription: Your spoken plan is transcribed to text before it is scheduled.
         BGTaskSchedulerPermittedIdentifiers: [com.smartschedule.refresh]
         # fetch: the BGAppRefresh task (App/Sync/AppRefresh.swift). No remote-notification: version 1.0 receives no
         # pushes (AppConstants.pushToStartEnabled).

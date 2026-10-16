@@ -74,6 +74,8 @@ enum AppConstants {
 /// into the Quick Capture overlay (Artboard 4), never the full month view.
 enum DeepLink {
     static let compose = URL(string: "smartschedule://compose")!
+    /// Kept for compatibility (Shared API, links already out there): 1.0 has no in-app speech input, so it opens
+    /// Quick Capture exactly like `compose`, keyboard up (`AppRouter.handle` ignores `mode`).
     static let composeVoice = URL(string: "smartschedule://compose?mode=voice")!
 
     static func event(_ id: String) -> URL {

@@ -908,16 +908,6 @@
         }
       }
     },
-    "Apple turns speech into text: on your iPhone when On-device recognition is on and supports your language, otherwise on Apple's servers." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "語音由 Apple 轉成文字：開啟「裝置端辨識」且支援你的語言時在 iPhone 上處理，否則使用 Apple 的伺服器。"
-          }
-        }
-      }
-    },
     "Ask me first" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1832,16 +1822,6 @@
         }
       }
     },
-    "Dictate" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "聽寫"
-          }
-        }
-      }
-    },
     "Discard" : {
       "comment" : "Failed change in the drawer: drop it and keep Google's version",
       "localizations" : {
@@ -2506,6 +2486,16 @@
         }
       }
     },
+    "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. Smart Schedules only receives the text." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字，Smart Schedules 只會收到文字。"
+          }
+        }
+      }
+    },
     "In %lld days" : {
       "localizations" : {
         "en" : {
@@ -3010,16 +3000,6 @@
         }
       }
     },
-    "Not supported for this language" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "這個語言不支援裝置端辨識"
-          }
-        }
-      }
-    },
     "Not synced yet" : {
       "comment" : "Drawer sync status before the first sync",
       "localizations" : {
@@ -3293,16 +3273,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "當天 %@"
-          }
-        }
-      }
-    },
-    "On-device recognition" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "裝置端辨識"
           }
         }
       }
@@ -4147,16 +4117,6 @@
         }
       }
     },
-    "Speech language" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "語音辨識語言"
-          }
-        }
-      }
-    },
     "Start on a different date" : {
       "comment" : "Suggestion chip; the demo assistant reads it back",
       "localizations" : {
@@ -4215,16 +4175,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "狀態"
-          }
-        }
-      }
-    },
-    "Stop dictation" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "停止聽寫"
           }
         }
       }
@@ -4326,16 +4276,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "星期日"
-          }
-        }
-      }
-    },
-    "Supported for this language" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "這個語言支援裝置端辨識"
           }
         }
       }
@@ -5069,16 +5009,6 @@
         }
       }
     },
-    "Voice input" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "語音輸入"
-          }
-        }
-      }
-    },
     "WEEK" : {
       "comment" : "Quick Capture mode picker",
       "localizations" : {
@@ -5178,16 +5108,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "某天的提醒超過上限時，會先發送最重要的：行程開始時的提醒，接著是截止日、其他行程提醒、待辦事項和例行活動。其餘的會列在當天的早晨摘要裡。"
-          }
-        }
-      }
-    },
-    "When on, speech in languages this iPhone supports is recognised on the device and never leaves it. Other languages use Apple's servers." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "開啟時，這支 iPhone 支援的語言會在裝置上辨識，語音不會離開裝置。其他語言會使用 Apple 的伺服器。"
           }
         }
       }

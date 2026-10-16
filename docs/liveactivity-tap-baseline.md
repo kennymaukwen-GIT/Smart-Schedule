@@ -21,7 +21,7 @@ Deep link 定義（`Shared/Core/AppConstants.swift`）：
 | T4 | `IslandInputPill` | `Link(destination: DeepLink.composeVoice)` 包麥克風圖示 | 展開的動態島 | `smartschedule://compose?mode=voice` |
 | T5 | `IslandInputPill` | `Link(destination: DeepLink.compose)` 包紙飛機圖示 | 展開的動態島 | `smartschedule://compose` |
 
-**2026-10-16 更新：** 展開的動態島底部不再有輸入列。T3–T5 三個 `Link`（文字、麥克風、紙飛機）換成一個全寬的「編輯」按鈕 `IslandEditButton`：`Link(destination: DeepLink.compose)` 包 `Text("Edit")`（繁體中文「編輯」），整個膠囊都能點，打開快速輸入、鍵盤已叫出，目標 `smartschedule://compose`。動態島上不再有麥克風，Live Activity 也不再用 `DeepLink.composeVoice`；這個常數留在 `AppConstants`（App 仍處理 `?mode=voice`，測試也用到）。上表 T3–T5 保留 Step 0 的原樣作為紀錄。
+**2026-10-16 更新：** 展開的動態島底部不再有輸入列。T3–T5 三個 `Link`（文字、麥克風、紙飛機）換成一個全寬的「編輯」按鈕 `IslandEditButton`：`Link(destination: DeepLink.compose)` 包 `Text("Edit")`（繁體中文「編輯」），整個膠囊都能點，打開快速輸入、鍵盤已叫出，目標 `smartschedule://compose`。動態島上不再有麥克風，Live Activity 也不再用 `DeepLink.composeVoice`；這個常數留在 `AppConstants`（Shared 的公開 API 不變，測試也用到）；App 拿掉語音輸入之後（同一天），`?mode=voice` 和 `smartschedule://compose` 一樣只打開快速輸入、鍵盤已叫出，不會開始收音。上表 T3–T5 保留 Step 0 的原樣作為紀錄。
 
 | # | 位置 | 元件 | 呈現 | 目標 |
 |---|---|---|---|---|

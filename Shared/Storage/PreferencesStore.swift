@@ -100,7 +100,7 @@ actor PreferencesStore {
 
     /// One write. Every `PreferenceKey` is diffed before/after `change`: the ledger gets one line per changed key
     /// (removed when the key is back at its default) and the receipt lists the changes. nil when no key changed
-    /// (other settings, such as the speech language, are still saved). `change` must not read this store.
+    /// (other settings, such as the Dynamic Island lead time, are still saved). `change` must not read this store.
     @discardableResult
     func update(source: LedgerSource = .settings,
                 _ change: @Sendable (inout AppPreferences) -> Void) -> PreferenceChangeReceipt? {

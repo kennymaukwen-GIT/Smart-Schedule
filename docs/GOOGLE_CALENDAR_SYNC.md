@@ -215,7 +215,7 @@ Smart Schedules 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 
 
 ### 9.6 寫入：預設行事曆和路由（`CalendarRouter`）
 
-- **新事件**寫到 `AccountStore.defaultWriteTarget()`：設定或語音選的「新行程的行事曆」（帳號仍連接、行事曆存在且可寫入時），否則第一個帳號的主要行事曆；沒有帳號就丟 `AuthError.signedOut`。Demo 模式用 demo 的個人主要行事曆（或 `default_calendar` 選的）。
+- **新事件**寫到 `AccountStore.defaultWriteTarget()`：設定或對話（`update_preferences`）選的「新行程的行事曆」（帳號仍連接、行事曆存在且可寫入時），否則第一個帳號的主要行事曆；沒有帳號就丟 `AuthError.signedOut`。Demo 模式用 demo 的個人主要行事曆（或 `default_calendar` 選的）。
 - **既有事件**帶著帳號和行事曆，修改、刪除都送到那份副本所在的行事曆（去重之後就是主辦人或可寫入的那份）。整個系列的修改 PATCH 該 instance 所在行事曆的 `seriesID`。沒有行事曆的事件送到預設行事曆。
 - `delete_events` 帶 `plan_id` 時，在每個可寫入的同步行事曆用 `privateExtendedProperty=ssPlanId=<id>` 找系列（計畫寫在當初加入的行事曆）。
 - 寫入唯讀行事曆會在送出前擋下，Google 回 403 `requiredAccessLevel` 也一樣，顯示「你無法修改「<行事曆>」裡的行程。」

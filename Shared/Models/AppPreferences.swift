@@ -43,6 +43,7 @@ enum ReplyLanguage: String, Codable, CaseIterable, Sendable {
     case english = "en"
 }
 
+/// Unused since 1.0 has no in-app speech input; kept for `AppPreferences.speechLanguage` (Shared API).
 enum SpeechLanguage: String, Codable, CaseIterable, Sendable {
     case automatic = "auto"
     case chineseTaiwan = "zh-TW"
@@ -124,6 +125,8 @@ struct AppPreferences: Codable, Hashable, Sendable {
     /// nil = follow the device (`TimeZone.current`); otherwise an IANA identifier.
     var timeZoneIdentifier: String? = nil
     var replyLanguage: ReplyLanguage = .matchInput
+    /// Unused: 1.0 has no in-app speech input (Siri and keyboard dictation follow the system's settings). Still decoded
+    /// and encoded so the Shared API and existing preferences.json files stay the same; nothing reads them.
     var speechLanguage: SpeechLanguage = .automatic
     var speechOnDevice = true
     var autonomy: AssistantAutonomy = .addDirectly

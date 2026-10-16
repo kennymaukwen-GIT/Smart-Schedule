@@ -1,4 +1,3 @@
-/* Permission prompts from App/Info.plist (the English text lives in project.yml). This folder also makes
-   XcodeGen list zh-Hant in the project's knownRegions. */
-"NSMicrophoneUsageDescription" = "點麥克風後，Smart Schedules 會聽你說的計畫，不用打字。";
-"NSSpeechRecognitionUsageDescription" = "你說的計畫會先轉成文字，再排進行事曆。";
+/* zh-Hant translations of App/Info.plist strings (the English text lives in project.yml). Version 1.0 asks for no
+   permission that needs one: it has no microphone or speech recognition. This folder also makes XcodeGen list zh-Hant
+   in the project's knownRegions, so keep the file. */

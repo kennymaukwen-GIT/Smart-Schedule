@@ -136,7 +136,7 @@ Verification Center 的「Prepare for verification」在品牌**驗證並發佈*
 ### 4.1 App 說明（Additional information 或審查員問「App 做什麼」時）
 
 ```text
-Smart Schedules is an iPhone calendar app and AI scheduling assistant for Google Calendar (iOS 18 or later). Users connect one or more Google accounts and see, add, change and delete their Google Calendar events in month, week and day views, with reminders and Live Activities on the iPhone. They can also type or say requests such as "lunch with Joe tomorrow at 12:30", and an optional AI assistant, used only after the user allows it in an in-app consent dialog, turns them into calendar events.
+Smart Schedules is an iPhone calendar app and AI scheduling assistant for Google Calendar (iOS 18 or later). Users connect one or more Google accounts and see, add, change and delete their Google Calendar events in month, week and day views, with reminders and Live Activities on the iPhone. They can also type requests such as "lunch with Joe tomorrow at 12:30" (or say them to Siri), and an optional AI assistant, used only after the user allows it in an in-app consent dialog, turns them into calendar events.
 
 Calendar sync runs directly between the iPhone and the Google Calendar API. OAuth tokens are kept in the iOS Keychain and are only ever sent to Google (the Calendar API and Google's token and revoke endpoints). Users can remove an account in the app, which revokes the app's access at Google.
 
@@ -149,7 +149,7 @@ Privacy policy: https://www.smart-schedules.com/privacy (Google permissions: sec
 ```text
 Smart Schedules is a Google Calendar client for iPhone. It uses calendar.events to:
 1. Read events (events.list, events.get) in the user's calendars to show them in month, week and day views and in the event list, and to schedule reminders and Live Activities on the iPhone.
-2. Create events (events.insert) when the user adds them, for example by typing or saying "lunch with Joe tomorrow at 12:30" to the in-app assistant, or by tapping Add on events or a plan the assistant proposed.
+2. Create events (events.insert) when the user adds them, for example by typing "lunch with Joe tomorrow at 12:30" to the in-app assistant (or saying it to Siri), or by tapping Add on events or a plan the assistant proposed.
 3. Change events (events.patch) when the user edits the title, time, location, reminders or notes on the event page, or asks the assistant to move an event.
 4. Delete events (events.delete) when the user taps Delete event or confirms a deletion the assistant proposed.
 All calls are made by the app on the user's iPhone directly to the Google Calendar API, in response to the user's actions or to keep the on-device copy in sync.
@@ -208,11 +208,11 @@ openid and email identify which Google account the user connected. The app reads
 ```text
 How the Smart Schedules AI assistant uses Google user data
 
-The AI assistant is a user-facing feature: the user types or says a request such as "lunch with Joe tomorrow at 12:30", and the assistant creates or changes the event in the user's Google Calendar.
+The AI assistant is a user-facing feature: the user types a request such as "lunch with Joe tomorrow at 12:30" (or says it to Siri), and the assistant creates or changes the event in the user's Google Calendar.
 
 Consent: nothing is sent until the user taps Allow in an in-app dialog ("Use the AI assistant?") that lists exactly what is sent. The same text is in our privacy policy, section 4 (https://www.smart-schedules.com/privacy#en-ai). Users can stop sharing at any time in Settings > AI & privacy. Demo mode never contacts the AI.
 
-What is sent: the user's request (spoken requests as text); the titles, times, notes (up to 300 characters) and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder the user replies to; for "AI suggestions" on one event, that event including its location; the user's calendar names and assistant settings; time zone and language. Google account email addresses are never sent: the assistant sees calendars as "Account 1", "Account 2", and the app replaces the connected accounts' addresses in the user's request, event text and error messages with placeholders before sending (and puts them back on the iPhone in what it writes to Google Calendar). Attendees, organizer and video-call links are not sent.
+What is sent: the user's request as text (the app has no microphone; requests spoken to Siri or with the keyboard's dictation reach it as text from Apple); the titles, times, notes (up to 300 characters) and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder the user replies to; for "AI suggestions" on one event, that event including its location; the user's calendar names and assistant settings; time zone and language. Google account email addresses are never sent: the assistant sees calendars as "Account 1", "Account 2", and the app replaces the connected accounts' addresses in the user's request, event text and error messages with placeholders before sending (and puts them back on the iPhone in what it writes to Google Calendar). Attendees, organizer and video-call links are not sent.
 
 Path and recipient: the request goes from the app to our server (a Cloudflare Worker), which verifies with Apple App Attest that it comes from our app, removes the user's IP address and device headers, and forwards the body unchanged to Google's Gemini API with our API key. The server does not store or log the content. The app contains no API key and uses no other AI provider.
 
@@ -318,7 +318,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
   ```
 
 **鏡頭 10｜AI 同意畫面（3:10–3:50）**
-- 畫面：關掉抽屜，在輸入框打「Lunch with Joe tomorrow at 12:30」送出 →「Use the AI assistant?」出現 → 慢慢捲過 5 項說明、收件者那一行、語音由 Apple 轉成文字那一行 → 點 Allow。
+- 畫面：關掉抽屜，在輸入框打「Lunch with Joe tomorrow at 12:30」送出 →「Use the AI assistant?」出現 → 慢慢捲過 5 項說明、收件者那一行、Siri 和鍵盤聽寫由 Apple 轉成文字那一行 → 點 Allow。
 - 旁白：
   ```text
   The AI assistant is optional. Before anything is sent, the app shows this consent dialog. It lists exactly what goes to Google's Gemini API: the request; the titles, times, notes and event IDs of up to forty events in the next fourteen days and of the event whose reminder is answered; for AI suggestions on one event, only that event, including its location; calendar names and assistant settings; and time zone and language. Google account email addresses are never sent. Requests pass through our server, which doesn't keep them. Nothing is sent until the user taps Allow.

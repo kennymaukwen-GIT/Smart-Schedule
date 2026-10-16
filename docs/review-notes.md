@@ -1,6 +1,6 @@
 # App Review notes（背景說明，不要整份貼上）
 
-給審核員的說明的背景版本，比 App Store Connect 的 Notes 上限（4000 位元組）長，也沒有測試帳號和備用驗證碼。**要貼進 App Store Connect › App Review Information › Notes 的是 [`app-store-metadata.md`](app-store-metadata.md) 第 8.2 節的 `asc:en/review-notes` 區塊**（3,867 位元組）；審核員追問細節時，可以從下面的英文段落或第 8.3 節摘取。最後一節是送審前自己要確認的事項。
+給審核員的說明的背景版本，比 App Store Connect 的 Notes 上限（4000 位元組）長，也沒有測試帳號和備用驗證碼。**要貼進 App Store Connect › App Review Information › Notes 的是 [`app-store-metadata.md`](app-store-metadata.md) 第 8.2 節的 `asc:en/review-notes` 區塊**（3,843 位元組）；審核員追問細節時，可以從下面的英文段落或第 8.3 節摘取。最後一節是送審前自己要確認的事項。
 
 ---
 
@@ -19,15 +19,15 @@
 
 **Time Sensitive notifications.** Reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning summary and suggestions are Normal. People can change the urgency per kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off.
 
-**Long-press on a reminder.** The notification content extension lets people reply to a reminder by typing or speaking. The extension calls the AI service (through our server) and Google Calendar itself, so a change ("move it to 4 pm") or a deletion (confirmed with a red button) is done before the notification closes. It uses an ephemeral network session with a 30-second timeout.
+**Long-press on a reminder.** The notification content extension lets people reply to a reminder by typing (or with the keyboard's dictation). The extension calls the AI service (through our server) and Google Calendar itself, so a change ("move it to 4 pm") or a deletion (confirmed with a red button) is done before the notification closes. It uses an ephemeral network session with a 30-second timeout.
 
-**AI and personal data (Guideline 5.1.2(i)).** Before anything is sent, a one-time dialog lists exactly what goes to Google's Gemini API: what the person types or says (speech is turned into text by Apple's speech recognition, on the iPhone or on Apple's servers), the titles, times, notes and Google event IDs of up to 40 events in the next 14 days and of the event whose reminder they reply to, the location of one event only when they ask for AI suggestions on it, their calendar names and assistant settings, and their time zone and language. Google account email addresses are never sent: the AI sees calendars as "Account 1", "Account 2", and the app removes the accounts' addresses from event text and error messages first. The dialog names Google as the recipient, says requests pass through our server, which does not keep them, and asks for permission ("Allow" / "Not now"). The same dialog appears when permission is given later in Settings › AI & privacy. Nothing is sent to the AI before the person taps Allow. Permission can be withdrawn in Settings › AI & privacy, and demo mode never contacts the AI. The current wording is version 5 of the disclosure, so people who allowed an earlier version are asked again.
+**AI and personal data (Guideline 5.1.2(i)).** Before anything is sent, a one-time dialog lists exactly what goes to Google's Gemini API: what the person types (or says to Siri or with the keyboard's dictation, which Apple turns into text before the app gets it), the titles, times, notes and Google event IDs of up to 40 events in the next 14 days and of the event whose reminder they reply to, the location of one event only when they ask for AI suggestions on it, their calendar names and assistant settings, and their time zone and language. Google account email addresses are never sent: the AI sees calendars as "Account 1", "Account 2", and the app removes the accounts' addresses from event text and error messages first. The dialog names Google as the recipient, says requests pass through our server, which does not keep them, and asks for permission ("Allow" / "Not now"). The same dialog appears when permission is given later in Settings › AI & privacy. Nothing is sent to the AI before the person taps Allow. Permission can be withdrawn in Settings › AI & privacy, and demo mode never contacts the AI. The current wording is version 5 of the disclosure, so people who allowed an earlier version are asked again.
 
 **Sign in with Apple (Guideline 4.8).** Not required. The app has no account of its own. Connecting a Google account ("Connect Google Calendar" / "Add Google account") only authorizes access to the person's Google Calendar (Calendar scopes), the same way a calendar app connects to a calendar service. No app account is created and no login is needed to use the app (see demo mode).
 
 **Background modes.** Only `fetch`: background app refresh syncs Google Calendar changes and keeps reminders and Live Activities up to date. Reminders are local notifications created on the iPhone.
 
-**Microphone and speech recognition.** Used only after the person taps the microphone button, until they tap it again or send, to turn a spoken plan into text.
+**Microphone and speech recognition.** Not used. The app has no microphone button and asks for neither permission (no `NSMicrophoneUsageDescription` or `NSSpeechRecognitionUsageDescription`). People who prefer to speak can use Siri or the keyboard's dictation key; Apple turns the speech into text and the app only receives the text.
 
 **In-app purchases.** Version 1.0 has no in-app purchases or subscriptions; every feature is free to use.
 
@@ -48,3 +48,4 @@
 - [ ] 年齡分級：App Store Connect 的年齡分級設為 18+（Gemini API 的條款要求使用者年滿 18 歲；問卷算出來比較低就選較高的分級）；隱私權政策和支援頁寫同樣的最低年齡。
 - [ ] 供應地區：1.0 不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架。價格與供應狀況裡取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登、瑞士、香港、澳門和中國大陸（後三個沒有 Gemini API）；英國和其他地區照常上架（`app-store-metadata.md` 第 4.3 節）。
 - [ ] 英國：開發者在英國，不需要英國 GDPR 第 27 條的代表人。到 ICO 網站（ico.org.uk）的「Do I need to pay the fee?」確認要不要繳資料保護費，金額以 ICO 網站為準（`app-store-metadata.md` 第 4.4 節第 4 點）。
+- [ ] 1.0 沒有麥克風和語音辨識：上傳的 build 的 Info.plist 沒有 `NSMicrophoneUsageDescription`、`NSSpeechRecognitionUsageDescription`（`plutil -p SmartSchedule.app/Info.plist | grep -E 'NSMicrophone|NSSpeech'` 什麼都不印）；App 隱私問卷不勾 Audio Data；實機上整個 App 不會跳出麥克風或語音辨識的權限提示。

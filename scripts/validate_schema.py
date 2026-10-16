@@ -25,6 +25,9 @@
    reads the flag in code, and project.yml has neither the aps-environment entitlement nor the remote-notification
    background mode while both push flags (pushToStartEnabled, liveActivityPushEnabled) are false (and aps-environment
    once one is on).
+9. Version 1.0 has no microphone or speech recognition of its own: no Swift file records audio or calls Apple's speech
+   recognizer, and neither project.yml nor a .strings file declares NSMicrophoneUsageDescription or
+   NSSpeechRecognitionUsageDescription. People type, use the keyboard's own dictation, or talk to Siri.
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -549,6 +552,32 @@ def push_checks() -> int:
     return gated
 
 
+# ---------- Version 1.0 has no microphone ----------
+
+MICROPHONE_USE = re.compile(r"^\s*import Speech\b|\bSFSpeech\w*|\bSpeech(?:Analyzer|Transcriber)\b"
+                            r"|\bAVAudio(?:Engine|Session|Recorder|Application)\b|\brequestRecordPermission\b", re.M)
+MICROPHONE_PERMISSIONS = ("NSMicrophoneUsageDescription", "NSSpeechRecognitionUsageDescription")
+
+
+def microphone_checks() -> None:
+    """Owner decision for 1.0 (2026-10-16): no in-app microphone or speech recognition. Typing, the keyboard's own
+    dictation and Siri (App Intents) cover speaking, and none of them needs the app to record. A Swift file that records
+    audio or calls Apple's speech recognizer fails, and so does a microphone or speech-recognition usage description
+    in project.yml or a .strings file (a permission the app never asks for is an App Review question). Comments are
+    ignored."""
+    for directory in SWIFT_DIRS:
+        for path in sorted((ROOT / directory).rglob("*.swift")):
+            code = re.sub(r"//.*", "", path.read_text(encoding="utf-8"))
+            if MICROPHONE_USE.search(code):
+                errors.append(f"{path.relative_to(ROOT)}: records audio or uses speech recognition (1.0 has no microphone)")
+    texts = {ROOT / "project.yml": re.sub(r"(^|\s)#.*", r"\1", (ROOT / "project.yml").read_text(encoding="utf-8"))}
+    texts.update({path: re.sub(r"/\*.*?\*/", "", path.read_text(encoding="utf-8"), flags=re.S) for path in STRINGS_FILES})
+    for path, text in texts.items():
+        for key in MICROPHONE_PERMISSIONS:
+            if key in text:
+                errors.append(f"{path.relative_to(ROOT)}: {key} is declared, but 1.0 has no microphone")
+
+
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
     by_name = {}
@@ -606,6 +635,8 @@ def main() -> int:
     strings_file_checks()
     print(f"✓ Subscriptions off: {subscription_checks()} files gated by {SUBSCRIPTION_FLAG}")
     print(f"✓ Push-to-start off, no aps-environment: {push_checks()} files gated by {PUSH_TO_START_FLAG}")
+    microphone_checks()
+    print("✓ No microphone or speech recognition, no usage descriptions for them")
 
     if errors:
         print("\n".join(f"✗ {e}" for e in errors), file=sys.stderr)

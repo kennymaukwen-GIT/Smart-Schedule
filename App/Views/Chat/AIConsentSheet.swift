@@ -94,7 +94,7 @@ struct AIConsentDisclosureText: View {
             Label {
                 Text(verbatim: AIConsentDisclosure.speechNote)
             } icon: {
-                Image(systemName: "mic")
+                Image(systemName: "text.bubble")
             }
             .font(.system(size: 15))
             .foregroundStyle(.white.opacity(0.92))

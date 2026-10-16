@@ -23,4 +23,15 @@ final class ReleaseConfigurationTests: XCTestCase {
         XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: AppConstants.pushToStartEnabled, schedulesOnDevice: false), .off)
         XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: AppConstants.pushToStartEnabled, schedulesOnDevice: true), .off)
     }
+
+    /// 1.0 has no microphone or speech recognition of its own (owner decision 2026-10-16): people type, use the
+    /// keyboard's dictation or talk to Siri, and the app never records. App/ is not in this bundle, so
+    /// scripts/validate_schema.py (check 9) fails on any Swift file that records audio or calls Apple's speech
+    /// recognizer, and on a microphone or speech-recognition usage description. The consent text says speech reaches
+    /// the app only as text, and `DeepLink.composeVoice` (kept for links already out there) still opens Quick Capture.
+    func testVersionOneHasNoMicrophone() {
+        XCTAssertFalse(AIConsentDisclosure.speechNote.contains("On-device recognition"), AIConsentDisclosure.speechNote)
+        XCTAssertTrue(AIConsentDisclosure.speechNote.contains("only receives the text"), AIConsentDisclosure.speechNote)
+        XCTAssertEqual(DeepLink.composeVoice.host, DeepLink.compose.host)
+    }
 }

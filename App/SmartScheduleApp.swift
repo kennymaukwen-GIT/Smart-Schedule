@@ -75,9 +75,8 @@ struct SmartScheduleApp: App {
 final class AppRouter {
     static let shared = AppRouter()
 
-    struct QuickCapture: Equatable {
-        var startsWithVoice: Bool
-    }
+    /// Quick Capture is open. Every compose link opens it the same way, keyboard up: 1.0 has no in-app speech input.
+    struct QuickCapture: Equatable {}
 
     /// The sheets the main screen presents.
     enum Sheet: String, Identifiable {
@@ -103,7 +102,7 @@ final class AppRouter {
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         switch url.host {
         case "compose":
-            quickCapture = QuickCapture(startsWithVoice: items.first { $0.name == "mode" }?.value == "voice")
+            quickCapture = QuickCapture() // `?mode=voice` (DeepLink.composeVoice) opens it the same way
         case "event":
             selectedEventID = items.first { $0.name == "id" }?.value
         case "settings":
