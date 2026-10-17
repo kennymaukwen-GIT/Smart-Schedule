@@ -5,7 +5,8 @@ import SwiftUI
 /// page); then one section per Google account, headed by its email (its "…" menu: "Remove account"), listing that
 /// account's calendars. The colour square shows or hides a calendar in one tap; the row opens its details (colour
 /// on this iPhone, reminders, "Use for new events"). Under the accounts, one line says where sync with Google
-/// stands, followed by any change Google refused; last, "Add Google account" opens the add page.
+/// stands, followed by any change Google refused; last, "Add Google account" opens the add page. A tap on the dimmed
+/// rest of the screen, or a swipe towards the edge, closes it.
 ///
 /// Events sit above the accounts: they are what the drawer is opened to manage day to day, and with several
 /// accounts the calendars would push them below the fold.
@@ -25,26 +26,41 @@ struct CalendarDrawer: View {
 
     var body: some View {
         GeometryReader { geo in
-            NavigationStack(path: $path) {
-                // Every minute, so an event leaves the Events section once it has ended.
-                TimelineView(.everyMinute) { context in
-                    list(now: context.date)
-                }
-                .navigationTitle("Smart Schedules")
-                .navigationBarTitleDisplayMode(.large)
-                .navigationDestination(for: DrawerRoute.self) { route in
-                    switch route {
-                    case let .calendar(ref): CalendarDetailsView(ref: ref)
-                    case .events: AllEventsView()
+            HStack(spacing: 0) {
+                NavigationStack(path: $path) {
+                    // Every minute, so an event leaves the Events section once it has ended.
+                    TimelineView(.everyMinute) { context in
+                        list(now: context.date)
+                    }
+                    .navigationTitle("Smart Schedules")
+                    .navigationBarTitleDisplayMode(.large)
+                    .navigationDestination(for: DrawerRoute.self) { route in
+                        switch route {
+                        case let .calendar(ref): CalendarDetailsView(ref: ref)
+                        case .events: AllEventsView()
+                        }
                     }
                 }
+                .frame(width: min(340, geo.size.width * 0.84))
+                .background(Theme.surface.ignoresSafeArea())
+                .offset(x: min(0, drag))
+                // Only on the drawer's first page: rows of the events list swipe left for Delete and Edit.
+                .simultaneousGesture(closeGesture, including: path.isEmpty ? .all : .subviews)
+
+                // The rest of the screen, dimmed by RootView: a tap there closes the drawer. It belongs to this layer,
+                // which lies over the dim layer and spans the whole screen, so the tap can't miss it.
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onClose)
+                    .accessibilityElement()
+                    .accessibilityLabel(Text("Close"))
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { onClose() }
             }
-            .frame(width: min(340, geo.size.width * 0.84))
-            .background(Theme.surface.ignoresSafeArea())
-            .offset(x: min(0, drag))
-            // Only on the drawer's first page: rows of the events list swipe left for Delete and Edit.
-            .simultaneousGesture(closeGesture, including: path.isEmpty ? .all : .subviews)
         }
+        // The first page has no text field: it keeps its full height while a keyboard that was up when the drawer
+        // opened goes away. "All events" keeps the keyboard's area for its search results.
+        .ignoresSafeArea(.keyboard, edges: path.isEmpty ? Edge.Set.bottom : Edge.Set())
         .task {
             // Lists older than 6 h are fetched again; the `.accounts` change then reloads the drawer.
             await AccountManager.shared.refreshCalendarLists(force: false)

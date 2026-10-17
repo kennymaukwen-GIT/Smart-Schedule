@@ -148,6 +148,11 @@ accounts the calendar rows would push it below the fold.
   for 12 months: only months the cache lacks are listed, per calendar). While it loads, a last row shows a small
   spinner and "Loading events". Footnote: "Shows events in the next 12 months." 「列出接下來 12 個月內的行程。」
 - The drawer's drag-to-close only works on its first page, so rows of the list can swipe left.
+- A tap on the dimmed rest of the screen closes the drawer on any page. The tap target is part of the drawer's own layer
+  (`CalendarDrawer`), not only RootView's dim layer under it: the drawer layer spans the whole screen above the dim, so
+  on an iPhone the dim layer's tap alone did not close it.
+- The drawer's first page ignores the keyboard's area, so a keyboard still up when it opens (going away,
+  `KeyboardDismissal`) doesn't cut its background short; "All events" keeps that area for its search results.
 
 #### 2.2.2 The event page (UI; `App/Views/Events/EventPage.swift` in `EventDetailSheet`; writes `Shared/Calendar/EventEditor.swift`)
 
