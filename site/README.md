@@ -21,8 +21,8 @@ site/
     _headers           安全性標頭（不會被當成頁面提供）
     robots.txt
     logo.png           120×120，由 App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png 縮小；OAuth 同意畫面的 logo 用同一張
-    home-bg.webp       首頁背景照片，1984×1110（約 260 KB）。照片由網站擁有者提供：用 Higgsfield 依參考圖編輯產生（Higgsfield 說明中心寫明不主張產出的所有權、不限制商用；參考圖本身的權利仍由擁有者負責）。已裁掉截圖左邊 14 px 的灰邊、去掉中繼資料。有疑慮時刪掉這兩個檔案，並刪掉 `index.html` `<style>` 最後那段照片用的 CSS，首頁就回到原本的樣式
-    home-bg-1200.webp  同一張照片的 1200×671 版（約 116 KB），手機等窄螢幕用；兩張都只有首頁使用
+    home-bg.webp       首頁背景照片：網站擁有者 SHENG HAN HSIEH 自己拍攝、擁有版權的黑白海浪照片（2026-10-17 換上，取代原本用 Higgsfield 產生的那張）。2000×1333（約 206 KB），去掉中繼資料。要撤下時刪掉這兩個檔案，並刪掉 `index.html` `<style>` 最後那段照片用的 CSS，首頁就回到原本的樣式
+    home-bg-1200.webp  同一張照片的 1200×800 版（約 54 KB），手機等窄螢幕用；兩張都只有首頁使用
 ```
 
 - 每一頁都是繁體中文在前、英文在後，頁首有語言切換（`#zh`、`#en`，純錨點，不用 JavaScript）。審核員可以直接點「English」。

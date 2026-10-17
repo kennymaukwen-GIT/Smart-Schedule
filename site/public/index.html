@@ -104,8 +104,8 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 /* Home page only: photo background (home-bg-1200.webp on narrow screens, home-bg.webp from 48rem). Screen only, so
    printing keeps the plain page above. The photo is a fixed full-viewport layer, not background-attachment: fixed (iOS
    Safari ignores that). Over the photo the page is dark in both colour schemes. The scrim is 72% over the content column
-   (it fades to 40% outside it on wide screens): the brightest pixel of the photo then becomes at most rgb(77, 73, 55),
-   on which --text is 8.3:1, --muted 5.5:1 and --link 5.5:1 (WCAG AA needs 4.5:1). Translucent boxes only darken it. */
+   (it fades to 40% outside it on wide screens): the brightest pixel of the photo (pure white sky) then becomes at most
+   rgb(77, 80, 83), on which --text is 7.5:1, --muted 4.9:1 and --link 4.9:1 (WCAG AA needs 4.5:1). Translucent boxes only darken it. */
 @media screen {
   :root {
     color-scheme: dark;
