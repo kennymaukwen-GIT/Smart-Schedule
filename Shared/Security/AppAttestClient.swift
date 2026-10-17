@@ -40,7 +40,7 @@ enum AttestationError: LocalizedError {
         case .unsupported: String(localized: "This device can't prove it is running Smart Schedules, so the assistant is unavailable.")
         case .sessionMissing: String(localized: "Open Smart Schedules once so the assistant can answer here.")
         case .notConfigured: "GEMINI_BASE_URL must point at the Smart Schedules server (server/worker)."
-        case let .server(status): String(localized: "The Smart Schedules server didn't answer (\(status)). Try again later.")
+        case let .server(status): String(localized: "The Smart Schedules server returned an error (\(status)). Try again later.")
         case .attestationRejected: String(localized: "The Smart Schedules server couldn't verify this copy of the app, so the assistant is unavailable.")
         case .rateLimited: String(localized: "Too many requests. Wait a minute and try again.")
         case .dailyLimit: NetworkSession.isAppExtension
@@ -335,7 +335,7 @@ enum AttestedRequest {
         // No credential the server accepts: the extension has no session yet, or a Debug build on the simulator
         // sends no X-Dev-Token (SS_DEV_TOKEN unset, or GEMINI_BASE_URL is not the development Worker).
         case "attestation_required": return NetworkSession.isAppExtension ? .sessionMissing : .unsupported
-        // POST /attest refused the key (it answered: this is not "didn't answer").
+        // POST /attest refused the key: a cause retrying can't fix, not a passing server error.
         case "invalid_attestation": return .attestationRejected
         default: return .server(status: status)
         }

@@ -283,7 +283,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 
 **鏡頭 5b｜授權網址裡的 client ID（選擇性，建議拍）**
 - 為什麼：iOS 的 `ASWebAuthenticationSession` 只顯示網域（accounts.google.com），看不到網址裡的 `client_id`。
-- 怎麼拍（不改程式）：iPhone 接 Mac，用 Xcode 跑 Debug 版（它連開發用的 Worker，所以 AI 那段仍用 TestFlight 版錄；OAuth client 兩者相同）。在 `App/Auth/GoogleSignInCoordinator.swift` 的 `let authURL = GoogleAuthorization.url(…)` 下一行設中斷點 › Edit Breakpoint › Action「Debugger Command」`po authURL.absoluteString`，勾「Automatically continue after evaluating actions」。按「Continue with Google」時 Xcode 主控台印出完整網址；放大 `client_id=` 和 `scope=` 那一段，然後關掉 Google 的頁面。這段在主流程之前單獨錄：Debug 版和 TestFlight 版的 bundle ID 相同，錄完再從 TestFlight 裝回正式版錄鏡頭 5 以後。**不要**在鏡頭裡打開 `Config/Secrets.xcconfig`（裡面有開發用的 token 和伺服器網址）。
+- 怎麼拍（不改程式）：iPhone 接 Mac，用 Xcode 跑 Debug 版（`Config/Secrets.xcconfig` 有 `GEMINI_BASE_URL[config=Debug]` 時它連開發用的 Worker，沒有時連正式版；AI 那段仍用 TestFlight 版錄，影片裡就是送審的 build；OAuth client 兩者相同）。在 `App/Auth/GoogleSignInCoordinator.swift` 的 `let authURL = GoogleAuthorization.url(…)` 下一行設中斷點 › Edit Breakpoint › Action「Debugger Command」`po authURL.absoluteString`，勾「Automatically continue after evaluating actions」。按「Continue with Google」時 Xcode 主控台印出完整網址；放大 `client_id=` 和 `scope=` 那一段，然後關掉 Google 的頁面。這段在主流程之前單獨錄：Debug 版和 TestFlight 版的 bundle ID 相同，錄完再從 TestFlight 裝回正式版錄鏡頭 5 以後。**不要**在鏡頭裡打開 `Config/Secrets.xcconfig`（裡面有開發用的 token 和伺服器網址）。
 - 旁白：
   ```text
   Apple's sign-in sheet shows only the host name, so here is the full authorization URL the app opens, logged in Xcode. It carries our client ID and the four scopes: openid, email, calendar.events and calendar.calendarlist.readonly.

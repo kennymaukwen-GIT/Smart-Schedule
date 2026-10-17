@@ -142,7 +142,7 @@ open SmartSchedule.xcodeproj
 ```
 1. 在 Apple Developer 後台建立 App Group `group.com.smartschedule.shared`，三個 target 都勾選。如果要改 bundle ID 前綴，記得同步改 `AppConstants.appGroupID`。
 2. Google Cloud：啟用 Calendar API，OAuth consent screen 加入 `calendar.events` 和 `calendar.calendarlist.readonly`（抽屜列出每個行事曆要用），建立 **iOS** 類型的 OAuth client。
-3. Gemini：App 裡**沒有** API key。key 只放在 Smart Schedules 的伺服器（`server/worker/`，Cloudflare Worker 的 secret），App 以 App Attest 證明自己後經由伺服器呼叫 Gemini（通知擴充不能用 App Attest，改送 App 替它要的 session token）。`GEMINI_BASE_URL` 指向伺服器（`https://<worker 網域>/v1beta`）；模擬器沒有 App Attest，Debug 版改送 `SS_DEV_TOKEN`（Release 一律為空）。上線前替 Gemini API 的專案開啟 Cloud Billing（付費層級）：免費層級下 Google 可能用請求內容改善產品，App 裡不會也不能宣稱「不用於訓練」。
+3. Gemini：App 裡**沒有** API key。key 只放在 Smart Schedules 的伺服器（`server/worker/`，Cloudflare Worker 的 secret），App 以 App Attest 證明自己後經由伺服器呼叫 Gemini（通知擴充不能用 App Attest，改送 App 替它要的 session token）。`GEMINI_BASE_URL` 指向伺服器（`https://<worker 網域>/v1beta`）；Xcode 裝到 iPhone 的 Debug 版和 TestFlight 一樣以 App Attest 的 production 環境 attest，連正式版 Worker 就能用；模擬器沒有 App Attest，Debug 版改送 `SS_DEV_TOKEN`（只有開發版 Worker 接受，Release 一律為空）。上線前替 Gemini API 的專案開啟 Cloud Billing（付費層級）：免費層級下 Google 可能用請求內容改善產品，App 裡不會也不能宣稱「不用於訓練」。
 4. 訂閱（1.0 關閉）：要在模擬器測試，暫時把 `AppConstants.subscriptionsEnabled` 改成 true，Scheme 的 StoreKit Configuration 會用 `Config/SmartSchedule.storekit`；不要提交這個改動（`validate_schema.py` 和 `ReleaseConfigurationTests` 會擋下來）。
 5. 實機執行，到控制中心加入「Smart Schedules」控制項（設定 › 捷徑與 Siri 有步驟說明）。
 
@@ -152,7 +152,7 @@ open SmartSchedule.xcodeproj
 
 - [ ] **Gemini 付費層級**：替 Gemini API 的 Google Cloud 專案開啟 Cloud Billing。免費層級下 Google 可能用請求內容改善產品；App 和隱私權政策都不能宣稱「不用於訓練」。App 經由 `server/worker/` 呼叫 Gemini，API key 不在 App 裡。
 - [ ] **Google OAuth 驗證**：`calendar.events` 和 `calendar.calendarlist.readonly` 都是敏感 scope。送審 consent screen（App 名稱、logo、首頁、隱私權政策、授權網域）、每個 scope 的用途說明，以及一段示範影片（OAuth 流程、新增行程、抽屜列出行事曆）。consent screen 還在 Testing 時，refresh token 7 天就會失效。步驟、要貼的英文和影片腳本見 [`docs/google-oauth-verification.md`](docs/google-oauth-verification.md)。
-- [ ] **Apple Developer 帳號**：Apple Developer Program 已核准。Team ID（developer.apple.com › Membership details）填進 `Config/Secrets.xcconfig`，也用 `npx wrangler secret put APPLE_TEAM_ID` 設給正式環境的 Worker（沒設時 `POST /attest` 回 500，AI 助理不能用；見 [`server/worker/README.md`](server/worker/README.md)）。
+- [ ] **Apple Developer 帳號**：Apple Developer Program 已核准。Team ID（developer.apple.com › Membership details）填進 `Config/Secrets.xcconfig`，也用 `npx wrangler secret put APPLE_TEAM_ID` 設給正式環境的 Worker，兩邊必須是同一個 Team ID（沒設時 `POST /attest` 回 500；不同時回 `401 invalid_attestation`，App 顯示「Smart Schedules 的伺服器無法驗證這個 App，所以目前無法使用助理。」；見 [`server/worker/README.md`](server/worker/README.md)）。
 - [ ] **App ID 和功能**：`com.smartschedules.app`、`com.smartschedules.app.widgets`、`com.smartschedules.app.notification-content` 三個都勾 App Groups（`group.com.smartschedule.shared`）；主 App 另外要 App Attest 和 Time Sensitive Notifications。**不需要 Push Notifications**：1.0 沒有 `aps-environment`（`AppConstants.pushToStartEnabled = false`）。
 - [ ] **Worker（1.0）**：只要 `GEMINI_API_KEY` 和 `APPLE_TEAM_ID` 兩個 secret；正式環境 `crons = []`，不用建立 APNs 的 `.p8`，也不用設 `APNS_*` secrets（`server/worker/README.md`「1.0：push-to-start 關閉」）。
 - [ ] **App Store 隱私標籤**（與 `App/PrivacyInfo.xcprivacy` 一致）：Other User Content（請求內容和跟請求一起送出的行程，經 Smart Schedules 的伺服器（Cloudflare Worker）轉給 Google Gemini，伺服器不保存；1.0 沒有 push-to-start，伺服器不存任何行程；Google 帳號 email 不送給 Gemini）、Device ID（App Attest 金鑰 ID：每個請求都帶，伺服器用來驗證請求和依安裝限制次數；1.0 沒有安裝 ID 或 push token），用途都是 App 功能、連結身分、不用於追蹤。隱私權政策要寫明 Cloudflare 是處理者、Google 是接收者。

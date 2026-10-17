@@ -98,9 +98,10 @@ final class GeminiProxyTests: XCTestCase {
         XCTAssertEqual(ProxyStub.requests.count, 1)
     }
 
-    /// invalid_attestation (POST /attest refused the key: a Debug build attesting in App Attest's development environment
-    /// against a Worker that checks production, or a Team ID mismatch): the server answered, so it is not "didn't
-    /// answer (401)". A 401 code this build does not know still is.
+    /// invalid_attestation (POST /attest refused the key: a build attesting in App Attest's development environment, as
+    /// Debug builds did before project.yml set production, against a Worker that checks production, or an APPLE_TEAM_ID
+    /// that is not the build's team): it says the app could not be verified, not "returned an error (401), try again
+    /// later". A 401 code this build does not know still is the general error.
     func testARejectedAttestationSaysTheAppCouldNotBeVerified() throws {
         let rejected = AttestedRequest.failure(status: 401, data: Data(#"{"error":"invalid_attestation"}"#.utf8),
                                                response: nil)
@@ -111,7 +112,7 @@ final class GeminiProxyTests: XCTestCase {
         guard case .server(status: 401)? = unknown else { return XCTFail("got \(String(describing: unknown))") }
     }
 
-    /// server_misconfigured (a missing secret on the server): retrying cannot help, and it is not "didn't answer".
+    /// server_misconfigured (a missing secret on the server): retrying cannot help, and it is not a passing error.
     func testAServerThatIsNotSetUpIsNotRetried() async {
         ProxyStub.respond([(500, #"{"error":"server_misconfigured"}"#), (200, ProxyStub.okResponse)])
         do {
@@ -203,7 +204,7 @@ final class GeminiProxyTests: XCTestCase {
     }
 
     /// 401 attestation_required: no credential the server accepts (a simulator build without the dev token, or an
-    /// extension without a session) is not "the server didn't answer, try again later".
+    /// extension without a session) is not "the server returned an error, try again later".
     func testNoAcceptedCredentialIsNotATransientError() async {
         ProxyStub.respond([(401, #"{"error":"attestation_required"}"#)])
         do {

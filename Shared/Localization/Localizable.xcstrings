@@ -4487,22 +4487,22 @@
         }
       }
     },
-    "The Smart Schedules server didn't answer (%lld). Try again later." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smart Schedules 的伺服器沒有回應（%lld）。請稍後再試。"
-          }
-        }
-      }
-    },
     "The Smart Schedules server isn't ready yet. Try again later." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Smart Schedules 的伺服器尚未準備好，請稍後再試。"
+          }
+        }
+      }
+    },
+    "The Smart Schedules server returned an error (%lld). Try again later." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedules 的伺服器回應錯誤（%lld）。請稍後再試。"
           }
         }
       }

@@ -93,22 +93,28 @@ fork 這個 repo 時把正式環境的 `id` 那行刪掉，第一次部署就會
 
 ### 開發 / 正式環境
 
-`APP_ATTEST_ENV` 必須對應 App 的 `com.apple.developer.devicecheck.appattest-environment` entitlement，
-`APNS_ENV` 必須對應 App 的 `aps-environment`（1.0 的 App 沒有 `aps-environment`、也不跑 cron，`APNS_ENV` 目前沒有作用，維持下表的值即可）：
+`APP_ATTEST_ENV` 必須對應 App 的 `com.apple.developer.devicecheck.appattest-environment` entitlement（App 每個設定都是 `production`），
+`APNS_ENV` 必須對應 App 的 `aps-environment`（1.0 的 App 沒有 `aps-environment`、也不跑 cron，`APNS_ENV` 目前沒有作用，維持下表各 Worker 的值即可）：
 
-| App build | Worker（`GEMINI_BASE_URL`） | `APP_ATTEST_ENV` | `APNS_ENV` | `ALLOW_DEV_TOKEN` |
+| Worker | 哪些 build 連它（`GEMINI_BASE_URL`） | `APP_ATTEST_ENV` | `APNS_ENV` | `ALLOW_DEV_TOKEN` |
 | --- | --- | --- | --- | --- |
-| Debug，Simulator | 開發版 | （沒有 App Attest，改送 `X-Dev-Token`） | — | `"true"` |
-| Debug，Xcode 裝到 iPhone | 正式版（有開發版時也可以用開發版） | `production` | `sandbox`（開發版） | 開發版 `"true"` |
-| TestFlight / App Store | 正式版 | `production` | `production` | **必須不是** `"true"` |
+| 正式版 `smart-schedule-worker` | TestFlight / App Store；Xcode 裝到 iPhone 的 Debug 或 Release | `production` | `production` | **必須不是** `"true"` |
+| 開發版 `smart-schedule-worker-dev`（選用） | Simulator 的 Debug（沒有 App Attest，改送 `X-Dev-Token`）；`Secrets.xcconfig` 有 `GEMINI_BASE_URL[config=Debug]` 時 iPhone 的 Debug | `production` | `sandbox` | `"true"` |
 
 App 的 `APP_ATTEST_ENVIRONMENT`（`project.yml`）在 Debug 和 Release 都是 `production`：Apple 允許開發中的 build 用正式的
 App Attest（「If instead you want to use the App Attest production servers during development, … set the associated value
 to `production`」），TestFlight / App Store 則不論怎麼設都是 `production`。所以從 Xcode 裝到 iPhone 的 build（Debug 或 Release）
-正式版 Worker 都接受，兩個 Worker 的 `APP_ATTEST_ENV` 也都是 `production`（`test/config-sync.test.ts` 會檢查三者一致）。
-以前 Debug 是 `development`：沒有開發版 Worker 時 Debug build 連到正式版，`POST /attest` 被拒（`401 invalid_attestation`，
-Worker log 的原因是 aaguid），App 顯示「伺服器沒有回應（401）」。現在 App 對 `invalid_attestation` 顯示「Smart Schedules 的伺服器無法驗證這個 App」。
-（之後開啟 push-to-start 時：這種 build 的 `aps-environment` 仍是 development，push token 屬於 sandbox，正式版 Worker 送到正式 APNs
+正式版 Worker 都接受（`DEVELOPMENT_TEAM` 要等於 Worker 的 `APPLE_TEAM_ID`），兩個 Worker 的 `APP_ATTEST_ENV` 也都是 `production`
+（`test/config-sync.test.ts` 會檢查 App 的 Debug、Release 與兩個 Worker 都是 `production`）。代價：開發用 iPhone 每次重裝產生的 key
+會算進 Apple 正式環境的裝置計數（Apple 建議開發時用 sandbox 就是為了這個）；Worker 不使用 fraud metric receipt，所以沒有影響。
+
+以前 Debug 是 `development`：沒有開發版 Worker 時 Debug build 連到正式版，`POST /attest` 被拒（`401 invalid_attestation`），
+App 顯示「Smart Schedules 的伺服器沒有回應（401）」（這句已改成「…回應錯誤（401）…」）。現在 App 對 `invalid_attestation` 顯示「Smart Schedules 的伺服器無法驗證這個 App，
+所以目前無法使用助理。」原因看 Worker log 的 `attestation_rejected`（`npx wrangler tail --env=""`，或 Cloudflare 後台 Workers Logs）：
+`aaguid does not match the production environment` 是 build 的 App Attest 環境不對（改 `project.yml` 後要 `xcodegen generate` 再裝一次）；
+`rpIdHash does not match appId` 是 `APPLE_TEAM_ID` 和 build 的 Team（`DEVELOPMENT_TEAM`）不同；`bundleId not allowed` 是 `BUNDLE_IDS` 沒有這個 bundle ID。
+
+（之後開啟 push-to-start 時：從 Xcode 裝到 iPhone 的 build（Debug 或 Release）`aps-environment` 仍是 development，push token 屬於 sandbox，正式版 Worker 送到正式 APNs
 會被拒（`BadDeviceToken`）。push-to-start 請用 TestFlight 測，或用 Debug build 搭配開了 cron 與 APNs secrets 的開發版，
 見 `wrangler.toml` 的 `[env.dev]`。）
 
@@ -118,7 +124,8 @@ rate limiter 與 secrets，`ALLOW_DEV_TOKEN = "true"`、`APP_ATTEST_ENV = "produ
 
 ### Debug build 用的開發版
 
-開發版是選用的：Xcode 裝到 iPhone 的 Debug build 和其他 build 一樣以 App Attest 的 `production` 環境 attest，正式版就接受。
+開發版是選用的：Xcode 裝到 iPhone 的 Debug build 和其他 build 一樣以 App Attest 的 `production` 環境 attest，只要 `DEVELOPMENT_TEAM`
+和 Worker 的 `APPLE_TEAM_ID` 相同，正式版就接受。
 只有 Simulator 需要開發版：它沒有 App Attest，改送 `X-Dev-Token`，只有開發用 Worker 接受：
 
 ```sh
@@ -127,7 +134,7 @@ npm run deploy:dev                                   # 建立 smart-schedule-wor
 npx wrangler secret put GEMINI_API_KEY --env dev     # 貼上 Gemini 金鑰
 openssl rand -hex 32                                 # 產生一組 dev token，複製起來
 npx wrangler secret put SS_DEV_TOKEN --env dev       # 貼上剛才那組
-npx wrangler secret put APPLE_TEAM_ID --env dev      # 只有 Debug build 裝到 iPhone 時需要
+npx wrangler secret put APPLE_TEAM_ID --env dev      # 只有 iPhone 上的 Debug build 連開發版（GEMINI_BASE_URL[config=Debug]）時需要
 npm run check-key -- --worker                        # 填開發版網址（可含 /v1beta）與 dev token，確認整條路通
 ```
 
@@ -196,7 +203,7 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `APPLE_TEAM_ID` | secret | 10 字元 Team ID；appId = `<APPLE_TEAM_ID>.<bundleId>`。沒設時 `/attest` 回 500 |
 | `APNS_KEY_ID`, `APNS_TEAM_ID` | secret | APNs token auth（.p8 的 Key ID、擁有它的 Team ID） |
 | `BUNDLE_IDS` | var | 允許 attest 的 bundle ID（逗號分隔），預設 `com.smartschedules.app`（App Attest 不能在 extension 裡用，notification extension 改用 session） |
-| `APP_ATTEST_ENV` | var | `development`（aaguid `appattestdevelop`）或 `production`（`appattest` + 7 個 0x00） |
+| `APP_ATTEST_ENV` | var | `production`（aaguid `appattest` + 7 個 0x00；兩個 Worker 都用這個，App 每個設定都以 production attest）或 `development`（aaguid `appattestdevelop`；目前沒有 build 用，設了會拒絕所有 build） |
 | `ALLOW_DEV_TOKEN` | var | 只有字串 `"true"` 會啟用 `X-Dev-Token`（以及 dev 身分申請的 session） |
 | `RATE_LIMIT_PER_MIN` | var | 每個身分（attested key / `dev`；session 算在申請它的 key）每分鐘的 request 數，也是 `/attest*` 每個 IP（IPv6 以 /64 計）與每個 (IP, key) 的 Bearer body 讀取上限；須與 `[[ratelimits]]` 的 `simple.limit` 相同；預設 30 |
 | `SESSION_TTL_SECONDS` | var | `POST /session` 發出的 token 壽命（秒，≥ 60），預設 `604800`（7 天） |
@@ -233,9 +240,9 @@ Body `{"keyId","attestation","challenge","bundleId"}`（皆為字串，base64 �
 | 狀況 | 回應 |
 | --- | --- |
 | challenge 不存在 / 過期 / 已用過（用一次即刪） | `401 invalid_challenge` |
-| bundleId 不在 `BUNDLE_IDS`、任何驗證失敗、任何無法解析的輸入（Worker log 記錄具體原因） | `401 invalid_attestation`（不會是 500） |
+| bundleId 不在 `BUNDLE_IDS`、App Attest 環境（aaguid）或 Team ID（rpIdHash）和 build 不符、任何驗證失敗、任何無法解析的輸入（Worker log `attestation_rejected` 記錄具體原因） | `401 invalid_attestation`（不會是 500；App 顯示「…無法驗證這個 App…」） |
 | body 不是預期的 JSON | `400 invalid_request` |
-| root CA 缺少、`APPLE_TEAM_ID`/`APP_ATTEST_ENV` 設定錯誤 | `500 server_misconfigured` |
+| root CA 缺少、`APPLE_TEAM_ID` 沒設或不是 10 個大寫英數字、`APP_ATTEST_ENV` 不是 `development`／`production` | `500 server_misconfigured` |
 
 ### 驗證（其餘路由）
 
