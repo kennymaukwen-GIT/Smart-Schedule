@@ -477,7 +477,8 @@ final class ScheduleViewModel {
         syncStatus.failed.filter { !discardedChangeIDs.contains($0.id) }
     }
 
-    /// "Try without signing in": sample data and accounts, offline assistant, Live Activity, no Google or Gemini.
+    /// "Try without signing in": sample data and accounts, Live Activity, no Google account. The chat's assistant
+    /// (`DemoModeAssistant`) is Gemini on the sample calendars once AI data sharing is allowed, offline rules otherwise.
     func startDemo() async {
         AppConstants.setDemoMode(true)
         // A draft or batch belongs to the assistant that made it.
@@ -495,7 +496,10 @@ final class ScheduleViewModel {
         let snapshot = await store.snapshot()
         await store.remove(ids: Set(snapshot.events.map(\.id).filter(DemoData.isDemoID)))
         await store.resetLoadedRanges() // they held demo events
-        for planID in Set(snapshot.nudges.map(\.planID).filter(DemoData.isDemoID)) {
+        // The offline rules' plans have demo- ids; a plan the AI added to the sample calendars has a Google-style id,
+        // so its nudges are found through its (demo-) events.
+        let demoPlans = Set(snapshot.events.filter { DemoData.isDemoID($0.id) }.compactMap(\.planID))
+        for planID in Set(snapshot.nudges.map(\.planID)).filter({ DemoData.isDemoID($0) || demoPlans.contains($0) }) {
             await store.removeNudges(planID: planID)
         }
         // A demo draft or batch must not reach Google through the real assistant.

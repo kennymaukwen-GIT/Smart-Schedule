@@ -1,6 +1,8 @@
 import Foundation
 
-/// Offline stand-in for `ScheduleAssistant` in demo mode: no Google account, no Gemini key, no network.
+/// Demo mode's offline rules, a stand-in for `ScheduleAssistant`: no Google account, no Gemini, no network.
+/// `DemoModeAssistant` answers with them when AI data sharing is not allowed or the AI can't be reached (previews use
+/// them directly).
 /// Keyword heuristics cover the artboard flows (long-term plan, "push it 30 min", delete, agenda,
 /// "title + day + time" capture, a time counted from now ("1個小時後買蛋", "in an hour"), and "加個備註：…" notes).
 /// Every write goes to the local `SharedStore` only.

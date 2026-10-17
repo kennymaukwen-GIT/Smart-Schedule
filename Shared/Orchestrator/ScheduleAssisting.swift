@@ -1,7 +1,8 @@
 import Foundation
 
 /// What the chat panel, Quick Capture, Siri and the notification extension need from an assistant.
-/// `ScheduleAssistant` (Gemini + Google Calendar) is the real one; `DemoAssistant` is the offline stand-in.
+/// `ScheduleAssistant` (Gemini + Google Calendar) is the real one. Demo mode uses `DemoModeAssistant`: the real one
+/// on the sample calendars, with `DemoAssistant` (offline rules) as its fallback.
 ///
 /// Callers pass every argument. A protocol-extension `handle` overload with defaults would be ambiguous
 /// with `ScheduleAssistant.handle`'s own defaulted parameters.

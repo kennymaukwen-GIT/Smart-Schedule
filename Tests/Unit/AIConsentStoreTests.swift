@@ -113,7 +113,10 @@ final class AIConsentStoreTests: XCTestCase {
         }
 
         XCTAssertTrue(AIConsentDisclosure.footnote.contains("Nothing is sent to the AI until you tap Allow"))
+        // Demo mode asks the same way and sends the sample calendars and events (DemoModeAssistant).
         XCTAssertTrue(AIConsentDisclosure.footnote.contains("Demo mode"))
+        XCTAssertTrue(AIConsentDisclosure.footnote.contains("sample"))
+        XCTAssertFalse(AIConsentDisclosure.footnote.contains("never contacts"))
         // Only Gemini's paid tier keeps prompts out of training: the app must never promise it.
         let all = ([AIConsentDisclosure.title, AIConsentDisclosure.lead, AIConsentDisclosure.recipient,
                     AIConsentDisclosure.footnote, AIConsentDisclosure.speechNote, note] + items)

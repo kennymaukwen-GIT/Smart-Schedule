@@ -106,18 +106,19 @@ final class NotificationChatModel {
     @ObservationIgnored private let assistant: any ScheduleAssisting
     @ObservationIgnored private let clock = WallClock()
 
-    /// `assistant` nil = `DemoAssistant` in demo mode, otherwise a `ScheduleAssistant`.
+    /// `assistant` nil = `DemoModeAssistant` in demo mode (the AI on the sample data with consent given in the app,
+    /// its offline rules otherwise; it never refuses), otherwise a `ScheduleAssistant`.
     init(assistant: (any ScheduleAssisting)? = nil) {
         if let assistant {
             self.assistant = assistant
         } else if AppConstants.isDemoMode {
-            self.assistant = DemoAssistant()
+            self.assistant = DemoModeAssistant()
         } else {
             self.assistant = ScheduleAssistant() // own instance: the extension is a separate process from the app
         }
     }
 
-    var isDemo: Bool { assistant is DemoAssistant }
+    var isDemo: Bool { assistant is DemoAssistant || assistant is DemoModeAssistant }
 
     /// A plan or pending events card is in the conversation: the card needs the taller size.
     var hasPlan: Bool { turns.contains { $0.planDraft != nil || $0.pendingEvents != nil } }

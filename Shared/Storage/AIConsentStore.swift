@@ -16,6 +16,9 @@ struct AIConsent: Codable, Hashable, Sendable {
     /// Still 5 after the app's own microphone was removed before 1.0 shipped (2026-10-16): only `speechNote` changed
     /// (Siri and the keyboard's dictation instead of the On-device recognition setting); the lead, the five items and
     /// the recipient, quoted word for word in the privacy policy's section 4, are unchanged.
+    /// Still 5 after demo mode started using the AI before 1.0 shipped (2026-10-17): only `footnote` changed (demo mode
+    /// sends the sample calendars and events instead of never contacting the AI); the lead, the five items and the
+    /// recipient quoted in the policy's section 4 are unchanged.
     static let disclosureVersion = 5
 
     var status: Status = .notAsked
@@ -126,7 +129,8 @@ enum AIConsentDisclosure {
         String(localized: "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. Smart Schedules only receives the text.")
     }
 
+    /// Demo mode asks the same way (`DemoModeAssistant`); what it sends are the fictional sample calendars and events.
     static var footnote: String {
-        String(localized: "Nothing is sent to the AI until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode never contacts the AI.")
+        String(localized: "Nothing is sent to the AI until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode sends the sample calendars and events instead of your Google Calendar.")
     }
 }

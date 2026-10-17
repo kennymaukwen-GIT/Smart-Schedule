@@ -38,7 +38,8 @@ enum AppConstants {
 
     // MARK: Demo mode
 
-    /// Demo mode runs on `DemoData` and the offline `DemoAssistant`: no Google account, no Gemini key.
+    /// Demo mode runs on `DemoData`'s sample calendars, without a Google account. Its assistant (`DemoModeAssistant`)
+    /// is Gemini on those samples once AI data sharing is allowed, and the offline `DemoAssistant` rules otherwise.
     ///
     /// The flag lives in the App Group defaults so the notification content extension (its own process) sees it.
     /// `UserDefaults.standard` is the fallback because a launch argument `-SSDemoMode YES` (Xcode → Edit Scheme →

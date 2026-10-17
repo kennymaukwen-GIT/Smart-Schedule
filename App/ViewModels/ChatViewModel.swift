@@ -96,6 +96,9 @@ final class ChatViewModel {
     /// What the user sent while consent was missing: run once they tap Allow, without a second bubble.
     private(set) var pendingConsentUtterance: String?
     private(set) var isConsentGranted = AIConsentStore.current.isGranted
+    /// "Use the AI assistant?" was answered for the current disclosure without Allow ("Not now", or Stop sharing in
+    /// Settings): demo mode no longer asks before sending, its offline rules answer (`showsDemoOfflineBanner`).
+    private(set) var isConsentDeclined = ChatViewModel.declinedCurrentDisclosure(AIConsentStore.current)
 
     var isBusy: Bool { isSending || isAddingPlan }
 
@@ -107,13 +110,14 @@ final class ChatViewModel {
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var consentObservation: SharedChangeObservation?
 
-    /// `assistant` nil = the mode's default: `DemoAssistant` in demo mode, otherwise `ScheduleAssistant.shared`.
+    /// `assistant` nil = the mode's default: `DemoModeAssistant` in demo mode (Gemini on the sample calendars once AI
+    /// data sharing is allowed, the offline `DemoAssistant` rules otherwise), otherwise `ScheduleAssistant.shared`.
     init(schedule: ScheduleViewModel, assistant: (any ScheduleAssisting)? = nil) {
         self.schedule = schedule
         if let assistant {
             self.assistant = assistant
         } else if AppConstants.isDemoMode {
-            self.assistant = DemoAssistant()
+            self.assistant = DemoModeAssistant()
         } else {
             self.assistant = ScheduleAssistant.shared
         }
@@ -161,16 +165,24 @@ final class ChatViewModel {
     }
 
     func refreshConsent() {
-        isConsentGranted = AIConsentStore.current.isGranted
+        let consent = AIConsentStore.current
+        isConsentGranted = consent.isGranted
+        isConsentDeclined = Self.declinedCurrentDisclosure(consent)
+    }
+
+    /// Answered for the current disclosure, and not with Allow (declined, or revoked in Settings).
+    nonisolated static func declinedCurrentDisclosure(_ consent: AIConsent) -> Bool {
+        !consent.isGranted && !DemoModeAssistant.shouldAskConsent(consent)
     }
 
     // MARK: Demo
 
-    /// Switches to the offline assistant ("Try without signing in", Settings › Demo mode).
+    /// Switches to demo mode's assistant ("Try without signing in", Settings › Demo mode): Gemini on the sample
+    /// calendars once AI data sharing is allowed (the chat asks first, as signed in), the offline rules otherwise.
     func enableDemo() {
-        assistant = DemoAssistant()
+        assistant = DemoModeAssistant()
         messages.append(Message(role: .assistant,
-                                text: String(localized: "Demo mode: sample data. Nothing leaves this device. Try one of these:"),
+                                text: String(localized: "Demo mode: fictional sample calendars, not your Google Calendar. Try one of these:"),
                                 suggestions: Self.demoSuggestions))
     }
 
@@ -198,9 +210,16 @@ final class ChatViewModel {
     }
 
     /// "The assistant is off until you allow AI data sharing." over the composer: signed in to Google, not in demo
-    /// mode, and no consent (not asked yet, declined or revoked).
+    /// mode, and no consent (not asked yet, declined or revoked). Demo mode has `showsDemoOfflineBanner` instead.
     var showsConsentBanner: Bool {
         !isConsentGranted && !usesDemoAssistant && !schedule.isDemo && schedule.isSignedIn
+    }
+
+    /// "Demo mode is using offline rules. Allow AI data sharing to try the real assistant." over the composer: demo
+    /// mode, without consent, and "Use the AI assistant?" already answered for the current disclosure, so sending no
+    /// longer asks and the offline rules answer.
+    var showsDemoOfflineBanner: Bool {
+        schedule.isDemo && !isConsentGranted && isConsentDeclined
     }
 
     func send(_ override: String? = nil) {
@@ -209,11 +228,23 @@ final class ChatViewModel {
         draft = ""
         messages.append(Message(role: .user, text: text))
         // App Store guideline 5.1.2(i): nothing personal reaches Gemini before the user allows it.
-        guard usesDemoAssistant || AIConsentStore.current.isGranted else {
+        guard !asksConsentFirst else {
             requestConsent(for: text)
             return
         }
         run(text)
+    }
+
+    /// Whether `send` shows "Use the AI assistant?" before the assistant answers. The offline `DemoAssistant` sends
+    /// nothing, so never. Demo mode's `DemoModeAssistant` asks until the current disclosure is answered; after "Not
+    /// now" (or Stop sharing) its offline rules answer and say so. Every other assistant waits for Allow.
+    private var asksConsentFirst: Bool {
+        let consent = AIConsentStore.current
+        switch assistant {
+        case is DemoAssistant: return false
+        case is DemoModeAssistant: return DemoModeAssistant.shouldAskConsent(consent)
+        default: return !consent.isGranted
+        }
     }
 
     /// The assistant answers `text`, whose bubble is already in the conversation.
@@ -265,16 +296,23 @@ final class ChatViewModel {
     func allowConsent() {
         AIConsentStore.grant()
         isConsentGranted = true
+        isConsentDeclined = false
         consentRequest = nil
         resumeAfterConsent()
     }
 
-    /// "Not now": the assistant stays off; the banner explains how to turn it on.
+    /// "Not now": the assistant stays off; the banner explains how to turn it on. In demo mode the offline rules
+    /// answer the message that was waiting instead (their reply says why).
     func declineConsent() {
         AIConsentStore.decline()
         isConsentGranted = false
+        isConsentDeclined = true
         consentRequest = nil
         guard pendingConsentUtterance != nil else { return }
+        if assistant is DemoModeAssistant {
+            resumeAfterConsent()
+            return
+        }
         pendingConsentUtterance = nil
         messages.append(Message(role: .assistant,
                                 text: String(localized: "OK. The assistant stays off until you allow AI data sharing in Settings › AI & privacy.")))
@@ -288,9 +326,10 @@ final class ChatViewModel {
 
     // MARK: Note suggestions
 
-    /// "AI suggestions" on the event page, from the assistant the chat uses: Gemini, or in demo mode Smart Schedule's
-    /// rules. Throws `GeminiError.consentRequired` without AI consent; the page asks with its own consent sheet
-    /// (it is a sheet itself) and calls again after Allow. Nothing is written.
+    /// "AI suggestions" on the event page, from the assistant the chat uses: Gemini (in demo mode for a sample event,
+    /// with Smart Schedule's rules after "Not now" or when the AI can't be reached). Throws
+    /// `GeminiError.consentRequired` while consent is missing (in demo mode: not asked yet); the page asks with its own
+    /// consent sheet (it is a sheet itself) and calls again after Allow. Nothing is written.
     func suggestNotes(for event: ScheduleEvent) async throws -> [NoteSuggestion] {
         try await assistant.suggestNotes(for: event)
     }
@@ -445,6 +484,8 @@ final class ChatViewModel {
         draft = ""
         pendingConsentUtterance = nil
         Task { await ScheduleAssistant.shared.resetConversation() }
+        // Demo mode's assistant keeps a conversation of its own (and the offline rules' open question): a new one.
+        if assistant is DemoModeAssistant { assistant = DemoModeAssistant() }
     }
 
     /// After "Erase all data on this device": the signed-out welcome state, with no consent.
@@ -457,7 +498,7 @@ final class ChatViewModel {
 
     // MARK: Private
 
-    private var usesDemoAssistant: Bool { assistant is DemoAssistant }
+    private var usesDemoAssistant: Bool { assistant is DemoAssistant || assistant is DemoModeAssistant }
 
     private func apply(_ reply: ScheduleAssistant.Reply) async {
         // Typed approval ("looks good", "加入") or abandonment ("cancel the plan") settles the open card.

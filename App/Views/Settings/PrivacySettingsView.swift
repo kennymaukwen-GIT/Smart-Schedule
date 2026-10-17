@@ -71,7 +71,7 @@ struct PrivacySettingsView: View {
             Button("Stop sharing", role: .destructive) { model.stopSharingAI() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The assistant will stop working until you allow sharing again. Demo mode keeps working.")
+            Text("The assistant will stop working until you allow sharing again. Demo mode keeps working with offline rules.")
         }
         .toolbar {
             if !model.ledger.isEmpty { EditButton() }

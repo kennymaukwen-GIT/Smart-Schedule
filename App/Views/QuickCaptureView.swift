@@ -303,6 +303,10 @@ struct QuickCaptureView: View {
 
             if chat.showsConsentBanner {
                 ConsentBanner { chat.reviewConsent() }
+            } else if chat.showsDemoOfflineBanner {
+                ConsentBanner(message: "Demo mode is using offline rules. Allow AI data sharing to try the real assistant.") {
+                    chat.reviewConsent()
+                }
             }
 
             ComposerBar(

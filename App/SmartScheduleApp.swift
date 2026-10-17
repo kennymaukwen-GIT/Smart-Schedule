@@ -181,7 +181,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             var answer: String
             var planID: String?
             var batchID: String?
-            let assistant: any ScheduleAssisting = AppConstants.isDemoMode ? DemoAssistant() : ScheduleAssistant.shared
+            // Demo mode: the AI on the sample data with consent, its offline rules without (it never refuses).
+            let assistant: any ScheduleAssisting = AppConstants.isDemoMode ? DemoModeAssistant() : ScheduleAssistant.shared
             do {
                 let reply = try await assistant.handle(text, focusEventID: eventID, now: Date())
                 answer = reply.text

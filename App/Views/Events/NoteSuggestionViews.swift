@@ -21,7 +21,8 @@ final class NoteSuggestionsModel {
     enum Phase: Equatable {
         case idle
         case loading
-        /// Answered. `fromRules`: Smart Schedule's own rules answered (demo mode, offline), not Gemini.
+        /// Answered. `fromRules`: Smart Schedule's own rules answered (offline, or demo mode without the AI), not
+        /// Gemini.
         /// `added`: how many new chips it brought.
         case loaded(fromRules: Bool, added: Int)
         case failed
@@ -84,9 +85,11 @@ final class NoteSuggestionsModel {
         isDismissed = false
     }
 
-    /// "AI suggestions": ideas for `event` (as edited so far) added after the chips already shown. Demo mode
-    /// answers from the rule engine (`DemoAssistant`); offline, this device does the same. Without AI consent
-    /// `fetch` throws `GeminiError.consentRequired`: the sheet asks, and Allow asks Gemini again.
+    /// "AI suggestions": ideas for `event` (as edited so far) added after the chips already shown. Offline, this
+    /// device answers from the rule engine, in demo mode too (its AI needs the network as well). Demo mode asks Gemini
+    /// about a sample event once AI data sharing is allowed, and its rules answer otherwise; an answer without an AI
+    /// item says the rules answered. Without AI consent `fetch` throws `GeminiError.consentRequired` (demo mode: only
+    /// before "Use the AI assistant?" was answered): the sheet asks, and Allow asks Gemini again.
     func requestSuggestions(for event: ScheduleEvent,
                             notes: String,
                             shown: [NoteSuggestion],
@@ -101,7 +104,7 @@ final class NoteSuggestionsModel {
             self?.answerFromRules(for: event, notes: notes, shown: shown, preferChinese: preferChinese,
                                   homeTimeZone: homeTimeZone)
         }
-        if isOffline && !isDemo {
+        if isOffline {
             fallback()
             return
         }
@@ -110,7 +113,7 @@ final class NoteSuggestionsModel {
             do {
                 let suggestions = try await fetch(event)
                 // The answer leads with the rules the row already shows; without an AI item, only they answered.
-                let fromRules = isDemo || !suggestions.contains(where: { $0.source == .ai })
+                let fromRules = !suggestions.contains(where: { $0.source == .ai })
                 add(suggestions, fromRules: fromRules, shown: shown, notes: notes)
             } catch GeminiError.consentRequired {
                 phase = .idle

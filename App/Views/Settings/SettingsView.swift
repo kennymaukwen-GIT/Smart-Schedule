@@ -80,7 +80,7 @@ struct SettingsView: View {
                         Label("Demo mode", systemImage: "theatermasks")
                     }
                 } footer: {
-                    Text("Sample data and an offline assistant. Nothing is sent to Google.")
+                    Text("Fictional sample calendars; your Google account isn't used. With AI data sharing allowed, what you type and the sample events go to Google's Gemini API; otherwise offline rules answer.")
                 }
 
                 Section {

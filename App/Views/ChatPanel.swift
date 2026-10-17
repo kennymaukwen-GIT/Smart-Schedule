@@ -74,6 +74,10 @@ struct ChatPanel: View {
 
             if chat.showsConsentBanner {
                 ConsentBanner { chat.reviewConsent() }
+            } else if chat.showsDemoOfflineBanner {
+                ConsentBanner(message: "Demo mode is using offline rules. Allow AI data sharing to try the real assistant.") {
+                    chat.reviewConsent()
+                }
             }
 
             ComposerBar(
@@ -112,7 +116,7 @@ private struct DemoBadge: View {
                     .padding(.vertical, 4)
                     .background(Capsule().fill(Theme.demoBadge))
             }
-            Text("Sample data · nothing is sent to Google")
+            Text("Sample data · not your Google Calendar")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)

@@ -192,10 +192,10 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
   4. 行事曆名稱和助理設定，但**不包括 Google 帳號的 email**；
   5. 時區和語言。
 
-  另外的段落：語音說明「你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字，Smart Schedules 只會收到文字。」（App 本身沒有麥克風和語音辨識）；註腳「點『允許』之前，不會傳送任何資料給 AI……示範模式從不連線到 AI」。iOS 18 的伺服器說明（接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色存在 Smart Schedules 的伺服器並透過 Apple 的推播服務送出）只在 `AppConstants.pushToStartEnabled` 為 true 時出現（`AIConsentDisclosure.serverNote`），1.0 在每個 iOS 版本都是 nil：伺服器不存任何行程。
+  另外的段落：語音說明「你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字，Smart Schedules 只會收到文字。」（App 本身沒有麥克風和語音辨識）；註腳「點『允許』之前，不會傳送任何資料給 AI……示範模式傳送的是範例行事曆和行程，不是你的 Google 日曆。」（只改了註腳，揭露版本仍是 5）。iOS 18 的伺服器說明（接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色存在 Smart Schedules 的伺服器並透過 Apple 的推播服務送出）只在 `AppConstants.pushToStartEnabled` 為 true 時出現（`AIConsentDisclosure.serverNote`），1.0 在每個 iOS 版本都是 nil：伺服器不存任何行程。
 - **絕對不要寫「不會被用來訓練」**：這只在 Gemini 付費方案成立。上線檢查清單：在 Gemini API 專案啟用 Cloud Billing（付費方案）。免費方案下 Google 可能用 prompt 改善產品。
-- 示範模式（`DemoAssistant`）不呼叫 Gemini，不需要同意。
-- Siri（`AddPlanIntent`）沒有同意時直接回「Turn on AI data sharing in the Smart Schedules settings first.」，不呼叫助理。
+- 示範模式也要同意；同意後用 Gemini（範例行事曆，加上 # DEMO MODE 段落），沒有同意或失敗時用離線規則（`DemoModeAssistant` → `DemoAssistant`）。聊天在還沒回答過目前版本的同意時先問（`DemoModeAssistant.shouldAskConsent`）；按「現在不要」之後不再問，改用離線規則並說明原因。
+- Siri（`AddPlanIntent`）沒有同意時直接回「Turn on AI data sharing in the Smart Schedules settings first.」，不呼叫助理。示範模式不會拒絕：沒有同意時用離線規則回答。
 
 ## 9. 模型設定
 
@@ -380,7 +380,7 @@ ALREADY SUGGESTED: Bring passport; Check visa or entry documents; Pack a plug ad
 | 回傳 | 先是規則的建議（`.rules`，就是頁面已經顯示的那些），再接 AI 新增的（`.ai`，最多 4 個）。AI 的項目會整理（去掉項目符號、編號、句點，超過 60 字的丟掉），和規則、行程已存的建議、備註**意思一樣**的不要（「Passport」和「Bring passport」算同一個） |
 | 沒有新的 | 回傳裡沒有 `.ai` 項目時，頁面顯示「來自 Smart Schedules 的建議」 |
 | 離線 | `URLError` 往上丟，頁面改用規則（`NoteSuggester`，最多 8 個），一樣顯示「來自 Smart Schedules 的建議」 |
-| 示範模式 | `DemoAssistant.suggestNotes` 只用規則，最多 8 個（`NoteSuggester.requestLimit`），什麼都不送 |
+| 示範模式 | 允許 AI 後是 Gemini＋規則；未允許或失敗時只用規則（`DemoAssistant.suggestNotes`，最多 8 個，`NoteSuggester.requestLimit`），什麼都不送。還沒回答過同意時一樣丟 `GeminiError.consentRequired`，行程頁跳出同意說明 |
 | 寫入 | 不寫入。點膠囊只改行程頁正在編輯的備註，按「儲存」才寫進 Google（和其他修改同一條路徑） |
 
 ### 12.3 `create_events.suggested_notes`

@@ -15,11 +15,13 @@ struct AddPlanIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let demo = AppConstants.isDemoMode
-        // Nothing may reach Gemini before the user allowed it in the app (the sheet cannot be shown from Siri).
+        // Nothing may reach Gemini before the user allowed it in the app (the sheet cannot be shown from Siri). Demo
+        // mode never refuses: with consent given in the app it uses the AI on the sample data, otherwise its offline
+        // rules answer.
         guard demo || AIConsentStore.current.isGranted else {
             return .result(dialog: "\(Self.consentNeeded)")
         }
-        let assistant: any ScheduleAssisting = demo ? DemoAssistant() : ScheduleAssistant.shared
+        let assistant: any ScheduleAssisting = demo ? DemoModeAssistant() : ScheduleAssistant.shared
         var reply: ScheduleAssistant.Reply
         do {
             reply = try await assistant.handle(text, focusEventID: nil, now: Date())

@@ -1801,6 +1801,16 @@
         }
       }
     },
+    "Demo mode is using offline rules. Allow AI data sharing to try the real assistant." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式正在使用離線規則。允許 AI 資料分享，就能試用真正的 AI 助理。"
+          }
+        }
+      }
+    },
     "Demo mode repeats only daily and weekly events, so this one was added once." : {
       "localizations" : {
         "zh-Hant" : {
@@ -1811,32 +1821,22 @@
         }
       }
     },
+    "Demo mode: fictional sample calendars, not your Google Calendar. Try one of these:" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式：使用虛構的範例行事曆，不是你的 Google 日曆。試試看："
+          }
+        }
+      }
+    },
     "Demo mode: nothing was written to Google Calendar." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "示範模式：沒有寫入 Google 日曆。"
-          }
-        }
-      }
-    },
-    "Demo mode: sample data, nothing leaves this device. Try “Lunch with Andrew tomorrow 1pm”, “push the team sync 30 min” or “I want to be muscular in 6 months”." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "示範模式：使用範例資料，不會離開這台裝置。試試「明天下午 1 點 Andrew 午餐」、「下一個行程延後 30 分鐘」或「我想在 6 個月內增肌」。"
-          }
-        }
-      }
-    },
-    "Demo mode: sample data. Nothing leaves this device. Try one of these:" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "示範模式：使用範例資料，不會離開這台裝置。試試看："
           }
         }
       }
@@ -2223,6 +2223,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "匯出我的資料"
+          }
+        }
+      }
+    },
+    "Fictional sample calendars; your Google account isn't used. With AI data sharing allowed, what you type and the sample events go to Google's Gemini API; otherwise offline rules answer." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用虛構的範例行事曆，不會用到你的 Google 帳號。允許 AI 資料分享時，你輸入的內容和範例行程會傳送到 Google 的 Gemini API；否則由離線規則回答。"
           }
         }
       }
@@ -3083,12 +3093,12 @@
         }
       }
     },
-    "Nothing is sent to the AI until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode never contacts the AI." : {
+    "Nothing is sent to the AI until you tap Allow. You can stop sharing any time in Settings › AI & privacy. Demo mode sends the sample calendars and events instead of your Google Calendar." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "點「允許」之前，不會傳送任何資料給 AI。你隨時可以在「設定 › AI 與隱私」停止分享。示範模式從不連線到 AI。"
+            "value" : "點「允許」之前，不會傳送任何資料給 AI。你隨時可以在「設定 › AI 與隱私」停止分享。示範模式傳送的是範例行事曆和行程，不是你的 Google 日曆。"
           }
         }
       }
@@ -3827,22 +3837,12 @@
         }
       }
     },
-    "Sample data and an offline assistant. Nothing is sent to Google." : {
+    "Sample data · not your Google Calendar" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用範例資料和離線助理，不會傳送任何資料到 Google。"
-          }
-        }
-      }
-    },
-    "Sample data · nothing is sent to Google" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "範例資料 · 不會傳送到 Google"
+            "value" : "範例資料 · 不是你的 Google 日曆"
           }
         }
       }
@@ -4517,12 +4517,12 @@
         }
       }
     },
-    "The assistant will stop working until you allow sharing again. Demo mode keeps working." : {
+    "The assistant will stop working until you allow sharing again. Demo mode keeps working with offline rules." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在你再次允許分享之前，助理會停止運作。示範模式仍可使用。"
+            "value" : "在你再次允許分享之前，助理會停止運作。示範模式仍可使用，改用離線規則。"
           }
         }
       }

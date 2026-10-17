@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Over the composer (chat panel and Quick Capture) while AI data sharing is not allowed: says why the assistant
-/// is quiet and opens the consent sheet.
+/// is quiet (in demo mode: that the offline rules answer) and opens the consent sheet.
 struct ConsentBanner: View {
+    var message: LocalizedStringKey = "The assistant is off until you allow AI data sharing."
     var onReview: () -> Void
 
     var body: some View {
@@ -10,7 +11,7 @@ struct ConsentBanner: View {
             Image(systemName: "hand.raised")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary)
-            Text("The assistant is off until you allow AI data sharing.")
+            Text(message)
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)

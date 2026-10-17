@@ -365,7 +365,8 @@ struct EventPage: View {
         draft.notes = NoteSuggester.appending(chip.text, to: draft.notes)
     }
 
-    /// "AI suggestions": through the chat's assistant (the demo one in demo mode), else the mode's own.
+    /// "AI suggestions": through the chat's assistant (in demo mode `DemoModeAssistant`: Gemini for a sample event once
+    /// AI data sharing is allowed, the rules otherwise), else the mode's own.
     private func requestSuggestions() {
         focus = nil
         let subject = suggestionSubject
@@ -381,7 +382,7 @@ struct EventPage: View {
             isOffline: schedule.isNetworkOffline,
             fetch: { event in
                 if let chat { return try await chat.suggestNotes(for: event) }
-                let assistant: any ScheduleAssisting = isDemo ? DemoAssistant() : ScheduleAssistant.shared
+                let assistant: any ScheduleAssisting = isDemo ? DemoModeAssistant() : ScheduleAssistant.shared
                 return try await assistant.suggestNotes(for: event)
             }
         )

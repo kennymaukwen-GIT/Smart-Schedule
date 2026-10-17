@@ -104,4 +104,14 @@ final class LocalizationCatalogTests: XCTestCase {
         XCTAssertEqual(zh(AIConsentDisclosure.speechNote, in: table),
                        "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字，Smart Schedules 只會收到文字。")
     }
+
+    /// Demo mode with the AI (DemoModeAssistant): the consent sheet's footnote says what demo mode sends, and the
+    /// composer banner says the offline rules answer after "Not now".
+    func testDemoModeConsentTexts() throws {
+        let table = try chineseTable()
+        XCTAssertEqual(zh(AIConsentDisclosure.footnote, in: table),
+                       "點「允許」之前，不會傳送任何資料給 AI。你隨時可以在「設定 › AI 與隱私」停止分享。示範模式傳送的是範例行事曆和行程，不是你的 Google 日曆。")
+        XCTAssertEqual(zh("Demo mode is using offline rules. Allow AI data sharing to try the real assistant.", in: table),
+                       "示範模式正在使用離線規則。允許 AI 資料分享，就能試用真正的 AI 助理。")
+    }
 }
