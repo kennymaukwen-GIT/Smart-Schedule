@@ -84,8 +84,7 @@ export function sessionTtlSeconds(env: Env): number {
  * extension — and remove an old one only once no supported build sends it, or Google has shut it down. Never a prefix.
  * test/config-sync.test.ts checks that the current GEMINI_MODEL_ID is listed here and in wrangler.toml.
  */
-// gemini-3.8-flash: the app since 2026-10-17. gemini-3.5-flash: the builds before it (still on testers' iPhones).
-export const DEFAULT_SESSION_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash"];
+export const DEFAULT_SESSION_MODELS = ["gemini-3.8-flash"];
 
 /** Models a Session token may call (POST …/models/<model>:generateContent only). */
 export function sessionModels(env: Env): string[] {

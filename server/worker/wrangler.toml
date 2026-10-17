@@ -70,7 +70,7 @@ SESSION_TTL_SECONDS = "604800"
 # before submitting the build that uses it (App Review tests the notification extension). Remove an old ID only once
 # no supported build sends it, or Google has shut it down. Exact IDs only, never a prefix. (test/config-sync.test.ts
 # fails when the current GEMINI_MODEL_ID is missing here.)
-SESSION_MODELS = "gemini-3.8-flash,gemini-3.5-flash"
+SESSION_MODELS = "gemini-3.8-flash"
 # Session-authenticated generateContent calls per identity per UTC day (the extension makes 1-3 per reply).
 SESSION_DAILY_LIMIT = "200"
 # Successful attestations (new identities) per client IP per UTC day; IPv6 counted per /64. High because mobile
@@ -135,6 +135,6 @@ RATE_LIMIT_PER_MIN = "30"
 APNS_BUNDLE_ID = "com.smartschedules.app"
 APNS_ENV = "sandbox"
 SESSION_TTL_SECONDS = "604800"
-SESSION_MODELS = "gemini-3.8-flash,gemini-3.5-flash"
+SESSION_MODELS = "gemini-3.8-flash"
 SESSION_DAILY_LIMIT = "200"
 ATTEST_DAILY_PER_IP = "200"

@@ -208,7 +208,7 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
 
 ## 9. 模型設定
 
-- `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.8-flash`（2026-10-17 從 `gemini-3.5-flash` 換過來，Worker 的 `SESSION_MODELS` 兩個都留著）。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。換 ID 前先把它加進 Worker 的 `SESSION_MODELS`（`server/worker/wrangler.toml`）並部署，舊 ID 留到舊版 App 不再使用；remote config 能選的每個模型也都要在裡面，否則通知擴充的回覆會被拒。
+- `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.8-flash`（2026-10-17 從 `gemini-3.5-flash` 換過來；1.0 還沒上架，Worker 的 `SESSION_MODELS` 只留 3.8）。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。換 ID 前先把它加進 Worker 的 `SESSION_MODELS`（`server/worker/wrangler.toml`）並部署，舊 ID 留到舊版 App 不再使用；remote config 能選的每個模型也都要在裡面，否則通知擴充的回覆會被拒。
 - `thinkingLevel: "low"`：只對 Gemini 3.x 有效。2.x 用的是 `thinkingBudget`，參數不相容。
 - **不設定 temperature**：Gemini 3 的官方建議是保持預設值 1.0，調低可能造成迴圈或品質下降。
 - 「send a link」（Artboard 5 的迴紋針）：Gemini API 的 changelog（2026-03）寫明，內建工具（如 `url_context`）可以和自訂 function 在同一次呼叫裡並用。建議把這件事放在 proxy 端做，讓模型直接讀活動頁面。舊模型則先跑一次 `url_context` 抽出文字，再呼叫 function。
