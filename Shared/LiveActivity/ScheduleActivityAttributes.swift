@@ -81,3 +81,13 @@ extension ScheduleActivityAttributes.ContentState {
         return countdownFrom...target
     }
 }
+
+extension ScheduleActivityAttributes.DayDigest {
+    /// What one day of the week strip shows in at most `rows` rows: its first chips, then "+N" in the last row for every
+    /// event not shown (`more`). The expanded island is capped at 160 pt, so a day has room for two rows only.
+    func visibleRows(_ rows: Int) -> (chips: [ScheduleActivityAttributes.Chip], more: Int) {
+        let total = chips.count + overflow
+        let shown = total <= rows ? min(chips.count, rows) : max(0, rows - 1)
+        return (Array(chips.prefix(shown)), total - shown)
+    }
+}

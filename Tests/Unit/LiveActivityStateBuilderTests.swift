@@ -9,6 +9,31 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         LiveActivityStateBuilder.build(events: events, lastLine: lastLine, now: now ?? self.now, clock: clock)
     }
 
+    /// The island's week strip has room for two rows a day: two chips, or one chip and "+N" for every other event.
+    func testADayShowsAtMostTwoRows() {
+        let chip = { (title: String) in ScheduleActivityAttributes.Chip(title: title, colorHex: "#33B679", isTask: false) }
+        func rows(_ chips: Int, overflow: Int) -> (titles: [String], more: Int) {
+            let day = ScheduleActivityAttributes.DayDigest(dayNumber: 17, chips: (0..<chips).map { chip("e\($0)") },
+                                                           overflow: overflow)
+            let shown = day.visibleRows(2)
+            return (shown.chips.map(\.title), shown.more)
+        }
+        XCTAssertEqual(rows(0, overflow: 0).titles, [])
+        XCTAssertEqual(rows(1, overflow: 0).titles, ["e0"])
+        XCTAssertEqual(rows(2, overflow: 0).titles, ["e0", "e1"])
+        XCTAssertEqual(rows(2, overflow: 0).more, 0)
+        // Yoga, 我要吃飯 and one more: Yoga and "+2".
+        XCTAssertEqual(rows(2, overflow: 1).titles, ["e0"])
+        XCTAssertEqual(rows(2, overflow: 1).more, 2)
+        // One chip (a long payload kept one) and one more event: both rows used.
+        XCTAssertEqual(rows(1, overflow: 1).titles, ["e0"])
+        XCTAssertEqual(rows(1, overflow: 1).more, 1)
+        XCTAssertEqual(rows(1, overflow: 4).titles, ["e0"])
+        XCTAssertEqual(rows(1, overflow: 4).more, 4)
+        XCTAssertEqual(rows(0, overflow: 3).titles, [])
+        XCTAssertEqual(rows(0, overflow: 3).more, 3)
+    }
+
     func testWeekHasSevenDaysStartingSunday() {
         let state = build([])
         XCTAssertEqual(state.days.count, 7)

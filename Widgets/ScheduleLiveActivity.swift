@@ -4,8 +4,10 @@ import WidgetKit
 
 /// Dynamic Island + Lock Screen presentation (Artboards 2 & 3).
 ///
-/// Height budget: the expanded island and the Lock Screen view are capped at 160 pt by the system;
-/// anything taller is clipped. Layout below ≈ 36 (header row) + 64 (week) + 36 (Edit button) + spacing.
+/// Height budget: the expanded island and the Lock Screen view are capped at 160 pt by the system; anything taller is
+/// clipped. On an iPhone the bottom region starts ≈ 60 pt down (the header row and the headline under the camera), so
+/// it has ≈ 98 pt: the week strip (≈ 51: two rows per day, `DayDigest.visibleRows`) + 5 + the Edit button (30) leaves
+/// a margin above the island's rounded bottom. Three rows per day and a 36 pt button cut the button off.
 struct ScheduleLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ScheduleActivityAttributes.self) { context in
@@ -64,11 +66,10 @@ struct ExpandedIslandView: View {
     let state: ScheduleActivityAttributes.ContentState
 
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 5) {
             IslandWeekStrip(state: state)
             IslandEditButton()
         }
-        .padding(.top, 2)
     }
 }
 
@@ -81,28 +82,31 @@ struct IslandWeekStrip: View {
 
         HStack(alignment: .top, spacing: 2) {
             ForEach(Array(state.days.enumerated()), id: \.offset) { index, day in
-                VStack(spacing: 2) {
+                // Two rows at most: two chips, or one and "+N" for the rest.
+                let rows = day.visibleRows(2)
+                VStack(spacing: 1) {
                     Text(letters[index % 7])
                         .font(.system(size: 7, weight: .semibold))
                         .foregroundStyle(Theme.textSecondary)
                     Text("\(day.dayNumber)")
-                        .font(.system(size: 11, weight: .bold).monospacedDigit())
+                        .font(.system(size: 10, weight: .bold).monospacedDigit())
                         .foregroundStyle(index == state.todayIndex ? Color.black : Color.white)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 16, height: 16)
                         .background(Circle().fill(index == state.todayIndex ? Color.white : Color.clear))
-                    ForEach(Array(day.chips.enumerated()), id: \.offset) { _, chip in
+                    ForEach(Array(rows.chips.enumerated()), id: \.offset) { _, chip in
                         IslandChip(chip: chip)
                     }
-                    if day.overflow > 0 {
-                        Text("+\(day.overflow)")
-                            .font(.system(size: 6, weight: .semibold))
+                    if rows.more > 0 {
+                        Text("+\(rows.more)")
+                            .font(.system(size: 6.5, weight: .semibold))
                             .foregroundStyle(Theme.textSecondary)
+                            .frame(height: 9)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 3)
         .padding(.horizontal, 4)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -134,17 +138,18 @@ struct IslandChip: View {
     }
 }
 
-/// Full-width "Edit" capsule (zh-Hant 「編輯」 from the String Catalog). The whole capsule is one `Link` to
-/// `DeepLink.compose`, so a tap anywhere on it opens Quick Capture with the keyboard up.
+/// Full-width "Edit" capsule (zh-Hant 「編輯」 from the String Catalog), 30 pt tall to fit the island's height budget.
+/// The whole capsule is one `Link` to `DeepLink.compose`, so a tap anywhere on it opens Quick Capture with the keyboard
+/// up (as does a tap anywhere else on the island: its `widgetURL`).
 struct IslandEditButton: View {
     var body: some View {
         Link(destination: DeepLink.compose) {
             Text("Edit")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity)
-                .frame(height: 36)
+                .frame(height: 30)
                 .background(Capsule().fill(Color.white.opacity(0.16)))
         }
     }

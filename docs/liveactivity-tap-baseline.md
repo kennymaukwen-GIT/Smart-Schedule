@@ -27,6 +27,8 @@ Deep link 定義（`Shared/Core/AppConstants.swift`）：
 |---|---|---|---|---|
 | T3′ | `IslandEditButton`（展開的動態島底部「編輯」按鈕，取代 T3–T5） | `Link(destination: DeepLink.compose)` 包 `Text("Edit")` | 展開的動態島 | `smartschedule://compose` |
 
+**2026-10-17 更新（高度）：** 展開的動態島最高 160 pt，iPhone 上底部區域約從 60 pt 開始，只剩約 98 pt。原本週曆一天最多三行（兩個行程＋「+N」）約 71 pt，加上 36 pt 的按鈕會超過，底部被截掉（實機截圖）。現在一天最多兩行（兩個行程，或一個行程＋「+N」，`DayDigest.visibleRows(2)`，有單元測試），週曆約 51 pt，「編輯」按鈕 30 pt，間距 5 pt，底部留約 12 pt。
+
 `Button(intent:)`：**0 個**。`DismissScheduleIntent`（Step 0 時在 `Shared/Intents/SummonScheduleIntent.swift`，Step 2 起移到 `Shared/Intents/DismissScheduleIntent.swift`）有定義，但沒有任何畫面使用它。
 
 驗證方式：每個改動 Live Activity 的 commit 之後執行
