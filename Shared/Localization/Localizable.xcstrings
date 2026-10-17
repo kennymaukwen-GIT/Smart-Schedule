@@ -537,6 +537,16 @@
         }
       }
     },
+    "AI data sharing is off, so demo mode answered with its offline rules. You can allow it in Settings › AI & privacy." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 資料分享未開啟，所以由示範模式的離線規則回答。可以到「設定 › AI 與隱私」開啟。"
+          }
+        }
+      }
+    },
     "AI suggestions" : {
       "comment" : "Event page: button asking Gemini for suggested notes",
       "localizations" : {
@@ -4443,6 +4453,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用條款"
+          }
+        }
+      }
+    },
+    "The AI isn't available right now, so demo mode answered with its offline rules." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前無法使用 AI，所以由示範模式的離線規則回答。"
           }
         }
       }
