@@ -99,38 +99,39 @@ enum SyncSummary: Equatable {
 }
 
 /// The drawer's status line under the accounts: "Synced · just now", "Offline · 3 changes waiting",
-/// "Can't reach Google · tap to retry". Re-reads the clock every 30 s so "5 min ago" stays true.
+/// "Can't reach Google · tap to retry". `now` is the drawer's minute clock, so "5 min ago" moves on with it.
+///
+/// No `TimelineView` of its own: the line sits inside the drawer's List, and a time-driven view inside a List that
+/// is redrawn on a timer hung the app (see `CalendarDrawer.now`).
 struct SyncStatusLine: View {
     let summary: SyncSummary
+    let now: Date
     var onTap: () -> Void = {}
 
     @Environment(\.locale) private var environmentLocale
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            Button(action: onTap) {
-                HStack(spacing: 8) {
-                    Group {
-                        if summary == .syncing {
-                            ProgressView().controlSize(.mini).tint(Theme.textSecondary)
-                        } else {
-                            Image(systemName: summary.systemImage)
-                        }
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Group {
+                    if summary == .syncing {
+                        ProgressView().controlSize(.mini).tint(Theme.textSecondary)
+                    } else {
+                        Image(systemName: summary.systemImage)
                     }
-                    .frame(width: 18)
-                    summary.label(now: context.date, clock: WallClock(),
-                                  locale: ChatFormat.dateLocale(environmentLocale))
-                        .lineLimit(2)
-                        .contentTransition(.opacity)
-                    Spacer(minLength: 0)
                 }
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(summary.needsAttention ? Color.orange : Theme.textSecondary)
-                .contentShape(Rectangle())
+                .frame(width: 18)
+                summary.label(now: now, clock: WallClock(), locale: ChatFormat.dateLocale(environmentLocale))
+                    .lineLimit(2)
+                    .contentTransition(.opacity)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .disabled(!summary.isTappable)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(summary.needsAttention ? Color.orange : Theme.textSecondary)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .disabled(!summary.isTappable)
         .animation(.easeInOut(duration: 0.2), value: summary)
     }
 }

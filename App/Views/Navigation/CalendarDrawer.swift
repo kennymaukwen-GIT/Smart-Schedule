@@ -24,15 +24,25 @@ struct CalendarDrawer: View {
     @State private var removal: ScheduleViewModel.AccountRemoval?
     /// Horizontal drag so far (negative = towards the edge); the panel follows it (`DrawerCloseSwipe`).
     @State private var drag: CGFloat = 0
+    /// What the Events section and the sync line take as now. It moves on at the start of every minute while the
+    /// drawer is open (`tickEveryMinute`), so an ended event leaves within a minute and "Synced · 5 min ago" stays
+    /// true.
+    ///
+    /// Not a `TimelineView`: the drawer froze at its first scroll on an iPhone. Its List was drawn inside
+    /// `TimelineView(.everyMinute)`, and the sync line inside the List ran a `TimelineView` of its own. That
+    /// nesting is reported to hang SwiftUI at 100% CPU (Apple developer forums thread 770311). With a connected
+    /// account the sync line sits below the fold, so it is first drawn at the first scroll. Keep every
+    /// `TimelineView` out of this List.
+    @State private var now = Date()
 
     var body: some View {
         GeometryReader { geo in
             HStack(spacing: 0) {
                 NavigationStack(path: $path) {
                     VStack(alignment: .leading, spacing: 0) {
-                        // The drawer's title as a plain heading, not a large navigation title: the drawer was the only
-                        // large title in the app, and its collapse starts at the first scroll, where the app froze on
-                        // an iPhone. The navigation bar is hidden on this page only.
+                        // The drawer's title as a plain heading rather than the app's only large navigation title,
+                        // whose collapse would start at the first scroll. The navigation bar is hidden on this page
+                        // only.
                         Text("Smart Schedules")
                             .font(.largeTitle.bold())
                             .foregroundStyle(.white)
@@ -42,10 +52,7 @@ struct CalendarDrawer: View {
                             .padding(.top, 12)
                             .padding(.bottom, 4)
                             .accessibilityAddTraits(.isHeader)
-                        // Every minute, so an event leaves the Events section once it has ended.
-                        TimelineView(.everyMinute) { context in
-                            list(now: context.date)
-                        }
+                        list(now: now)
                     }
                     .background(Theme.surface)
                     // The back button's label on pushed pages; the bar itself is hidden here.
@@ -96,6 +103,21 @@ struct CalendarDrawer: View {
             await AccountManager.shared.refreshCalendarLists(force: false)
             await schedule.reloadAccounts()
         }
+        .task { await tickEveryMinute() }
+    }
+
+    /// Moves `now` on at the start of every minute until the drawer closes, which cancels the task.
+    private func tickEveryMinute() async {
+        while true {
+            // A little past the tick, so `now` is inside the new minute.
+            let wait = MinuteTick.next(after: Date()).timeIntervalSinceNow + 0.05
+            do {
+                try await Task.sleep(for: .seconds(max(0.05, wait)))
+            } catch {
+                return
+            }
+            now = Date()
+        }
     }
 
     private func list(now: Date) -> some View {
@@ -132,7 +154,7 @@ struct CalendarDrawer: View {
                 accountSection(account)
             }
 
-            syncSection
+            syncSection(now: now)
 
             connectSection
         }
@@ -220,7 +242,7 @@ struct CalendarDrawer: View {
     /// The status line ("Synced · just now", "Offline · 3 changes waiting") as the section's header, then one row
     /// per change Google refused, with Retry and Discard. Tapping the line syncs now.
     @ViewBuilder
-    private var syncSection: some View {
+    private func syncSection(now: Date) -> some View {
         if schedule.isDemo || !schedule.accounts.isEmpty {
             Section {
                 ForEach(schedule.failedChanges, id: \.id) { change in
@@ -230,7 +252,7 @@ struct CalendarDrawer: View {
                                     onDiscard: { withAnimation(.snappy) { schedule.discardFailedChange(change.id) } })
                 }
             } header: {
-                SyncStatusLine(summary: syncSummary) {
+                SyncStatusLine(summary: syncSummary, now: now) {
                     Task { await schedule.refresh(.pull) }
                 }
                 .textCase(nil)

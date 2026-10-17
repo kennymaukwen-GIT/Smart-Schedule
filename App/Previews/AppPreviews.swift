@@ -1019,7 +1019,7 @@ enum PreviewSync {
     ]
     List {
         ForEach(Array(summaries.enumerated()), id: \.offset) { _, summary in
-            SyncStatusLine(summary: summary)
+            SyncStatusLine(summary: summary, now: Date())
         }
         FailedChangeRow(change: PreviewSync.failed(chinese: false)[0])
         FailedChangeRow(change: PreviewSync.failed(chinese: false)[1], isRetrying: true)

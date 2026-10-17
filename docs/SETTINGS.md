@@ -113,9 +113,12 @@ accounts the calendar rows would push it below the fold.
   ghosts (`isDraft`), minus calendars hidden a moment ago (before the cache reloads), ending after `now` and starting
   within 12 months. `EventDigest.rows` makes one row per one-off event and one per repeating series (`seriesID`),
   showing the occurrence under way or the next one.
-- **Always current.** The drawer and the list are drawn inside `TimelineView(.everyMinute)`, so an ended event
-  leaves within a minute; they read the observable `events`, so whatever the assistant, a plan, Siri, the
-  notification extension or a sync adds or deletes appears or leaves at once. Nothing is refreshed by hand.
+- **Always current.** The list is drawn inside `TimelineView(.everyMinute)`; the drawer moves its own `now` on at
+  the start of every minute (`MinuteTick`), so in both an ended event leaves within a minute. The drawer has no
+  `TimelineView`: its List holds the sync line, and a time-driven view inside a List drawn by a `TimelineView` hung
+  the app at the first scroll on an iPhone (Apple developer forums thread 770311). Both read the observable
+  `events`, so whatever the assistant, a plan, Siri, the notification extension or a sync adds or deletes appears
+  or leaves at once. Nothing is refreshed by hand.
 - **Section header "Events"** (「行程」). Rows: `EventDigest.upcoming(rows, limit: 6)` (under way first, then the
   soonest). Each row: the event's colour as a 9 pt dot (ringed while under way), the title (one line), a ↻ glyph
   (`repeat`, accessibility "Repeating") for a series, the waiting-to-sync glyph (`PendingSyncGlyph`), and under it the
