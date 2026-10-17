@@ -64,6 +64,15 @@ App Attest 在 iOS 的 app extension 裡不能用（Apple 文件：`generateKey`
 
 完整的 system prompt 在 [`Shared/AI/AssistantPrompt.swift`](../Shared/AI/AssistantPrompt.swift)。
 
+**示範模式**（`DemoModeAssistant`，使用者允許 AI 資料分享之後）：request 和上面一樣，但助理的 router 建在 `AccountStore.sampleCalendarsOnly()` 上，CALENDARS、UPCOMING 和 FOCUS 都是虛構的範例資料（`demo-` 帳號和行程），寫入只改 iPhone 上的快取（`CalendarRouter+Sample.swift`，[GOOGLE_CALENDAR_SYNC.md](GOOGLE_CALENDAR_SYNC.md) §9.6）。新行程的預設行事曆是範例行事曆時，`ScheduleAssistant` 在 system prompt 最後加上 `AssistantPrompt.demoModeBlock`：
+
+```
+# DEMO MODE
+CALENDARS, UPCOMING and FOCUS are fictional sample data kept on this iPhone, not the user's Google Calendar. Handle requests as usual. Never say anything was added to, changed in or deleted from Google Calendar.
+```
+
+一般模式（真的 Google 帳號）的 prompt 沒有這一段。沒有同意或 AI 無法使用時改用離線規則（`DemoAssistant`，第 8 節）。
+
 ## 4. 回傳範例
 
 ### 4.1 單一事件
@@ -114,7 +123,7 @@ Fixture：[`Tests/fixtures/modify_event.add_note.json`](../Tests/fixtures/modify
 | 衝突 | 跟其他欄位一樣：PATCH 帶 If-Match，412 時 `ConflictMerge` 只重送使用者這次改的欄位 |
 | Schema | `modify_event.changes.notes` 原本就有，沒有新增欄位，只補上 description；validator 和 fixture 照常通過 |
 
-Demo 模式（`DemoAssistant`）不經過 Gemini，自己認「加個備註：…」「備註：…」「看牙醫加備註 帶健保卡」「add a note: …」「add a note to the dentist: …」「note: …」：加到通知提醒的那個行程（FOCUS），否則是句子裡點名的行程，否則是這段對話剛新增、移動或加過備註的行程；都沒有就問「要把備註加到哪個行程？」。「明天下午 3 點開會，備註：帶簡報」這種前面有時間的句子仍然是新增行程。
+示範模式的離線規則（`DemoAssistant`）不經過 Gemini，自己認「加個備註：…」「備註：…」「看牙醫加備註 帶健保卡」「add a note: …」「add a note to the dentist: …」「note: …」：加到通知提醒的那個行程（FOCUS），否則是句子裡點名的行程，否則是這段對話剛新增、移動或加過備註的行程；都沒有就問「要把備註加到哪個行程？」。「明天下午 3 點開會，備註：帶簡報」這種前面有時間的句子仍然是新增行程。
 
 ## 5. 長期計畫先審閱再寫入：草稿 → Add / Keep editing
 
@@ -141,7 +150,7 @@ Demo 模式（`DemoAssistant`）不經過 Gemini，自己認「加個備註：�
 | 跨 process | 草稿存在 App Group，App、Siri 和通知 extension 看到的是同一份 |
 | 單一事件 | `create_events` 不變，照樣立刻寫入 |
 
-Demo 模式（`DemoAssistant`）走同一個流程：計畫先變成草稿；有草稿時，「好 / looks good」會加入、「不要了 / cancel the plan」會丟棄，其他訊息當成修改要求（`7am`、`mornings`、`MWF`、`weekdays`、`3 days a week`、`週一三五`、`45 min`、`shorter`、`next Monday`、`Nov 1`），看不懂就問「What would you like to change?」並附上 4 個建議。
+示範模式的離線規則（`DemoAssistant`）走同一個流程：計畫先變成草稿；有草稿時，「好 / looks good」會加入、「不要了 / cancel the plan」會丟棄，其他訊息當成修改要求（`7am`、`mornings`、`MWF`、`weekdays`、`3 days a week`、`週一三五`、`45 min`、`shorter`、`next Monday`、`Nov 1`），看不懂就問「What would you like to change?」並附上 4 個建議。
 
 Fixtures：[`create_long_term_plan.revision.json`](../Tests/fixtures/create_long_term_plan.revision.json)（肌肉計畫改到早上 7 點，`revises` 指向原始 fixture）、[`confirm_plan.add.json`](../Tests/fixtures/confirm_plan.add.json)。
 
@@ -171,7 +180,7 @@ Fixtures：[`create_long_term_plan.revision.json`](../Tests/fixtures/create_long
 
 日期依 UI 語言格式化（`ReplyFormatter.dayLabel` / `shortDate` / `when`），時間一律 `HH:mm`（`ReplyFormatter.clockTime`）。
 
-**語言**：UI 和 template 字串都在 `Shared/Localization/Localizable.xcstrings`（String Catalog，source language 是英文，加上 zh-Hant 翻譯）。App 和兩個 extension 都把它當 resource，各自從自己的 bundle 讀。模型的回覆則跟著使用者輸入的語言走；示範模式（`DemoAssistant`）也一樣：輸入中文就用中文回。validator 會確認每個 key 都有 zh-Hant 翻譯、格式參數（`%@`、`%lld`，順序不同時用 `%1$@`）一致，而且原始碼裡每個 `String(localized:)` 都在 catalog 裡。
+**語言**：UI 和 template 字串都在 `Shared/Localization/Localizable.xcstrings`（String Catalog，source language 是英文，加上 zh-Hant 翻譯）。App 和兩個 extension 都把它當 resource，各自從自己的 bundle 讀。模型的回覆則跟著使用者輸入的語言走；示範模式的離線規則（`DemoAssistant`）也一樣：輸入中文就用中文回。validator 會確認每個 key 都有 zh-Hant 翻譯、格式參數（`%@`、`%lld`，順序不同時用 `%1$@`）一致，而且原始碼裡每個 `String(localized:)` 都在 catalog 裡。
 
 ## 7. 多輪對話與 Gemini 3 的 thought signature
 
@@ -255,7 +264,7 @@ CALENDARS 和 PREFERENCES 的 `default_calendar` 都**不含 email**：有多個
 
 每一筆變更都記進「助理記得的事」（設定 › AI 與隱私），來源寫「你說：「…」」；刪掉那一行就把該設定恢復預設。
 
-示範模式（`DemoAssistant`）只在加備註（第 4.4 節）和從現在起算的時間（第 2 節）之後、**其他判斷之前**檢查這類句子，所以「8 點前不要提醒我」不會變成 08:00 的行程，「兩個小時以後開會」的「以後」也不會被當成「從今以後」。離線支援：「8 點前不要提醒我」「早上 8 點以前別提醒我」「don't remind me before 8am」「10 點後別提醒我」→ `quiet_hours`；「健身提前 2 小時提醒」「以後健身都提前兩小時提醒我」「remind me 2 hours before gym」→ `routine_reminders` `120`（句子裡有日期或時間就不算）；「別再提前一天提醒截止日」→ 從截止日的預設提醒拿掉 1 天；「以後用學校帳號」「from now on use my school account」→ 示範的學校行事曆（示範模式不連線，所以在 iPhone 上比對 email 的網域）；「以後會議預設 30 分鐘」→ `default_duration`；「以後用英文回覆」「always reply in Chinese」→ `reply_language`；「以後先問我再加」「ask me before adding events」→ `autonomy`。示範模式一樣經過 `PreferencesStore.apply`，所以驗證、紀錄和復原都相同。
+示範模式的離線規則（`DemoAssistant`）只在加備註（第 4.4 節）和從現在起算的時間（第 2 節）之後、**其他判斷之前**檢查這類句子，所以「8 點前不要提醒我」不會變成 08:00 的行程，「兩個小時以後開會」的「以後」也不會被當成「從今以後」。離線支援：「8 點前不要提醒我」「早上 8 點以前別提醒我」「don't remind me before 8am」「10 點後別提醒我」→ `quiet_hours`；「健身提前 2 小時提醒」「以後健身都提前兩小時提醒我」「remind me 2 hours before gym」→ `routine_reminders` `120`（句子裡有日期或時間就不算）；「別再提前一天提醒截止日」→ 從截止日的預設提醒拿掉 1 天；「以後用學校帳號」「from now on use my school account」→ 示範的學校行事曆（離線規則不連線，所以在 iPhone 上比對 email 的網域）；「以後會議預設 30 分鐘」→ `default_duration`；「以後用英文回覆」「always reply in Chinese」→ `reply_language`；「以後先問我再加」「ask me before adding events」→ `autonomy`。示範模式一樣經過 `PreferencesStore.apply`，所以驗證、紀錄和復原都相同。
 
 Fixtures：[`update_preferences.quiet_hours.json`](../Tests/fixtures/update_preferences.quiet_hours.json)、[`update_preferences.routine_reminders.json`](../Tests/fixtures/update_preferences.routine_reminders.json)、[`update_preferences.default_calendar.json`](../Tests/fixtures/update_preferences.default_calendar.json)。fixture 可以帶 `preferences` 和 `calendars` 兩個字串，模擬 prompt 裡的 PREFERENCES 和 CALENDARS 區塊；跟 prompt 一樣不能有 email（validator 檢查「@」），帳號寫成 `Account N`。
 

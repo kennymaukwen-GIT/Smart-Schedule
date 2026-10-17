@@ -170,7 +170,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>撤銷授權需要網路連線。如果移除時沒有網路，或你想確認授權已經撤銷，請到 Google 帳號的<a href="https://myaccount.google.com/connections">第三方應用程式和服務</a>移除 Smart Schedules 的存取權。</p>
 
 <h3 id="zh-withdraw">怎麼停止 AI 資料分享（撤回同意）？</h3>
-<p>到 設定 › AI 與隱私 › 停止分享。之後助理不會再傳送任何內容給 Google Gemini。動態島和即時動態不受影響：它們本來就在你的 iPhone 上產生，不需要 AI 資料分享。示範模式仍然可以使用。想再開啟時，到同一頁按「允許」。同一頁的「傳送的內容」列出會傳送哪幾類資料（例如「你的行事曆名稱和助理設定，但不包括你 Google 帳號的 email」）；完整的傳送內容請看隱私權政策的<a href="/privacy#zh-ai">第 4 節</a>。</p>
+<p>到 設定 › AI 與隱私 › 停止分享。之後助理不會再傳送任何內容給 Google Gemini。動態島和即時動態不受影響：它們本來就在你的 iPhone 上產生，不需要 AI 資料分享。示範模式仍然可以使用，改用離線規則。想再開啟時，到同一頁按「允許」。同一頁的「傳送的內容」列出會傳送哪幾類資料（例如「你的行事曆名稱和助理設定，但不包括你 Google 帳號的 email」）；完整的傳送內容請看隱私權政策的<a href="/privacy#zh-ai">第 4 節</a>。</p>
 
 <h3 id="zh-live">動態島什麼時候會出現？</h3>
 <p>每個有時間的行程，會在開始前你設定的時間出現在動態島和鎖定畫面（設定 › 通知 › 動態島 › 顯示下一個行程：30、15、10 或 5 分鐘，預設 30 分鐘），行程結束後消失。即時動態直接在你的 iPhone 上產生，不需要允許 AI 資料分享，也不會把行程傳到我們的伺服器。</p>
@@ -187,7 +187,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <ul>
   <li>iOS 18 以上的 iPhone 和網路連線。</li>
   <li>允許 AI 資料分享（第一次使用時的說明，或 設定 › AI 與隱私 › 允許）。</li>
-  <li>連接 Google 帳號，助理才能讀寫你的行事曆。不登入的話，示範模式會用離線的示範助理和範例行事曆。</li>
+  <li>連接 Google 帳號，助理才能讀寫你的行事曆。不登入的話，示範模式會用虛構的範例行事曆；允許 AI 資料分享後可以試用真正的 AI 助理，否則用離線規則。</li>
   <li>年滿 18 歲：Smart Schedules 只提供給年滿 18 歲的人使用（App Store 分級 18+），這是 Google Gemini API 條款的規定。</li>
   <li>想用說的：用 iPhone 鍵盤上的聽寫鍵，或透過 Siri 與捷徑。App 本身不使用麥克風，也不需要麥克風或語音辨識權限。</li>
 </ul>
@@ -251,7 +251,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>Revoking needs an internet connection. If you were offline when you removed the account, or want to make sure access is revoked, remove Smart Schedules under <a href="https://myaccount.google.com/connections">Third-party apps &amp; services</a> in your Google Account.</p>
 
 <h3 id="en-withdraw">How do I stop AI data sharing (withdraw consent)?</h3>
-<p>Go to Settings › AI &amp; privacy › Stop sharing. The assistant then sends nothing more to Google Gemini. The Dynamic Island and Live Activities are not affected: they are created on your iPhone and never needed AI data sharing. Demo mode keeps working. To turn sharing back on, tap Allow on the same page. "What is sent" on that page lists the kinds of data sent (for example "Your calendar names and assistant settings, but not your Google account email addresses"); for the full list of what is sent, see <a href="/privacy#en-ai">section 4</a> of the Privacy Policy.</p>
+<p>Go to Settings › AI &amp; privacy › Stop sharing. The assistant then sends nothing more to Google Gemini. The Dynamic Island and Live Activities are not affected: they are created on your iPhone and never needed AI data sharing. Demo mode keeps working, with offline rules instead of the AI. To turn sharing back on, tap Allow on the same page. "What is sent" on that page lists the kinds of data sent (for example "Your calendar names and assistant settings, but not your Google account email addresses"); for the full list of what is sent, see <a href="/privacy#en-ai">section 4</a> of the Privacy Policy.</p>
 
 <h3 id="en-live">When does an event appear in the Dynamic Island?</h3>
 <p>Each timed event appears in the Dynamic Island and on the Lock Screen the time you chose before it starts (Settings › Notifications › Dynamic Island › Show next event: 30, 15, 10 or 5 minutes; 30 by default) and goes away after it ends. Live Activities are created on your iPhone: they need no AI data sharing, and your events are not sent to our server for them.</p>
@@ -268,7 +268,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <ul>
   <li>An iPhone with iOS 18 or later and an internet connection.</li>
   <li>AI data sharing allowed (in the dialog the first time you use it, or Settings › AI &amp; privacy › Allow).</li>
-  <li>A connected Google account, so the assistant can read and write your calendar. Without signing in, demo mode uses an offline demo assistant and sample calendars.</li>
+  <li>A connected Google account, so the assistant can read and write your calendar. Without signing in, demo mode uses fictional sample calendars; allow AI data sharing to try the real assistant on them, otherwise it uses offline rules.</li>
   <li>You must be 18 or older: Smart Schedules is only for people aged 18 or older (rated 18+ on the App Store), as Google's Gemini API terms require.</li>
   <li>To speak instead of typing: use the dictation key on the iPhone keyboard, or Siri and Shortcuts. The app itself does not use the microphone and needs no microphone or speech recognition permission.</li>
 </ul>

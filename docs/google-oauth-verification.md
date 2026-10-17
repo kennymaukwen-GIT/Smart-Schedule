@@ -190,7 +190,7 @@ openid and email identify which Google account the user connected. The app reads
 
 審查員最可能問：Google 使用者資料（行事曆）被送到 AI 了嗎？在什麼條件下？會不會被拿去訓練？依目前的程式，答案是：
 
-- **只有使用者同意後才送**：唯一的關卡在 `GeminiClient.generate`，`AIConsentStore.current.isGranted` 為 false 時連 request 都不組。聊天、快速輸入、Siri、通知回覆、通知擴充、「AI suggestions」全部經過這裡。示範模式不連 AI。
+- **只有使用者同意後才送**：唯一的關卡在 `GeminiClient.generate`，`AIConsentStore.current.isGranted` 為 false 時連 request 都不組。聊天、快速輸入、Siri、通知回覆、通知擴充、「AI suggestions」全部經過這裡。示範模式不使用 Google 帳號；同意後送出的是使用者輸入的內容和虛構的範例行程，不含任何 Google 使用者資料。
 - **同意畫面逐項列出送出的內容**（`AIConsentDisclosure`，[`Shared/Storage/AIConsentStore.swift`](../Shared/Storage/AIConsentStore.swift)，第 5 版；改了說明就把 `AIConsent.disclosureVersion` 加 1，所有人重新同意）：
   1. 使用者輸入或說出的內容（語音先轉成文字），包括其中提到的姓名或 email；
   2. 從今天起 14 天內最多 40 個行程的標題、時間、備註（最多 300 字）和 Google 行程 ID，以及回覆提醒的那個行程；
@@ -210,7 +210,7 @@ How the Smart Schedules AI assistant uses Google user data
 
 The AI assistant is a user-facing feature: the user types a request such as "lunch with Joe tomorrow at 12:30" (or says it to Siri), and the assistant creates or changes the event in the user's Google Calendar.
 
-Consent: nothing is sent until the user taps Allow in an in-app dialog ("Use the AI assistant?") that lists exactly what is sent. The same text is in our privacy policy, section 4 (https://www.smart-schedules.com/privacy#en-ai). Users can stop sharing at any time in Settings > AI & privacy. Demo mode never contacts the AI.
+Consent: nothing is sent until the user taps Allow in an in-app dialog ("Use the AI assistant?") that lists exactly what is sent. The same text is in our privacy policy, section 4 (https://www.smart-schedules.com/privacy#en-ai). Users can stop sharing at any time in Settings > AI & privacy. Demo mode (no Google sign-in) uses fictional sample calendars; after the same consent, its requests contain what the user types and those sample events, never Google user data.
 
 What is sent: the user's request as text (the app has no microphone; requests spoken to Siri or with the keyboard's dictation reach it as text from Apple); the titles, times, notes (up to 300 characters) and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder the user replies to; for "AI suggestions" on one event, that event including its location; the user's calendar names and assistant settings; time zone and language. Google account email addresses are never sent: the assistant sees calendars as "Account 1", "Account 2", and the app replaces the connected accounts' addresses in the user's request, event text and error messages with placeholders before sending (and puts them back on the iPhone in what it writes to Google Calendar). Attendees, organizer and video-call links are not sent.
 
@@ -235,7 +235,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 
 ### 6.2 錄影前準備
 
-1. 品牌已發佈（3.2），iPhone 裝的是 TestFlight 上含同意說明第 5 版的版本。
+1. 品牌已發佈（3.2），iPhone 裝的是 TestFlight 上含同意說明第 5 版的版本，而且同意畫面的註腳已經是「… Demo mode sends the sample calendars and events instead of your Google Calendar.」（示範模式改用 AI 之後的註腳；舊註腳「Demo mode never contacts the AI.」的版本不要拿來錄）。
 2. 到 https://myaccount.google.com/connections 把測試帳號對 Smart Schedules 的授權移除。App 帶 `include_granted_scopes=true`，帳號已授權過時 Google 可能只列出新增的 scope，同意畫面就不完整。
 3. 刪除再重新安裝 App（或 設定 › Data › Erase all data on this device），讓「Connect Google Calendar」和 AI 同意畫面重新出現。
 4. 語言全部用英文：iPhone 設定 › 一般 › 語言與地區 › iPhone 語言 = English，或只把 設定 › App › Smart Schedules › 語言 設成 English（App 的設定 › Language 會打開這一頁）。Google 的登入頁跟著 iPhone 語言，底部的語言選單要顯示 English (United States)。Mac 上的 Google Calendar 網頁也用英文。

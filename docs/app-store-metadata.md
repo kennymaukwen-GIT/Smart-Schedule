@@ -116,7 +116,7 @@ Smart Schedules 是搭配 Google 日曆的 iPhone AI 行程助理。輸入一句
 • 一直略過同一種提醒時，Smart Schedules 會問你要不要停掉；你按下之前什麼都不會改。
 
 ■ 隱私
-• 不登入先試用：示範模式有範例行事曆和離線助理，不需要帳號，也不會連線到 AI。
+• 不登入先試用：示範模式用虛構的範例行事曆，不需要帳號，也不會用到你的 Google 帳號。允許 AI 資料分享後可以試用真正的 AI 助理；沒有允許或連不上時改用離線規則。
 • AI 助理使用 Google 的 Gemini API。第一次使用前，App 會列出會傳送哪些內容並徵求你的同意；按「允許」之前，不會傳送任何資料給 AI。請求會經過 Smart Schedules 的伺服器轉給 Gemini，伺服器不保存這些內容。你 Google 帳號的 email 不會傳給 AI。隨時可以在設定裡停止分享。
 • 和 Google 日曆的同步直接在你的 iPhone 和 Google 之間進行。沒有廣告，也沒有追蹤。
 • 可以匯出你的資料、移除任何一個 Google 帳號（同時撤銷授權），或清除這台 iPhone 上 Smart Schedules 的所有資料。
@@ -222,7 +222,7 @@ REMINDERS THAT FIT YOUR DAY
 • Keep dismissing the same reminder? Smart Schedules offers to stop it; nothing changes until you tap.
 
 PRIVACY
-• Try without signing in: demo mode has sample calendars and an offline assistant. No account needed, and nothing is sent to the AI.
+• Try without signing in: demo mode has fictional sample calendars, needs no account and never uses your Google account. Allow AI data sharing to try the real AI assistant on them; otherwise, or offline, built-in rules answer.
 • The AI assistant uses Google's Gemini API. Before its first use, the app lists what will be sent and asks for your permission; nothing goes to the AI until you tap Allow. Requests pass through the Smart Schedules server to Gemini, and the server doesn't keep them. Your Google account email addresses are never sent to the AI. You can stop sharing any time in Settings.
 • Calendar sync runs directly between your iPhone and Google. No ads, no tracking.
 • Export your data, remove any Google account (its access is revoked), or erase everything Smart Schedules keeps on your iPhone.
@@ -260,9 +260,9 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,diary,assistant,o
 | 名稱（主要／備用 1／備用 2） | 15／23／22 字元 | 15／27／29 字元 | 30 字元 |
 | 副標題 | 13 字元 | 29 字元 | 30 字元 |
 | 宣傳文字 | 63 字元 | 151 字元 | 170 字元 |
-| 描述 | 1,646 字元 | 3,731 字元 | 4,000 字元 |
+| 描述 | 1,693 字元 | 3,825 字元 | 4,000 字元 |
 | 關鍵字 | 99 位元組 | 100 位元組 | 100 位元組 |
-| 審核備註（第 8.2 節） | — | 3,843 位元組（填入備用驗證碼後要重算） | 4,000 位元組 |
+| 審核備註（第 8.2 節） | — | 3,930 位元組（填入備用驗證碼後要重算） | 4,000 位元組 |
 
 精確數字用第 12 節的腳本算；改了文字就重跑一次。
 
@@ -433,7 +433,7 @@ Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級�
 | Sign-in required | **勾選。** User name：`[測試 Google 帳號，例如 example@gmail.com 這種格式]`；Password：`[密碼]` |
 
 **為什麼要提供測試帳號，不能只靠示範模式：** Guideline 2.1 要求有登入的 App 提供 demo account；用內建示範模式代替帳號需要 Apple 事先核准。
-示範模式涵蓋大部分畫面，但讀寫真正的 Google 日曆和真正的 AI 助理只能用 Google 帳號測試。
+示範模式涵蓋大部分畫面，允許 AI 資料分享後也能測真正的 AI 助理（用的是範例行程）；只有讀寫真正的 Google 日曆要用 Google 帳號測試。
 
 測試用 Google 帳號的準備：
 
@@ -449,13 +449,13 @@ Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級�
 <!-- asc:en/review-notes -->
 ```text
 TRY IT WITHOUT SIGNING IN
-On first launch the main screen shows "Connect Google Calendar" and "Try without signing in". Tap "Try without signing in" (also: avatar at top right, or ☰ › General › Demo mode). Demo mode has sample calendars and an offline assistant; it needs no Google account and never contacts the AI service. Try the chips, e.g. "I want to be muscular in 6 months" (a plan card with Add / Keep editing). Please allow notifications at launch: the sample "Online meeting with Joe" starts 21 minutes after the demo starts, its Live Activity appears at once and a reminder arrives about a minute later.
+On first launch the main screen shows "Connect Google Calendar" and "Try without signing in". Tap "Try without signing in" (also: avatar at top right, or ☰ › General › Demo mode). Demo mode has fictional sample calendars and needs no Google account. Its assistant is the real AI (see below) on the sample data; without AI permission or a connection, offline rules answer and say so. Try the chips, e.g. "I want to be muscular in 6 months" (a plan card with Add / Keep editing). Please allow notifications at launch: the sample "Online meeting with Joe" starts 21 minutes after the demo starts, its Live Activity appears at once and a reminder arrives about a minute later.
 
 FULL FEATURES: TEST GOOGLE ACCOUNT
-The account in Sign-In Information is a test Google account with sample events. Tap "Connect Google Calendar", enter its address, tap "Continue with Google", sign in on Google's page and allow calendar access. If Google asks for a code, use a backup code: [CODE 1] [CODE 2] [CODE 3]. A Google account is needed to read and write Google Calendar and for the real AI assistant (also AI suggestions on an event page). Google sign-in only connects the person's own Google Calendar; the app has no accounts of its own, so Sign in with Apple is not required (4.8).
+The account in Sign-In Information is a test Google account with sample events. Tap "Connect Google Calendar", enter its address, tap "Continue with Google", sign in on Google's page and allow calendar access. If Google asks for a code, use a backup code: [CODE 1] [CODE 2] [CODE 3]. A Google account is needed only to read and write Google Calendar. Google sign-in only connects the person's own Google Calendar; the app has no accounts of its own, so Sign in with Apple is not required (4.8).
 
 AI ASSISTANT AND CONSENT (5.1.2(i))
-The assistant uses Google's Gemini API through our server (it holds the API key; the app has none and uses App Attest), so the server must be reachable; calendar features work without it. The first message opens "Use the AI assistant?", which lists what is sent: the request text; titles, times, notes and Google event IDs of up to 40 events in the next 14 days; one event's location only for AI suggestions; calendar names and assistant settings; time zone and language. It names Google as the recipient and asks Allow / Not now. Google account email addresses are never sent (calendars appear as "Account 1", "Account 2"). Not now keeps the assistant off. Settings (☰ › General) › AI & privacy shows the status, "What is sent", Allow and Stop sharing. Siri and notification replies refuse until permission is given in the app. Demo mode never contacts the AI.
+The assistant uses Google's Gemini API through our server (it holds the API key; the app has none and uses App Attest), so the server must be reachable; calendar features work without it. The first message opens "Use the AI assistant?", which lists what is sent: the request text; titles, times, notes and Google event IDs of up to 40 events in the next 14 days; one event's location only for AI suggestions; calendar names and assistant settings; time zone and language. It names Google as the recipient and asks Allow / Not now. Google account email addresses are never sent (calendars appear as "Account 1", "Account 2"). Not now keeps the assistant off. Settings (☰ › General) › AI & privacy shows the status, "What is sent", Allow and Stop sharing. Siri and notification replies refuse until permission is given in the app (demo mode: offline rules). Demo requests carry only the fictional sample events, never Google data.
 
 LIVE ACTIVITY / DYNAMIC ISLAND
 One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island; default 30, or Off) until it ends; it leaves the Lock Screen 10 minutes after the end. No upcoming event, no Live Activity. Everything happens on the iPhone: nothing is sent to our server and no AI permission is needed. iOS 26: opening the app schedules the next two days' activities (Activity.request with a start date), so each appears on time with the app closed. iOS 18 cannot schedule them: an activity appears when the app is opened during the lead time or the event, and stays after the app closes. The countdown is a system timer. Tapping it opens Quick Capture.
@@ -488,7 +488,7 @@ What our server keeps: AI requests are passed to Google's Gemini API and not sto
 
 Speech: the app has no microphone or speech-recognition feature and asks for neither permission. People can speak a request to Siri ("Add a plan in Smart Schedules") or use the keyboard's dictation key; Apple turns the speech into text, and the app only receives the text.
 
-Siri: "Add a plan in Smart Schedules" runs without opening the app. It checks AI permission first and answers "Turn on AI data sharing in the Smart Schedules settings first." when it is missing. Long-term plans made through Siri wait in the app until the person taps Add. In demo mode Siri uses the offline demo assistant.
+Siri: "Add a plan in Smart Schedules" runs without opening the app. It checks AI permission first and answers "Turn on AI data sharing in the Smart Schedules settings first." when it is missing. Long-term plans made through Siri wait in the app until the person taps Add. In demo mode Siri uses the real assistant on the sample data when AI permission was given in the app, and the offline demo rules otherwise.
 
 Provenance: events the assistant creates carry a line at the top of their Google Calendar description saying they were scheduled by the Smart Schedules assistant, with what the person asked.
 
@@ -571,7 +571,7 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 | 由誰發送提醒、緊急程度、安靜時段、每日上限、早晨摘要、晚間預覽 | `App/Views/Settings/NotificationSettingsView.swift`、`Shared/Notifications/ReminderPlanner.swift`、`BriefingBuilder.swift` |
 | 專注模式過濾條件 | `App/Intents/CalendarFocusFilter.swift` |
 | 一直略過的提醒會問要不要停掉 | `Shared/Notifications/ReminderEngagement.swift`、`Shared/Storage/PreferencesStore.swift`（連續 `LearnedSuggestion.dismissThreshold` = 5 次，`Shared/Models/PreferenceLedger.swift`） |
-| 示範模式不連線到 AI | `Shared/Orchestrator/DemoAssistant.swift`；`ChatViewModel.enableDemo()` |
+| 示範模式：允許 AI 後用真正的助理處理範例行程；沒有允許或 AI 無法使用時用離線規則 | `Shared/Orchestrator/DemoModeAssistant.swift`；`Shared/Calendar/CalendarRouter+Sample.swift`；`ChatViewModel.enableDemo()` |
 | 同意前不送任何資料給 AI；同意說明的內容 | `GeminiClient.generate` 的 `consentRequired`；`Shared/Storage/AIConsentStore.swift`（`AIConsentDisclosure`，第 5 版；`serverNote` 在 1.0 是 nil） |
 | 帳號 email 不會傳給 AI | `Shared/AI/CalendarAliases.swift`、`Shared/Models/PromptRedaction.swift`、`Tests/Unit/AccountEmailPrivacyTests.swift` |
 | 伺服器不保存請求，也不存任何行程（1.0 沒有 push-to-start） | `server/worker/src/gemini.ts`；`AppConstants.pushToStartEnabled = false`、`PushToStartRegistrar.install(enabled:upload:)`；`server/worker/wrangler.toml` 的 `crons = []` |

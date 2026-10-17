@@ -162,7 +162,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 
 <h2 id="zh-who">1. 我們是誰</h2>
 <p>Smart Schedules（iPhone App，包括它的即時動態、控制中心按鈕、通知擴充功能、Siri 與捷徑動作）以及本網站 www.smart-schedules.com，由 SHENG HAN HSIEH（以下稱「我們」）提供。我們負責本政策說明的資料處理（以英國 GDPR 等個資法的用語，是「控管者」）。聯絡方式：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>。</p>
-<p>Smart Schedules 沒有自己的帳號系統。要使用真實的行事曆，你需要連接 Google 帳號；也可以按「不登入先試用」進入示範模式。示範模式使用範例行事曆，從不連線到 AI，也不會傳送你的行事曆資料。（如果你之前已經允許 AI 資料分享，App 在示範模式下仍會更新它和我們伺服器之間的工作階段；見第 6 節。）</p>
+<p>Smart Schedules 沒有自己的帳號系統。要使用真實的行事曆，你需要連接 Google 帳號；也可以按「不登入先試用」進入示範模式。示範模式使用虛構的範例行事曆，從不使用你的 Google 帳號。你允許 AI 資料分享後，示範模式的助理和一般模式一樣運作（見第 4 節），但傳送的行事曆資料是範例資料；沒有允許時，它在你的 iPhone 上用離線規則回答，不會傳送任何內容。</p>
 
 <h2 id="zh-device">2. 存在你 iPhone 上的資料</h2>
 <p>Smart Schedules 把下列資料存在你的裝置上。除了第 3、4 節說明的情況，它們不會離開你的 iPhone：</p>
@@ -197,7 +197,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>Smart Schedules 用 Google 的 Gemini API 理解你用日常語言說的話（例如「明天中午和 Joe 吃午餐」）。這是唯一會把你的行事曆資料送到 Google 日曆以外的功能。</p>
 
 <h3>要你允許才會傳送</h3>
-<p>你在「要使用 AI 助理嗎？」的說明中按「允許」之前（也可以在 設定 › AI 與隱私 允許），不會傳送任何內容給 AI。這適用於助理出現的所有地方：對話、快速輸入、Siri 與捷徑、長按提醒通知回覆，以及行程頁的「AI 建議」。示範模式從不連線到 AI。</p>
+<p>你在「要使用 AI 助理嗎？」的說明中按「允許」之前（也可以在 設定 › AI 與隱私 允許），不會傳送任何內容給 AI。這適用於助理出現的所有地方：對話、快速輸入、Siri 與捷徑、長按提醒通知回覆，以及行程頁的「AI 建議」。示範模式也一樣。</p>
 <p>App 裡的說明（同意畫面，以及 設定 › AI 與隱私 ›「傳送的內容」）寫的是：</p>
 <blockquote class="quote">
 <p>為了理解你的要求，Smart Schedules 會把要求傳送到 Google 的 Gemini API，內容包括：</p>
@@ -222,6 +222,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li>需要時：等你確認的行程（「先問我」）、提醒通知所屬的行程，以及你正在審閱的長期計畫。</li>
   <li>目前這段對話最近的幾輪（最多 6 輪），包括助理動作的結果（例如剛建立的行程標題和時間）和錯誤訊息。這只存在記憶體中；你儲存的聊天記錄不會傳送。</li>
 </ul>
+<p><strong>示範模式。</strong>請求的組成相同，但其中的行程、行事曆名稱和等待確認的項目都是虛構的範例資料，不包含你的 Google 日曆或 Google 帳號的任何資料；你輸入的內容、當地日期時間、時區、語言和助理設定是真實的。如果你沒有允許 AI 資料分享，示範模式不會傳送任何內容，而是在你的 iPhone 上用離線規則回答。AI 無法使用時（沒有網路、App 驗證無法使用、達到每日上限或伺服器錯誤），也改由離線規則回答。</p>
 <p>行程頁的「AI 建議」只傳送那一個行程：標題、日期、時間和時長、地點、備註（最多 300 個字）、是否為視訊會議、你的時區、今天的日期、語言和畫面上已有的建議。</p>
 <p>你輸入或說出的內容、行程的標題、地點和備註，以及傳回給 Gemini 的錯誤訊息裡，如果出現你已連接的 Google 帳號的 email 地址，App 會在傳送前把它換成「[account email]」或「[Account 2 email]」這類佔位字；錯誤訊息裡的其他 email 地址也會換成「[email address]」。Gemini 回覆裡的這些佔位字，會在你的 iPhone 上換回原本的地址，才寫進 Google 日曆或顯示給你看。你輸入或說出的其他內容照原樣傳送，包括其中別人的 email 地址。</p>
 <p>你的請求和行程可能包含別人的資料，例如你輸入的姓名和 email、別人邀請你的行程，或別人共用給你的行事曆名稱。請只分享你有權分享的內容。</p>
@@ -322,7 +323,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>沒有任何方法能百分之百安全。如果發生影響你資料的安全事件，我們會採取適當措施，並依法律要求通報。</p>
 
 <h2 id="zh-rights">15. 你的選擇與權利</h2>
-<p>提供資料是自願的：不允許 AI 資料分享，就無法使用 AI 助理；不連接 Google 帳號，就無法使用你真實的行事曆，但仍可使用示範模式。</p>
+<p>提供資料是自願的：不允許 AI 資料分享，就無法使用 AI 助理（示範模式改用離線規則）；不連接 Google 帳號，就無法使用你真實的行事曆，但仍可使用示範模式。</p>
 <h3>在 App 裡（立即生效）</h3>
 <p>設定的位置：點左上角的 ☰ › 一般。</p>
 <ul>
@@ -403,7 +404,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 
 <h2 id="en-who">1. Who we are</h2>
 <p>Smart Schedules (the iPhone app, including its Live Activities, Control Center control, notification extension, Siri and Shortcuts actions) and this website, www.smart-schedules.com, are provided by SHENG HAN HSIEH ("we", "us"). We are responsible for the processing described in this policy (in the terms of the UK GDPR and similar laws, the controller). Contact: <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>.</p>
-<p>Smart Schedules has no accounts of its own. To use your real calendar you connect a Google account. You can also tap "Try without signing in" to use demo mode. Demo mode uses sample calendars, never contacts the AI and sends none of your calendar data. (If you allowed AI data sharing earlier, the app still renews its session with our server in demo mode; see section 6.)</p>
+<p>Smart Schedules has no accounts of its own. To use your real calendar you connect a Google account. You can also tap "Try without signing in" to use demo mode. Demo mode uses fictional sample calendars and never uses your Google account. Once you allow AI data sharing, its assistant works as described in section 4, but the calendar details it sends are the sample ones; without your permission it answers with offline rules on your iPhone and sends nothing.</p>
 
 <h2 id="en-device">2. Data stored on your iPhone</h2>
 <p>Smart Schedules keeps the following on your device. Except as described in sections 3 and 4, it does not leave your iPhone:</p>
@@ -438,7 +439,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 <p>Smart Schedules uses Google's Gemini API to understand requests in everyday language (for example "lunch with Joe tomorrow at noon"). This is the only feature that sends your calendar data outside Google Calendar.</p>
 
 <h3>Only with your permission</h3>
-<p>Nothing is sent to the AI until you tap Allow in the "Use the AI assistant?" dialog (you can also allow it in Settings › AI &amp; privacy). This applies everywhere the assistant works: the chat, Quick Capture, Siri and Shortcuts, replies from a reminder notification, and AI suggestions on an event page. Demo mode never contacts the AI.</p>
+<p>Nothing is sent to the AI until you tap Allow in the "Use the AI assistant?" dialog (you can also allow it in Settings › AI &amp; privacy). This applies everywhere the assistant works: the chat, Quick Capture, Siri and Shortcuts, replies from a reminder notification, and AI suggestions on an event page. This includes demo mode.</p>
 <p>The explanation in the app (the consent dialog, and Settings › AI &amp; privacy › What is sent) reads:</p>
 <blockquote class="quote">
 <p>To understand your requests, Smart Schedules sends them to Google's Gemini API. This includes:</p>
@@ -463,6 +464,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
   <li>When relevant: events waiting for your confirmation ("Ask me first"), the event a reminder is about, and a long-term plan you are reviewing.</li>
   <li>The last few turns (up to 6) of the current conversation, including the results of the assistant's actions (such as the title and time of an event it just created) and error messages. These are held in memory only; your saved chat history is never sent.</li>
 </ul>
+<p><strong>Demo mode.</strong> A request has the same parts, but the events, calendar names and items waiting for confirmation are fictional sample data; nothing from your Google Calendar or Google account is included. What you type, your local date and time, time zone, language and assistant settings are real. If you haven't allowed AI data sharing, demo mode sends nothing and answers with offline rules on your iPhone. It also uses those rules when the AI can't be used (no connection, App Attest unavailable, the daily limit reached or a server error).</p>
 <p>For AI suggestions on an event page, only that event is sent: its title, date, time and duration, location, notes (up to 300 characters), whether it is a video call, your time zone, today's date, language and the suggestions already shown.</p>
 <p>If the address of a Google account you connected appears in what you type or say, in an event's title, location or notes, or in an error message sent back to Gemini, the app replaces it with a placeholder such as "[account email]" or "[Account 2 email]" before sending; any other email address in an error message becomes "[email address]". When Gemini's answer uses these placeholders, your iPhone puts the address back before it writes to Google Calendar or shows you the answer. The rest of what you type or say is sent as it is, including other people's email addresses.</p>
 <p>Your requests and events may contain other people's information, such as names and email addresses you type, invitations from other people, or the names of calendars shared with you. Please share only what you are entitled to share.</p>
@@ -563,7 +565,7 @@ Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com
 <p>No method is completely secure. If a security incident affects your data, we will take appropriate steps and give notice as the law requires.</p>
 
 <h2 id="en-rights">15. Your choices and rights</h2>
-<p>Providing data is voluntary: without AI data sharing, the AI assistant is unavailable; without a Google account you can't use your real calendar, but you can still use demo mode.</p>
+<p>Providing data is voluntary: without AI data sharing, the AI assistant is unavailable (demo mode then uses offline rules); without a Google account you can't use your real calendar, but you can still use demo mode.</p>
 <h3>In the app (takes effect immediately)</h3>
 <p>To open Settings, tap ☰ at the top left › General.</p>
 <ul>
