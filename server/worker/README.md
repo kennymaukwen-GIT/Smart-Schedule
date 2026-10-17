@@ -81,6 +81,7 @@ fork 這個 repo 時把正式環境的 `id` 那行刪掉，第一次部署就會
 `AQ.` 開頭的新格式金鑰在部分帳號會被 Gemini API 拒絕（`401 ACCESS_TOKEN_TYPE_UNSUPPORTED`），所以部署前先跑一次；
 被拒時腳本會再試 Bearer 和 Vertex AI express mode，看出是哪一種金鑰。
 `npm run check-key -- --worker` 則經過開發用 Worker（X-Dev-Token）走完整條 App → Worker → Gemini。
+`npm run check-request` 用同一把金鑰直接打 Google，依序送出 App 會送的幾種請求（純文字、加 thinkingLevel、加函式宣告與 mode ANY、App 第一次的完整請求、App 第二次的請求），每一種都印出 HTTP 狀態和 Google 的完整錯誤（含 field violations），用來找出 App 收到的 `400 Request contains an invalid argument` 是哪個部分造成的。只印狀態、錯誤和模型呼叫的函式名稱，不印金鑰。
 
 **Rate Limiting binding**：`wrangler.toml` 的 `[[ratelimits]]`（`name = "SS_RATE_LIMITER"`、`simple = { limit = 30, period = 60 }`）
 是 Cloudflare Workers Rate Limiting：不寫 KV、在同一據點內原子計數。`namespace_id` 是你自選、在帳號內唯一的正整數

@@ -15,7 +15,8 @@
     "check-root-ca": "node scripts/check-root-ca.mjs",
     "deploy": "node scripts/check-root-ca.mjs && wrangler deploy --env=\"\"",
     "deploy:dev": "node scripts/check-root-ca.mjs && wrangler deploy --env dev",
-    "check-key": "sh scripts/check-gemini-key.sh"
+    "check-key": "sh scripts/check-gemini-key.sh",
+    "check-request": "sh scripts/check-gemini-request.sh"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261012.1",
