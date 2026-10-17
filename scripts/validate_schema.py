@@ -341,7 +341,10 @@ def suggestion_checks(name: str, args: dict, root: dict, fixture: str) -> None:
 
 
 def declaration_checks(by_name: dict) -> None:
-    """suggest_event_notes exists (items only, at most 4) and create_events may carry suggested_notes (at most 4)."""
+    """suggest_event_notes exists (items only, at most 4) and create_events may carry suggested_notes (at most 4, said in
+    its description). create_events has no minItems/maxItems anywhere: Gemini 3.8 Flash refuses the whole request
+    (400 INVALID_ARGUMENT) when they are in it under mode ANY (2026-10-17, npm run check-request); the app enforces
+    20 events, 5 reminders and 4 suggested notes itself."""
     suggest = by_name.get("suggest_event_notes")
     if not suggest:
         errors.append("suggest_event_notes is missing from the declarations")
@@ -351,8 +354,10 @@ def declaration_checks(by_name: dict) -> None:
             errors.append("suggest_event_notes: 'items' is required and holds at most 4")
     event_props = by_name["create_events"]["parameters"]["properties"]["events"]["items"]["properties"]
     suggested = event_props.get("suggested_notes")
-    if not suggested or suggested.get("type") != "array" or suggested.get("maxItems") != 4:
-        errors.append("create_events: events[].suggested_notes must be an optional array of at most 4")
+    if not suggested or suggested.get("type") != "array" or "Up to 4" not in suggested.get("description", ""):
+        errors.append("create_events: events[].suggested_notes must be an optional array of at most 4 (in its description)")
+    if re.search(r'"(minItems|maxItems)"', json.dumps(by_name["create_events"])):
+        errors.append("create_events: no minItems/maxItems (Gemini 3.8 Flash rejects them under mode ANY)")
     if "suggested_notes" in by_name["create_events"]["parameters"]["properties"]["events"]["items"].get("required", []):
         errors.append("create_events: suggested_notes must stay optional")
 

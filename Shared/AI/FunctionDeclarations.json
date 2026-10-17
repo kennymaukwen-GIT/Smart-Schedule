@@ -7,9 +7,7 @@
       "properties": {
         "events": {
           "type": "array",
-          "description": "Every event to create, in chronological order. One utterance may contain several events.",
-          "minItems": 1,
-          "maxItems": 20,
+          "description": "Every event to create, in chronological order, at least 1 and at most 20. One utterance may contain several events.",
           "items": {
             "type": "object",
             "properties": {
@@ -88,7 +86,6 @@
               "reminder_minutes": {
                 "type": "array",
                 "description": "Minutes before start for push reminders on THIS event, only when the user asks for them. OMIT to use the user's defaults (event_reminders and the other *_reminders lines in PREFERENCES). Max 5 values, each 0-40320. Exception: a start counted from now → [0] (rule 7).",
-                "maxItems": 5,
                 "items": { "type": "integer", "minimum": 0, "maximum": 40320 }
               },
               "notes": {
@@ -98,7 +95,6 @@
               "suggested_notes": {
                 "type": "array",
                 "description": "Optional. Up to 4 short things this event clearly calls for, in the language of the title, e.g. a trip abroad: ['Bring passport', 'Check visa or entry documents']; '健身': ['帶水', '帶毛巾']; an exam: ['Bring admission ticket']. Each a checklist noun or a 2-6 word action, max 40 characters, no bullet. The app offers them as chips the user can tap and never writes them to the calendar. Omit when nothing specific applies. No medical, legal or financial advice; no prices.",
-                "maxItems": 4,
                 "items": { "type": "string" }
               }
             },

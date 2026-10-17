@@ -250,7 +250,12 @@ final class SuggestedNotesTests: XCTestCase {
                                    as? [String: Any])
         let event = try XCTUnwrap(events["items"] as? [String: Any])
         let suggested = try XCTUnwrap((event["properties"] as? [String: Any])?["suggested_notes"] as? [String: Any])
-        XCTAssertEqual(suggested["maxItems"] as? Int, 4)
+        // At most 4, said in the description: create_events carries no minItems/maxItems, which Gemini 3.8 Flash
+        // refuses under mode ANY (NoteSuggester.cleanedItems keeps 4).
+        XCTAssertNil(suggested["maxItems"])
+        XCTAssertTrue((suggested["description"] as? String ?? "").contains("Up to 4"))
+        let createJSON = String(decoding: try JSONSerialization.data(withJSONObject: create), as: UTF8.self)
+        XCTAssertFalse(createJSON.contains("\"maxItems\"") || createJSON.contains("\"minItems\""), createJSON)
         XCTAssertFalse((event["required"] as? [String] ?? []).contains("suggested_notes"))
     }
 

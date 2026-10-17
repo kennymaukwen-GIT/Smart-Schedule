@@ -208,6 +208,8 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
 
 ## 9. 模型設定
 
+**`create_events` 不寫 `minItems`／`maxItems`（2026-10-17）。** gemini-3.8-flash 在 `mode: ANY` 下，只要 `create_events` 的結構裡有 `minItems` 或 `maxItems`（`events` 1–20、`reminder_minutes` 最多 5、`suggested_notes` 最多 4），整個請求就回 `400 INVALID_ARGUMENT Request contains an invalid argument.`，沒有欄位說明；其他 8 個函式單獨送都正常，`mode: AUTO` 也正常（`npm run check-request` 逐一測出來的）。所以這三個上限改寫在描述裡（"at least 1 and at most 20"、"Max 5 values"、"Up to 4"），由 App 自己執行：`ScheduleAssistant` 只取前 20 筆（`args.events.prefix(20)`）、`ReminderPolicy` 最多 5 個提醒（`googleMaxOverrides`）、`NoteSuggester.cleanedItems` 最多 4 項。`scripts/validate_schema.py` 和 `SuggestedNotesTests` 會擋住有人把它們加回去。其他函式的 `minItems`／`maxItems` 照舊。換模型時先跑一次 `npm run check-request`。
+
 - `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.8-flash`（2026-10-17 從 `gemini-3.5-flash` 換過來；1.0 還沒上架，Worker 的 `SESSION_MODELS` 只留 3.8）。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。換 ID 前先把它加進 Worker 的 `SESSION_MODELS`（`server/worker/wrangler.toml`）並部署，舊 ID 留到舊版 App 不再使用；remote config 能選的每個模型也都要在裡面，否則通知擴充的回覆會被拒。
 - `thinkingLevel: "low"`：只對 Gemini 3.x 有效。2.x 用的是 `thinkingBudget`，參數不相容。
 - **不設定 temperature**：Gemini 3 的官方建議是保持預設值 1.0，調低可能造成迴圈或品質下降。
