@@ -2,6 +2,8 @@
 
 Smart Schedules 的靜態網站：首頁、隱私權政策和支援頁，網址是 **https://www.smart-schedules.com**。Google OAuth 驗證、App Store Connect 和 App 裡的連結都指向這裡。
 
+**實際上線方式（2026-10-17 起）：Vercel。** 網站放在 GitHub repo `Smart-Schedules-WEB`（Vercel 專案 `smartschedules-supportwebsite`，正式網域 www.smart-schedules.com），push 到 `main` 就自動部署。repo 的**最上層**放 `public/` 裡的檔案（`index.html`、`privacy.html`、`support.html`、`404.html`、`logo.png`、`home-bg.webp`、`home-bg-1200.webp`、`robots.txt`、`vercel.json`），不要放在子資料夾裡，也不要改檔名：Vercel 找不到最上層的 `index.html` 時整個網站都是 404（2026-10-17 就是只上傳了一個改名成 `SSWEB.html` 的政策頁）。`vercel.json` 讓 `/privacy`、`/support` 不用加 `.html`（`cleanUrls`，App 的隱私權政策連結就是 `/privacy`），並加上和 `_headers` 相同的安全標頭；`_headers` 和 `wrangler.toml` 只給 Cloudflare 用，Vercel 不需要。Vercel 專案設定：Framework Preset「Other」，Build Command 和 Output Directory 留空，Root Directory 是 repo 最上層。政策第 10、12、17 節寫網站由 Vercel 託管（Vercel DPA）。下面的 Cloudflare Pages 步驟是原本的方案，現在沒有使用。
+
 部署方式（1.0）：**Cloudflare Pages 專案**（Direct Upload，只有靜態檔案，沒有 Functions），用 `server/worker` 已經裝好的 wrangler（4.151.1）從終端機上傳，和 `server/worker` 用同一個 Cloudflare 帳號。**DNS 留在 Squarespace，不搬到 Cloudflare**：nameserver 仍然是 `nsa1`～`nsa4.squarespacedns.com`，DNSSEC 照舊開著，Google Workspace 的郵件紀錄一筆都不動；唯一和網站有關的 DNS 變更是在 Squarespace 加**一筆 CNAME**（`www` → 專案的 `pages.dev` 主機名稱）。根網域 smart-schedules.com 不提供網站，可以選擇用 Squarespace 的網域轉址轉到 www（[§3.5](#35選做根網域-smart-schedulescom-轉到-www)）。步驟在 [§3](#3-網站上線wwwsmart-schedulescomcloudflare-pages--squarespace-一筆-cname不搬-dns)；之後如果要把 DNS 搬到 Cloudflare，見[附錄](#附錄之後若要把-dns-搬到-cloudflare10-不需要)（1.0 不需要）。
 
 ## 檔案
