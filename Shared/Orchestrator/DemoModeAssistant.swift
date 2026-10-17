@@ -8,9 +8,9 @@ import Foundation
 ///   and its prompt says the calendars are fictional (`AssistantPrompt.demoModeBlock`).
 /// - The offline rules answer when AI data sharing is not allowed, or when the AI fails. The AI fails only before it
 ///   writes anything (`ScheduleAssistant.handle` throws only from Gemini), so a fallback never repeats a write. App
-///   Attest that this device or build can't do (or a server this build doesn't know) is not tried again until
-///   `resetConversation`. Each reason is said once ("…so demo mode answered with its offline rules."), until the AI
-///   answers again.
+///   Attest that this device or build can't do, or that the server refuses (or a server this build doesn't know), is
+///   not tried again until `resetConversation`. Each reason is said once ("…so demo mode answered with its offline
+///   rules."), until the AI answers again.
 /// - A question carries over: when the offline rules asked back ("what time?"), the answer goes to them as well; when
 ///   the AI asked back and the offline rules answer next (the AI failed, or consent was withdrawn), they get the
 ///   request and the answer together.
@@ -42,7 +42,7 @@ actor DemoModeAssistant: ScheduleAssisting {
     private let consent: @Sendable () -> AIConsent
     private let isDemoMode: @Sendable () -> Bool
     /// The AI can't work in this build or on this device (`AttestationError.unsupported`, `.notConfigured`,
-    /// `.sessionMissing`): not tried again until `resetConversation`.
+    /// `.sessionMissing`, `.attestationRejected`): not tried again until `resetConversation`.
     private var aiUnavailable = false
     /// The reason said last: each is said once, until the AI answers again.
     private var lastNote: Fallback?
@@ -122,7 +122,7 @@ actor DemoModeAssistant: ScheduleAssisting {
     private func fallback(after error: Error) -> Fallback {
         if let attestation = error as? AttestationError {
             switch attestation {
-            case .unsupported, .notConfigured, .sessionMissing: aiUnavailable = true
+            case .unsupported, .notConfigured, .sessionMissing, .attestationRejected: aiUnavailable = true
             default: break
             }
         }

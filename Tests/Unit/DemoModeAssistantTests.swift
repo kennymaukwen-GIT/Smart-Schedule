@@ -188,6 +188,22 @@ final class DemoModeAssistantTests: XCTestCase {
         XCTAssertEqual(requestCount, 2, "a new conversation tries the AI again")
     }
 
+    /// 401 invalid_attestation: the server refused this build's attestation (an App Attest environment, Team ID or
+    /// bundle ID it does not check). Every new key is refused the same way, so the AI waits for a new conversation.
+    func testARejectedAttestationIsNotTriedAgain() async throws {
+        let rig = await makeRig()
+        DemoModeGeminiStub.recorder.answer([.server(401, #"{"error":"invalid_attestation"}"#)])
+
+        let first = try await ask(rig, "1個小時後買蛋給 Jocelyn")
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertEqual(first.addedEvents.map(\.title), ["買蛋給 Jocelyn"])
+        XCTAssertTrue(first.text.hasSuffix(unavailableNote), first.text)
+
+        _ = try await ask(rig, "兩小時後打給媽媽")
+        XCTAssertEqual(requestCount, 1, "not tried again")
+        await assertNothingReachedGoogle(rig)
+    }
+
     /// 429 rate_limited: the limit passes, so the next message asks the AI again.
     func testTheServersRateLimitFallsBackForThatMessageOnly() async throws {
         let rig = await makeRig()

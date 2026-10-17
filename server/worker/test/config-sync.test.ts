@@ -91,7 +91,7 @@ describe("app ↔ Worker configuration", () => {
 
   it("each environment attests the app's bundle ID, pushes to it on its APNs host, and keeps invocation logs off", () => {
     const app = match(repoFile("project.yml"), /^  SmartSchedule:\n(?:(?!^  \S).*\n)*?[ \t]+PRODUCT_BUNDLE_IDENTIFIER:[ \t]*(\S+)/m, "SmartSchedule PRODUCT_BUNDLE_IDENTIFIER in project.yml");
-    const expected = new Map([["production", { attest: "production", apns: "production" }], ["dev", { attest: "development", apns: "sandbox" }]]);
+    const expected = new Map([["production", { attest: "production", apns: "production" }], ["dev", { attest: "production", apns: "sandbox" }]]);
     const environments = wranglerEnvironments();
     assert.deepEqual([...environments.keys()].sort(), [...expected.keys()].sort());
     for (const [name, toml] of environments) {
@@ -103,5 +103,17 @@ describe("app ↔ Worker configuration", () => {
       assert.match(toml, /^\[(?:env\.[A-Za-z0-9_-]+\.)?observability\.logs\]\ninvocation_logs[ \t]*=[ \t]*false$/m, `invocation_logs = false (${name})`);
     }
     assert.deepEqual(DEFAULT_BUNDLE_IDS, [app]);
+  });
+
+  it("every app configuration attests in App Attest's production environment, the one every Worker checks", () => {
+    // A Debug build on an iPhone reaches the production Worker when Secrets.xcconfig has no development Worker: with
+    // "development" there it was refused (401 invalid_attestation, aaguid).
+    const project = repoFile("project.yml");
+    const values = [...project.matchAll(/^[ \t]+APP_ATTEST_ENVIRONMENT:[ \t]*(\S+)/gm)].map((m) => m[1]);
+    assert.deepEqual(values, ["production", "production"], "APP_ATTEST_ENVIRONMENT for Debug and Release in project.yml");
+    assert.match(project, /appattest-environment:[ \t]*\$\(APP_ATTEST_ENVIRONMENT\)/, "the entitlement reads APP_ATTEST_ENVIRONMENT");
+    for (const [name, toml] of wranglerEnvironments()) {
+      assert.equal(match(toml, /^[ \t]*APP_ATTEST_ENV[ \t]*=[ \t]*"([^"]*)"/m, `APP_ATTEST_ENV (${name})`), "production", name);
+    }
   });
 });

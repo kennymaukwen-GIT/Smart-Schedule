@@ -99,22 +99,27 @@ fork 這個 repo 時把正式環境的 `id` 那行刪掉，第一次部署就會
 | App build | Worker（`GEMINI_BASE_URL`） | `APP_ATTEST_ENV` | `APNS_ENV` | `ALLOW_DEV_TOKEN` |
 | --- | --- | --- | --- | --- |
 | Debug，Simulator | 開發版 | （沒有 App Attest，改送 `X-Dev-Token`） | — | `"true"` |
-| Debug，Xcode 裝到 iPhone | 開發版 | `development` | `sandbox` | `"true"` |
+| Debug，Xcode 裝到 iPhone | 正式版（有開發版時也可以用開發版） | `production` | `sandbox`（開發版） | 開發版 `"true"` |
 | TestFlight / App Store | 正式版 | `production` | `production` | **必須不是** `"true"` |
 
-Release 設定從 Xcode 直接 Run 到 iPhone（或 Development export）時，App Attest 是 `production`、可以用正式版。
+App 的 `APP_ATTEST_ENVIRONMENT`（`project.yml`）在 Debug 和 Release 都是 `production`：Apple 允許開發中的 build 用正式的
+App Attest（「If instead you want to use the App Attest production servers during development, … set the associated value
+to `production`」），TestFlight / App Store 則不論怎麼設都是 `production`。所以從 Xcode 裝到 iPhone 的 build（Debug 或 Release）
+正式版 Worker 都接受，兩個 Worker 的 `APP_ATTEST_ENV` 也都是 `production`（`test/config-sync.test.ts` 會檢查三者一致）。
+以前 Debug 是 `development`：沒有開發版 Worker 時 Debug build 連到正式版，`POST /attest` 被拒（`401 invalid_attestation`，
+Worker log 的原因是 aaguid），App 顯示「伺服器沒有回應（401）」。現在 App 對 `invalid_attestation` 顯示「Smart Schedules 的伺服器無法驗證這個 App」。
 （之後開啟 push-to-start 時：這種 build 的 `aps-environment` 仍是 development，push token 屬於 sandbox，正式版 Worker 送到正式 APNs
 會被拒（`BadDeviceToken`）。push-to-start 請用 TestFlight 測，或用 Debug build 搭配開了 cron 與 APNs secrets 的開發版，
 見 `wrangler.toml` 的 `[env.dev]`。）
 
 開發與正式是兩個不同的 Worker：`wrangler.toml` 的 `[env.dev]` 是 `smart-schedule-worker-dev`（自己的 KV namespace、
-rate limiter 與 secrets，`ALLOW_DEV_TOKEN = "true"`、`APP_ATTEST_ENV = "development"`、`APNS_ENV = "sandbox"`、不跑 cron），
+rate limiter 與 secrets，`ALLOW_DEV_TOKEN = "true"`、`APP_ATTEST_ENV = "production"`、`APNS_ENV = "sandbox"`、不跑 cron），
 正式 Worker 永遠不接受 dev token（`test/config-sync.test.ts` 會檢查）。
 
 ### Debug build 用的開發版
 
-Xcode 裝的 Debug build 在 iPhone 上以 App Attest 的 `development` 環境 attest，Simulator 沒有 App Attest、改送 `X-Dev-Token`，
-兩者都只有開發用 Worker 接受：
+開發版是選用的：Xcode 裝到 iPhone 的 Debug build 和其他 build 一樣以 App Attest 的 `production` 環境 attest，正式版就接受。
+只有 Simulator 需要開發版：它沒有 App Attest，改送 `X-Dev-Token`，只有開發用 Worker 接受：
 
 ```sh
 cd server/worker
@@ -126,7 +131,8 @@ npx wrangler secret put APPLE_TEAM_ID --env dev      # 只有 Debug build 裝到
 npm run check-key -- --worker                        # 填開發版網址（可含 /v1beta）與 dev token，確認整條路通
 ```
 
-App 端（`Config/Secrets.xcconfig`，git-ignored；範本是 `Config/Secrets.example.xcconfig`）：Release 用正式版、Debug 用開發版。
+App 端（`Config/Secrets.xcconfig`，git-ignored；範本是 `Config/Secrets.example.xcconfig`）：Release 用正式版、Debug 用開發版
+（沒有開發版時把 `[config=Debug]` 那兩行註解掉，Debug 也用正式版）。
 xcconfig 裡同一個設定以最後一個符合的為準，所以沒有條件的那行要放在前面：
 
 ```

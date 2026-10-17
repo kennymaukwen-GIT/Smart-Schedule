@@ -19,6 +19,10 @@ enum AttestationError: LocalizedError {
     /// `SSGeminiBaseURL` does not point at Smart Schedule's server.
     case notConfigured
     case server(status: Int)
+    /// The server refused this app's attestation (`invalid_attestation`): the build's App Attest environment, Team ID or
+    /// bundle ID is not the one the server checks (the Worker log says which), or the proof is not genuine. Every new
+    /// key would be refused the same way.
+    case attestationRejected
     /// The server's per-minute limit for this app.
     case rateLimited
     /// A limit on the server that lasts until the next UTC day: the notification extension's replies, or new
@@ -37,6 +41,7 @@ enum AttestationError: LocalizedError {
         case .sessionMissing: String(localized: "Open Smart Schedules once so the assistant can answer here.")
         case .notConfigured: "GEMINI_BASE_URL must point at the Smart Schedules server (server/worker)."
         case let .server(status): String(localized: "The Smart Schedules server didn't answer (\(status)). Try again later.")
+        case .attestationRejected: String(localized: "The Smart Schedules server couldn't verify this copy of the app, so the assistant is unavailable.")
         case .rateLimited: String(localized: "Too many requests. Wait a minute and try again.")
         case .dailyLimit: NetworkSession.isAppExtension
             ? String(localized: "Today's limit for replies here is used up. Open Smart Schedules to continue, or try again tomorrow.")
@@ -330,6 +335,8 @@ enum AttestedRequest {
         // No credential the server accepts: the extension has no session yet, or a Debug build on the simulator
         // sends no X-Dev-Token (SS_DEV_TOKEN unset, or GEMINI_BASE_URL is not the development Worker).
         case "attestation_required": return NetworkSession.isAppExtension ? .sessionMissing : .unsupported
+        // POST /attest refused the key (it answered: this is not "didn't answer").
+        case "invalid_attestation": return .attestationRejected
         default: return .server(status: status)
         }
     }

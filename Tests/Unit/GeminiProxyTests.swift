@@ -98,6 +98,19 @@ final class GeminiProxyTests: XCTestCase {
         XCTAssertEqual(ProxyStub.requests.count, 1)
     }
 
+    /// invalid_attestation (POST /attest refused the key: a Debug build attesting in App Attest's development environment
+    /// against a Worker that checks production, or a Team ID mismatch): the server answered, so it is not "didn't
+    /// answer (401)". A 401 code this build does not know still is.
+    func testARejectedAttestationSaysTheAppCouldNotBeVerified() throws {
+        let rejected = AttestedRequest.failure(status: 401, data: Data(#"{"error":"invalid_attestation"}"#.utf8),
+                                               response: nil)
+        guard case .attestationRejected? = rejected else { return XCTFail("got \(String(describing: rejected))") }
+        XCTAssertEqual(rejected?.errorDescription,
+                       "The Smart Schedules server couldn't verify this copy of the app, so the assistant is unavailable.")
+        let unknown = AttestedRequest.failure(status: 401, data: Data(#"{"error":"something_new"}"#.utf8), response: nil)
+        guard case .server(status: 401)? = unknown else { return XCTFail("got \(String(describing: unknown))") }
+    }
+
     /// server_misconfigured (a missing secret on the server): retrying cannot help, and it is not "didn't answer".
     func testAServerThatIsNotSetUpIsNotRetried() async {
         ProxyStub.respond([(500, #"{"error":"server_misconfigured"}"#), (200, ProxyStub.okResponse)])

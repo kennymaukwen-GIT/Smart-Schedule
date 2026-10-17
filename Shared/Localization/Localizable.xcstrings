@@ -4477,6 +4477,16 @@
         }
       }
     },
+    "The Smart Schedules server couldn't verify this copy of the app, so the assistant is unavailable." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedules 的伺服器無法驗證這個 App，所以目前無法使用助理。"
+          }
+        }
+      }
+    },
     "The Smart Schedules server didn't answer (%lld). Try again later." : {
       "localizations" : {
         "zh-Hant" : {

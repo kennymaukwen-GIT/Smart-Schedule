@@ -50,9 +50,9 @@ invocation_logs = false
 # Bundle IDs allowed to attest (comma-separated). Only the app: App Attest does not work in app extensions, so the
 # notification extension uses a session token (POST /session) instead.
 BUNDLE_IDS = "com.smartschedules.app"
-# Must match the app's com.apple.developer.devicecheck.appattest-environment entitlement:
-#   "production"  → App Store / TestFlight builds (aaguid "appattest" + 7 zero bytes)
-#   "development" → Xcode-installed builds        (aaguid "appattestdevelop")
+# Must match the app's com.apple.developer.devicecheck.appattest-environment entitlement, which project.yml sets to
+# "production" in every configuration (aaguid "appattest" + 7 zero bytes): App Store and TestFlight builds, and
+# Xcode-installed Debug and Release builds on an iPhone. "development" (aaguid "appattestdevelop") would refuse them all.
 APP_ATTEST_ENV = "production"
 # "true" ONLY on a development deployment: then X-Dev-Token (= the SS_DEV_TOKEN secret) bypasses App Attest.
 ALLOW_DEV_TOKEN = "false"
@@ -89,16 +89,17 @@ ATTEST_DAILY_PER_IP = "200"
 # A name cannot be both a var and a secret: these must not appear in [vars] (test/config-sync.test.ts checks).
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Development Worker for Debug builds. The simulator has no App Attest, so it sends X-Dev-Token (SS_DEV_TOKEN in
-# Config/Secrets.xcconfig, the same value as this Worker's SS_DEV_TOKEN secret); Xcode-installed builds on an iPhone
-# attest in App Attest's "development" environment, which only this Worker accepts. A Worker of its own
+# Development Worker for Debug builds (optional: without it, Debug builds on an iPhone use the production Worker, which
+# accepts them). The simulator has no App Attest, so it sends X-Dev-Token (SS_DEV_TOKEN in Config/Secrets.xcconfig,
+# the same value as this Worker's SS_DEV_TOKEN secret), which only this Worker accepts; Xcode-installed builds on an
+# iPhone attest in App Attest's production environment, as every build does (project.yml). A Worker of its own
 # (smart-schedule-worker-dev), with its own KV namespace and secrets, so the production Worker never accepts a dev
 # token. Bindings and vars are not inherited from the top level, so all of them are repeated here. observability is
 # inherited, but an [env.dev.observability] table replaces the top-level one whole, so it is repeated in full too.
 #   npm run deploy:dev
 #   npx wrangler secret put GEMINI_API_KEY --env dev
 #   npx wrangler secret put SS_DEV_TOKEN --env dev
-#   npx wrangler secret put APPLE_TEAM_ID --env dev        (Debug builds on an iPhone)
+#   npx wrangler secret put APPLE_TEAM_ID --env dev        (Debug builds on an iPhone, when GEMINI_BASE_URL[config=Debug] is this Worker)
 # Push-to-start from a Debug build on an iPhone (a sandbox APNs token; only once the app turns it on, not in 1.0):
 # also set APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY with --env dev, and crons = ["* * * * *"] below.
 # Local: `npm run dev` runs this environment on http://localhost:8787 with the secrets in a git-ignored .dev.vars.
@@ -128,7 +129,7 @@ simple = { limit = 30, period = 60 }
 
 [env.dev.vars]
 BUNDLE_IDS = "com.smartschedules.app"
-APP_ATTEST_ENV = "development"
+APP_ATTEST_ENV = "production"
 ALLOW_DEV_TOKEN = "true"
 RATE_LIMIT_PER_MIN = "30"
 APNS_BUNDLE_ID = "com.smartschedules.app"

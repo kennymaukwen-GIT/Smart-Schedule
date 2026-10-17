@@ -17,7 +17,12 @@ configFiles:
 
 settings:
   configs:
-    # App Attest: development uses Apple's sandbox; TestFlight and App Store builds always use production.
+    # App Attest: production in every configuration. TestFlight and App Store builds always use production whatever this
+    # says; Xcode-installed builds use it because of this value (Apple: "If instead you want to use the App Attest
+    # production servers during development, … set the associated value to production"), so a Debug build on an iPhone
+    # is accepted by the production Worker, and by the development one, which checks production too (wrangler.toml).
+    # Apple's own pages disagree on the sandbox aaguid ("appattestdevelop" vs "appattestsandbox"); production avoids it.
+    # server/worker/test/config-sync.test.ts keeps these values and both Workers' APP_ATTEST_ENV equal.
     # SS_DEV_TOKEN (Config/Secrets.xcconfig) only reaches Debug builds: Release forces it empty.
     # No push environment: version 1.0 uses no remote push (AppConstants.pushToStartEnabled and
     # liveActivityPushEnabled are false), so the app has no aps-environment entitlement. To turn push-to-start on in a
@@ -27,7 +32,7 @@ settings:
     # `aps-environment: $(APS_ENVIRONMENT)` to the app's entitlements and remote-notification to its UIBackgroundModes.
     # scripts/validate_schema.py checks the flags and these entries agree.
     Debug:
-      APP_ATTEST_ENVIRONMENT: development
+      APP_ATTEST_ENVIRONMENT: production
     Release:
       APP_ATTEST_ENVIRONMENT: production
       SS_DEV_TOKEN: ""

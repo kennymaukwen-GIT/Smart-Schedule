@@ -119,7 +119,8 @@ jobs:
           xcodegen generate
 
       # Config/Secrets.xcconfig (git-ignored) as Secrets.example.xcconfig lays it out, with placeholder hosts: Release
-      # builds get the production Worker and no dev token, Debug builds the development Worker, and the dev token only
+      # builds get the production Worker and no dev token, Debug builds the development Worker (optional: every build
+      # attests in App Attest's production environment, which both Workers check), and the dev token only
       # reaches Debug simulator builds. The file is removed again before the real build.
       - name: Secrets.xcconfig layout resolves per configuration
         run: |
