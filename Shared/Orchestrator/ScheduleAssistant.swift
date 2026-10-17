@@ -21,6 +21,10 @@ enum AssistantError: LocalizedError {
 /// Preferences, the clock and the mapper are read per request (never cached in the singleton), so a change in
 /// Settings or by voice applies to the very next request. Every Google write goes through `CalendarRouter`: new
 /// events to the default calendar, edits and deletes to the calendar that owns the event.
+///
+/// With a router whose new events go to a sample calendar (demo mode: `AccountStore.sampleCalendarsOnly()`), every
+/// write stays on this iPhone (`CalendarRouter+Sample.swift`): the prompt adds `AssistantPrompt.demoModeBlock` and
+/// the replies say "on this device" where they would name Google Calendar.
 actor ScheduleAssistant {
     struct PendingDeletion: Sendable, Equatable {
         let eventIDs: [String]
@@ -94,6 +98,7 @@ actor ScheduleAssistant {
     private let store: SharedStore
     private let preferences: PreferencesStore
     private let fixedClock: WallClock?
+    private let rescheduleReminders: @Sendable (SharedStore) async -> Void
     /// Each exchange = [user text, model turn, function responses]. Trimmed by whole exchanges so a
     /// functionCall is never separated from its functionResponse (Gemini rejects that).
     private var exchanges: [[GeminiTurn]] = []
@@ -109,11 +114,25 @@ actor ScheduleAssistant {
          store: SharedStore = .shared,
          preferences: PreferencesStore = .shared,
          clock: WallClock? = nil) {
+        self.init(gemini: gemini, router: router, store: store, preferences: preferences, clock: clock,
+                  rescheduleReminders: { cache in await ReminderScheduler.shared.reschedule(store: cache) })
+    }
+
+    /// Every dependency given, none defaulted (so no call can match both initializers).
+    /// - Parameter rescheduleReminders: runs after every write. Unit tests pass a no-op because a hostless test
+    ///   bundle has no notification center.
+    init(gemini: GeminiClient,
+         router: CalendarRouter,
+         store: SharedStore,
+         preferences: PreferencesStore,
+         clock: WallClock?,
+         rescheduleReminders: @escaping @Sendable (SharedStore) async -> Void) {
         self.gemini = gemini
         self.router = router
         self.store = store
         self.preferences = preferences
         self.fixedClock = clock
+        self.rescheduleReminders = rescheduleReminders
     }
 
     func resetConversation() {
@@ -134,6 +153,12 @@ actor ScheduleAssistant {
         return Context(clock: clock, preferences: current, mapper: mapper, router: requestRouter)
     }
 
+    /// New events go to a sample calendar (demo mode's router): every write stays on this iPhone.
+    private func writesOnDevice(_ ctx: Context) async -> Bool {
+        guard let target = try? await ctx.router.defaultTarget() else { return false }
+        return CalendarRouter.isSample(target.id)
+    }
+
     /// - Parameter focusEventID: set when replying from a reminder notification, so "push it 30 min"
     ///   resolves to that event without the user naming it.
     /// - Throws: `GeminiError.consentRequired` when AI data sharing is not allowed; nothing was sent.
@@ -149,11 +174,13 @@ actor ScheduleAssistant {
         let defaultTarget = await ctx.router.accounts.defaultWriteTarget()?.id
         // The same names the prompt uses: function results name calendars this way too, and hold no account address.
         let aliases = CalendarAliases(calendars: calendars)
+        let onDevice = await writesOnDevice(ctx)
 
         let system = AssistantPrompt.system(now: now, clock: ctx.clock, locale: .current,
                                             upcoming: upcoming, focus: focus, policy: ctx.mapper.policy, draft: draft,
                                             preferences: ctx.preferences, calendars: calendars,
                                             defaultTarget: defaultTarget, pendingEvents: pendingEvents)
+            + (onDevice ? "\n\n" + AssistantPrompt.demoModeBlock : "")
         // The user's own words, without their Google accounts' addresses ("use example@yourmail.com from now on" →
         // "[Account 2 email]"). The request kept for the events' notes and the reply keeps what they typed.
         var exchange = [GeminiTurn.user(aliases.scrubbingAccountEmails(utterance))]
@@ -190,7 +217,7 @@ actor ScheduleAssistant {
             reply.text = response.text.map { aliases.restoringAccountEmails($0) } ?? String(localized: "Done.")
         }
         if reply.waitingToSync { reply.append(Self.waitingToSyncNote) }
-        if reply.changed { await ReminderScheduler.shared.reschedule(store: store) }
+        if reply.changed { await rescheduleReminders(store) }
         await store.setLastAssistantLine(reply.text)
         return reply
     }
@@ -203,9 +230,14 @@ actor ScheduleAssistant {
             : pending.refs
         let queued = try await ctx.router.delete(refs, now: Date())
         if let planID = pending.planID { await store.removeNudges(planID: planID) }
-        await ReminderScheduler.shared.reschedule(store: store)
+        await rescheduleReminders(store)
         var reply = Reply(changed: true)
-        reply.append(String(localized: "Deleted \(pending.eventIDs.count) items from Google Calendar."))
+        let onDevice = await writesOnDevice(ctx)
+        if onDevice {
+            reply.append(String(localized: "Deleted \(pending.eventIDs.count) items on this device."))
+        } else {
+            reply.append(String(localized: "Deleted \(pending.eventIDs.count) items from Google Calendar."))
+        }
         if queued {
             reply.waitingToSync = true
             reply.append(Self.waitingToSyncNote)
@@ -220,7 +252,7 @@ actor ScheduleAssistant {
         let reply = try await writePlan(draft, ctx: ctx, now: Date())
         // Tell Gemini, so "move the gym to 7am" next turn edits the real plan instead of re-drafting it.
         remember([.user("[app] The user tapped Add; the draft plan is now in the calendar.")])
-        await ReminderScheduler.shared.reschedule(store: store)
+        await rescheduleReminders(store)
         await store.setLastAssistantLine(reply.text)
         return reply
     }
@@ -248,7 +280,11 @@ actor ScheduleAssistant {
         var reply = Reply(changed: true)
         reply.committedPlanID = draft.id
         reply.showRange = firstWeek(of: draft, clock: ctx.clock)
-        reply.append(ReplyFormatter.planAdded(draft.title))
+        if CalendarRouter.isSample(target.id) {
+            reply.append(String(localized: "Added “\(draft.title)” on this device."))
+        } else {
+            reply.append(ReplyFormatter.planAdded(draft.title))
+        }
         Self.noteHidden(target, in: &reply)
         if saved.contains(where: \.isWaitingToSync) {
             reply.waitingToSync = true
@@ -276,14 +312,18 @@ actor ScheduleAssistant {
         let (events, target) = try await writeBatch(batch, ctx: ctx, now: Date())
         remember([.user("[app] The user tapped Add; the pending events are now in the calendar.")])
         if lastProposal == .events { lastProposal = nil }
-        await ReminderScheduler.shared.reschedule(store: store)
+        await rescheduleReminders(store)
 
         var reply = Reply(changed: true)
         reply.created = events
         reply.addedEvents = events
         reply.committedEventBatchID = batch.id
         reply.showRange = Self.dayRange(of: events, clock: ctx.clock)
-        reply.append(ReplyFormatter.pendingEventsAdded(events.count))
+        if CalendarRouter.isSample(target.id) {
+            reply.append(ReplyFormatter.confirmation(for: events, clock: ctx.clock))
+        } else {
+            reply.append(ReplyFormatter.pendingEventsAdded(events.count))
+        }
         Self.noteHidden(target, in: &reply)
         if events.contains(where: \.isWaitingToSync) {
             reply.waitingToSync = true
@@ -409,6 +449,7 @@ actor ScheduleAssistant {
             reply.changed = true
             reply.append(ReplyFormatter.confirmation(for: events, clock: clock))
             reply.append(ReplyFormatter.conflicts(events, against: upcoming))
+            if CalendarRouter.isSample(target.id) { Self.noteSampleLimits(mapped, saved: inserted, in: &reply) }
             Self.noteHidden(target, in: &reply)
             if events.contains(where: \.isWaitingToSync) { reply.waitingToSync = true }
             // Back to Gemini: the titles without the accounts' addresses again.
@@ -608,7 +649,7 @@ actor ScheduleAssistant {
             rejected += result.rejected
             Self.describe(result.receipt, rejected: rejected, summary: aliases.restoringAccountEmails(args.summaryForUser),
                           in: &reply)
-            if Self.touchesNotifications(result.receipt) { await ReminderScheduler.shared.reschedule(store: store) }
+            if Self.touchesNotifications(result.receipt) { await rescheduleReminders(store) }
             // The stored label ("My calendar | <email>") stays on this iPhone: Gemini gets the CALENDARS label.
             let applied: [[String: String]] = (result.receipt?.changes ?? []).map { change in
                 ["key": change.key.rawValue,
@@ -673,11 +714,18 @@ actor ScheduleAssistant {
         var result = events
         for index in result.indices {
             let event = result[index]
-            guard let notes = suggested[event.id] ?? event.seriesID.flatMap({ suggested[$0] }) else { continue }
+            guard let notes = suggested[Self.mappedID(event.id)]
+                ?? event.seriesID.flatMap({ suggested[Self.mappedID($0)] }) else { continue }
             result[index].suggestedNotes = notes
             await store.setSuggestedNotes(notes, for: event)
         }
         return result
+    }
+
+    /// The id the mapper gave an event, which `suggestedNotes` is keyed by: a sample calendar's copy carries it after
+    /// `demo-` (`CalendarRouter.insertSample`). Google ids never contain "-", so theirs are unchanged.
+    private static func mappedID(_ id: String) -> String {
+        DemoData.isDemoID(id) ? String(id.dropFirst(DemoData.idPrefix.count)) : id
     }
 
     /// "✨ AI suggestions" on the event page: one `suggest_event_notes` request of its own (mode ANY, only that
@@ -739,6 +787,27 @@ actor ScheduleAssistant {
         guard !target.isVisible, !target.accountID.isEmpty else { return }
         reply.savedToHiddenCalendar = target.id
         reply.savedToHiddenCalendarName = target.displayName
+    }
+
+    /// Said when an online event went to a sample calendar: demo mode adds no Google Meet link.
+    static var sampleMeetNote: String { String(localized: "Demo mode doesn't create Google Meet links.") }
+
+    /// Said when a repeating event went to a sample calendar as one event: only weekly and every-day repeats expand
+    /// there (`CalendarRouter.insertSample`).
+    static var sampleRepeatNote: String {
+        String(localized: "Demo mode repeats only daily and weekly events, so this one was added once.")
+    }
+
+    /// What the sample calendars left out of new events: a Meet link, or the repeat of a series that was not
+    /// expanded (none of its occurrences carries its series id).
+    static func noteSampleLimits(_ mapped: [MappedEvent], saved: [ScheduleEvent], in reply: inout Reply) {
+        if mapped.contains(where: \.wantsConference) { reply.append(sampleMeetNote) }
+        let series = Set(saved.compactMap(\.seriesID))
+        let addedOnce = mapped.contains { item in
+            guard item.body.recurrence != nil, let id = item.body.id else { return false }
+            return !series.contains(DemoData.idPrefix + id)
+        }
+        if addedOnce { reply.append(sampleRepeatNote) }
     }
 
     /// Reminders, urgency, quiet hours, briefings and the daily limit change what is scheduled; the calendar for new

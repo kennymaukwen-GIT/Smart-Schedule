@@ -1761,6 +1761,16 @@
         }
       }
     },
+    "Demo mode doesn't create Google Meet links." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式不會建立 Google Meet 連結。"
+          }
+        }
+      }
+    },
     "Demo mode has ended, so nothing was changed." : {
       "localizations" : {
         "zh-Hant" : {
@@ -1777,6 +1787,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "示範模式已開啟"
+          }
+        }
+      }
+    },
+    "Demo mode repeats only daily and weekly events, so this one was added once." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式只能重複每天或每週的行程，所以這個行程只加入一次。"
           }
         }
       }

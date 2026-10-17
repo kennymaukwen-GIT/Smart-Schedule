@@ -200,6 +200,14 @@ enum AssistantPrompt {
         return aliases.scrubbingAccountEmails(lines.joined(separator: "\n"))
     }
 
+    /// Follows `system(…)` when new events go to a sample calendar (demo mode, `ScheduleAssistant`): the calendars and
+    /// events are fictional and every change stays on this iPhone.
+    static let demoModeBlock = """
+        # DEMO MODE
+        CALENDARS, UPCOMING and FOCUS are fictional sample data kept on this iPhone, not the user's Google Calendar. \
+        Handle requests as usual. Never say anything was added to, changed in or deleted from Google Calendar.
+        """
+
     /// What UPCOMING says about an event's calendar.
     private struct CalendarLabel {
         var name: String?       // nil while only one calendar is visible
