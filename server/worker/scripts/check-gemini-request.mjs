@@ -52,7 +52,34 @@ async function probe(label, body) {
 console.log(`Model: ${model}. ${declarations.length} function declarations, ${conversational.length} allowed in chat.`);
 await probe("1. text only", { contents: [user("Reply with the single word OK.")] });
 await probe("2. + thinkingLevel low", { contents: [user("Reply with the single word OK.")], generationConfig: thinking });
-await probe("3. + functions, mode ANY", { contents: [user("10分鐘後吃飯")], tools, toolConfig });
+const third = await probe("3. + functions, mode ANY", { contents: [user("10分鐘後吃飯")], tools, toolConfig });
+if (!third) {
+  // Narrow it down: each function alone, the calling mode, then every schema keyword removed in turn.
+  const ask = { contents: [user("10分鐘後吃飯")] };
+  console.log("\n-- each function alone (mode ANY) --");
+  for (const d of declarations) {
+    await probe(`   ${d.name}`, { ...ask, tools: [{ functionDeclarations: [d] }], toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: [d.name] } } });
+  }
+  console.log("\n-- all functions, other calling modes --");
+  await probe("   mode ANY, no allowedFunctionNames", { ...ask, tools, toolConfig: { functionCallingConfig: { mode: "ANY" } } });
+  await probe("   mode AUTO", { ...ask, tools, toolConfig: { functionCallingConfig: { mode: "AUTO" } } });
+  await probe("   no toolConfig", { ...ask, tools });
+  console.log("\n-- all functions, one kind of schema keyword removed --");
+  const strip = (o, keys) => Array.isArray(o) ? o.map((v) => strip(v, keys))
+    : o && typeof o === "object" ? Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k) || o.type === undefined && k !== "type")
+        .map(([k, v]) => [k, k === "properties" ? Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, strip(pv, keys)])) : strip(v, keys)])) : o;
+  const without = (keys) => declarations.map((d) => ({ ...d, parameters: strip(d.parameters, keys) }));
+  for (const keys of [["minItems", "maxItems"], ["minimum", "maximum"], ["enum"], ["required"], ["description"],
+                      ["minItems", "maxItems", "minimum", "maximum", "enum"]]) {
+    await probe(`   without ${keys.join(", ")}`, { ...ask, tools: [{ functionDeclarations: without(keys) }], toolConfig });
+  }
+  const upper = (o) => Array.isArray(o) ? o.map(upper) : o && typeof o === "object"
+    ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, k === "type" && typeof v === "string" ? v.toUpperCase()
+      : k === "properties" ? Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, upper(pv)])) : upper(v)])) : o;
+  await probe("   types in upper case (STRING, OBJECT…)", { ...ask, tools: [{ functionDeclarations: declarations.map((d) => ({ ...d, parameters: upper(d.parameters) })) }], toolConfig });
+  await probe("   as parametersJsonSchema", { ...ask, tools: [{ functionDeclarations: declarations.map(({ parameters, ...d }) => ({ ...d, parametersJsonSchema: parameters })) }], toolConfig });
+  console.log("");
+}
 const first = await probe("4. like the app: system + functions + thinking", {
   systemInstruction: { parts: [{ text: system }] }, contents: [user("10分鐘後吃飯")], tools, toolConfig, generationConfig: thinking,
 });
