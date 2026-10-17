@@ -3,7 +3,7 @@
 Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.events`、`calendar.calendarlist.readonly`），所以正式上線前要在 Google Auth Platform 完成兩件事：**品牌驗證**（App 名稱和 logo 才會出現在同意畫面）和**敏感 scope 驗證**。這份文件列出要填的每個欄位、要貼進表單的英文、示範影片的分鏡腳本、送審順序、常見退件原因，以及回覆審查信的範本。
 
 - 中文是說明；`text` 區塊裡的英文是要**原樣貼進 Google 表單或回信**的內容。
-- 依據的程式是 2026-10-16 的工作目錄（AI 同意說明第 5 版：Google 帳號 email 不送給 Gemini（第 4 版起）；1.0 不用 iOS 18 的即時動態 push-to-start，伺服器不存任何行程，同意畫面在 iOS 18 也沒有伺服器那一段）。網站在 **https://www.smart-schedules.com**（Cloudflare Pages，DNS 留在 Squarespace，見 [`site/README.md`](../site/README.md) §3）。程式的 scope、同意說明或網站改了，這份文件、表單和影片都要跟著改。
+- 依據的程式是 2026-10-16 的工作目錄（AI 同意說明第 5 版：Google 帳號 email 不送給 Gemini（第 4 版起）；1.0 不用 iOS 18 的即時動態 push-to-start，伺服器不存任何行程，同意畫面在 iOS 18 也沒有伺服器那一段）。網站在 **https://www.smart-schedules.com**（Vercel，DNS 留在 Squarespace，見 [`site/README.md`](../site/README.md) §3）。程式的 scope、同意說明或網站改了，這份文件、表單和影片都要跟著改。
 - Google 的官方頁面（developers.google.com、support.google.com）在撰寫環境打不開，下面的規定來自這些頁面的搜尋摘要，另有幾項來自第三方或開發者論壇（會註明）。**送審前請再讀一次第 10 節列出的原文**，按鈕名稱以控制台實際顯示為準。
 
 > **重要，先讀這段：Cloud 專案在 Google Workspace 組織 `smart-schedules.com` 底下（2026-10-15 依 Admin console 截圖更新）**
@@ -14,7 +14,7 @@ Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.eve
 > - **Publishing status 要從 Testing 改成 In production**（第 3.5 節）。External 而且還在 Testing 時，只有測試使用者能登入，refresh token 7 天就失效。
 > - **User support email 和 Developer contact information 都填 support@smart-schedules.com。** 它是真實信箱，用它登入時會直接出現在 User support email 的下拉選單（第 3.2 節）；Google 的審查信也會寄到這裡，在 Gmail 裡直接回覆即可。
 > - **Search Console 的網域驗證可能已經完成**：Workspace 驗證 smart-schedules.com 時通常會在 DNS（Squarespace）加一筆 `google-site-verification` TXT（也可能用別的方式驗證），用同一個帳號在 Search Console 新增網域資源時可能直接通過（請在畫面上確認）。見第 3.1 節。
-> - **DNS 留在 Squarespace，不搬到 Cloudflare**（nameserver `nsa1`～`nsa4.squarespacedns.com`，DNSSEC 照舊）。網站只在 Squarespace 加一筆 `www` 的 CNAME 指到 Cloudflare Pages（[`site/README.md`](../site/README.md) §3.3）。Google 的 MX、SPF、DKIM、DMARC 和**每一筆** `google-site-verification` TXT 一筆都不要動，也不用 Cloudflare Email Routing；刪了 MX，support@ 收不到信，Google 的審查信也會漏掉；刪了驗證 TXT，Workspace 和 Search Console 的網域驗證都會失效。
+> - **DNS 留在 Squarespace，不搬到 Cloudflare**（nameserver `nsa1`～`nsa4.squarespacedns.com`，DNSSEC 照舊）。網站只在 Squarespace 加一筆 `www` 的 CNAME 指到 Vercel（[`site/README.md`](../site/README.md) §3.3）。Google 的 MX、SPF、DKIM、DMARC 和**每一筆** `google-site-verification` TXT 一筆都不要動，也不用 Cloudflare Email Routing；刪了 MX，support@ 收不到信，Google 的審查信也會漏掉；刪了驗證 TXT，Workspace 和 Search Console 的網域驗證都會失效。
 > - 整個 Cloud 組織和專案都掛在 support@ 這個 Workspace 帳號上：Workspace 訂閱要持續有效，帳號要設好救援 email 和電話。新建立的組織可能預設啟用「Domain restricted sharing」（`iam.allowedPolicyMemberDomains`）這類組織政策，在 IAM 加入組織外的帳號（例如個人 Gmail）時可能被擋（請在畫面上確認）。「Set up Google Cloud for your organisation」精靈不是 OAuth 驗證的前提，可以之後再做（請在畫面上確認）。
 
 ## 0. 一覽：要填的值
@@ -201,6 +201,7 @@ openid and email identify which Google account the user connected. The app reads
 - **經過我們的伺服器**：App 沒有 API key，不直接連 Gemini。Cloudflare Worker 驗證 App Attest，移除 IP、裝置和語言標頭，把 body 原封不動轉給 Gemini API，不保存也不記錄內容。
 - **付費層級，不用於訓練**：Gemini API 專案有 Cloud Billing（Paid Services），依條款 Google 不用 prompt 和回覆改善產品，只為偵測濫用和法律要求保留最多 55 天。我們自己也不用 Google 使用者資料或其衍生資料訓練任何模型（隱私權政策第 11 節）。這兩點對 Limited Use 很重要：Google 的常見問題寫 Google 使用者資料只能用在執行使用者看得到的功能的個人化用途，不能用來訓練或改善基礎模型；有人在 2026 年被拒，原因是把 Workspace 資料送給條款保留訓練權利的 AI 供應商（只是個案報告）。
 - **動態島和即時動態**：只在 iPhone 上產生，不上傳任何行程，也不需要 AI 同意。1.0 不用 iOS 18 的 push-to-start（`AppConstants.pushToStartEnabled = false`）：不要求 push token、不呼叫 `POST /devices/push-to-start`，伺服器不存任何行程（同意說明第 5 版因此拿掉 iOS 18 的伺服器說明）。iOS 26 在 iPhone 上排程；iOS 18 只有在提前時間內打開 App 才出現。
+- **目前版本只有 Gemini**（2026-10-18）：隱私權政策第 4、11 節寫「在目前版本中」，第 18 節說之後如果有其他 AI 選項（例如 Apple 的裝置端模型或使用者自己連結的 AI 帳號），會先更新政策、寫明收件者並在 App 裡再次徵求同意，而且只用條款寫明不拿資料訓練模型的服務。送審內容和影片只示範 Gemini，不提還沒做的功能；之後真的加入其他 AI 時，先寫信告訴審查團隊。
 - **使用者可以隨時停止**：設定 › AI & privacy › Stop sharing；Remove account 撤銷 Google 授權。
 
 ### 5.2 英文（貼進 Additional information，或回覆 AI 相關的提問）
@@ -214,7 +215,7 @@ Consent: nothing is sent until the user taps Allow in an in-app dialog ("Use the
 
 What is sent: the user's request as text (the app has no microphone; requests spoken to Siri or with the keyboard's dictation reach it as text from Apple); the titles, times, notes (up to 300 characters) and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder the user replies to; for "AI suggestions" on one event, that event including its location; the user's calendar names and assistant settings; time zone and language. Google account email addresses are never sent: the assistant sees calendars as "Account 1", "Account 2", and the app replaces the connected accounts' addresses in the user's request, event text and error messages with placeholders before sending (and puts them back on the iPhone in what it writes to Google Calendar). Attendees, organizer and video-call links are not sent.
 
-Path and recipient: the request goes from the app to our server (a Cloudflare Worker), which verifies with Apple App Attest that it comes from our app, removes the user's IP address and device headers, and forwards the body unchanged to Google's Gemini API with our API key. The server does not store or log the content. The app contains no API key and uses no other AI provider.
+Path and recipient: the request goes from the app to our server (a Cloudflare Worker), which verifies with Apple App Attest that it comes from our app, removes the user's IP address and device headers, and forwards the body unchanged to Google's Gemini API with our API key. The server does not store or log the content. The app contains no API key. In this version the only AI provider is Google's Gemini API (paid tier).
 
 Training and retention: our Gemini API project has Cloud Billing enabled, so it is a Paid Service under the Gemini API terms: Google does not use the prompts or responses to improve its products, and keeps them for up to 55 days only to detect abuse and for legally required disclosures. We do not use Google user data, or data derived from it, to develop, improve or train any AI or machine-learning model, generalized or personalized, and we do not allow anyone else to do so (privacy policy, section 11: https://www.smart-schedules.com/privacy#en-limited-use).
 
