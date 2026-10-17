@@ -9,7 +9,7 @@ GEMINI_BASE_URL =
 // Check https://ai.google.dev/gemini-api/docs/deprecations before shipping.
 // Changing it: first add the new ID to SESSION_MODELS in server/worker/wrangler.toml and deploy the Worker (keep the
 // old ID while older app versions are in use), or the notification extension's replies get 403 session_scope.
-GEMINI_MODEL_ID = gemini-3.5-flash
+GEMINI_MODEL_ID = gemini-3.8-flash
 // Debug only (project.yml empties it for Release): lets the simulator, which has no App Attest, call the server.
 SS_DEV_TOKEN =
 GOOGLE_IOS_CLIENT_ID =

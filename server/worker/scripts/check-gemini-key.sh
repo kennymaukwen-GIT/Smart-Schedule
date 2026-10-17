@@ -15,7 +15,7 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 model=$(sed -n 's/^[[:space:]]*GEMINI_MODEL_ID[[:space:]]*=[[:space:]]*\([^[:space:]/]*\).*/\1/p' \
   "$here/../../../Config/Base.xcconfig" 2>/dev/null | head -n 1)
-model=${GEMINI_MODEL_ID:-${model:-gemini-3.5-flash}}
+model=${GEMINI_MODEL_ID:-${model:-gemini-3.8-flash}}
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT INT TERM

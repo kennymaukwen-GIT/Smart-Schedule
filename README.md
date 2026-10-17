@@ -176,4 +176,4 @@ open SmartSchedule.xcodeproj
 | Swift 編譯（App、Widgets、Notification extension） | ⏳ 設定、多帳號改動後待 CI 重新編譯（GitHub Actions 的 macOS runner：xcodegen 加 xcodebuild） |
 | 單元測試 | ⏳ 設定、多帳號改動後待 CI 重跑（hostless `SmartScheduleCoreTests`） |
 | 只能在實機上確認的行為（控制中心打開快速輸入、iOS 26 排程啟動的 Live Activity、iOS 18 打開 App 時出現的 Live Activity（1.0 沒有 push-to-start）、通知內 inline TextField、160 pt 高度） | ⏳ 清單在 `docs/ARCHITECTURE.md` 第 7 節 |
-| Gemini 模型 ID | ⚠️ 預設 `gemini-3.5-flash`；上線前到 Gemini deprecations 頁確認。換 ID 前先加進 Worker 的 `SESSION_MODELS` |
+| Gemini 模型 ID | ⚠️ 預設 `gemini-3.8-flash`（2026-10-17 從 3.5 換過來；3.5 已被標示淘汰，請求會轉到 3.6）；上線前到 Gemini deprecations 頁確認。換 ID 前先加進 Worker 的 `SESSION_MODELS` |

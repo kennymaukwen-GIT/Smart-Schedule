@@ -207,7 +207,7 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `ALLOW_DEV_TOKEN` | var | 只有字串 `"true"` 會啟用 `X-Dev-Token`（以及 dev 身分申請的 session） |
 | `RATE_LIMIT_PER_MIN` | var | 每個身分（attested key / `dev`；session 算在申請它的 key）每分鐘的 request 數，也是 `/attest*` 每個 IP（IPv6 以 /64 計）與每個 (IP, key) 的 Bearer body 讀取上限；須與 `[[ratelimits]]` 的 `simple.limit` 相同；預設 30 |
 | `SESSION_TTL_SECONDS` | var | `POST /session` 發出的 token 壽命（秒，≥ 60），預設 `604800`（7 天） |
-| `SESSION_MODELS` | var | Session token 可呼叫的模型（逗號分隔，完整 ID，不接受 prefix），預設 `gemini-3.5-flash`。**必須包含所有仍在使用的 App 版本的 `GEMINI_MODEL_ID`**（`Config/Base.xcconfig`）：新 ID 要在送審使用它的 build 之前加入並部署 Worker（App Review 會測 notification extension）；舊 ID 等到沒有受支援的 build 再送它、或 Google 已關閉它時才移除。`test/config-sync.test.ts` 會檢查目前的 `GEMINI_MODEL_ID` 有列在這裡 |
+| `SESSION_MODELS` | var | Session token 可呼叫的模型（逗號分隔，完整 ID，不接受 prefix），預設 `gemini-3.8-flash,gemini-3.5-flash`（3.8 是 2026-10-17 起的 App，3.5 是之前的 build）。**必須包含所有仍在使用的 App 版本的 `GEMINI_MODEL_ID`**（`Config/Base.xcconfig`）：新 ID 要在送審使用它的 build 之前加入並部署 Worker（App Review 會測 notification extension）；舊 ID 等到沒有受支援的 build 再送它、或 Google 已關閉它時才移除。`test/config-sync.test.ts` 會檢查目前的 `GEMINI_MODEL_ID` 有列在這裡 |
 | `SESSION_DAILY_LIMIT` | var | 每個身分每 UTC 日以 session 呼叫 generateContent 的上限，預設 `200`（extension 每次回覆 1–3 次）；Bearer 不受影響 |
 | `ATTEST_DAILY_PER_IP` | var | 每個 IP bucket（IPv6 以 /64 計）每 UTC 日**成功** attest 的上限（= 新身分數），預設 `200`（行動網路常有許多使用者共用一個 IPv4） |
 | `APNS_BUNDLE_ID` | var | 預設 `com.smartschedules.app` |

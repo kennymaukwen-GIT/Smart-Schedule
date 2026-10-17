@@ -10,7 +10,7 @@ import { START, jsonOf, makeHarness } from "./helpers/harness.ts";
 import { generateEcKeyPair } from "./helpers/webcrypto.ts";
 import { encode as cborEncode } from "cborg";
 
-const SESSION_MODEL = "gemini-3.5-flash"; // SESSION_MODELS default = the app's GEMINI_MODEL_ID
+const SESSION_MODEL = "gemini-3.8-flash"; // SESSION_MODELS default = the app's GEMINI_MODEL_ID
 
 let chain: Chain;
 before(async () => {

@@ -15,7 +15,7 @@ struct GeminiConfig: Sendable {
     static var fromBundle: GeminiConfig {
         GeminiConfig(
             baseURL: AppConstants.info("SSGeminiBaseURL") ?? "",
-            modelID: AppConstants.info("SSGeminiModelID") ?? "gemini-3.5-flash",
+            modelID: AppConstants.info("SSGeminiModelID") ?? "gemini-3.8-flash",
             apiKey: nil,
             thinkingLevel: "low" // parsing a sentence is latency-bound; plans still come out well-structured
         )
