@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The hamburger's drawer (Artboard 5, right): WHAT you see. "General" opens Settings; then "Events", what is on
 /// now and next with "All events (N)" pushing the full list (every event still to come, each opening the event
@@ -21,19 +22,35 @@ struct CalendarDrawer: View {
     @State private var path: [DrawerRoute] = []
     /// The "Remove account" confirmation on screen.
     @State private var removal: ScheduleViewModel.AccountRemoval?
-    /// Horizontal drag so far (negative = towards the edge); the panel follows it.
-    @GestureState private var drag: CGFloat = 0
+    /// Horizontal drag so far (negative = towards the edge); the panel follows it (`DrawerCloseSwipe`).
+    @State private var drag: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
             HStack(spacing: 0) {
                 NavigationStack(path: $path) {
-                    // Every minute, so an event leaves the Events section once it has ended.
-                    TimelineView(.everyMinute) { context in
-                        list(now: context.date)
+                    VStack(alignment: .leading, spacing: 0) {
+                        // The drawer's title as a plain heading, not a large navigation title: the drawer was the only
+                        // large title in the app, and its collapse starts at the first scroll, where the app froze on
+                        // an iPhone. The navigation bar is hidden on this page only.
+                        Text("Smart Schedules")
+                            .font(.largeTitle.bold())
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
+                            .padding(.bottom, 4)
+                            .accessibilityAddTraits(.isHeader)
+                        // Every minute, so an event leaves the Events section once it has ended.
+                        TimelineView(.everyMinute) { context in
+                            list(now: context.date)
+                        }
                     }
+                    .background(Theme.surface)
+                    // The back button's label on pushed pages; the bar itself is hidden here.
                     .navigationTitle("Smart Schedules")
-                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar(.hidden, for: .navigationBar)
                     .navigationDestination(for: DrawerRoute.self) { route in
                         switch route {
                         case let .calendar(ref): CalendarDetailsView(ref: ref)
@@ -43,9 +60,22 @@ struct CalendarDrawer: View {
                 }
                 .frame(width: min(340, geo.size.width * 0.84))
                 .background(Theme.surface.ignoresSafeArea())
-                .offset(x: min(0, drag))
-                // Only on the drawer's first page: rows of the events list swipe left for Delete and Edit.
-                .simultaneousGesture(closeGesture, including: path.isEmpty ? .all : .subviews)
+                .offset(x: drag)
+                // Swipe towards the edge to close: a UIKit pan on the window (never a SwiftUI gesture over the List,
+                // `DrawerSwipe`). Only on the drawer's first page: rows of "All events" swipe left for Delete and Edit.
+                .background(
+                    DrawerCloseSwipe(isEnabled: path.isEmpty,
+                                     onDrag: { offset in
+                                         if offset == 0 {
+                                             withAnimation(.snappy) { drag = 0 }
+                                         } else {
+                                             drag = offset
+                                         }
+                                     },
+                                     onClose: onClose)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                )
 
                 // The rest of the screen, dimmed by RootView: a tap there closes the drawer. It belongs to this layer,
                 // which lies over the dim layer and spans the whole screen, so the tap can't miss it.
@@ -258,18 +288,88 @@ struct CalendarDrawer: View {
         onClose()
         Task { await schedule.reconnect(accountID: account.id) }
     }
+}
 
-    /// Drag towards the leading edge to close; vertical drags are left to the list.
-    private var closeGesture: some Gesture {
-        DragGesture(minimumDistance: 20)
-            .updating($drag) { value, state, _ in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                state = value.translation.width
-            }
-            .onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                if value.translation.width < -80 || value.predictedEndTranslation.width < -200 { onClose() }
-            }
+/// The drawer's swipe-to-close: a `UIPanGestureRecognizer` on the window while the drawer is on screen (the same
+/// pattern as App/Views/KeyboardDismissSwipe.swift). It only watches: it recognizes alongside the List's scrolling,
+/// never cancels or delays touches, and begins only for a sideways drag towards the edge (`DrawerSwipe.begins`), so
+/// every vertical drag stays the List's. Taps (General, rows, the dimmed area) are never touched.
+private struct DrawerCloseSwipe: UIViewRepresentable {
+    var isEnabled: Bool
+    var onDrag: (CGFloat) -> Void
+    var onClose: () -> Void
+
+    func makeUIView(context: Context) -> HostView {
+        let view = HostView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ uiView: HostView, context: Context) {
+        uiView.swipe.isEnabled = isEnabled
+        uiView.swipe.onDrag = onDrag
+        uiView.swipe.onClose = onClose
+    }
+
+    /// Puts the recognizer on the window it is in, and takes it off when the drawer leaves.
+    final class HostView: UIView {
+        let swipe = DrawerSwipeRecognizer()
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            swipe.attach(to: window)
+        }
+    }
+}
+
+/// The window's pan recognizer and its delegate (a recognizer does not keep its target or delegate alive; the host
+/// view keeps this).
+private final class DrawerSwipeRecognizer: NSObject, UIGestureRecognizerDelegate {
+    var isEnabled = true
+    var onDrag: (CGFloat) -> Void = { _ in }
+    var onClose: () -> Void = {}
+
+    private lazy var pan: UIPanGestureRecognizer = {
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
+        pan.delegate = self
+        pan.cancelsTouchesInView = false
+        pan.delaysTouchesBegan = false
+        pan.delaysTouchesEnded = false
+        return pan
+    }()
+
+    func attach(to window: UIWindow?) {
+        pan.view?.removeGestureRecognizer(pan)
+        window?.addGestureRecognizer(pan)
+    }
+
+    @objc private func panned(_ pan: UIPanGestureRecognizer) {
+        let dx = pan.translation(in: pan.view).x
+        switch pan.state {
+        case .changed:
+            onDrag(DrawerSwipe.offset(translation: dx))
+        case .ended:
+            let closes = DrawerSwipe.closes(translation: dx, velocity: pan.velocity(in: pan.view).x)
+            onDrag(0)
+            if closes { onClose() }
+        case .cancelled, .failed:
+            onDrag(0)
+        default:
+            break
+        }
+    }
+
+    // MARK: UIGestureRecognizerDelegate
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard isEnabled, let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+        return DrawerSwipe.begins(velocity: pan.velocity(in: pan.view))
+    }
+
+    /// Always alongside, never instead of, the List's scrolling or the keyboard swipe.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
     }
 }
 

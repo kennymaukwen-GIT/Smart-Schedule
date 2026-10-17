@@ -58,7 +58,7 @@ No pull-to-refresh on the main screen: a `.refreshable` there reaches every scro
 A panel sliding in from the leading edge over a dimmed main screen (dim `Color.black.opacity(0.45)`, tap to close, drag left to close). Opening it hides the keyboard (anywhere in the app, a swipe down hides it too: `App/Views/KeyboardDismissSwipe.swift`). Width `min(340, 84% of screen)`. Background `Theme.surface`. The panel hosts its own `NavigationStack` so calendar details push inside it.
 
 ```
-Smart Schedules                         ← large title, white
+Smart Schedules                         ← heading (.largeTitle bold, white; not a navigation title)
 ┌─────────────────────────────────────┐
 │ ⚙︎  General                       ›  │ → presents Settings (§2.5) as a sheet, drawer closes
 └─────────────────────────────────────┘
@@ -148,9 +148,18 @@ accounts the calendar rows would push it below the fold.
   for 12 months: only months the cache lacks are listed, per calendar). While it loads, a last row shows a small
   spinner and "Loading events". Footnote: "Shows events in the next 12 months." 「列出接下來 12 個月內的行程。」
 - The drawer's drag-to-close only works on its first page, so rows of the list can swipe left.
+- Drag-to-close is a `UIPanGestureRecognizer` on the window while the drawer is on screen (`DrawerCloseSwipe` in
+  `CalendarDrawer.swift`, rules in `Shared/Core/DrawerSwipe.swift`, unit tested): it begins only for a sideways drag
+  towards the edge, never cancels touches, and the panel follows the finger; letting go past 80 pt, or a flick faster
+  than 500 pt/s, closes it. It replaced a SwiftUI `DragGesture` attached with `.simultaneousGesture(…, including: .all)`
+  over the drawer's `NavigationStack`/`List`: on an iPhone the app froze at the first scroll in the drawer (scroll,
+  General, the dimmed area all dead; a tap on General as the very first touch still worked). For the same reason the
+  title "Smart Schedules" is a plain heading above the list with the navigation bar hidden on that page (it was the
+  app's only large navigation title, whose collapse also starts at the first scroll); pushed pages keep their bar, with
+  "Smart Schedules" as the back button.
 - A tap on the dimmed rest of the screen closes the drawer on any page. The tap target is part of the drawer's own layer
   (`CalendarDrawer`), not only RootView's dim layer under it: the drawer layer spans the whole screen above the dim, so
-  on an iPhone the dim layer's tap alone did not close it.
+  the tap can't be lost between the two layers. (The dead tap seen on an iPhone was the freeze described above.)
 - The drawer's first page ignores the keyboard's area, so a keyboard still up when it opens (going away,
   `KeyboardDismissal`) doesn't cut its background short; "All events" keeps that area for its search results.
 

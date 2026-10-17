@@ -219,6 +219,7 @@ sequenceDiagram
 - [ ] 1.0 沒有語音輸入：快速輸入、主畫面對話和長按通知都沒有麥克風按鈕；`smartschedule://compose?mode=voice` 打開一般的快速輸入（鍵盤已叫出）；整個 App 不會跳出麥克風或語音辨識的權限提示；設定 › 助理沒有「語音輸入」區塊。鍵盤上的聽寫鍵照常可用。
 - [ ] 抽屜在不同機型上的寬度（`min(340, 84%)`）和往左滑關閉的手勢不會和清單捲動衝突。
 - [ ] 往下滑收鍵盤（`App/Views/KeyboardDismissSwipe.swift`）：主畫面對話、Quick Capture、行程頁、新增帳號頁鍵盤叫出時，往下滑 30 pt 以上鍵盤收起，點輸入框再出現；左右翻頁、列的刪除滑動、抽屜往左滑、對話把手、往上滑關 Quick Capture、下拉關 sheet 都照常；從正在輸入的框裡開始的拖曳（移動游標、選字）不收鍵盤；打開抽屜時鍵盤收起。
+- [ ] 抽屜不會卡住（2026-10-17 實機問題）：打開抽屜後第一下就上下滑清單，清單照常捲動，之後點「一般」、點行程、點右邊變暗處（關閉）都有反應；往左滑抽屜（或變暗處）會關閉，上下滑不會關；「全部行程」頁的列往左滑出現刪除和編輯，不會關閉抽屜。
 - [ ] 左右滑不會上下移動：主畫面月曆左右滑（包括斜斜往下滑）不出現轉圈、月份頁不會被拉下來，相鄰月份不會一頁高一頁低（除非自己把某一頁往下捲過）；對話往下拉也不會同步。Quick Capture 的 WEEK、DAY 內容放得下時上下拖不動，放不下時照常上下捲動。抽屜狀態列點一下會同步。往下滑收鍵盤照常。
 - [ ] App Attest：Xcode 裝到 iPhone 的 Debug 與 TestFlight 各裝一次。兩者的 `appattest-environment` 都是 `production`（`project.yml`），都可以連正式版 Worker（Debug 也可以連選用的開發版，它同樣檢查 `production`），Xcode 簽署時沒有 entitlement 不符的錯誤。第一次用助理時 `GET /attest/challenge` → `POST /attest` 成功，之後的 Gemini request 帶 `Authorization: Bearer`；Release 版從不送 `X-Dev-Token`。用到的每個 Worker 都要先 `wrangler secret put APPLE_TEAM_ID`（沒設時 `POST /attest` 回 500），而且要等於 build 的 `DEVELOPMENT_TEAM`：不同時回 `401 invalid_attestation`，App 顯示「Smart Schedules 的伺服器無法驗證這個 App，所以目前無法使用助理。」
 - [ ] 通知擴充的 session（用 TestFlight／Release 版測）：App 回到前景或背景更新時，剩不到 3 天就 `POST /session` 換新；在伺服器刪掉該 `sess:` key 後長按通知回覆，看到「請先打開 Smart Schedules 一次…」，打開 App 後恢復。Debug 版在 Simulator 上 session 失效後改送 `X-Dev-Token`：`SS_DEV_TOKEN` 有值且開發 Worker 開了 `ALLOW_DEV_TOKEN` 時回覆照常成功，空白時顯示「請先打開 Smart Schedules 一次…」（伺服器回 `attestation_required`）。
