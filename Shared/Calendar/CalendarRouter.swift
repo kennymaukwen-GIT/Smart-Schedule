@@ -30,6 +30,9 @@ enum RouterError: LocalizedError {
 /// - When Google cannot be reached (no network, a timeout, 5xx after the client's retries) the change goes to the
 ///   outbox (`SyncOutbox`) and the cache shows it at once, marked `isPendingSync`. A later change of an event that
 ///   still waits queues behind it, so order is kept. `SyncEngine` sends the queue.
+///
+/// Sample calendars (demo mode's accounts) never reach Google: their writes change the cache only
+/// (`CalendarRouter+Sample.swift`).
 struct CalendarRouter: Sendable {
     var accounts: AccountStore = .shared
     var tokens: GoogleTokenProvider = .shared
@@ -66,6 +69,7 @@ struct CalendarRouter: Sendable {
     func insert(_ events: [MappedEvent], into target: CalendarInfo, mapper: CalendarEventMapper, now: Date) async throws -> [ScheduleEvent] {
         guard !events.isEmpty else { return [] }
         try Self.requireWritable(target)
+        if Self.isSample(target.id) { return try await insertSample(events, into: target, mapper: mapper, now: now) }
         let saved: [GCalEvent]
         do {
             saved = try await makeClient(target).insertAll(events)
@@ -90,6 +94,7 @@ struct CalendarRouter: Sendable {
     func patch(_ event: ScheduleEvent, body: GCalEvent, mapper: CalendarEventMapper, now: Date = Date()) async throws -> ScheduleEvent? {
         let calendar = try await owningCalendar(of: event)
         try Self.requireWritable(calendar)
+        if Self.isSample(calendar.id) { return try await patchSample(event, body: body, mapper: mapper) }
         let target = calendar.id
         let waiting = await outbox.hasPending(calendar: target, eventID: event.id)
         if waiting || event.isWaitingToSync {
@@ -134,6 +139,10 @@ struct CalendarRouter: Sendable {
                      mapper: CalendarEventMapper, now: Date) async throws -> Bool {
         let calendar = try await owningCalendar(of: event)
         try Self.requireWritable(calendar)
+        if Self.isSample(calendar.id) {
+            try await patchSampleSeries(of: event, body: body, newStart: newStart, duration: duration, mapper: mapper)
+            return false
+        }
         let target = calendar.id
         let seriesID = event.seriesID ?? event.id
         var body = body
@@ -202,6 +211,13 @@ struct CalendarRouter: Sendable {
                     fallback = calendar
                 }
                 try Self.requireWritable(calendar)
+                if Self.isSample(calendar.id) {
+                    // Sample events live in the cache only: they leave it below, with a series' occurrences.
+                    try await requireDemoActive()
+                    deleted += [ref, EventRef(accountID: calendar.accountID, calendarID: calendar.calendarID,
+                                              eventID: ref.eventID)]
+                    continue
+                }
                 let target = calendar.id
                 let copy = cached.first(where: { $0.ref == ref })
                     ?? cached.first(where: { $0.id == ref.eventID && OutboxOverlay.belongs($0, to: target) })
@@ -243,6 +259,7 @@ struct CalendarRouter: Sendable {
     /// Series masters of a plan across all writable synced calendars (a plan lives where it was added). Offline:
     /// the plan's series as cached, so deleting it can wait in the outbox.
     func planEventRefs(planID: String, now: Date) async throws -> [EventRef] {
+        if let target = try? await defaultTarget(), Self.isSample(target.id) { return await samplePlanRefs(planID: planID) }
         do {
             return try await listedPlanRefs(planID: planID, now: now)
         } catch let error where CalendarFailure.of(error).isTransport {

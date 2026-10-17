@@ -220,6 +220,7 @@ Smart Schedules 產生的 id（`GoogleEventID.make(seed:)`）用每次請求的 
 - `delete_events` 帶 `plan_id` 時，在每個可寫入的同步行事曆用 `privateExtendedProperty=ssPlanId=<id>` 找系列（計畫寫在當初加入的行事曆）。
 - 寫入唯讀行事曆會在送出前擋下，Google 回 403 `requiredAccessLevel` 也一樣，顯示「你無法修改「<行事曆>」裡的行程。」
 - 寫完立刻 upsert 到快取（帶上帳號、行事曆）；有重複事件時改為重新列出那個行事曆的滾動視窗。
+- **範例行事曆**（demo 帳號，id 開頭是 `demo-`；真的帳號 id 是 OpenID `sub`，不會這樣開頭）：`insert`、`patch`、`patchSeries`、`delete` 只改 `SharedStore`，不拿 token、不進 outbox、不重新列出、不連 Google（`CalendarRouter+Sample.swift`）。新行程的 id 加上 `demo-`；每週重複和沒有間隔的每天重複展開 26 週（`PlanDraftBuilder.previewWeeks`），其他重複只加一次。`planEventRefs` 從快取找計畫的範例行程。每次寫入前先看快取自己的 `AccountStore`（即時的示範模式開關），示範模式已經結束就丟 `DemoCalendarError.demoEnded`「示範模式已結束，所以沒有做任何變更。」，什麼都不改。`AccountStore.sampleCalendarsOnly()` 不管開關都只列出範例帳號，用它建的 router 即使在請求途中示範模式結束，新行程也只會寫到範例行事曆。
 
 ### 9.7 專注模式過濾條件（`CalendarFocusFilter`）
 

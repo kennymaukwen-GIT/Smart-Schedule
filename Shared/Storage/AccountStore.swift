@@ -409,6 +409,17 @@ actor AccountStore {
     }
 }
 
+extension AccountStore {
+    /// The sample accounts only, whatever the demo flag says, with this device's settings for their calendars (the
+    /// same App Group `accounts.json`). A `CalendarRouter` built on it adds new events to a sample calendar, even when
+    /// demo mode ends while a request is running.
+    static func sampleCalendarsOnly() -> AccountStore {
+        let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppConstants.appGroupID)
+            ?? FileManager.default.temporaryDirectory
+        return AccountStore(fileURL: container.appendingPathComponent("accounts.json"), isDemoMode: { true })
+    }
+}
+
 extension AccountStore.File {
     /// Tolerant: a newer build's file still yields the accounts this build understands, and one bad entry is
     /// skipped instead of losing every account.

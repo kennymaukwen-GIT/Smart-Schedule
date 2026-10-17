@@ -1087,6 +1087,8 @@ The infinite-calendar change keeps one global `loadedRanges` plus the rolling `w
 
 **Routing:** every existing event carries `accountID` / `calendarID`, so modify and delete go to the account and calendar that own that copy (after de-dup that is the organizer's or a writable copy). Series edits PATCH `seriesID` in the instance's calendar. `delete_events` with `plan_id` lists masters with `privateExtendedProperty=ssPlanId=<id>` in every writable synced calendar (a plan lives where it was added). Events with `accountID == nil` route to the default target. A 403 on a read-only calendar surfaces as `CalendarAPIError` with the text "You can't change events in “%@”." (`RouterError.readOnly(name)`).
 
+**Sample calendars** (`Shared/Calendar/CalendarRouter+Sample.swift`): a calendar of a sample account (`demo-` account id; real ids are OpenID `sub` values) is written on the iPhone only. `insert`, `patch`, `patchSeries` and `delete` change `SharedStore` and never touch tokens, the outbox, a refresh or Google; new events get `demo-` ids, WEEKLY and every-day DAILY repeats expand `PlanDraftBuilder.previewWeeks` (26) weeks ahead and other repeats are added once; `planEventRefs` reads the plan's sample events from the cache. Each such write first checks the cache's own `AccountStore` (the live demo flag) and, once demo mode has ended, throws `DemoCalendarError.demoEnded` ("Demo mode has ended, so nothing was changed." 「示範模式已結束，所以沒有做任何變更。」) without changing anything. `AccountStore.sampleCalendarsOnly()` lists only the sample accounts whatever the demo flag says, so a router built on it adds new events to a sample calendar even if demo mode ends during the request.
+
 ```swift
 struct CalendarRouter: Sendable {
     var accounts: AccountStore = .shared

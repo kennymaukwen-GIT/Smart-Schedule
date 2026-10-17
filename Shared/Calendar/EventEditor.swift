@@ -383,8 +383,9 @@ actor EventEditor {
     // MARK: Helpers
 
     /// One occurrence with a series edit applied: the fields, then the new time of day and length on its own date.
-    private static func occurrence(_ event: ScheduleEvent, applying body: GCalEvent, newStart: Date?,
-                                   duration: TimeInterval?, clock: WallClock) -> ScheduleEvent {
+    /// Also how the router edits a sample series (`CalendarRouter.patchSampleSeries`).
+    static func occurrence(_ event: ScheduleEvent, applying body: GCalEvent, newStart: Date?,
+                           duration: TimeInterval?, clock: WallClock) -> ScheduleEvent {
         var fields = body
         fields.start = nil
         fields.end = nil
