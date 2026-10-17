@@ -87,7 +87,7 @@ extension ScheduleActivityAttributes.DayDigest {
     /// event not shown (`more`). The expanded island is capped at 160 pt, so a day has room for two rows only.
     func visibleRows(_ rows: Int) -> (chips: [ScheduleActivityAttributes.Chip], more: Int) {
         let total = chips.count + overflow
-        let shown = total <= rows ? min(chips.count, rows) : max(0, rows - 1)
-        return (Array(chips.prefix(shown)), total - shown)
+        let shown = Array(chips.prefix(total <= rows ? rows : max(0, rows - 1)))
+        return (shown, total - shown.count)
     }
 }
