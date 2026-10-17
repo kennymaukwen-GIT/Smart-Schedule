@@ -25,11 +25,13 @@ const thinking = { thinkingConfig: { thinkingLevel: "low" } };
 async function probe(label, body) {
   let status = 0, json = null;
   try {
-    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) });
+    // 60 s each: a request that hangs is reported and the next one runs.
+    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key },
+                                 body: JSON.stringify(body), signal: AbortSignal.timeout(60_000) });
     status = r.status;
     json = await r.json().catch(() => null);
   } catch (e) {
-    console.log(`${label.padEnd(46)} network error: ${e.message}`);
+    console.log(`${label.padEnd(46)} ${e.name === "TimeoutError" ? "no answer in 60 s" : `network error: ${e.message}`}`);
     return null;
   }
   console.log(`${label.padEnd(46)} HTTP ${status}`);
@@ -55,15 +57,12 @@ await probe("2. + thinkingLevel low", { contents: [user("Reply with the single w
 const third = await probe("3. + functions, mode ANY", { contents: [user("10分鐘後吃飯")], tools, toolConfig });
 if (!third) {
   // Narrow it down: each function alone, the calling mode, then every schema keyword removed in turn.
-  const ask = { contents: [user("10分鐘後吃飯")] };
+  // Low thinking as in the app (test 3 failed without it too), so each answer comes quickly.
+  const ask = { contents: [user("10分鐘後吃飯")], generationConfig: thinking };
   console.log("\n-- each function alone (mode ANY) --");
   for (const d of declarations) {
     await probe(`   ${d.name}`, { ...ask, tools: [{ functionDeclarations: [d] }], toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: [d.name] } } });
   }
-  console.log("\n-- all functions, other calling modes --");
-  await probe("   mode ANY, no allowedFunctionNames", { ...ask, tools, toolConfig: { functionCallingConfig: { mode: "ANY" } } });
-  await probe("   mode AUTO", { ...ask, tools, toolConfig: { functionCallingConfig: { mode: "AUTO" } } });
-  await probe("   no toolConfig", { ...ask, tools });
   console.log("\n-- all functions, one kind of schema keyword removed --");
   const strip = (o, keys) => Array.isArray(o) ? o.map((v) => strip(v, keys))
     : o && typeof o === "object" ? Object.fromEntries(Object.entries(o).filter(([k]) => !keys.includes(k) || o.type === undefined && k !== "type")
@@ -78,6 +77,9 @@ if (!third) {
       : k === "properties" ? Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, upper(pv)])) : upper(v)])) : o;
   await probe("   types in upper case (STRING, OBJECT…)", { ...ask, tools: [{ functionDeclarations: declarations.map((d) => ({ ...d, parameters: upper(d.parameters) })) }], toolConfig });
   await probe("   as parametersJsonSchema", { ...ask, tools: [{ functionDeclarations: declarations.map(({ parameters, ...d }) => ({ ...d, parametersJsonSchema: parameters })) }], toolConfig });
+  console.log("\n-- all functions, other calling modes --");
+  await probe("   mode ANY, no allowedFunctionNames", { ...ask, tools, toolConfig: { functionCallingConfig: { mode: "ANY" } } });
+  await probe("   mode AUTO", { ...ask, tools, toolConfig: { functionCallingConfig: { mode: "AUTO" } } });
   console.log("");
 }
 const first = await probe("4. like the app: system + functions + thinking", {
