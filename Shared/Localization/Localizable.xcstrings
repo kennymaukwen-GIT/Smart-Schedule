@@ -1771,6 +1771,16 @@
         }
       }
     },
+    "Demo mode changes only the sample calendars, so nothing was changed." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "示範模式只會修改範例行事曆，所以沒有做任何變更。"
+          }
+        }
+      }
+    },
     "Demo mode doesn't create Google Meet links." : {
       "localizations" : {
         "zh-Hant" : {

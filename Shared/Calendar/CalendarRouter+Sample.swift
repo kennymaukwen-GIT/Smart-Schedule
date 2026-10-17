@@ -1,10 +1,19 @@
 import Foundation
 
-/// A write reached a sample calendar after demo mode ended (a request that was still running when the user left it).
 enum DemoCalendarError: LocalizedError {
+    /// A write reached a sample calendar after demo mode ended (a request that was still running when the user left
+    /// it).
     case demoEnded
+    /// A write reached a real calendar while new events go to a sample one (demo mode, and always on demo mode's own
+    /// router).
+    case sampleCalendarsOnly
 
-    var errorDescription: String? { String(localized: "Demo mode has ended, so nothing was changed.") }
+    var errorDescription: String? {
+        switch self {
+        case .demoEnded: String(localized: "Demo mode has ended, so nothing was changed.")
+        case .sampleCalendarsOnly: String(localized: "Demo mode changes only the sample calendars, so nothing was changed.")
+        }
+    }
 }
 
 /// The sample calendars (`DemoData.accounts`) live on this iPhone only. A write the router sends to one changes
@@ -19,6 +28,15 @@ extension CalendarRouter {
     /// A calendar of a sample account. Real account ids are OpenID `sub` values, which never start with "demo-".
     static func isSample(_ calendar: CalendarRef) -> Bool {
         DemoData.isDemoID(calendar.accountID)
+    }
+
+    /// Throws `DemoCalendarError.sampleCalendarsOnly` while new events go to a sample calendar: in demo mode, and
+    /// always on a router pinned to the samples (`AccountStore.sampleCalendarsOnly()`), no real calendar is written,
+    /// whatever ref reaches the router (a hidden copy of a real event, an id Gemini made up). Called before any token,
+    /// outbox item or Google request for a real calendar.
+    func requireRealCalendarWritable() async throws {
+        guard let target = try? await defaultTarget(), Self.isSample(target.id) else { return }
+        throw DemoCalendarError.sampleCalendarsOnly
     }
 
     /// Throws `DemoCalendarError.demoEnded` once demo mode is off. A cache without an account store (unit tests)

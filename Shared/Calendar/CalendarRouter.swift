@@ -32,7 +32,7 @@ enum RouterError: LocalizedError {
 ///   still waits queues behind it, so order is kept. `SyncEngine` sends the queue.
 ///
 /// Sample calendars (demo mode's accounts) never reach Google: their writes change the cache only
-/// (`CalendarRouter+Sample.swift`).
+/// (`CalendarRouter+Sample.swift`). While new events go to a sample calendar, a write to a real one is refused.
 struct CalendarRouter: Sendable {
     var accounts: AccountStore = .shared
     var tokens: GoogleTokenProvider = .shared
@@ -70,6 +70,7 @@ struct CalendarRouter: Sendable {
         guard !events.isEmpty else { return [] }
         try Self.requireWritable(target)
         if Self.isSample(target.id) { return try await insertSample(events, into: target, mapper: mapper, now: now) }
+        try await requireRealCalendarWritable()
         let saved: [GCalEvent]
         do {
             saved = try await makeClient(target).insertAll(events)
@@ -95,6 +96,7 @@ struct CalendarRouter: Sendable {
         let calendar = try await owningCalendar(of: event)
         try Self.requireWritable(calendar)
         if Self.isSample(calendar.id) { return try await patchSample(event, body: body, mapper: mapper) }
+        try await requireRealCalendarWritable()
         let target = calendar.id
         let waiting = await outbox.hasPending(calendar: target, eventID: event.id)
         if waiting || event.isWaitingToSync {
@@ -143,6 +145,7 @@ struct CalendarRouter: Sendable {
             try await patchSampleSeries(of: event, body: body, newStart: newStart, duration: duration, mapper: mapper)
             return false
         }
+        try await requireRealCalendarWritable()
         let target = calendar.id
         let seriesID = event.seriesID ?? event.id
         var body = body
@@ -218,6 +221,7 @@ struct CalendarRouter: Sendable {
                                               eventID: ref.eventID)]
                     continue
                 }
+                try await requireRealCalendarWritable()
                 let target = calendar.id
                 let copy = cached.first(where: { $0.ref == ref })
                     ?? cached.first(where: { $0.id == ref.eventID && OutboxOverlay.belongs($0, to: target) })

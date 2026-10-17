@@ -2,8 +2,9 @@ import XCTest
 
 /// The router's seam for the sample calendars (`CalendarRouter+Sample.swift`): a write to a demo account's calendar
 /// stays in the cache with `demo-` ids and never reaches Google, the outbox or a refresh; once demo mode has ended it
-/// is refused and nothing changes; an account store pinned to the samples never lists a real calendar; writes to a
-/// real account's calendar go to Google (or the outbox) as before.
+/// is refused and nothing changes; an account store pinned to the samples never lists a real calendar, and its router
+/// refuses a real calendar; outside demo mode, writes to a real account's calendar go to Google (or the outbox) as
+/// before.
 final class SampleCalendarRouterTests: XCTestCase {
     private let files = TemporaryStoreFiles()
     private let mapper = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy())
@@ -24,11 +25,12 @@ final class SampleCalendarRouterTests: XCTestCase {
         let google: SampleRouterGoogle
     }
 
-    /// The router's accounts are pinned to the samples (as `AccountStore.sampleCalendarsOnly()` is), and their file
-    /// also holds a real account. `demoActive` is what the cache's own account store says: the live demo flag.
-    private func makeRig(demoActive: Bool = true) async -> Rig {
+    /// The router's accounts are pinned to the samples (as `AccountStore.sampleCalendarsOnly()` is) unless `pinned` is
+    /// false, and their file also holds a real account. `demoActive` is what the cache's own account store says: the
+    /// live demo flag.
+    private func makeRig(demoActive: Bool = true, pinned: Bool = true) async -> Rig {
         let file = files.url("SampleCalendarRouterTests-accounts")
-        let accounts = AccountStore(fileURL: file, isDemoMode: { true }, defaultCalendar: { nil })
+        let accounts = AccountStore(fileURL: file, isDemoMode: { pinned }, defaultCalendar: { nil })
         await accounts.upsert(SampleAccounts.account("111", email: "kenny@example.com"))
         let live = AccountStore(fileURL: file, isDemoMode: { demoActive }, defaultCalendar: { nil })
         let store = SharedStore(fileURL: files.url("SampleCalendarRouterTests-cache"), accounts: live)
@@ -69,6 +71,18 @@ final class SampleCalendarRouterTests: XCTestCase {
             // expected
         } catch {
             XCTFail("expected DemoCalendarError.demoEnded, got \(error)", file: file, line: line)
+        }
+    }
+
+    private func assertSampleCalendarsOnly(_ write: () async throws -> Void, file: StaticString = #filePath,
+                                           line: UInt = #line) async {
+        do {
+            try await write()
+            XCTFail("expected DemoCalendarError.sampleCalendarsOnly", file: file, line: line)
+        } catch DemoCalendarError.sampleCalendarsOnly {
+            // expected
+        } catch {
+            XCTFail("expected DemoCalendarError.sampleCalendarsOnly, got \(error)", file: file, line: line)
         }
     }
 
@@ -327,10 +341,34 @@ final class SampleCalendarRouterTests: XCTestCase {
         XCTAssertFalse(CalendarRouter.isSample(CalendarRef(accountID: "", calendarID: "primary")))
     }
 
-    // MARK: Real calendars (unchanged)
+    // MARK: Real calendars
 
-    func testAnInsertIntoARealCalendarStillGoesToGoogleOrTheOutbox() async throws {
+    /// Whatever reaches demo mode's router (a hidden copy of a real event, an id Gemini made up), a real calendar is
+    /// neither sent to nor queued for.
+    func testAPinnedRouterNeverWritesARealCalendar() async throws {
         let rig = await makeRig()
+        let real = TestEvents.make(id: "realdentist1", title: "Dentist", start: TestClock.local(2026, 10, 14, 9),
+                                   end: TestClock.local(2026, 10, 14, 10), calendar: realCalendar.id)
+        await rig.store.upsert([real])
+        let router = rig.router, mapper = self.mapper, now = self.now, realCalendar = self.realCalendar
+        let event = try relativeTimeEvent()
+        var change = GCalEvent()
+        change.summary = "Changed"
+
+        await assertSampleCalendarsOnly { _ = try await router.insert([event], into: realCalendar, mapper: mapper, now: now) }
+        await assertSampleCalendarsOnly { _ = try await router.patch(real, body: change, mapper: mapper, now: now) }
+        await assertSampleCalendarsOnly { _ = try await router.patchSeries(of: real, body: change, mapper: mapper, now: now) }
+        await assertSampleCalendarsOnly { _ = try await router.delete([real.ref], now: now) }
+
+        let cached = await rig.store.snapshot().events
+        XCTAssertEqual(cached.map(\.title), ["Dentist"], "the real event is untouched")
+        await assertNothingReachedGoogle(rig)
+        XCTAssertEqual(DemoCalendarError.sampleCalendarsOnly.errorDescription,
+                       "Demo mode changes only the sample calendars, so nothing was changed.")
+    }
+
+    func testOutsideDemoModeAnInsertIntoARealCalendarGoesToGoogleOrTheOutbox() async throws {
+        let rig = await makeRig(demoActive: false, pinned: false)
         let sent = try await rig.router.insert([relativeTimeEvent(seed: "s|online")], into: realCalendar,
                                                mapper: mapper, now: now)
         XCTAssertEqual(sent.count, 1)
