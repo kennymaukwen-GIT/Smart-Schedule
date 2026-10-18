@@ -43,7 +43,9 @@ enum ReplyLanguage: String, Codable, CaseIterable, Sendable {
     case english = "en"
 }
 
-/// Unused since 1.0 has no in-app speech input; kept for `AppPreferences.speechLanguage` (Shared API).
+/// Settings › Assistant › Speech language: the language the mic button (App/Voice/VoiceTranscriber) recognises, on this
+/// iPhone only. The picker offers Automatic (the app's language), 中文（台灣） and English (US); `englishUK`, which an
+/// earlier build offered, stays decodable and is recognised as US English (`VoiceInput.localeIdentifier`).
 enum SpeechLanguage: String, Codable, CaseIterable, Sendable {
     case automatic = "auto"
     case chineseTaiwan = "zh-TW"
@@ -125,9 +127,12 @@ struct AppPreferences: Codable, Hashable, Sendable {
     /// nil = follow the device (`TimeZone.current`); otherwise an IANA identifier.
     var timeZoneIdentifier: String? = nil
     var replyLanguage: ReplyLanguage = .matchInput
-    /// Unused: 1.0 has no in-app speech input (Siri and keyboard dictation follow the system's settings). Still decoded
-    /// and encoded so the Shared API and existing preferences.json files stay the same; nothing reads them.
+    /// The mic button's language (`VoiceInput.localeIdentifier`); Siri and the keyboard's dictation follow the system's
+    /// settings instead.
     var speechLanguage: SpeechLanguage = .automatic
+    /// Not read: the mic button always recognises speech on this iPhone (`requiresOnDeviceRecognition`), so Settings no
+    /// longer has the On-device recognition switch. Still decoded and encoded so the Shared API and existing
+    /// preferences.json files stay the same.
     var speechOnDevice = true
     var autonomy: AssistantAutonomy = .addDirectly
 

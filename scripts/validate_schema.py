@@ -25,9 +25,13 @@
    reads the flag in code, and project.yml has neither the aps-environment entitlement nor the remote-notification
    background mode while both push flags (pushToStartEnabled, liveActivityPushEnabled) are false (and aps-environment
    once one is on).
-9. Version 1.0 has no microphone or speech recognition of its own: no Swift file records audio or calls Apple's speech
-   recognizer, and neither project.yml nor a .strings file declares NSMicrophoneUsageDescription or
-   NSSpeechRecognitionUsageDescription. People type, use the keyboard's own dictation, or talk to Siri.
+9. Voice input (the mic button, owner decision 2026-10-18) recognises speech on the iPhone only: microphone and speech
+   code lives only in App/Voice (Shared/, the widget and the notification extension have none); every
+   SFSpeech*RecognitionRequest a Swift file creates is a named constant that sets requiresOnDeviceRecognition = true,
+   and nothing sets it to anything else; App/Voice writes no audio file, makes no network request, uses no other speech
+   API (file requests, iOS 26's SpeechAnalyzer) and reads no subscription flag (voice input is free).
+   NSMicrophoneUsageDescription and NSSpeechRecognitionUsageDescription are declared for the app target (English in
+   project.yml, saying "on this iPhone"; zh-Hant in every InfoPlist.strings) and for neither extension.
 10. A time counted from now (prompt rule 7: "1個小時後", "in an hour"): a fixture with "relative_minutes" says such a
     time and creates one event that starts at now_local plus that many minutes (the next day past midnight), with no
     time phrase in its title, reminder_minutes [0] (a reminder at the start) and no end.
@@ -605,30 +609,96 @@ def push_checks() -> int:
     return gated
 
 
-# ---------- Version 1.0 has no microphone ----------
+# ---------- Voice input: on the iPhone only ----------
 
-MICROPHONE_USE = re.compile(r"^\s*import Speech\b|\bSFSpeech\w*|\bSpeech(?:Analyzer|Transcriber)\b"
-                            r"|\bAVAudio(?:Engine|Session|Recorder|Application)\b|\brequestRecordPermission\b", re.M)
-MICROPHONE_PERMISSIONS = ("NSMicrophoneUsageDescription", "NSSpeechRecognitionUsageDescription")
+VOICE_DIR = "App/Voice"
+# Anything that reaches the microphone or Apple's speech recognition.
+VOICE_API = re.compile(r"^\s*import Speech\b|\bSFSpeech\w*|\bAVAudio(?:Engine|Session|Application|InputNode|Recorder)\b"
+                       r"|\bAVCaptureAudio\w*|\b(?:request)?[Rr]ecordPermission\b"
+                       r"|\b(?:SpeechAnalyzer|SpeechTranscriber|DictationTranscriber|SpeechDetector)\b", re.M)
+# In App/Voice: audio written to a file, a network request, another speech path, or a subscription gate.
+VOICE_FORBIDDEN = [
+    (re.compile(r"\bAVAudioRecorder\b|\bAVAudioFile\b|\bAVAssetWriter\b|\bwrite\(to:|\bFileManager\b"),
+     "writes audio or files (no audio is stored)"),
+    (re.compile(r"\bURLSession\b|\bURLRequest\b|\bServerClient\b|\bGeminiClient\b"),
+     "makes a network request (no audio is sent anywhere)"),
+    (re.compile(r"\bSFSpeechURLRecognitionRequest\b|\b(?:SpeechAnalyzer|SpeechTranscriber|DictationTranscriber)\b"),
+     "uses a speech API other than SFSpeechRecognizer with SFSpeechAudioBufferRecognitionRequest"),
+    (re.compile(r"\bsubscriptionsEnabled\b|\bSubscriptionStore\b|\bisPro\b"),
+     "reads a subscription flag (voice input is free)"),
+]
+REQUEST_CREATION = re.compile(r"\bSFSpeech\w*RecognitionRequest\s*\(")
+NAMED_REQUEST = re.compile(r"\b(?:let|var)\s+(\w+)\s*=\s*SFSpeech\w*RecognitionRequest\s*\(")
+ON_DEVICE_ASSIGNMENT = re.compile(r"\brequiresOnDeviceRecognition\s*=\s*([^\n;]*)")
+VOICE_PERMISSIONS = ("NSMicrophoneUsageDescription", "NSSpeechRecognitionUsageDescription")
+APP_TARGET, EXTENSION_TARGETS = "SmartSchedule", ("SmartScheduleWidgets", "SmartScheduleNotificationContent")
 
 
-def microphone_checks() -> None:
-    """Owner decision for 1.0 (2026-10-16): no in-app microphone or speech recognition. Typing, the keyboard's own
-    dictation and Siri (App Intents) cover speaking, and none of them needs the app to record. A Swift file that records
-    audio or calls Apple's speech recognizer fails, and so does a microphone or speech-recognition usage description
-    in project.yml or a .strings file (a permission the app never asks for is an App Review question). Comments are
-    ignored."""
+def target_block(project: str, name: str) -> str | None:
+    match = re.search(rf"^  {name}:\n(.*?)(?=^  \S|\Z)", project, re.M | re.S)
+    return match.group(1) if match else None
+
+
+def voice_checks() -> int:
+    """Owner decision 2026-10-18: the app's own voice input is back, Traditional Chinese (Taiwan) and English, free, with
+    speech recognised on the iPhone only, never by Apple's servers; no audio is stored or sent. Comments are ignored.
+    Returns the number of recognition requests checked."""
+    requests = 0
     for directory in SWIFT_DIRS:
         for path in sorted((ROOT / directory).rglob("*.swift")):
+            relative = path.relative_to(ROOT)
             code = re.sub(r"//.*", "", path.read_text(encoding="utf-8"))
-            if MICROPHONE_USE.search(code):
-                errors.append(f"{path.relative_to(ROOT)}: records audio or uses speech recognition (1.0 has no microphone)")
-    texts = {ROOT / "project.yml": re.sub(r"(^|\s)#.*", r"\1", (ROOT / "project.yml").read_text(encoding="utf-8"))}
-    texts.update({path: re.sub(r"/\*.*?\*/", "", path.read_text(encoding="utf-8"), flags=re.S) for path in STRINGS_FILES})
-    for path, text in texts.items():
-        for key in MICROPHONE_PERMISSIONS:
-            if key in text:
-                errors.append(f"{path.relative_to(ROOT)}: {key} is declared, but 1.0 has no microphone")
+            in_voice = relative.parts[:2] == tuple(VOICE_DIR.split("/"))
+            if VOICE_API.search(code) and not in_voice:
+                errors.append(f"{relative}: microphone or speech recognition outside {VOICE_DIR} "
+                              "(the extensions have no microphone)")
+            if in_voice:
+                for pattern, problem in VOICE_FORBIDDEN:
+                    if pattern.search(code):
+                        errors.append(f"{relative}: {problem}")
+            created = REQUEST_CREATION.findall(code)
+            named = NAMED_REQUEST.findall(code)
+            requests += len(created)
+            if len(named) != len(created):
+                errors.append(f"{relative}: assign each SFSpeech*RecognitionRequest to a constant that sets "
+                              "requiresOnDeviceRecognition = true")
+            for name in named:
+                if not re.search(rf"\b{name}\.requiresOnDeviceRecognition\s*=\s*true\b", code):
+                    errors.append(f"{relative}: {name} must set requiresOnDeviceRecognition = true (speech is "
+                                  "recognised on the iPhone only)")
+            for value in ON_DEVICE_ASSIGNMENT.findall(code):
+                if value.strip() != "true":
+                    errors.append(f"{relative}: requiresOnDeviceRecognition = {value.strip()} (must be true)")
+    if requests == 0:
+        errors.append(f"{VOICE_DIR}: no SFSpeechAudioBufferRecognitionRequest found (the mic button's recognizer)")
+
+    project = re.sub(r"(^|\s)#.*", r"\1", (ROOT / "project.yml").read_text(encoding="utf-8"))
+    app = target_block(project, APP_TARGET) or ""
+    for key in VOICE_PERMISSIONS:
+        match = re.search(rf"^\s+{key}:\s*(.+)$", app, re.M)
+        if not match:
+            errors.append(f"project.yml: target {APP_TARGET} needs {key} (asked on the mic button's first tap)")
+        elif "on this iPhone" not in match.group(1):
+            errors.append(f"project.yml: {key} must say speech is turned into text on this iPhone")
+    for name in EXTENSION_TARGETS:
+        block = target_block(project, name)
+        if block is None:
+            errors.append(f"project.yml: target {name} not found")
+            continue
+        for key in VOICE_PERMISSIONS:
+            if key in block:
+                errors.append(f"project.yml: {name} declares {key}, but the extensions have no microphone")
+    for path in STRINGS_FILES:
+        if path.name != "InfoPlist.strings":
+            continue
+        text = re.sub(r"/\*.*?\*/", "", path.read_text(encoding="utf-8"), flags=re.S)
+        for key in VOICE_PERMISSIONS:
+            match = re.search(rf'^"{key}"\s*=\s*"(.+)";$', text, re.M)
+            if not match:
+                errors.append(f"{path.relative_to(ROOT)}: {key} is missing (project.yml declares it in English)")
+            elif "iPhone" not in match.group(1):
+                errors.append(f"{path.relative_to(ROOT)}: {key} must say speech is turned into text on this iPhone")
+    return requests
 
 
 def notification_extension_checks() -> None:
@@ -713,9 +783,9 @@ def main() -> int:
     strings_file_checks()
     print(f"✓ Subscriptions off: {subscription_checks()} files gated by {SUBSCRIPTION_FLAG}")
     print(f"✓ Push-to-start off, no aps-environment: {push_checks()} files gated by {PUSH_TO_START_FLAG}")
-    microphone_checks()
+    print(f"✓ Voice input on the iPhone only: {voice_checks()} recognition request(s) with requiresOnDeviceRecognition "
+          f"= true in {VOICE_DIR}; usage descriptions for the app target only (en + zh-Hant)")
     notification_extension_checks()
-    print("✓ No microphone or speech recognition, no usage descriptions for them")
 
     if errors:
         print("\n".join(f"✗ {e}" for e in errors), file=sys.stderr)

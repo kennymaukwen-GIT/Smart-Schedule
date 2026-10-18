@@ -97,12 +97,30 @@ final class LocalizationCatalogTests: XCTestCase {
         XCTAssertEqual(String(format: zh("Daily reminder %@", in: table), "07:30"), "每天 07:30 提醒")
     }
 
-    /// The consent sheet's speech line (AIConsentDisclosure.speechNote): 1.0 has no microphone, so speech reaches the
-    /// app only as text from Siri or the keyboard's dictation.
+    /// The consent sheet's speech line (AIConsentDisclosure.speechNote): Siri and the keyboard's dictation are Apple's,
+    /// the app's mic button recognises speech on the iPhone, and only the text is sent.
     func testConsentSpeechNote() throws {
         let table = try chineseTable()
         XCTAssertEqual(zh(AIConsentDisclosure.speechNote, in: table),
-                       "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字，Smart Schedules 只會收到文字。")
+                       "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字；Smart Schedules 的麥克風按鈕則在你的 iPhone 上轉成文字。只會傳送文字，不會傳送語音。")
+    }
+
+    /// Voice input: the mic button, Settings › Assistant › Voice input, and the alert after a refused permission.
+    func testVoiceInputLabels() throws {
+        let table = try chineseTable()
+        XCTAssertEqual(zh("Dictate", in: table), "聽寫")
+        XCTAssertEqual(zh("Stop dictation", in: table), "停止聽寫")
+        XCTAssertEqual(zh("Voice input", in: table), "語音輸入")
+        XCTAssertEqual(zh("Speech language", in: table), "語音辨識語言")
+        XCTAssertEqual(zh("Open Settings", in: table), "打開設定")
+        let microphone = try XCTUnwrap(VoiceInput.Access.denied(microphone: true, speechRecognition: false).message)
+        let speech = try XCTUnwrap(VoiceInput.Access.denied(microphone: false, speechRecognition: true).message)
+        let both = try XCTUnwrap(VoiceInput.Access.denied(microphone: true, speechRecognition: true).message)
+        let restricted = try XCTUnwrap(VoiceInput.Access.restricted.message)
+        XCTAssertEqual(zh(microphone, in: table), "想用說的輸入，請到「設定」允許 Smart Schedules 使用「麥克風」。")
+        XCTAssertEqual(zh(speech, in: table), "想用說的輸入，請到「設定」允許 Smart Schedules 使用「語音辨識」。")
+        XCTAssertEqual(zh(both, in: table), "想用說的輸入，請到「設定」允許 Smart Schedules 使用「麥克風」和「語音辨識」。")
+        XCTAssertEqual(zh(restricted, in: table), "這支 iPhone 限制了語音輸入，你仍然可以打字輸入計畫。")
     }
 
     /// Demo mode with the AI (DemoModeAssistant): the consent sheet's footnote says what demo mode sends, and the

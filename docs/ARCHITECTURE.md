@@ -81,7 +81,7 @@ flowchart LR
 **為什麼有三個 target：**
 | Target | 內容 | 不放進其他 target 的理由 |
 |---|---|---|
-| `SmartSchedule`（App） | SwiftUI 主畫面、Quick Capture、Google 登入（PKCE）、BGTask、App Intents | `ASWebAuthenticationSession` 和 `UIApplication` 在 extension 裡不能用 |
+| `SmartSchedule`（App） | SwiftUI 主畫面、Quick Capture、Google 登入（PKCE）、語音輸入（只在 iPhone 上辨識）、BGTask、App Intents | `ASWebAuthenticationSession` 和 `UIApplication` 在 extension 裡不能用；麥克風只給 App，兩個 extension 都沒有 |
 | `SmartScheduleWidgets` | Live Activity（動態島＋鎖定畫面）、Control Center 控制項 | Widget extension 有記憶體上限，所以只編譯 Models、Storage、LiveActivity、Intents、DesignSystem，不放 AI 和網路程式碼 |
 | `SmartScheduleNotificationContent` | 「長按展開」的對話 UI 和完整的 AI → Calendar 管線 | 必須能在鎖定畫面上獨立完成寫入（Gemini 要用 App 在 7 天內替它換好的 session，見 3.3） |
 
@@ -107,7 +107,7 @@ flowchart LR
   - Compact：⏰ 加短標題（leading），倒數（trailing）。
   - Expanded：`.leading` 放時鐘、`.center` 放標題、`.trailing` 放「21 MIN」膠囊；`.bottom` 放一週微型日曆和「編輯」按鈕。
   - Minimal：只有 ⏰。
-- 互動：`Link` 用於 deep link（「編輯」按鈕 → `smartschedule://compose`；動態島沒有麥克風；App 仍接受 `?mode=voice`，但和 `compose` 一樣只打開快速輸入，1.0 沒有語音輸入）；`Button(intent:)` 用於不開 App 的動作。
+- 互動：`Link` 用於 deep link（「編輯」按鈕 → `smartschedule://compose`；動態島沒有麥克風；App 仍接受 `?mode=voice`（`DeepLink.composeVoice`）：打開快速輸入，不必跳權限提示就能收音時直接開始語音輸入，否則和 `compose` 一樣叫出鍵盤）；`Button(intent:)` 用於不開 App 的動作。
 - 推播：`pushType: .token` 搭配 `NSSupportsLiveActivitiesFrequentUpdates`；APNs 的 `apns-push-type: liveactivity`，topic 是 `<bundle>.push-type.liveactivity`。1.0 不用任何推播：`AppConstants.liveActivityPushEnabled` 和 `pushToStartEnabled` 都是 false，`Activity.request` 用 `pushType: nil`，App 沒有 `aps-environment` 也沒有 `remote-notification` 背景模式。
 
 ### 3.3 通知：UserNotificationsUI Content Extension
@@ -121,6 +121,7 @@ flowchart LR
 - 背景工作：`.backgroundTask(.appRefresh(...))`（SwiftUI 的 scene modifier）。
 - **Artboard 5 的導覽**：漢堡選單 = 看什麼（`CalendarDrawer`，從左邊滑出，內含自己的 `NavigationStack`，行事曆設定在抽屜裡推入）；頭像 = 我是誰（`AccountSheet`：Google 帳號；Smart Schedules Pro 區塊在 1.0 關閉）；General = App 怎麼運作（`SettingsView`）。`AppRouter` 管抽屜開關和這兩個 sheet，也接受 `smartschedule://settings`、`smartschedule://accounts`。月份 chips 和月曆格維持無限捲動；時區或每週起始日改變時，用 `.id(schedule.clockID)` 讓它們以 `displayedMonth` 重新排版。
 - **View model**：`ScheduleViewModel`（可見行程、帳號、待確認的計畫和「先問我」行程、`clock`）、`ChatViewModel`（對話、卡片狀態、AI 同意流程、對話紀錄的讀寫）、`SettingsModel`（設定頁的偏好、紀錄、建議、同意狀態；每次修改都經過 `PreferencesStore.update(source: .settings)`，自動記進「助理記得的事」）。
+- **語音輸入**（2026-10-18 加回，免費）：主畫面對話和快速輸入的輸入列（`ComposerBar`）有麥克風按鈕，由 `App/Voice/VoiceTranscriber.swift` 用 `SFSpeechRecognizer` 辨識中文（台灣）或美式英文（設定 › 助理 › 語音辨識語言，「自動」跟著 App 的語言；規則在 `Shared/Voice/VoiceInput.swift`）。每個 `SFSpeechAudioBufferRecognitionRequest` 都設 `requiresOnDeviceRecognition = true`，只在 iPhone 上辨識、不用 Apple 的伺服器；這支 iPhone 不支援該語言的裝置端辨識時不顯示按鈕（鍵盤的聽寫照常可用）。音訊只在記憶體裡交給辨識器，不寫檔、不上傳；辨識到的字填進輸入框，按「傳送」才送出。再按一次、按傳送、離開畫面、App 退到背景、靜默 3 秒（還沒聽到字時 8 秒）或滿 60 秒就停。麥克風和語音辨識權限只在第一次按麥克風時詢問；被拒絕後按麥克風會說明要開哪個開關，並可打開「設定」。`scripts/validate_schema.py` 第 9 項檢查這些規則和 usage description 只在 App target。
 - **啟動順序**：先讀回對話紀錄 → `ScheduleViewModel.bootstrap()`（舊版單一帳號搬到多帳號 → 帳號 → 快取 → 同步）→ 對齊 App Group 裡的草稿和「先問我」批次 → 加入學到的建議卡片 → `summonIfDue`。回到前景時另外重新整理行事曆清單（超過 6 小時的）。
 
 ### 3.5 零 UI 輸入：App Intents
@@ -216,7 +217,7 @@ sequenceDiagram
 - [ ] 專注模式過濾條件：開啟和關閉專注模式時 `CalendarFocusFilter.perform()` 都有被呼叫。
 - [ ] 時效性提醒能穿過專注模式；「安靜」等級和安靜時段內的提醒只進通知中心、沒有聲音。
 - [ ] 乾淨安裝時，第一次送出訊息、Siri、長按通知回覆都先要求 AI 資料分享同意，同意前沒有任何 request 送到 Gemini。
-- [ ] 1.0 沒有語音輸入：快速輸入、主畫面對話和長按通知都沒有麥克風按鈕；`smartschedule://compose?mode=voice` 打開一般的快速輸入（鍵盤已叫出）；整個 App 不會跳出麥克風或語音辨識的權限提示；設定 › 助理沒有「語音輸入」區塊。鍵盤上的聽寫鍵照常可用。
+- [ ] 語音輸入（只在 iPhone 上辨識）：快速輸入和主畫面對話有麥克風按鈕，長按通知沒有；第一次按才跳麥克風和語音辨識的權限提示（文字寫「在這支 iPhone 上轉成文字」），之前整個 App 都不會跳；中文（台灣）和 English (US) 各說一句，字邊說邊填進輸入框，按「傳送」才送出；開飛航模式仍能辨識（證明沒有用 Apple 的伺服器）；靜默約 3 秒、滿 60 秒、App 退到背景、關掉快速輸入都會停；拒絕權限後再按，跳出說明和「打開設定」；在沒有下載裝置端語音模型的語言（設定 › 助理 › 語音辨識語言）下按鈕不出現，設定頁顯示「這個語言不支援裝置端辨識」；`smartschedule://compose?mode=voice` 在已授權時直接開始收音，未授權時只叫出鍵盤、不跳權限提示。鍵盤上的聽寫鍵照常可用。
 - [ ] 抽屜在不同機型上的寬度（`min(340, 84%)`）和往左滑關閉的手勢不會和清單捲動衝突。
 - [ ] 往下滑收鍵盤（`App/Views/KeyboardDismissSwipe.swift`）：主畫面對話、Quick Capture、行程頁、新增帳號頁鍵盤叫出時，往下滑 30 pt 以上鍵盤收起，點輸入框再出現；左右翻頁、列的刪除滑動、抽屜往左滑、對話把手、往上滑關 Quick Capture、下拉關 sheet 都照常；從正在輸入的框裡開始的拖曳（移動游標、選字）不收鍵盤；打開抽屜時鍵盤收起。
 - [ ] 抽屜不會卡住（2026-10-17 實機問題）：打開抽屜後第一下就上下滑清單，清單照常捲動，之後點「一般」、點行程、點右邊變暗處（關閉）都有反應；往左滑抽屜（或變暗處）會關閉，上下滑不會關；「全部行程」頁的列往左滑出現刪除和編輯，不會關閉抽屜。

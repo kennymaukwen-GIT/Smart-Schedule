@@ -24,14 +24,27 @@ final class ReleaseConfigurationTests: XCTestCase {
         XCTAssertEqual(ActivityPlanner.pushToStartStep(enabled: AppConstants.pushToStartEnabled, schedulesOnDevice: true), .off)
     }
 
-    /// 1.0 has no microphone or speech recognition of its own (owner decision 2026-10-16): people type, use the
-    /// keyboard's dictation or talk to Siri, and the app never records. App/ is not in this bundle, so
-    /// scripts/validate_schema.py (check 9) fails on any Swift file that records audio or calls Apple's speech
-    /// recognizer, and on a microphone or speech-recognition usage description. The consent text says speech reaches
-    /// the app only as text, and `DeepLink.composeVoice` (kept for links already out there) still opens Quick Capture.
-    func testVersionOneHasNoMicrophone() {
-        XCTAssertFalse(AIConsentDisclosure.speechNote.contains("On-device recognition"), AIConsentDisclosure.speechNote)
-        XCTAssertTrue(AIConsentDisclosure.speechNote.contains("only receives the text"), AIConsentDisclosure.speechNote)
+    /// The app's own voice input (owner decision 2026-10-18): free, Traditional Chinese (Taiwan) and US English, speech
+    /// recognised on the iPhone only. App/ is not in this bundle, so scripts/validate_schema.py (check 9) checks the
+    /// recorder: microphone and speech code only in App/Voice, every recognition request with
+    /// requiresOnDeviceRecognition = true, no audio file or network request there, and the usage descriptions in the
+    /// app target only. The consent text names the mic button and says only the text is sent;
+    /// `DeepLink.composeVoice` opens Quick Capture and asks for the mic.
+    func testVoiceInputIsOnDeviceOnly() {
+        XCTAssertEqual(VoiceInput.localeIdentifiers, ["zh-TW", "en-US"])
+        for language in SpeechLanguage.allCases {
+            for appLanguage in ["zh-Hant", "en"] {
+                XCTAssertTrue(VoiceInput.localeIdentifiers.contains(VoiceInput.localeIdentifier(for: language, appLanguage: appLanguage)),
+                              "\(language) in \(appLanguage)")
+            }
+        }
+        let note = AIConsentDisclosure.speechNote
+        XCTAssertTrue(note.contains("microphone button"), note)
+        XCTAssertTrue(note.contains("on your iPhone"), note)
+        XCTAssertTrue(note.contains("Only the text is sent, never the audio"), note)
+        XCTAssertFalse(note.contains("On-device recognition"), "no such setting any more: \(note)")
         XCTAssertEqual(DeepLink.composeVoice.host, DeepLink.compose.host)
+        XCTAssertTrue(DeepLink.startsVoiceInput(DeepLink.composeVoice))
+        XCTAssertFalse(DeepLink.startsVoiceInput(DeepLink.compose))
     }
 }

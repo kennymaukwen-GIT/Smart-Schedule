@@ -187,14 +187,22 @@ struct ChatMessageRow: View {
     }
 }
 
-/// Shared input bar (Artboards 2–5): optional paperclip, field, send. No mic of its own: dictation is the keyboard's.
+/// Shared input bar (Artboards 2–5): optional paperclip, field, mic, send. The mic (`VoiceTranscriber`) turns speech
+/// into text on this iPhone and shows only when the chosen language can be recognised on the device; the keyboard's
+/// dictation works either way. Its words fill the field; nothing is sent until Send.
 struct ComposerBar: View {
     @Binding var text: String
     var placeholder: LocalizedStringKey
     var showsAttachment = false
     var isBusy = false
     var focus: FocusState<Bool>.Binding
+    /// `smartschedule://compose?mode=voice`: start the mic on appear when that needs no permission prompt; otherwise
+    /// the keyboard comes up.
+    var startsRecording = false
     var onSend: () -> Void
+
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var transcriber = VoiceTranscriber()
 
     var body: some View {
         HStack(spacing: 8) {
@@ -212,11 +220,23 @@ struct ComposerBar: View {
                 .foregroundStyle(.white)
                 .focused(focus)
                 .submitLabel(.send)
-                .onSubmit(onSend)
+                .onSubmit(send)
 
-            Button {
-                onSend()
-            } label: {
+            if transcriber.isAvailable || transcriber.isRecording {
+                Button {
+                    Task { await transcriber.toggle(typed: text) }
+                } label: {
+                    Image(systemName: transcriber.isRecording ? "waveform" : "mic.fill")
+                        .symbolEffect(.variableColor.iterative, isActive: transcriber.isRecording)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(Color.white.opacity(transcriber.isRecording ? 0.35 : 0.12)))
+                }
+                .accessibilityLabel(transcriber.isRecording ? "Stop dictation" : "Dictate")
+            }
+
+            Button(action: send) {
                 Image(systemName: isBusy ? "hourglass" : "paperplane.fill")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
@@ -231,6 +251,48 @@ struct ComposerBar: View {
         .frame(minHeight: 50)
         .background(Capsule().fill(Theme.surfaceRaised))
         .overlay(Capsule().strokeBorder(Theme.hairline))
+        .onChange(of: transcriber.fieldText) { _, words in
+            if let words { text = words }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                transcriber.refreshAvailability()
+            } else {
+                transcriber.stop()
+            }
+        }
+        .task(id: startsRecording) {
+            transcriber.refreshAvailability()
+            if startsRecording, !(await transcriber.startIfAllowed(typed: text)) {
+                focus.wrappedValue = true
+            }
+        }
+        .onDisappear { transcriber.cancel() }
+        .alert("Voice input", isPresented: problemShown, presenting: transcriber.problem) { problem in
+            if problem.opensSettings {
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("OK", role: .cancel) {}
+            }
+        } message: { problem in
+            Text(verbatim: problem.message ?? "")
+        }
+    }
+
+    /// Send ends a recording first; words still on their way are dropped, so they can't refill the cleared field.
+    private func send() {
+        transcriber.cancel()
+        onSend()
+    }
+
+    private var problemShown: Binding<Bool> {
+        Binding(get: { transcriber.problem != nil },
+                set: { if !$0 { transcriber.problem = nil } })
     }
 
     /// "send a link" — e.g. an event page. Gemini reads the URL text; for full page context add the

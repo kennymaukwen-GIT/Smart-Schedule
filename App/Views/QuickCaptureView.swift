@@ -8,6 +8,8 @@ private let modeStorageKey = "quickCaptureMode"
 /// the calendar in that scope (endless either way), the conversation (the app's whole chat history, scrollable
 /// inside the panel, with a handle to pull it up over the calendar) with the input bar, suggestions, and a grabber.
 struct QuickCaptureView: View {
+    /// Opened by `DeepLink.composeVoice`: the mic starts instead of the keyboard when it can without asking anything.
+    let startsWithVoice: Bool
     let onClose: () -> Void
 
     @Environment(ChatViewModel.self) private var chat
@@ -41,9 +43,11 @@ struct QuickCaptureView: View {
 
     /// `initialMode` overrides the remembered scope (previews); nil opens in whatever the user picked last.
     /// `conversationExpanded` opens with the conversation pulled up (previews).
-    init(initialMode: CalendarScope? = nil,
+    init(startsWithVoice: Bool = false,
+         initialMode: CalendarScope? = nil,
          conversationExpanded: Bool = false,
          onClose: @escaping () -> Void) {
+        self.startsWithVoice = startsWithVoice
         self.onClose = onClose
         // `mode` drives the animation; `storedMode` only persists it. Both read the same defaults key.
         let stored = UserDefaults.standard.string(forKey: modeStorageKey).flatMap(CalendarScope.init(rawValue:))
@@ -100,7 +104,8 @@ struct QuickCaptureView: View {
         .padding(.horizontal, 10)
         .padding(.top, 6)
         .onAppear {
-            inputFocused = true
+            // With voice, the composer brings the keyboard up itself if the mic can't start.
+            if !startsWithVoice { inputFocused = true }
             if showsPlanCard { isConversationExpanded = true }
         }
         .onChange(of: mode) { _, newMode in
@@ -314,6 +319,7 @@ struct QuickCaptureView: View {
                 placeholder: "Type in any plan to add or change",
                 isBusy: chat.isBusy,
                 focus: $inputFocused,
+                startsRecording: startsWithVoice,
                 onSend: { chat.send() }
             )
             .padding(.top, 4)

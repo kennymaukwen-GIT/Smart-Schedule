@@ -15,12 +15,12 @@ struct RootView: View {
         ZStack(alignment: .top) {
             MainView()
 
-            if router.quickCapture != nil {
+            if let request = router.quickCapture {
                 Color.black.opacity(0.45)
                     .ignoresSafeArea()
                     .onTapGesture { close() }
                     .transition(.opacity)
-                QuickCaptureView(onClose: close)
+                QuickCaptureView(startsWithVoice: request.startsWithVoice, onClose: close)
                     // Grows out of the island: anchored top-center, starts pill-sized.
                     .transition(.scale(scale: 0.18, anchor: .top).combined(with: .opacity))
                     .zIndex(1)

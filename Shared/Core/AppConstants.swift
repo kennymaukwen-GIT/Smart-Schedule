@@ -75,9 +75,17 @@ enum AppConstants {
 /// into the Quick Capture overlay (Artboard 4), never the full month view.
 enum DeepLink {
     static let compose = URL(string: "smartschedule://compose")!
-    /// Kept for compatibility (Shared API, links already out there): 1.0 has no in-app speech input, so it opens
-    /// Quick Capture exactly like `compose`, keyboard up (`AppRouter.handle` ignores `mode`).
+    /// Quick Capture with the app's voice input started (App/Voice/VoiceTranscriber, recognised on this iPhone only)
+    /// when it can start without a permission prompt: both permissions already given and the speech language
+    /// recognised on the device. Otherwise it opens exactly like `compose`, keyboard up. No Live Activity links it.
     static let composeVoice = URL(string: "smartschedule://compose?mode=voice")!
+
+    /// Whether `url` is a compose link that asks for voice input (`composeVoice`).
+    static func startsVoiceInput(_ url: URL) -> Bool {
+        guard url.scheme == AppConstants.urlScheme, url.host == "compose" else { return false }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        return items.contains { $0.name == "mode" && $0.value == "voice" }
+    }
 
     static func event(_ id: String) -> URL {
         var components = URLComponents()

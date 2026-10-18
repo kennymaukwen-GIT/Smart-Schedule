@@ -106,11 +106,14 @@ final class AIConsentStoreTests: XCTestCase {
         }
         XCTAssertNil(AIConsentDisclosure.serverNote(beforeIOS26: false, pushToStart: true), "iOS 26 schedules them itself")
 
-        // 1.0 has no microphone: speech reaches the app only as text, from Siri or the keyboard's dictation (Apple's).
+        // Speech reaches the AI only as text: Siri and the keyboard's dictation are Apple's, the app's microphone button
+        // recognises it on the iPhone (App/Voice/VoiceTranscriber, requiresOnDeviceRecognition).
         let speech = AIConsentDisclosure.speechNote
-        for part in ["Siri", "keyboard's dictation", "Apple", "only receives the text"] {
+        for part in ["Siri", "keyboard's dictation", "Apple", "microphone button", "on your iPhone",
+                     "Only the text is sent, never the audio"] {
             XCTAssertTrue(speech.contains(part), "\(part) missing from: \(speech)")
         }
+        XCTAssertFalse(speech.contains("server"), "the mic button never uses Apple's servers: \(speech)")
 
         XCTAssertTrue(AIConsentDisclosure.footnote.contains("Nothing is sent to the AI until you tap Allow"))
         // Demo mode asks the same way and sends the sample calendars and events (DemoModeAssistant).
@@ -122,8 +125,7 @@ final class AIConsentStoreTests: XCTestCase {
                     AIConsentDisclosure.footnote, AIConsentDisclosure.speechNote, note] + items)
             .joined(separator: " ").lowercased()
         XCTAssertFalse(all.contains("train"), all)
-        // No setting or button of the app's own is named: Settings › Assistant has no On-device recognition any more.
+        // Recognition is always on the iPhone: Settings › Assistant has no On-device recognition switch to name.
         XCTAssertFalse(all.contains("on-device recognition"), all)
-        XCTAssertFalse(all.contains("microphone"), all)
     }
 }

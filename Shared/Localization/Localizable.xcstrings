@@ -1872,6 +1872,17 @@
         }
       }
     },
+    "Dictate" : {
+      "comment" : "Mic button in the chat composer and Quick Capture (accessibility label)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聽寫"
+          }
+        }
+      }
+    },
     "Discard" : {
       "comment" : "Failed change in the drawer: drop it and keep Google's version",
       "localizations" : {
@@ -2556,12 +2567,12 @@
         }
       }
     },
-    "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. Smart Schedules only receives the text." : {
+    "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. The microphone button in Smart Schedules does it on your iPhone. Only the text is sent, never the audio." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字，Smart Schedules 只會收到文字。"
+            "value" : "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字；Smart Schedules 的麥克風按鈕則在你的 iPhone 上轉成文字。只會傳送文字，不會傳送語音。"
           }
         }
       }
@@ -3070,6 +3081,17 @@
         }
       }
     },
+    "Not supported for this language" : {
+      "comment" : "Settings › Assistant › Voice input: this iPhone can't recognise the language on the device",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個語言不支援裝置端辨識"
+          }
+        }
+      }
+    },
     "Not synced yet" : {
       "comment" : "Drawer sync status before the first sync",
       "localizations" : {
@@ -3373,6 +3395,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打開快速輸入"
+          }
+        }
+      }
+    },
+    "Open Settings" : {
+      "comment" : "Alert button: opens the app's page in the iOS Settings app",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打開設定"
           }
         }
       }
@@ -4177,6 +4210,17 @@
         }
       }
     },
+    "Speech language" : {
+      "comment" : "Settings › Assistant › Voice input picker",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音辨識語言"
+          }
+        }
+      }
+    },
     "Start on a different date" : {
       "comment" : "Suggestion chip; the demo assistant reads it back",
       "localizations" : {
@@ -4235,6 +4279,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "狀態"
+          }
+        }
+      }
+    },
+    "Stop dictation" : {
+      "comment" : "Mic button while recording (accessibility label)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止聽寫"
           }
         }
       }
@@ -4340,6 +4395,17 @@
         }
       }
     },
+    "Supported for this language" : {
+      "comment" : "Settings › Assistant › Voice input: this iPhone recognises the language on the device",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個語言支援裝置端辨識"
+          }
+        }
+      }
+    },
     "Sync first" : {
       "comment" : "Remove account confirmation: send the account's queued changes before removing it",
       "localizations" : {
@@ -4433,6 +4499,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "點一下建議就會加入備註，再按「儲存」。"
+          }
+        }
+      }
+    },
+    "Tap the mic next to the text field to speak a plan. Speech is turned into text on this iPhone; the audio is not recorded or sent anywhere. Nothing is sent until you tap Send." : {
+      "comment" : "Settings › Assistant › Voice input footer",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "點輸入框旁的麥克風，就能用說的輸入計畫。語音會在這支 iPhone 上轉成文字，不會錄音存檔，也不會傳送到任何地方；按「傳送」之前不會送出任何內容。"
           }
         }
       }
@@ -4630,6 +4707,17 @@
         }
       }
     },
+    "This iPhone can't recognise this language on the device yet, so the mic is hidden. The keyboard's dictation still works." : {
+      "comment" : "Settings › Assistant › Voice input footer when on-device recognition isn't available",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這支 iPhone 還無法在裝置上辨識這個語言，所以不會顯示麥克風；鍵盤的聽寫照常可用。"
+          }
+        }
+      }
+    },
     "This is a repeating event." : {
       "comment" : "Delete confirmation message for a repeating event",
       "localizations" : {
@@ -4760,6 +4848,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要把每一次都移到別天，請在 Google 日曆修改。"
+          }
+        }
+      }
+    },
+    "To speak instead of typing, allow Microphone and Speech Recognition for Smart Schedules in Settings." : {
+      "comment" : "Mic tapped after both permissions were refused",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "想用說的輸入，請到「設定」允許 Smart Schedules 使用「麥克風」和「語音辨識」。"
+          }
+        }
+      }
+    },
+    "To speak instead of typing, allow Microphone for Smart Schedules in Settings." : {
+      "comment" : "Mic tapped after the microphone permission was refused",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "想用說的輸入，請到「設定」允許 Smart Schedules 使用「麥克風」。"
+          }
+        }
+      }
+    },
+    "To speak instead of typing, allow Speech Recognition for Smart Schedules in Settings." : {
+      "comment" : "Mic tapped after the speech recognition permission was refused",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "想用說的輸入，請到「設定」允許 Smart Schedules 使用「語音辨識」。"
           }
         }
       }
@@ -5085,6 +5206,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "僅供檢視"
+          }
+        }
+      }
+    },
+    "Voice input" : {
+      "comment" : "Settings › Assistant section; title of the alert when the mic can't be used",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音輸入"
+          }
+        }
+      }
+    },
+    "Voice input is restricted on this iPhone. You can still type your plan." : {
+      "comment" : "Mic tapped while Screen Time or a profile blocks it",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這支 iPhone 限制了語音輸入，你仍然可以打字輸入計畫。"
           }
         }
       }

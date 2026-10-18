@@ -16,6 +16,9 @@ struct AIConsent: Codable, Hashable, Sendable {
     /// Still 5 after the app's own microphone was removed before 1.0 shipped (2026-10-16): only `speechNote` changed
     /// (Siri and the keyboard's dictation instead of the On-device recognition setting); the lead, the five items and
     /// the recipient, quoted word for word in the privacy policy's section 4, are unchanged.
+    /// Still 5 after the app's own voice input came back, recognised on the iPhone only, before 1.0 shipped (2026-10-18):
+    /// only `speechNote` changed again (it adds the microphone button); the lead, the five items and the recipient are
+    /// unchanged.
     /// Still 5 after demo mode started using the AI before 1.0 shipped (2026-10-17): only `footnote` changed (demo mode
     /// sends the sample calendars and events instead of never contacting the AI); the lead, the five items and the
     /// recipient quoted in the policy's section 4 are unchanged.
@@ -123,10 +126,10 @@ enum AIConsentDisclosure {
         return String(localized: "On iOS 18, the titles, start and end times, event IDs and calendar colours of your events in the next 48 hours are also kept on the Smart Schedules server and sent through Apple's push service, so each one can appear in the Dynamic Island before it starts. Notes and places are not stored.")
     }
 
-    /// Spoken requests: the app has no microphone or speech recognition of its own. Speech reaches it only as text,
-    /// from Siri (the App Intents) or the keyboard's dictation, both Apple's.
+    /// Spoken requests reach the assistant only as text: Siri (the App Intents) and the keyboard's dictation are Apple's;
+    /// the app's microphone button (App/Voice/VoiceTranscriber) recognises speech on the iPhone only and keeps no audio.
     static var speechNote: String {
-        String(localized: "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. Smart Schedules only receives the text.")
+        String(localized: "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. The microphone button in Smart Schedules does it on your iPhone. Only the text is sent, never the audio.")
     }
 
     /// Demo mode asks the same way (`DemoModeAssistant`); what it sends are the fictional sample calendars and events.
