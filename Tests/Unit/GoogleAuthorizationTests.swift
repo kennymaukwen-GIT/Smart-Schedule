@@ -47,6 +47,44 @@ final class GoogleAuthorizationTests: XCTestCase {
         XCTAssertFalse(raw.contains("+"), raw)
     }
 
+    func testGooglesPagesFollowTheAppsLanguage() {
+        let url = GoogleAuthorization.url(clientID: "123.apps.googleusercontent.com",
+                                          redirectURI: "com.googleusercontent.apps.123:/oauth2redirect",
+                                          codeChallenge: "challenge", loginHint: "example+cal@gmail.com",
+                                          scopes: GoogleTokenProvider.scopes, language: "en")
+        let items = query(url)
+        XCTAssertEqual(items["hl"], "en")
+        XCTAssertEqual(items["login_hint"], "example+cal@gmail.com")
+        XCTAssertEqual(items["prompt"], "consent")
+        let raw = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQuery ?? ""
+        XCTAssertTrue(raw.hasSuffix("&hl=en"), raw)
+        XCTAssertFalse(raw.contains("+"), raw)
+
+        let chinese = GoogleAuthorization.url(clientID: "id", redirectURI: "r:/cb", codeChallenge: "c", loginHint: nil,
+                                              scopes: GoogleTokenProvider.scopes, language: "zh-TW")
+        XCTAssertEqual(query(chinese)["hl"], "zh-TW")
+        XCTAssertEqual(query(chinese)["prompt"], "consent select_account")
+
+        for language in [nil, ""] as [String?] {
+            let plain = GoogleAuthorization.url(clientID: "id", redirectURI: "r:/cb", codeChallenge: "c", loginHint: nil,
+                                                scopes: GoogleTokenProvider.scopes, language: language)
+            XCTAssertNil(query(plain)["hl"])
+        }
+        XCTAssertNil(query(authorizationURL(hint: nil))["hl"], "the original request is unchanged")
+    }
+
+    func testTheAppsLocalizationMapsToGooglesLanguage() {
+        XCTAssertEqual(GoogleAuthorization.googleLanguage(forLocalization: "en"), "en")
+        XCTAssertEqual(GoogleAuthorization.googleLanguage(forLocalization: "en-GB"), "en")
+        XCTAssertEqual(GoogleAuthorization.googleLanguage(forLocalization: "zh-Hant"), "zh-TW")
+        XCTAssertEqual(GoogleAuthorization.googleLanguage(forLocalization: "zh-Hant-TW"), "zh-TW")
+        XCTAssertEqual(GoogleAuthorization.googleLanguage(forLocalization: "zh-TW"), "zh-TW")
+        XCTAssertNil(GoogleAuthorization.googleLanguage(forLocalization: "Base"))
+        XCTAssertNil(GoogleAuthorization.googleLanguage(forLocalization: "fr"))
+        XCTAssertNil(GoogleAuthorization.googleLanguage(forLocalization: nil))
+        XCTAssertNil(GoogleAuthorization.googleLanguage(forLocalization: ""))
+    }
+
     // MARK: The redirect back
 
     private func redirect(_ query: String) -> URL {

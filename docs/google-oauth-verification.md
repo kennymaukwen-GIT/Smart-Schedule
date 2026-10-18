@@ -59,7 +59,7 @@ Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.eve
 - [ ] **App**：TestFlight 上的版本已包含同意說明第 7 版（`AIConsent.disclosureVersion` = 7：只列五項，第 6 版的附件那一項拿掉了；同意的內容變了，所以在 TestFlight 上允許過第 5 或第 6 版的人也要重新同意，符合政策第 18 節；`CalendarAliases` 取代帳號 email，`AppConstants.pushToStartEnabled = false`），CI 的 `AccountEmailPrivacyTests` 和 `AIConsentStoreTests` 通過。影片要用這個版本錄。**錄影前**確認同意畫面是**五項**、沒有「A photo or PDF you attach …」那一項，語音那一句是目前程式的文字（「… The microphone button in Smart Schedules does it on your iPhone. Smart Schedules sends only the text, never audio.」），這樣影片裡的同意畫面才和政策第 4 節的引用一致；主畫面的對話輸入列也沒有迴紋針（1.0 把它藏起來了）。
 - [ ] **Gemini 是付費層級**：Gemini API 的 Google Cloud 專案已連結有效的 Cloud Billing，AI Studio 的記錄（Logs）關閉、沒有選擇把資料集分享給 Google（[`site/README.md`](../site/README.md) 第 2 節）。這是下面「不用於訓練」那些句子成立的條件；免費層級時**不要送審**。英國也在上架範圍，Gemini 條款要求對英國使用者只能用付費服務，所以本來就必須是付費層級。
 - [ ] **Cloud 專案**：已啟用 Google Calendar API；Google Auth Platform › Clients 只有一個 iOS client（Bundle ID `com.smartschedules.app`，填好 Team ID）。測試時建立的 Web／Desktop client 先刪掉：Google 要求影片涵蓋專案裡所有 OAuth client。
-- [ ] **測試用 Google 帳號**：專門用來錄影的帳號（文件裡寫成 `example@gmail.com`），不要有真實的個人資料。準備幾個明天以後的行程、兩個自己的行事曆（例如 My calendar、Gym），再由另一個帳號共用一個行事曆給它（例如 Family，權限「See all event details」），抽屜裡才看得到唯讀行事曆。
+- [ ] **測試用 Google 帳號**：專門用來錄影的帳號（文件裡寫成 `example@gmail.com`），不要有真實的個人資料。準備幾個明天以後的行程、兩個自己的行事曆（例如 My calendar、Gym），再由另一個帳號共用一個行事曆給它（例如 Test，權限「See all event details」），或在 Other calendars › Browse calendars of interest 加一個國定假日行事曆，抽屜裡才看得到唯讀行事曆。行程可以用匯入 .ics 的方式建立（Settings › Import & export），建議設成每週重複，之後 Apple 審查時才不會已經過去。
 - [ ] **信箱有人看**：support@smart-schedules.com（Google Workspace 的 Gmail 信箱）和 Cloud 專案擁有者的信箱（擁有者就是 support@ 時是同一個）。審查只用 email 聯絡專案的擁有者／編輯者和開發者聯絡信箱；第三方文章說來信的寄件地址以 `api-oauth-dev-verification-reply` 開頭（google.com），記得檢查垃圾郵件，並把它加進聯絡人。
 - [ ] **support@ 收發信正常**：Squarespace DNS 裡 Google 的 MX、SPF 和所有 `google-site-verification` TXT 都還在，加 `www` CNAME 時沒有動到（Google Admin Toolbox 的 Check MX，或 `dig MX smart-schedules.com`）；做完 Admin console 的「Complete email setup」（DKIM、DMARC，紀錄加在 Squarespace），回給審查員的信比較不會被當成垃圾郵件。步驟見 [`site/README.md`](../site/README.md) §3.6。
 
@@ -106,7 +106,7 @@ Verification Center 的「Prepare for verification」在品牌**驗證並發佈*
 
 1. **Data access › Add or remove scopes**：勾 `openid`、`.../auth/userinfo.email`、`.../auth/calendar.events`、`.../auth/calendar.calendarlist.readonly`。清單裡找不到 Calendar 的 scope，代表 Calendar API 還沒啟用（APIs & Services › Library），或直接貼進「Manually add scopes」。不要加第 1 節列為「沒有要求」的 scope。
 2. 確認分類：2026-10-18 的控制台把 `calendar.calendarlist.readonly` 放在 **Your non-sensitive scopes**（和 `openid`、`userinfo.email` 一起），**Your sensitive scopes** 只有 `calendar.events`。以控制台顯示的為準。
-3. 「How will the scopes be used?」只有一個欄位，上限 1,000 字元：貼第 4.5 節（只講 `calendar.events`，970 字元）。`calendar.calendarlist.readonly` 又被列為敏感時，改貼 4.4 節的合併版（998 字元）。4.2、4.3 節的長版留著回覆審查員的提問。影片欄位貼 YouTube 連結。
+3. 「How will the scopes be used?」只有一個欄位，上限 1,000 字元：貼第 4.5 節（只講 `calendar.events`，結尾是 Google 規定的 Limited Use 聲明，981 字元）。`calendar.calendarlist.readonly` 又被列為敏感時，改貼 4.4 節的合併版（998 字元）。4.2、4.3 節的長版留著回覆審查員的提問。影片欄位貼 YouTube 連結。
 4. Save。
 
 ### 3.5 Audience：發佈到 In production
@@ -178,10 +178,10 @@ calendar.calendarlist.readonly: calendarList.list only, to list the user's calen
 Sync is direct between iPhone and Google. Only with in-app consent: limited event details (no account emails) pass through our server (not stored) to the paid Gemini API. Departure reminders send an event's place and start time to Apple's MapKit, its place to Google Maps on tap. Reminders and Live Activities are made on the iPhone; our server stores no calendar data. No ads, no sale, no AI training.
 ```
 
-### 4.5 只有 `calendar.events` 是敏感 scope 時（Data access 的欄位，970 字元）
+### 4.5 只有 `calendar.events` 是敏感 scope 時（Data access 的欄位，981 字元）
 
 ```text
-Smart Schedules is a Google Calendar client and AI scheduling assistant for iPhone. It uses calendar.events to read events for its month, week and day views, reminders and Live Activities, and to create, change and delete events when the user does so on the event page or asks the in-app assistant (for example "lunch with Joe tomorrow at 12:30"). Narrower scopes do not fit: the readonly scopes cannot write, calendar.events.owned excludes calendars shared with the user, and calendar.app.created covers only calendars the app creates. All calls go directly from the iPhone to the Google Calendar API; our server never receives OAuth tokens and stores no calendar data. Only after the user allows AI in the app do limited event details (titles, times, notes, event IDs; never account emails) pass through our server, unstored, to the paid Gemini API. Departure reminders send one event's place to Apple's MapKit from the iPhone. No ads, no sale of data, no AI training.
+Smart Schedules is a Google Calendar client and AI scheduling assistant for iPhone. calendar.events is used to read events for its month, week and day views, reminders and Live Activities, and to create, change and delete events when the user does so or asks the in-app assistant. Narrower scopes do not fit: readonly scopes cannot write, calendar.events.owned excludes calendars shared with the user, calendar.app.created covers only app-created calendars. Calls go directly from the iPhone to Google; our server never receives OAuth tokens and stores no calendar data. Only after in-app AI consent do limited event details (no account emails) pass through our server, unstored, to the paid Gemini API, never used to train AI models. Departure reminders send one event's place to Apple's MapKit. Smart Schedules' use and transfer to any other app of information received from Google APIs will adhere to Google API Services User Data Policy, including the Limited Use requirements.
 ```
 
 ### 4.6 `openid`、`email`（非敏感，表單通常不問；審查員問到時用）
@@ -250,7 +250,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 1. 品牌已發佈（3.2），iPhone 裝的是 TestFlight 上含同意說明第 7 版的版本：同意畫面有**五項**，沒有附件那一項，和政策第 4 節的引用逐字相同（有六項、含「A photo or PDF you attach …」的第 6 版不要拿來錄）；而且同意畫面的註腳已經是「… Demo mode sends the sample calendars and events instead of your Google Calendar.」（示範模式改用 AI 之後的註腳；舊註腳「Demo mode never contacts the AI.」的版本不要拿來錄）。
 2. 到 https://myaccount.google.com/connections 把測試帳號對 Smart Schedules 的授權移除。App 帶 `include_granted_scopes=true`，帳號已授權過時 Google 可能只列出新增的 scope，同意畫面就不完整。
 3. 刪除再重新安裝 App（或 設定 › Data › Erase all data on this device），讓「Connect Google Calendar」和 AI 同意畫面重新出現。
-4. 語言全部用英文：iPhone 設定 › 一般 › 語言與地區 › iPhone 語言 = English，或只把 設定 › App › Smart Schedules › 語言 設成 English（App 的設定 › Language 會打開這一頁）。Google 的登入頁跟著 iPhone 語言，底部的語言選單要顯示 English (United States)。Mac 上的 Google Calendar 網頁也用英文。
+4. 語言全部用英文：iPhone 設定 › 一般 › 語言與地區 › iPhone 語言 = English，或只把 設定 › App › Smart Schedules › 語言 設成 English（App 的設定 › Language 會打開這一頁）。App 開 Google 頁面時帶 `hl`（跟著 App 的語言：英文 App 是 `hl=en`，繁中是 `hl=zh-TW`；`GoogleAuthorization.googleLanguage(forLocalization:)`），所以登入頁、未驗證警告和同意畫面都跟著 App 的語言，不受測試帳號或 Safari 記住的語言影響；底部的語言選單要顯示 English (United States)。Mac 上的 Google Calendar 網頁也用英文。
 5. iOS 18 或 iOS 26 的 iPhone 都可以錄：1.0 的同意畫面在兩種系統上相同（沒有伺服器那一段）。
 6. 打開勿擾模式，關掉通知預覽。
 7. 主畫面的對話輸入列沒有迴紋針：1.0 把它藏起來（`App/Views/ChatPanel.swift` 的 `showsAttachment: false`）。還看得到迴紋針的舊建置不要拿來錄。
@@ -325,7 +325,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
   ```
 
 **鏡頭 9｜行事曆清單：`calendar.calendarlist.readonly` 和 `email`（2:40–3:10）**
-- 畫面：點左上角 ☰ 打開抽屜：帳號那一區的標題是帳號 email，下面是 My calendar、Gym、Family（唯讀）和各自的顏色。點 Gym 的色塊隱藏它，行程消失，再點一次恢復。點 My calendar 那一列，打開詳細頁，指出「Show in Smart Schedules」和「Use for new events」。Mac 上 Google Calendar 左側的「My calendars」「Other calendars」做對照。
+- 畫面：點左上角 ☰ 打開抽屜：帳號那一區的標題是帳號 email，下面是 My calendar、Gym、Test（另一個帳號分享的，唯讀；或 Holidays in United Kingdom 這類國定假日行事曆）和各自的顏色。點 Gym 的色塊隱藏它，行程消失，再點一次恢復。點 My calendar 那一列，打開詳細頁，指出「Show in Smart Schedules」和「Use for new events」。Mac 上 Google Calendar 左側的「My calendars」「Other calendars」做對照。
 - 旁白：
   ```text
   The calendar.calendarlist.readonly scope lets the app list the user's calendars. The sidebar shows them under the account, which is identified by its email address from the email scope, with each calendar's name and colour as in Google Calendar. The user can hide or show each calendar and choose which calendar new events go to. The app only reads this list; it never changes the user's calendars.

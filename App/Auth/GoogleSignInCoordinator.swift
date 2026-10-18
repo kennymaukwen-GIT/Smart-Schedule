@@ -49,8 +49,11 @@ final class GoogleSignInCoordinator: NSObject, ASWebAuthenticationPresentationCo
         let verifier = Self.randomURLSafe(bytes: 32)
         let challenge = Self.base64URL(Data(SHA256.hash(data: Data(verifier.utf8))))
 
+        // Google's pages in the app's language, not the one Google remembers for the account or the browser.
+        let language = GoogleAuthorization.googleLanguage(forLocalization: Bundle.main.preferredLocalizations.first)
         let authURL = GoogleAuthorization.url(clientID: clientID, redirectURI: redirectURI, codeChallenge: challenge,
-                                              loginHint: loginHint, scopes: GoogleTokenProvider.scopes)
+                                              loginHint: loginHint, scopes: GoogleTokenProvider.scopes,
+                                              language: language)
 
         let callback: URL = try await withCheckedThrowingContinuation { continuation in
             let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { url, error in

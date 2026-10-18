@@ -34,6 +34,34 @@ enum GoogleAuthorization {
         return components.url!
     }
 
+    /// The same request with Google's pages (sign-in, the unverified-app notice, the consent screen) shown in
+    /// `language`, Google's `hl` ("en", "zh-TW"), so they match the app instead of the language Google remembers for
+    /// the account or the browser. nil or empty leaves the choice to Google.
+    static func url(clientID: String, redirectURI: String, codeChallenge: String, loginHint: String?,
+                    scopes: [String], language: String?) -> URL {
+        let base = url(clientID: clientID, redirectURI: redirectURI, codeChallenge: codeChallenge,
+                       loginHint: loginHint, scopes: scopes)
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        guard let language, !language.isEmpty,
+              let value = language.addingPercentEncoding(withAllowedCharacters: allowed),
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: false),
+              let query = components.percentEncodedQuery else { return base }
+        // Appended to the encoded query as it is, so the "+" → %2B above stays intact.
+        components.percentEncodedQuery = query + "&hl=" + value
+        return components.url ?? base
+    }
+
+    /// Google's `hl` for the language the app runs in (`Bundle.main.preferredLocalizations.first`): "en" for
+    /// English, "zh-TW" for Traditional Chinese, nil for anything else (Google then picks).
+    static func googleLanguage(forLocalization localization: String?) -> String? {
+        guard let code = localization?.lowercased(), !code.isEmpty else { return nil }
+        if code == "en" || code.hasPrefix("en-") || code.hasPrefix("en_") { return "en" }
+        if code.hasPrefix("zh-hant") || code.hasPrefix("zh_hant") || code == "zh-tw" || code == "zh_tw" {
+            return "zh-TW"
+        }
+        return nil
+    }
+
     /// Smart Schedule cannot read or write events without `calendar.events` (or the full calendar scope). The
     /// calendar-list scope is optional: without it only the primary calendar is synced ("Show all calendars").
     static func grantsCalendarAccess(_ scopes: [String]) -> Bool {
