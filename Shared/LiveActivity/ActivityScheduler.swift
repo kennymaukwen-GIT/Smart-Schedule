@@ -1,5 +1,6 @@
 import ActivityKit
 import Foundation
+import os
 
 /// Which events get a Live Activity and when (pure; unit-tested). A Live Activity stands for one event about to
 /// start or under way: it appears `leadMinutes` (Settings › Dynamic Island, 30 / 15 / 10 / 5) before the start and
@@ -193,6 +194,7 @@ final class ActivityScheduler {
         for activity in ScheduleActivity.activities where Self.isLive(activity) {
             guard let id = activity.attributes.eventID, !covered.contains(id) else {
                 // An older build's always-on activity, or a second one for the same event.
+                Logger.liveActivity.notice("end now: older or duplicate activity id=\(activity.attributes.eventID ?? "nil", privacy: .public)")
                 await activity.end(nil, dismissalPolicy: .immediate)
                 continue
             }
@@ -205,6 +207,7 @@ final class ActivityScheduler {
                     // The old one stays unless the new one is requested (that fails from the background).
                     covered.insert(id)
                     if start(item, events: events, lastLine: lastLine, now: now, replacing: true) {
+                        Logger.liveActivity.notice("replaced id=\(id, privacy: .public)")
                         await activity.end(nil, dismissalPolicy: .immediate)
                         started[id] = item.triggerAt.timeIntervalSince1970
                     }
@@ -215,9 +218,11 @@ final class ActivityScheduler {
                 // Over: the final content stays on the Lock Screen until 10 minutes after the end.
                 let item = ActivityPlanner.Item(event: event, leadMinutes: lead)
                 let dismissal: ActivityUIDismissalPolicy = item.dismissal > now ? .after(item.dismissal) : .immediate
+                Logger.liveActivity.notice("over: final content id=\(id, privacy: .public) start=\(event.start, privacy: .public) end=\(event.end, privacy: .public) now=\(now, privacy: .public) leaves=\(item.dismissal, privacy: .public)")
                 await activity.end(finalContent(item, events: events, lastLine: lastLine, now: now), dismissalPolicy: dismissal)
             } else {
                 // Deleted, moved past the window, completed, or the Dynamic Island turned off.
+                Logger.liveActivity.notice("end now: not planned (deleted, moved, completed, hidden or off) id=\(id, privacy: .public) cached=\(known[id] != nil, privacy: .public)")
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
         }
@@ -315,19 +320,32 @@ final class ActivityScheduler {
         let pushType: PushType? = AppConstants.liveActivityPushEnabled ? .token : nil
         if item.triggerAt <= now {
             // Already due: only possible while the app is in front.
-            return (try? ScheduleActivity.request(attributes: attributes,
-                                                  content: content(item, events: events, lastLine: lastLine, asOf: now),
-                                                  pushType: pushType)) != nil
+            do {
+                _ = try ScheduleActivity.request(attributes: attributes,
+                                                 content: content(item, events: events, lastLine: lastLine, asOf: now),
+                                                 pushType: pushType)
+                return true
+            } catch {
+                // Usually the app is in the background; the next pass with the app in front starts it.
+                Logger.liveActivity.error("start failed (due now) id=\(item.eventID, privacy: .public): \(String(describing: error), privacy: .public)")
+                return false
+            }
         }
         if #available(iOS 26.0, *) {
             let running = ScheduleActivity.activities.filter(Self.isLive).count
             guard running < ActivityPlanner.maxPending + (replacing ? 1 : 0) else { return false }
-            return (try? ScheduleActivity.request(attributes: attributes,
-                                                  content: content(item, events: events, lastLine: lastLine, asOf: item.triggerAt),
-                                                  pushType: pushType,
-                                                  style: .standard,
-                                                  alertConfiguration: Self.startAlert(item),
-                                                  start: item.triggerAt)) != nil
+            do {
+                _ = try ScheduleActivity.request(attributes: attributes,
+                                                 content: content(item, events: events, lastLine: lastLine, asOf: item.triggerAt),
+                                                 pushType: pushType,
+                                                 style: .standard,
+                                                 alertConfiguration: Self.startAlert(item),
+                                                 start: item.triggerAt)
+                return true
+            } catch {
+                Logger.liveActivity.error("schedule failed id=\(item.eventID, privacy: .public) at=\(item.triggerAt, privacy: .public): \(String(describing: error), privacy: .public)")
+                return false
+            }
         }
         return false
     }
@@ -364,6 +382,7 @@ final class ActivityScheduler {
         state.isInProgress = false
         state.countdownTarget = nil
         state.eventEnd = nil
+        state.hasEnded = true
         return ActivityContent(state: state, staleDate: nil)
     }
 
@@ -400,4 +419,9 @@ final class ActivityScheduler {
             }
         }
     }
+}
+
+extension Logger {
+    /// Console.app › the iPhone › search "LiveActivity": why a card ended, or why one could not start.
+    static let liveActivity = Logger(subsystem: "com.smartschedules.app", category: "LiveActivity")
 }

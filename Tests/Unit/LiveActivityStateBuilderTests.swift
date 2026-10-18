@@ -355,9 +355,26 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         XCTAssertNil(decoded.upNext)
         XCTAssertNil(decoded.upNextMore)
         XCTAssertNil(decoded.timeZoneIdentifier)
+        XCTAssertNil(decoded.hasEnded)
         XCTAssertEqual(decoded.headline, "Drive to school")
         XCTAssertEqual(decoded.eventStart, at(10, 30))
         XCTAssertEqual(decoded.days, state.days)
+    }
+
+    /// The scheduler's final content (an event that is over, left on the Lock Screen for 10 minutes) has no timer and
+    /// reads "Ended"; no state the builder makes is marked ended.
+    func testTheEndedLookReadsBackWithNoTimer() throws {
+        var state = build([item("next", "Drive to school", at(10, 30))])
+        XCTAssertNil(state.hasEnded, "only ActivityScheduler.finalContent sets it")
+        state.isInProgress = false
+        state.countdownTarget = nil
+        state.eventEnd = nil
+        state.hasEnded = true
+        let decoded = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self,
+                                               from: JSONEncoder().encode(state))
+        XCTAssertEqual(decoded.hasEnded, true)
+        XCTAssertNil(decoded.countdownRange(isStale: true), "no timer, so the capsule reads Ended")
+        XCTAssertNil(decoded.countdownRange(isStale: false))
     }
 
     func testPayloadStaysUnderBudgetWithLongUpNextTitlesAndPlace() throws {

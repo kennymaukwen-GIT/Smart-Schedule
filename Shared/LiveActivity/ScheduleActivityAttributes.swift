@@ -49,11 +49,15 @@ struct ScheduleActivityAttributes: ActivityAttributes {
         /// Settings › "Time zone" the builder grouped the days in, so the times on screen are in it too (views format
         /// them at render time). nil (older payloads) = the iPhone's.
         var timeZoneIdentifier: String? = nil
+        /// The ended activity's last look (`ActivityScheduler`'s final content): its countdown reads "Ended" instead
+        /// of a dash, so a card left on the Lock Screen for its last minutes is not taken for a running one.
+        /// nil (every other state and older payloads) = not ended.
+        var hasEnded: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
             case headline, shortHeadline, eventID, countdownFrom, countdownTarget, isInProgress, weekStart, todayIndex
             case days, lastAssistantLine, firstWeekday, eventStart, eventEnd
-            case location, upNext, upNextMore, timeZoneIdentifier
+            case location, upNext, upNextMore, timeZoneIdentifier, hasEnded
         }
     }
 
@@ -102,6 +106,7 @@ extension ScheduleActivityAttributes.ContentState {
         upNext = try c.decodeIfPresent([ScheduleActivityAttributes.UpNextItem].self, forKey: .upNext)
         upNextMore = try c.decodeIfPresent(Int.self, forKey: .upNextMore)
         timeZoneIdentifier = try c.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
+        hasEnded = try c.decodeIfPresent(Bool.self, forKey: .hasEnded)
     }
 
     /// What the countdown shows: to the start, or to the end once the event is under way — because the state says so

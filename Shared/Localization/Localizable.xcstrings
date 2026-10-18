@@ -2028,6 +2028,16 @@
         }
       }
     },
+    "Ended" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已結束"
+          }
+        }
+      }
+    },
     "Ends" : {
       "comment" : "Event page: end date and time",
       "localizations" : {
