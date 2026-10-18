@@ -48,7 +48,7 @@ struct AssistantSettingsView: View {
                 Text("Voice input")
             } footer: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Tap the mic next to the text field to speak a plan. Speech is turned into text on this iPhone; the audio is not recorded or sent anywhere. Nothing is sent until you tap Send.")
+                    Text("Tap the mic next to the text field to speak a plan. Speech is turned into text on this iPhone; the audio is not saved or sent anywhere. Nothing is sent until you tap Send.")
                     if VoiceTranscriber.supportsOnDevice(localeIdentifier: VoiceInput.localeIdentifier(for: preferences)) {
                         Label("Supported for this language", systemImage: "checkmark.circle")
                     } else {

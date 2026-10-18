@@ -80,6 +80,9 @@ final class AppRouter {
     /// `DeepLink.compose`.
     struct QuickCapture: Equatable {
         var startsWithVoice = false
+        /// New for every compose link, so a second `?mode=voice` while Quick Capture is still open starts the mic
+        /// again.
+        var id = UUID()
     }
 
     /// The sheets the main screen presents.
@@ -101,11 +104,22 @@ final class AppRouter {
     var isDrawerOpen = false
     var sheet: Sheet?
 
+    /// What the main screen shows over Quick Capture as well: the drawer, a sheet, or the event page (RootView shows it
+    /// while `selectedEventID` names an event the schedule has). The mic doesn't listen under them
+    /// (`ComposerBar.isCovered`).
+    func coversQuickCapture(_ schedule: ScheduleViewModel) -> Bool {
+        isDrawerOpen || sheet != nil || selectedEventID.flatMap(schedule.event(id:)) != nil
+    }
+
     func handle(_ url: URL) {
         guard url.scheme == AppConstants.urlScheme else { return }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         switch url.host {
         case "compose":
+            // The drawer closes (as for `openSheet`). A sheet or the event page stays, since closing it could lose an
+            // edit; Quick Capture opens under it and its composer brings the keyboard up instead of the mic
+            // (`ComposerBar.isCovered`), so nothing records out of sight.
+            isDrawerOpen = false
             quickCapture = QuickCapture(startsWithVoice: DeepLink.startsVoiceInput(url))
         case "event":
             selectedEventID = items.first { $0.name == "id" }?.value

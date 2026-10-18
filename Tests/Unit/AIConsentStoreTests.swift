@@ -110,7 +110,7 @@ final class AIConsentStoreTests: XCTestCase {
         // recognises it on the iPhone (App/Voice/VoiceTranscriber, requiresOnDeviceRecognition).
         let speech = AIConsentDisclosure.speechNote
         for part in ["Siri", "keyboard's dictation", "Apple", "microphone button", "on your iPhone",
-                     "Only the text is sent, never the audio"] {
+                     "Smart Schedules sends only the text, never audio"] {
             XCTAssertTrue(speech.contains(part), "\(part) missing from: \(speech)")
         }
         XCTAssertFalse(speech.contains("server"), "the mic button never uses Apple's servers: \(speech)")

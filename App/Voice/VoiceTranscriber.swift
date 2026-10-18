@@ -7,12 +7,14 @@ import Speech
 ///
 /// - The recognizer is for Settings › Assistant › Speech language (`VoiceInput.localeIdentifier`: zh-TW or en-US, the
 ///   app's language when Automatic). The button shows only while it exists, `isAvailable` and
-///   `supportsOnDeviceRecognition`; otherwise it is hidden and the keyboard's dictation is still there.
+///   `supportsOnDeviceRecognition`; otherwise it is hidden and the keyboard's dictation is still there. Its delegate
+///   (`AvailabilityRelay`) updates that while the button is on screen, e.g. when the on-device model finishes
+///   downloading.
 /// - Every request sets `requiresOnDeviceRecognition = true` (scripts/validate_schema.py check 9 fails otherwise).
 ///   Audio buffers go from the microphone straight to the recognizer: nothing is written to disk or sent anywhere.
 /// - The words fill the text field as they come (`fieldText`); nothing is sent until Send.
-/// - Stops on a second tap, on Send, when the composer goes away or the app leaves the foreground, after a silence
-///   and at `VoiceInput.maxDuration`.
+/// - Stops on a second tap, on Send, when the composer goes away, is covered (`ComposerBar.isCovered`) or its field is
+///   cleared, when the app leaves the foreground, after a silence and at `VoiceInput.maxDuration`.
 /// - iOS asks for speech recognition and the microphone on the first tap only; after a refusal a tap explains which
 ///   switch to turn on and opens Settings (`problem`).
 ///
@@ -31,6 +33,8 @@ final class VoiceTranscriber {
 
     @ObservationIgnored private var recognizer: SFSpeechRecognizer?
     @ObservationIgnored private var recognizerLocaleID: String?
+    /// The recognizer's delegate, kept here because `SFSpeechRecognizer.delegate` is weak.
+    @ObservationIgnored private var availabilityRelay: AvailabilityRelay?
     /// Made on the first recording: SwiftUI builds a transcriber each time a composer's parent redraws and keeps only
     /// the first, so creating one must stay cheap.
     @ObservationIgnored private var audioEngine: AVAudioEngine?
@@ -52,7 +56,8 @@ final class VoiceTranscriber {
     // MARK: Availability
 
     /// Re-checks whether the mic button can show: on appear, when the app comes back to the foreground and when the
-    /// speech language changes (any process).
+    /// speech language changes (any process). In between, the recognizer's availability changes arrive through
+    /// `AvailabilityRelay`.
     func refreshAvailability() {
         if preferencesObservation == nil {
             preferencesObservation = SharedChangeNotifier.observe(.preferences) { [weak self] in
@@ -62,9 +67,17 @@ final class VoiceTranscriber {
         let identifier = VoiceInput.localeIdentifier(for: PreferencesStore.shared.current())
         if identifier != recognizerLocaleID {
             cancel()
+            let relay = availabilityRelay ?? AvailabilityRelay(owner: self)
+            availabilityRelay = relay
             recognizer = SFSpeechRecognizer(locale: Locale(identifier: identifier))
+            recognizer?.delegate = relay
             recognizerLocaleID = identifier
         }
+        isAvailable = Self.worksOnDevice(recognizer)
+    }
+
+    /// The recognizer became available or unavailable (`AvailabilityRelay`): the button follows while it is on screen.
+    fileprivate func recognizerAvailabilityChanged() {
         isAvailable = Self.worksOnDevice(recognizer)
     }
 
@@ -169,7 +182,7 @@ final class VoiceTranscriber {
     }
 
     /// Ends the recording; the last words still arrive and fill the field. A second tap, a silence, the time limit,
-    /// the app leaving the foreground.
+    /// the app leaving the foreground, the composer being covered.
     func stop() {
         guard isRecording else { return }
         stopAudio()
@@ -177,7 +190,7 @@ final class VoiceTranscriber {
         task?.finish()
     }
 
-    /// Ends the recording and ignores whatever is still on its way: Send (the field is about to be cleared) and the
+    /// Ends the recording and ignores whatever is still on its way: Send, the field cleared from anywhere, and the
     /// composer going away.
     func cancel() {
         recording += 1
@@ -301,5 +314,20 @@ final class VoiceTranscriber {
         if AVAudioApplication.shared.recordPermission == .undetermined {
             _ = await AVAudioApplication.requestRecordPermission()
         }
+    }
+}
+
+/// `SFSpeechRecognizer.delegate` must be an NSObject and is weak, so `VoiceTranscriber` keeps this one. The recognizer
+/// calls it on its `queue` (the main queue unless changed) when it becomes available or unavailable: the language's
+/// on-device model finished downloading, the speech service came back or went away. As in Apple's SpokenWord sample.
+private final class AvailabilityRelay: NSObject, SFSpeechRecognizerDelegate {
+    private weak var owner: VoiceTranscriber?
+
+    init(owner: VoiceTranscriber) {
+        self.owner = owner
+    }
+
+    func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
+        Task { @MainActor [weak owner = self.owner] in owner?.recognizerAvailabilityChanged() }
     }
 }

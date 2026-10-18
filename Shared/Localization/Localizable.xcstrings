@@ -2567,12 +2567,12 @@
         }
       }
     },
-    "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. The microphone button in Smart Schedules does it on your iPhone. Only the text is sent, never the audio." : {
+    "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. The microphone button in Smart Schedules does it on your iPhone. Smart Schedules sends only the text, never audio." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字；Smart Schedules 的麥克風按鈕則在你的 iPhone 上轉成文字。只會傳送文字，不會傳送語音。"
+            "value" : "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字；Smart Schedules 的麥克風按鈕則在你的 iPhone 上轉成文字。Smart Schedules 只傳送文字，不傳送語音。"
           }
         }
       }
@@ -4503,7 +4503,7 @@
         }
       }
     },
-    "Tap the mic next to the text field to speak a plan. Speech is turned into text on this iPhone; the audio is not recorded or sent anywhere. Nothing is sent until you tap Send." : {
+    "Tap the mic next to the text field to speak a plan. Speech is turned into text on this iPhone; the audio is not saved or sent anywhere. Nothing is sent until you tap Send." : {
       "comment" : "Settings › Assistant › Voice input footer",
       "localizations" : {
         "zh-Hant" : {

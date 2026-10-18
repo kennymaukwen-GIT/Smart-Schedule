@@ -102,7 +102,7 @@ final class LocalizationCatalogTests: XCTestCase {
     func testConsentSpeechNote() throws {
         let table = try chineseTable()
         XCTAssertEqual(zh(AIConsentDisclosure.speechNote, in: table),
-                       "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字；Smart Schedules 的麥克風按鈕則在你的 iPhone 上轉成文字。只會傳送文字，不會傳送語音。")
+                       "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字；Smart Schedules 的麥克風按鈕則在你的 iPhone 上轉成文字。Smart Schedules 只傳送文字，不傳送語音。")
     }
 
     /// Voice input: the mic button, Settings › Assistant › Voice input, and the alert after a refused permission.

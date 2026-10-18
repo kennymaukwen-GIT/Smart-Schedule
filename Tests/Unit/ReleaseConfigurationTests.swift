@@ -41,7 +41,7 @@ final class ReleaseConfigurationTests: XCTestCase {
         let note = AIConsentDisclosure.speechNote
         XCTAssertTrue(note.contains("microphone button"), note)
         XCTAssertTrue(note.contains("on your iPhone"), note)
-        XCTAssertTrue(note.contains("Only the text is sent, never the audio"), note)
+        XCTAssertTrue(note.contains("Smart Schedules sends only the text, never audio"), note)
         XCTAssertFalse(note.contains("On-device recognition"), "no such setting any more: \(note)")
         XCTAssertEqual(DeepLink.composeVoice.host, DeepLink.compose.host)
         XCTAssertTrue(DeepLink.startsVoiceInput(DeepLink.composeVoice))

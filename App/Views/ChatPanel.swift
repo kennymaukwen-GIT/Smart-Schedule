@@ -86,6 +86,9 @@ struct ChatPanel: View {
                 showsAttachment: true,
                 isBusy: chat.isBusy,
                 focus: $inputFocused,
+                // Quick Capture, the drawer or a sheet over the chat: its mic stops.
+                isCovered: router.quickCapture != nil || router.coversQuickCapture(schedule)
+                    || chat.consentRequest != nil,
                 onSend: { chat.send() }
             )
         }
@@ -196,9 +199,12 @@ struct ComposerBar: View {
     var showsAttachment = false
     var isBusy = false
     var focus: FocusState<Bool>.Binding
-    /// `smartschedule://compose?mode=voice`: start the mic on appear when that needs no permission prompt; otherwise
-    /// the keyboard comes up.
-    var startsRecording = false
+    /// `smartschedule://compose?mode=voice` (`AppRouter.QuickCapture.id`, new for every link): start the mic when that
+    /// needs no permission prompt; otherwise the keyboard comes up.
+    var voiceRequest: UUID?
+    /// Something covers this composer (Quick Capture over the main chat, the drawer, a sheet): a recording stops,
+    /// keeping the words heard so far, and a voice request does not start one, so the mic never listens out of sight.
+    var isCovered = false
     var onSend: () -> Void
 
     @Environment(\.scenePhase) private var scenePhase
@@ -254,6 +260,11 @@ struct ComposerBar: View {
         .onChange(of: transcriber.fieldText) { _, words in
             if let words { text = words }
         }
+        // The field was cleared (Send here or in the other composer, a suggestion, Clear chat history, by hand): the
+        // recording ends and words still on their way are dropped, so they can't refill it.
+        .onChange(of: text) { old, new in
+            if new.isEmpty, !old.isEmpty { transcriber.cancel() }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 transcriber.refreshAvailability()
@@ -261,9 +272,15 @@ struct ComposerBar: View {
                 transcriber.stop()
             }
         }
-        .task(id: startsRecording) {
+        .onChange(of: isCovered) { _, covered in
+            if covered { transcriber.stop() }
+        }
+        .task(id: voiceRequest) {
             transcriber.refreshAvailability()
-            if startsRecording, !(await transcriber.startIfAllowed(typed: text)) {
+            guard voiceRequest != nil else { return }
+            if isCovered {
+                focus.wrappedValue = true
+            } else if !(await transcriber.startIfAllowed(typed: text)) {
                 focus.wrappedValue = true
             }
         }

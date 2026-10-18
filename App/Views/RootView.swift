@@ -20,7 +20,7 @@ struct RootView: View {
                     .ignoresSafeArea()
                     .onTapGesture { close() }
                     .transition(.opacity)
-                QuickCaptureView(startsWithVoice: request.startsWithVoice, onClose: close)
+                QuickCaptureView(voiceRequest: request.startsWithVoice ? request.id : nil, onClose: close)
                     // Grows out of the island: anchored top-center, starts pill-sized.
                     .transition(.scale(scale: 0.18, anchor: .top).combined(with: .opacity))
                     .zIndex(1)

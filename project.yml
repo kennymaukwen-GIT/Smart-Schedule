@@ -74,8 +74,8 @@ targets:
         # Voice input (App/Voice/VoiceTranscriber.swift): asked on the first tap of the mic button. Speech is recognised
         # on the iPhone only (requiresOnDeviceRecognition); the app target only, the extensions have no microphone.
         # zh-Hant in Shared/Localization/zh-Hant.lproj/InfoPlist.strings; scripts/validate_schema.py (check 9).
-        NSMicrophoneUsageDescription: Tap the mic to speak a plan instead of typing it. Your speech is turned into text on this iPhone; the audio is not recorded or sent anywhere.
-        NSSpeechRecognitionUsageDescription: Your speech is turned into text on this iPhone, so you can speak a plan instead of typing it. The audio is not recorded or sent anywhere.
+        NSMicrophoneUsageDescription: Tap the mic to speak a plan instead of typing it. Your speech is turned into text on this iPhone; the audio is not saved or sent anywhere.
+        NSSpeechRecognitionUsageDescription: Your speech is turned into text on this iPhone, so you can speak a plan instead of typing it. The audio is not saved or sent anywhere.
         BGTaskSchedulerPermittedIdentifiers: [com.smartschedule.refresh]
         # fetch: the BGAppRefresh task (App/Sync/AppRefresh.swift). No remote-notification: version 1.0 receives no
         # pushes (AppConstants.pushToStartEnabled).

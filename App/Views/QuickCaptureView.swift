@@ -8,8 +8,9 @@ private let modeStorageKey = "quickCaptureMode"
 /// the calendar in that scope (endless either way), the conversation (the app's whole chat history, scrollable
 /// inside the panel, with a handle to pull it up over the calendar) with the input bar, suggestions, and a grabber.
 struct QuickCaptureView: View {
-    /// Opened by `DeepLink.composeVoice`: the mic starts instead of the keyboard when it can without asking anything.
-    let startsWithVoice: Bool
+    /// Opened by `DeepLink.composeVoice` (`AppRouter.QuickCapture.id`, new for every link): the mic starts instead of
+    /// the keyboard when it can without asking anything.
+    let voiceRequest: UUID?
     let onClose: () -> Void
 
     @Environment(ChatViewModel.self) private var chat
@@ -43,11 +44,11 @@ struct QuickCaptureView: View {
 
     /// `initialMode` overrides the remembered scope (previews); nil opens in whatever the user picked last.
     /// `conversationExpanded` opens with the conversation pulled up (previews).
-    init(startsWithVoice: Bool = false,
+    init(voiceRequest: UUID? = nil,
          initialMode: CalendarScope? = nil,
          conversationExpanded: Bool = false,
          onClose: @escaping () -> Void) {
-        self.startsWithVoice = startsWithVoice
+        self.voiceRequest = voiceRequest
         self.onClose = onClose
         // `mode` drives the animation; `storedMode` only persists it. Both read the same defaults key.
         let stored = UserDefaults.standard.string(forKey: modeStorageKey).flatMap(CalendarScope.init(rawValue:))
@@ -105,7 +106,7 @@ struct QuickCaptureView: View {
         .padding(.top, 6)
         .onAppear {
             // With voice, the composer brings the keyboard up itself if the mic can't start.
-            if !startsWithVoice { inputFocused = true }
+            if voiceRequest == nil { inputFocused = true }
             if showsPlanCard { isConversationExpanded = true }
         }
         .onChange(of: mode) { _, newMode in
@@ -319,7 +320,9 @@ struct QuickCaptureView: View {
                 placeholder: "Type in any plan to add or change",
                 isBusy: chat.isBusy,
                 focus: $inputFocused,
-                startsRecording: startsWithVoice,
+                voiceRequest: voiceRequest,
+                // The event page or the consent sheet over Quick Capture: its mic stops.
+                isCovered: router.coversQuickCapture(schedule) || chat.consentRequest != nil,
                 onSend: { chat.send() }
             )
             .padding(.top, 4)

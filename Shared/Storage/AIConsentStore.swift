@@ -129,7 +129,7 @@ enum AIConsentDisclosure {
     /// Spoken requests reach the assistant only as text: Siri (the App Intents) and the keyboard's dictation are Apple's;
     /// the app's microphone button (App/Voice/VoiceTranscriber) recognises speech on the iPhone only and keeps no audio.
     static var speechNote: String {
-        String(localized: "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. The microphone button in Smart Schedules does it on your iPhone. Only the text is sent, never the audio.")
+        String(localized: "If you speak to Siri or use the keyboard's dictation, Apple turns your speech into text. The microphone button in Smart Schedules does it on your iPhone. Smart Schedules sends only the text, never audio.")
     }
 
     /// Demo mode asks the same way (`DemoModeAssistant`); what it sends are the fictional sample calendars and events.
