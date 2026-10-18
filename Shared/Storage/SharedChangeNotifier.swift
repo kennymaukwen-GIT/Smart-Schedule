@@ -6,6 +6,8 @@ enum SharedChange: String, CaseIterable, Sendable {
     case preferences, accounts, consent
     /// `SyncStatusStore`: the outbox, failures or the last successful sync changed (cached events usually too).
     case syncStatus
+    /// `DeepLinkRequests.open`: a link (the Control Center button's Quick Capture) waits in the App Group for the app.
+    case deepLink
     var darwinName: String { "com.smartschedule.changed.\(rawValue)" }
 
     /// Another name for `.syncStatus`.

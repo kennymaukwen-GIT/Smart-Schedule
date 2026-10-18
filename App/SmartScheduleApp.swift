@@ -10,7 +10,9 @@ struct SmartScheduleApp: App {
     @State private var chat: ChatViewModel
 
     init() {
-        // The Control Center button's intent runs in this process and opens Quick Capture through the router.
+        // The Control Center button's intent, when it runs in this process (iOS 18), opens Quick Capture through the
+        // router at once. Run in the widget extension (iOS 26), it leaves the link in the App Group: see `.active`
+        // below and `deepLinkObservation`.
         DeepLinkRequests.install { AppRouter.shared.handle($0) }
         let schedule = ScheduleViewModel()
         _schedule = State(initialValue: schedule)
@@ -26,6 +28,9 @@ struct SmartScheduleApp: App {
                 .preferredColorScheme(.dark)
                 .onOpenURL { router.handle($0) }
                 .task {
+                    // Cold start: a Quick Capture link the widget extension wrote before the app launched opens with
+                    // the first frame (the `.active` check below finds nothing then: taken once).
+                    DeepLinkRequests.routePending(to: { router.handle($0) })
                     // History first: cards for a draft or batch found in the App Group are matched against it.
                     await chat.loadHistory()
                     await schedule.bootstrap()
@@ -38,8 +43,15 @@ struct SmartScheduleApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
-                // A Quick Capture request the intent could only leave in the App Group.
-                if let url = DeepLinkRequests.takePending() { router.handle(url) }
+                // A Quick Capture request the intent could only leave in the App Group. The widget extension may write
+                // it just after the app comes forward, so with nothing waiting the app looks once more a moment
+                // later; a later write still arrives through `.deepLink` (AppDelegate). Taken once, opened once.
+                if !DeepLinkRequests.routePending(to: { router.handle($0) }) {
+                    Task {
+                        try? await Task.sleep(for: DeepLinkRequests.lateWriteDelay)
+                        DeepLinkRequests.routePending(to: { router.handle($0) })
+                    }
+                }
                 Task {
                     // Events before the draft (reloadFromCache's order): a plan added from Siri or a notification
                     // must already be in `events` when its card is settled. refresh() skips this while signed out.
@@ -142,6 +154,7 @@ final class AppRouter {
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     private var consentObservation: SharedChangeObservation?
+    private var deepLinkObservation: SharedChangeObservation?
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -165,6 +178,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     await LiveActivityManager.shared.refreshIfRunning()
                 }
                 await AppAttestClient.shared.refreshSessionIfNeeded()
+            }
+        }
+        // The Control Center button's link, left in the App Group by the widget extension (iOS 26) after the app came
+        // forward: Quick Capture opens as soon as it is written. Not while in the background: it waits for `.active`.
+        deepLinkObservation = SharedChangeNotifier.observe(.deepLink) {
+            Task { @MainActor in
+                guard UIApplication.shared.applicationState != .background else { return }
+                DeepLinkRequests.routePending(to: { AppRouter.shared.handle($0) })
             }
         }
         // Finishes transactions that arrived while the app was closed and keeps `isPro` current. Version 1.0 sells

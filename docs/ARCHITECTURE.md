@@ -11,7 +11,7 @@
 
 | 設計需求 | iOS 實際行為 | 本專案對策（檔案） |
 |---|---|---|
-| 從控制中心按時鐘圖示（Artboard 3 紅圈） | 直接打開 App 的快速輸入（鍵盤已叫出）。`ControlWidgetButton` 綁 `OpenQuickCaptureIntent`（`openAppWhenRun = true`），`perform()` 在 App process 把 `DeepLink.compose` 交給 `AppRouter`（`DeepLinkRequests`）。不再叫出動態島：沒有近期行程時那會是一個空白常駐的動態島，違反 Live Activity 只代表「即將發生或進行中」事件的規範 | `Shared/Intents/OpenQuickCaptureIntent.swift`、`Shared/Core/DeepLinkRequests.swift`、`Widgets/SmartScheduleControl.swift` |
+| 從控制中心按時鐘圖示（Artboard 3 紅圈） | 直接打開 App 的快速輸入（鍵盤已叫出）。`ControlWidgetButton` 綁 `OpenQuickCaptureIntent`。iOS 18：`openAppWhenRun = true`，`perform()` 在 App process 把 `DeepLink.compose` 直接交給 `AppRouter`（`DeepLinkRequests`）。iOS 26：`openAppWhenRun` 已棄用，改宣告 `supportedModes = .foreground(.immediate)`；但 Apple 寫明控制項的 intent 在 widget extension 背景執行，所以連結先寫進 App Group 並發 `SharedChange.deepLink`，App 在收到通知、回到前景（和 0.5 秒後再看一次）、冷啟動第一個畫面時取走它（只取一次，3.1 節）。不再叫出動態島：沒有近期行程時那會是一個空白常駐的動態島，違反 Live Activity 只代表「即將發生或進行中」事件的規範 | `Shared/Intents/OpenQuickCaptureIntent.swift`、`Shared/Core/DeepLinkRequests.swift`、`Widgets/SmartScheduleControl.swift` |
 | 動態島展開後有 TextField、麥克風、送出（Artboard 3） | Live Activity 只支援 `Button`、`Toggle`（App Intent）和 `Link`。不能放 TextField、叫不出鍵盤、不能捲動。Expanded 和 Lock Screen 的高度上限都是 160 pt | 展開的動態島左上角、鏡頭旁放一個小的「✎ 編輯」按鈕（`IslandEditPill`，`Link` 到 `DeepLink.compose`，島上唯一的控制項；點島上其他地方也一樣打開），不放輸入框、麥克風和送出鍵。點下去開啟 **Quick Capture**（Artboard 4）：一張外形像動態島、鍵盤已彈出的卡片，從島的位置放大出現。完全不開 App 的輸入改走 Siri、Action Button、Spotlight（`AddPlanIntent`）。2026-10-18 起底部不再有全寬的「編輯」按鈕（兩端會被島的圓角切到） |
 | 動態島不常駐 | Live Activity 只能代表「即將發生或進行中」的事件（HIG、Guideline 4.2）；一個最多活躍 8 小時，之後在鎖定畫面再留最多 4 小時 | 一個行程一個 activity，開始前 30／15／10／5 分鐘出現、結束後 10 分鐘消失（`ActivityScheduler`，見 docs/NOTIFICATIONS.md §8） |
 | 動態島顯示一週日曆（2026-10-18 起改成「接下來」的行程，同一天再改成只顯示這個行程和倒數進度條） | ActivityKit 的內容（static 加 dynamic）不能超過 4 KB。畫面渲染時不能連網，App 也不能每秒更新畫面。展開的島最高 160 pt，放進七天的週曆後字只剩 7–10 pt，看不清楚；「接下來」的時間欄在繁體中文（「明天 晚上 7:00」）被切掉 | 展開的島和鎖定畫面只顯示倒數的這個行程：標題、下面一行的時間和地點（`location`），底部是一條倒數進度條（`CountdownBar`，`ProgressView(timerInterval:countsDown:)`，系統自己會動，不用 App 更新）：只表示離開始還有多久（老闆 2026-10-18：「就單純是距離行程開始的時間」）：開始前從即時動態出現的時間（觸發時間，`ContentState.progressStart`）慢慢填滿，填滿就是開始（全長就是提前時間：iOS 18 在提前時間內才打開 App 時，出現時已經填了一段；出現後起點不變，改提前量不會讓進度條倒退或停住，`ActivityPlanner.keptProgressStart`）；進行中（或開始時間過了、內容過期）保持全滿，和倒數膠囊同時切換（`ContentState.progressRange`、`progressIsFull`）；結束後和沒有行程時沒有進度條。時間在顯示時才格式化，跟著 iPhone 的 12／24 小時制和設定 › 時區。`LiveActivityStateBuilder` 的標題最多 80 字、地點最多 40 字（截掉的結尾加「…」）；「接下來」的資料（`upNext`、`upNextMore`，最多 3 筆、標題最多 48 字）照樣產生，相容舊的 payload，之後也可以再拿來顯示，但畫面不顯示，改變時也不更新或替換即時動態。超過預算時先減少畫面不顯示的資料：週資料（`days`，為了相容舊的 payload 仍保留）和助理的最後一句，畫面上的內容因此不受助理回覆長短影響；再把「接下來」的標題截短到一個字都不留（畫面不顯示，所以之後的行程標題再長也不會讓地點變短）；還不夠才截短地點；都不夠時（一個字由很多 Unicode scalar 組成，例如很長的 emoji 序列）才按 scalar 截短標題、拿掉地點 |
@@ -90,7 +90,7 @@ flowchart LR
 - **Keychain access group**：存 OAuth refresh token，屬性設 `kSecAttrAccessibleAfterFirstUnlock`，這樣鎖定畫面上的 extension 也讀得到。
 - **Extension 寫入後，Live Activity 不會立刻更新**：extension 改不了 App 的 activity。要等下次 App 被喚醒（BG refresh、Control、Siri），或由後端發 Live Activity push。
 - **其他 App Group 檔案**：`accounts.json`（帳號、行事曆、這台裝置上的顯示／顏色／提醒設定、專注模式過濾條件）、`preferences.json`（設定、「助理記得的事」、學到的建議、略過提醒的次數）、`chat-history.json`（App 的對話，最多 200 則）。AI 同意存在 App Group 的 UserDefaults（`SSAIConsent`），可以同步讀取。
-- **跨 process 變更通知**：寫入設定、帳號或同意狀態的 process 會發 Darwin notification（`SharedChangeNotifier`，名稱 `com.smartschedule.changed.preferences|accounts|consent`），其他 process 收到後重新讀取。App 裡 `ScheduleViewModel` 在設定變更時重建 `WallClock`（時區、每週起始日）、重排提醒、更新 Live Activity；帳號變更時重新讀取帳號和可見行程。
+- **跨 process 變更通知**：寫入設定、帳號或同意狀態的 process 會發 Darwin notification（`SharedChangeNotifier`，名稱 `com.smartschedule.changed.preferences|accounts|consent|syncStatus|deepLink`），其他 process 收到後重新讀取。App 裡 `ScheduleViewModel` 在設定變更時重建 `WallClock`（時區、每週起始日）、重排提醒、更新 Live Activity；帳號變更時重新讀取帳號和可見行程。
 
 ---
 
@@ -100,7 +100,14 @@ flowchart LR
 - `StaticControlConfiguration` 搭配 `ControlWidgetButton(action: OpenQuickCaptureIntent())`：打開 App 停在快速輸入。沒有 `openAppWhenRun = true` 的 intent 在控制中心只會在背景默默執行。
 - 控制項只能顯示 SF Symbol 或自訂 symbol（`.symbolset`）。要和 App icon 的時鐘一模一樣，得把它匯出成 custom symbol。
 - 同一個控制項可以放進控制中心、鎖定畫面左下和右下的按鈕位，以及 Action Button。
-- 控制項的 intent 不啟動 Live Activity；`openAppWhenRun = true` 讓 App 到前景，在 App process 執行 `perform()`。**要在實機上驗證**：按下後停在快速輸入、鍵盤已叫出，動態島沒有新的 activity。
+- 控制項的 intent 不啟動 Live Activity。
+- **iOS 18**：`openAppWhenRun = true` 讓 App 到前景，在 App process 執行 `perform()`；App 啟動時 `DeepLinkRequests.install` 裝好的 handler 直接呼叫 `AppRouter.handle(DeepLink.compose)`。
+- **iOS 26**：`openAppWhenRun` 在 iOS 26 SDK 棄用（「Use supportedModes instead」，在 app extension 裡設成 `true` 會產生錯誤）。`OpenQuickCaptureIntent` 另外宣告 `@available(iOS 26.0, *) static var supportedModes: IntentModes { .foreground(.immediate) }`（App 先到前景再執行 `perform()`）。不過 Apple 的「Configuring the runtime behavior of your app intents」說 modes 只是建議，而且「For WidgetKit controls in a Widget extension, the system runs the control's app intent from the extension in the background」：`perform()` 多半在 widget extension 執行，沒有 handler，所以：
+  1. `DeepLinkRequests.open` 把連結和時間寫進 App Group（`deepLink.pendingURL`／`pendingDate`，60 秒內有效），`synchronize()` 後發 Darwin notification `SharedChange.deepLink`。
+  2. App 在三個時機呼叫 `DeepLinkRequests.routePending`：`AppDelegate` 收到 `.deepLink` 而且不在背景時；scene 變成 `.active` 時，當下沒有的話 `lateWriteDelay`（0.5 秒）後再看一次；冷啟動 `RootView` 的 `.task` 一開始。寫入比 App 到前景早或晚都接得到。
+  3. `takePending` 讀到就刪掉，所以三個時機只有第一個打開快速輸入，不會打開兩次。
+- 診斷：`perform()` 在 Console.app 記一行（subsystem `com.smartschedules.app`，category `QuickCapture`）：在哪個 process 執行（`com.smartschedules.app` 或 `com.smartschedules.app.widgets`），iOS 26 另記 `systemContext.currentMode`。
+- **要在實機上驗證**（第 7 節）：按下後停在快速輸入、鍵盤已叫出，動態島沒有新的 activity。
 
 ### 3.2 動態島：ActivityKit 加 WidgetKit `ActivityConfiguration`
 - 版面配置（`Widgets/ScheduleLiveActivity.swift`）：
@@ -206,7 +213,7 @@ sequenceDiagram
 
 ## 7. 只能在實機上驗證的項目
 
-- [ ] 控制中心 → `OpenQuickCaptureIntent` 打開快速輸入（已鎖定和未鎖定都要測），動態島沒有新的 activity。
+- [ ] 控制中心 → `OpenQuickCaptureIntent` 打開快速輸入、鍵盤已叫出（已鎖定和未鎖定都要測），動態島沒有新的 activity。iOS 18 和 iOS 26 各測三種狀態：App 沒在執行（從 App 切換器滑掉）、App 在背景、App 開著（在 App 裡拉下控制中心再按）。iOS 26 若仍停在主畫面：在 Console.app 看 `QuickCapture` 那一行是哪個 process、哪個 mode；再於 60 秒內切出去再回到 App，若這時才出現快速輸入，代表連結有寫入但沒收到 `.deepLink`；若一直沒有，代表 `perform()` 沒有執行（改用 Apple 文件的 `OpenIntent` 做法）。
 - [ ] iOS 26：App 關著時，`Activity.request(…, start:)` 排程的 activity 在提前量準時出現（1.0 的 build 沒有 `aps-environment`，也要準時出現）；同時排 10／20／50 筆，記下第幾筆丟出 `ActivityAuthorizationError`，減 2 回填 `ActivityPlanner.maxPending`；排程後重開機，pending 是否存活。
 - [ ] iOS 18（1.0 沒有 push-to-start）：提前時間內或行程進行中打開 App，即時動態馬上出現，關掉 App 後還在；App 一直關著時不會出現。設定 › 通知 › 動態島 的說明出現 iOS 18 那一句（「On iOS 18, an event appears only if you open Smart Schedules…」）。AI 同意畫面沒有伺服器那一段。
 - [ ] 上傳 build 後 App Store Connect 有沒有寄 ITMS-90078 之類的推播 entitlement 警告（二進位檔裡還有關掉的 push-to-start 程式碼）：警告不是退件，記下來就好（請在畫面上確認）。
