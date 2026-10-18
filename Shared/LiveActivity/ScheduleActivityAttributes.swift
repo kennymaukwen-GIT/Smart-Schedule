@@ -2,7 +2,7 @@ import ActivityKit
 import Foundation
 
 /// Live Activity payload. Hard limits that shape this type:
-/// • ActivityKit content (static + dynamic) must stay under 4 KB — chips are truncated by the builder.
+/// • ActivityKit content (static + dynamic) must stay under 4 KB — titles are truncated by the builder.
 /// • Views cannot do I/O at render time; everything shown must be in this state.
 /// • Only Button/Toggle (App Intents) and Link are interactive — no TextField, no scrolling.
 ///
@@ -23,20 +23,49 @@ struct ScheduleActivityAttributes: ActivityAttributes {
         var isInProgress: Bool
         var weekStart: Date
         var todayIndex: Int
-        var days: [DayDigest]             // always 7, starting on `firstWeekday`
+        /// Always 7, starting on `firstWeekday`. No view shows them since the island's "Up next" list replaced the
+        /// week strip; still built and required when decoding, so every payload an older build wrote stays readable.
+        var days: [DayDigest]
+        /// The assistant's last reply. No view shows it any more (the Lock Screen keeps its height for "Up next").
         var lastAssistantLine: String?
-        /// Settings › "Week starts on" (1 = Sunday, 2 = Monday) for the week strip letters; nil (older payloads) = Sunday.
+        /// Settings › "Week starts on" (1 = Sunday, 2 = Monday) the week in `days` starts on; nil (older payloads) =
+        /// Sunday.
         var firstWeekday: Int? = nil
         /// When the event starts (the build time when there is none). Older payloads: `countdownTarget`, else
         /// `countdownFrom`.
         var eventStart: Date = .distantPast
         /// When the event ends: once the start has passed (the content is stale), the island counts down to it.
         var eventEnd: Date? = nil
+        /// The event's place, on the line under the headline: trimmed, its lines joined, at most 40 characters. nil
+        /// when it has none (and in older payloads).
+        var location: String? = nil
+        /// "Up next": what comes after the event the same day, soonest first, at most 3 (`upNextMore` counts the rest
+        /// of that day); with nothing more that day, the first item the next day alone (`isTomorrow`). [] = nothing
+        /// after the event that day or the next. nil = no event (nothing to show) or an older payload.
+        var upNext: [UpNextItem]? = nil
+        /// How many more items that day `upNext` leaves out (the "+N" beside "Up next"); 0 when it shows them all.
+        /// nil = no event, or an older payload.
+        var upNextMore: Int? = nil
+        /// Settings › "Time zone" the builder grouped the days in, so the times on screen are in it too (views format
+        /// them at render time). nil (older payloads) = the iPhone's.
+        var timeZoneIdentifier: String? = nil
 
         enum CodingKeys: String, CodingKey {
             case headline, shortHeadline, eventID, countdownFrom, countdownTarget, isInProgress, weekStart, todayIndex
             case days, lastAssistantLine, firstWeekday, eventStart, eventEnd
+            case location, upNext, upNextMore, timeZoneIdentifier
         }
+    }
+
+    /// One row of "Up next": the item's start time (formatted when shown), a coloured bar (a ring for a task) and
+    /// its title, truncated by the builder.
+    struct UpNextItem: Codable, Hashable {
+        var title: String
+        var start: Date
+        var colorHex: String
+        var isTask: Bool
+        /// On the day after the event: the row reads "Tomorrow 09:00".
+        var isTomorrow: Bool
     }
 
     struct DayDigest: Codable, Hashable {
@@ -69,6 +98,10 @@ extension ScheduleActivityAttributes.ContentState {
         firstWeekday = try c.decodeIfPresent(Int.self, forKey: .firstWeekday)
         eventStart = try c.decodeIfPresent(Date.self, forKey: .eventStart) ?? countdownTarget ?? countdownFrom
         eventEnd = try c.decodeIfPresent(Date.self, forKey: .eventEnd)
+        location = try c.decodeIfPresent(String.self, forKey: .location)
+        upNext = try c.decodeIfPresent([ScheduleActivityAttributes.UpNextItem].self, forKey: .upNext)
+        upNextMore = try c.decodeIfPresent(Int.self, forKey: .upNextMore)
+        timeZoneIdentifier = try c.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)
     }
 
     /// What the countdown shows: to the start, or to the end once the event is under way — because the state says so
@@ -80,11 +113,55 @@ extension ScheduleActivityAttributes.ContentState {
         guard let target = countdownTarget, target > countdownFrom else { return nil }
         return countdownFrom...target
     }
+
+    /// The zone the times on screen are shown in: the builder's (Settings › "Time zone"), else the iPhone's.
+    var displayTimeZone: TimeZone {
+        timeZoneIdentifier.flatMap(TimeZone.init(identifier:)) ?? .current
+    }
+
+    /// Hour and minute in `displayTimeZone`, in `locale`'s style (12- or 24-hour, as the iPhone is set).
+    func timeStyle(locale: Locale = .autoupdatingCurrent) -> Date.FormatStyle {
+        Date.FormatStyle(locale: locale, timeZone: displayTimeZone).hour().minute()
+    }
+
+    /// The line under the headline: "08:15–08:45 · St Mary's School" (the start alone once the end is gone, in the
+    /// ended activity's last look). Formatted when shown, so it follows the iPhone's 12/24-hour setting. nil when
+    /// there is no event.
+    func detailLine(locale: Locale = .autoupdatingCurrent) -> String? {
+        guard eventID != nil else { return nil }
+        let style = timeStyle(locale: locale)
+        var time = eventStart.formatted(style)
+        if let end = eventEnd, end > eventStart {
+            time += "–" + end.formatted(style)
+        }
+        guard let location, !location.isEmpty else { return time }
+        return time + " · " + location
+    }
+
+    /// Whether the island and the Lock Screen would look the same with `other`, so a running activity needs no
+    /// update. Leaves out what no view shows: the build time (`countdownFrom`: the timer counts to the same target
+    /// from any earlier start), the week digest (`days`, `weekStart`, `todayIndex`, `firstWeekday`) and the
+    /// assistant's last line.
+    func looksTheSame(as other: Self) -> Bool {
+        guard headline == other.headline, shortHeadline == other.shortHeadline, eventID == other.eventID else {
+            return false
+        }
+        guard countdownTarget == other.countdownTarget, isInProgress == other.isInProgress else { return false }
+        guard eventStart == other.eventStart, eventEnd == other.eventEnd else { return false }
+        return hasSameUpNext(as: other)
+    }
+
+    /// Whether what `upNext`, `upNextMore`, the place and the time zone of the times show is the same: a scheduled
+    /// (iOS 26 pending) activity, which cannot be updated, is replaced when this changes.
+    func hasSameUpNext(as other: Self) -> Bool {
+        guard location == other.location, timeZoneIdentifier == other.timeZoneIdentifier else { return false }
+        return upNext == other.upNext && upNextMore == other.upNextMore
+    }
 }
 
 extension ScheduleActivityAttributes.DayDigest {
-    /// What one day of the week strip shows in at most `rows` rows: its first chips, then "+N" in the last row for every
-    /// event not shown (`more`). The expanded island is capped at 160 pt, so a day has room for two rows only.
+    /// What one day of a week view shows in at most `rows` rows: its first chips, then "+N" in the last row for every
+    /// event not shown (`more`). The island used it for its week strip (two rows a day), which "Up next" replaced.
     func visibleRows(_ rows: Int) -> (chips: [ScheduleActivityAttributes.Chip], more: Int) {
         let total = chips.count + overflow
         let shown = Array(chips.prefix(total <= rows ? rows : max(0, rows - 1)))

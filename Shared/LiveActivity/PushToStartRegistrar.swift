@@ -177,7 +177,18 @@ enum PushToStartRegistrar {
                       state: ScheduleActivityAttributes.ContentState) throws -> Event {
         var state = state
         state.lastAssistantLine = nil // the assistant's reply never goes to the server
+        // Never places (the line under the headline), nor the time zone the times are shown in, which says roughly
+        // where the person is: the times show in the iPhone's zone until the app's first update fills both in.
+        state.location = nil
+        state.timeZoneIdentifier = nil
+        // The headline and the "Up next" titles are short in characters (`LiveActivityStateBuilder`), but a character
+        // can be many Unicode scalars: both are cut to what the server takes.
         state.headline = capped(state.headline)
+        state.upNext = state.upNext?.map { original in
+            var item = original
+            item.title = capped(item.title)
+            return item
+        }
         // Default date and data strategies: ActivityKit decodes pushes with its defaults. Sorted keys: the same
         // content always gives the same text, so an unchanged calendar is not "changed" and uploaded again.
         let encoder = JSONEncoder()

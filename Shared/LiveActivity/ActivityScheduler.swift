@@ -96,6 +96,14 @@ enum ActivityPlanner {
         guard let shownTrigger, shownTrigger == item.triggerAt else { return true }
         return now < item.triggerAt
     }
+
+    /// Whether a running activity showing `shown` (stale at `shownStaleDate`) needs `fresh`: only when something on
+    /// screen changes (`ContentState.looksTheSame`) or the stale date moves (the start or end changed, or the event
+    /// got under way). A pass that changes nothing visible sends no update.
+    static func needsUpdate(shown: ScheduleActivityAttributes.ContentState, shownStaleDate: Date?,
+                            fresh: ScheduleActivityAttributes.ContentState, freshStaleDate: Date?) -> Bool {
+        !shown.looksTheSame(as: fresh) || shownStaleDate != freshStaleDate
+    }
 }
 
 /// Keeps the Live Activities in step with the calendar. Called when the app becomes active
@@ -109,7 +117,8 @@ enum ActivityPlanner {
 ///   iPhone, so an activity appears only once the app runs within the lead time (it then starts at once). While the
 ///   app keeps running, a pass at the next trigger time (`dueWake`) starts that one on time.
 /// • Both: an event already due when the app is in front starts at once; a changed scheduled activity is replaced
-///   (the old one ends only once the new one is requested); a deleted event's activity ends; an ended event's
+///   (the old one ends only once the new one is requested); a running one is updated when what it shows changed
+///   (its event, or what comes after it: "Up next", the place); a deleted event's activity ends; an ended event's
 ///   activity ends and leaves the Lock Screen 10 minutes after the end.
 ///
 /// Starting an activity (scheduled or not) only works while the app is in front; from the background the request
@@ -250,8 +259,8 @@ final class ActivityScheduler {
                     ActivityPlanner.items(events: events, leadMinutes: lead, now: now, limit: PushToStartRegistrar.maxEvents),
                     now: now, showing: covered, shownTriggers: started)
                 : []
-            // What the server stores: only the registered events (the week strip shows just those) and no assistant
-            // reply. The app fills in the rest with its first update once the activity is running.
+            // What the server stores: only the registered events ("Up next" shows just those), no assistant reply
+            // and no place. The app fills in the rest with its first update once the activity is running.
             let registered = upcoming.map(\.event)
             let entries = upcoming.compactMap { item in
                 try? PushToStartRegistrar.event(for: item,
@@ -266,22 +275,35 @@ final class ActivityScheduler {
     }
 
     /// What to do with `activity`, which stands for `item`'s event; a running one is brought up to date here.
+    ///
+    /// Every pass rebuilds the content from the events, so an item added, renamed, moved or deleted after the event
+    /// reaches "Up next" with the next pass after the change (each write and sync runs one). A running activity is
+    /// updated only when what it shows differs (`ContentState.looksTheSame`, which leaves out the build time and the
+    /// week digest no view shows) or its stale date moved, so a pass that changes nothing on screen sends no update.
     private func keep(_ activity: ScheduleActivity, as item: ActivityPlanner.Item,
                       events: [ScheduleEvent], lastLine: String?, now: Date) async -> Decision {
         let shown = activity.content.state
-        let sameEvent = shown.headline == item.event.title && shown.eventStart == item.event.start
-            && shown.eventEnd == item.event.end
         if #available(iOS 26.0, *), activity.activityState == .pending {
-            // A scheduled activity cannot be changed: a new time, title or lead time needs a new one. Unchanged, it
-            // stays even past its trigger (iOS is about to start it).
-            return sameEvent && shown.countdownFrom == item.triggerAt ? .keep : .replace
+            // A scheduled activity cannot be changed: a new time, title or lead time, or a change in what comes after
+            // the event ("Up next", the place), needs a new one; the content is the one it was scheduled with, as of
+            // its trigger. Unchanged, it stays even past its trigger (iOS is about to start it). The headline is
+            // compared as the builder makes it (a very long title is cut), or a long title would look changed on
+            // every pass and its activity be replaced again and again.
+            let planned = content(item, events: events, lastLine: lastLine, asOf: item.triggerAt).state
+            let sameEvent = shown.headline == planned.headline && shown.eventStart == item.event.start
+                && shown.eventEnd == item.event.end
+            return sameEvent && shown.countdownFrom == item.triggerAt && shown.hasSameUpNext(as: planned) ? .keep : .replace
         }
         if item.triggerAt > now.addingTimeInterval(ActivityPlanner.earlyStartTolerance) {
             // Moved later: no longer about to start. Planned again below.
             await activity.end(nil, dismissalPolicy: .immediate)
             return .ended
         }
-        await activity.update(content(item, events: events, lastLine: lastLine, asOf: now))
+        let fresh = content(item, events: events, lastLine: lastLine, asOf: now)
+        if ActivityPlanner.needsUpdate(shown: shown, shownStaleDate: activity.content.staleDate,
+                                       fresh: fresh.state, freshStaleDate: fresh.staleDate) {
+            await activity.update(fresh)
+        }
         return .keep
     }
 

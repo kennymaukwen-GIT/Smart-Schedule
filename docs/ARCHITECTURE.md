@@ -12,9 +12,9 @@
 | 設計需求 | iOS 實際行為 | 本專案對策（檔案） |
 |---|---|---|
 | 從控制中心按時鐘圖示（Artboard 3 紅圈） | 直接打開 App 的快速輸入（鍵盤已叫出）。`ControlWidgetButton` 綁 `OpenQuickCaptureIntent`（`openAppWhenRun = true`），`perform()` 在 App process 把 `DeepLink.compose` 交給 `AppRouter`（`DeepLinkRequests`）。不再叫出動態島：沒有近期行程時那會是一個空白常駐的動態島，違反 Live Activity 只代表「即將發生或進行中」事件的規範 | `Shared/Intents/OpenQuickCaptureIntent.swift`、`Shared/Core/DeepLinkRequests.swift`、`Widgets/SmartScheduleControl.swift` |
-| 動態島展開後有 TextField、麥克風、送出（Artboard 3） | Live Activity 只支援 `Button`、`Toggle`（App Intent）和 `Link`。不能放 TextField、叫不出鍵盤、不能捲動。Expanded 和 Lock Screen 的高度上限都是 160 pt | 展開的動態島底部放一個全寬的「編輯」按鈕（`IslandEditButton`，`Link` 到 `DeepLink.compose`），不放輸入框、麥克風和送出鍵。點下去開啟 **Quick Capture**（Artboard 4）：一張外形像動態島、鍵盤已彈出的卡片，從島的位置放大出現。完全不開 App 的輸入改走 Siri、Action Button、Spotlight（`AddPlanIntent`） |
+| 動態島展開後有 TextField、麥克風、送出（Artboard 3） | Live Activity 只支援 `Button`、`Toggle`（App Intent）和 `Link`。不能放 TextField、叫不出鍵盤、不能捲動。Expanded 和 Lock Screen 的高度上限都是 160 pt | 展開的動態島左上角、鏡頭旁放一個小的「✎ 編輯」按鈕（`IslandEditPill`，`Link` 到 `DeepLink.compose`，島上唯一的控制項；點島上其他地方也一樣打開），不放輸入框、麥克風和送出鍵。點下去開啟 **Quick Capture**（Artboard 4）：一張外形像動態島、鍵盤已彈出的卡片，從島的位置放大出現。完全不開 App 的輸入改走 Siri、Action Button、Spotlight（`AddPlanIntent`）。2026-10-18 起底部不再有全寬的「編輯」按鈕（兩端會被島的圓角切到） |
 | 動態島不常駐 | Live Activity 只能代表「即將發生或進行中」的事件（HIG、Guideline 4.2）；一個最多活躍 8 小時，之後在鎖定畫面再留最多 4 小時 | 一個行程一個 activity，開始前 30／15／10／5 分鐘出現、結束後 10 分鐘消失（`ActivityScheduler`，見 docs/NOTIFICATIONS.md §8） |
-| 動態島顯示一週日曆 | ActivityKit 的內容（static 加 dynamic）不能超過 4 KB。畫面渲染時不能連網 | `LiveActivityStateBuilder` 先壓縮：每天最多 2 個 chip、標題截短，超過預算就自動降一級 |
+| 動態島顯示一週日曆（2026-10-18 起改成「接下來」的行程） | ActivityKit 的內容（static 加 dynamic）不能超過 4 KB。畫面渲染時不能連網。展開的島最高 160 pt，放進七天的週曆後字只剩 7–10 pt，看不清楚 | 展開的島和鎖定畫面在標題下顯示倒數行程的時間和地點，底部是「接下來」：同一天之後最多 3 筆（時間、顏色條或任務圓圈、標題），其餘的以「+N」表示；當天沒有就只顯示明天第一筆（「明天 09:00」），都沒有就顯示「今天接下來沒有其他行程」（`ContentState.upNext`、`upNextMore`、`location`）。時間在顯示時才格式化，跟著 iPhone 的 12／24 小時制和設定 › 時區。`LiveActivityStateBuilder` 的標題最多 80 字、「接下來」的標題最多 48 字、地點最多 40 字（截掉的結尾加「…」）。超過預算時先減少畫面不顯示的資料：週資料（`days`，為了相容舊的 payload 仍保留）和助理的最後一句，畫面上的內容因此不受助理回覆長短影響；再截短「接下來」的標題和地點；都不夠時（一個字由很多 Unicode scalar 組成，例如很長的 emoji 序列）才按 scalar 截短標題、拿掉地點 |
 | 「21 MIN」倒數 | 不靠推播也會自己跳動的文字，只有 `Text(timerInterval:)` 和日期樣式 | `countdownFrom`／`countdownTarget`，由 builder 保證範圍永遠合法 |
 | 長按 Google 日曆送來的通知，原地展開（Artboard 1） | **App 不能擴充別的 App 的通知。** Google Calendar App 的推播，Smart Schedules 碰不到 | 改由 Smart Schedules 自己發提醒（本地通知或 APNs），並把 category 綁到 Content Extension。建議使用者關掉 Google Calendar iOS App 的通知（網頁和桌機上的 Google 彈窗照常保留） |
 | 在通知裡直接輸入 | Content Extension 加上 `UNNotificationExtensionUserInteractionEnabled`，再用 `UNTextInputNotificationAction` 讓使用者打字。文字送出後，extension 內的 `didReceive(_:completionHandler:)` 直接處理，回傳 `.doNotDismiss` 讓卡片保持展開 | `NotificationContent/NotificationViewController.swift` |
@@ -105,7 +105,7 @@ flowchart LR
 ### 3.2 動態島：ActivityKit 加 WidgetKit `ActivityConfiguration`
 - 版面配置（`Widgets/ScheduleLiveActivity.swift`）：
   - Compact：⏰ 加短標題（leading），倒數（trailing）。
-  - Expanded：`.leading` 放時鐘、`.center` 放標題、`.trailing` 放「21 MIN」膠囊；`.bottom` 放一週微型日曆和「編輯」按鈕。
+  - Expanded：`.leading` 放「✎ 編輯」小膠囊（`IslandEditPill`，`Link` 到 `DeepLink.compose`，島上唯一的控制項，點島上其他地方也一樣打開快速輸入）、`.trailing` 放「21 MIN」倒數膠囊（兩個膠囊離島的角落再往內 4 pt、往下 2 pt，外框用 `strokeBorder` 畫在內側）；`.center` 放標題和下一行的時間・地點；`.bottom` 放「接下來」（`UpNextList`：同一天之後最多 3 筆，其餘以「+N」表示，當天沒有就只顯示明天第一筆，都沒有就是「今天接下來沒有其他行程」；沒有倒數行程時底部是空的）。
   - Minimal：只有 ⏰。
 - 互動：`Link` 用於 deep link（「編輯」按鈕 → `smartschedule://compose`；動態島沒有麥克風；App 仍接受 `?mode=voice`（`DeepLink.composeVoice`）：打開快速輸入，不必跳權限提示就能收音時直接開始語音輸入，否則和 `compose` 一樣叫出鍵盤；上面有 sheet 或行程頁時也只叫出鍵盤，抽屜會先關掉）；`Button(intent:)` 用於不開 App 的動作。
 - 推播：`pushType: .token` 搭配 `NSSupportsLiveActivitiesFrequentUpdates`；APNs 的 `apns-push-type: liveactivity`，topic 是 `<bundle>.push-type.liveactivity`。1.0 不用任何推播：`AppConstants.liveActivityPushEnabled` 和 `pushToStartEnabled` 都是 false，`Activity.request` 用 `pushType: nil`，App 沒有 `aps-environment` 也沒有 `remote-notification` 背景模式。
@@ -211,7 +211,7 @@ sequenceDiagram
 - [ ] iOS 18（1.0 沒有 push-to-start）：提前時間內或行程進行中打開 App，即時動態馬上出現，關掉 App 後還在；App 一直關著時不會出現。設定 › 通知 › 動態島 的說明出現 iOS 18 那一句（「On iOS 18, an event appears only if you open Smart Schedules…」）。AI 同意畫面沒有伺服器那一段。
 - [ ] 上傳 build 後 App Store Connect 有沒有寄 ITMS-90078 之類的推播 entitlement 警告（二進位檔裡還有關掉的 push-to-start 程式碼）：警告不是退件，記下來就好（請在畫面上確認）。
 - [ ] Content Extension 裡的 inline `TextField` 能不能取得鍵盤焦點。保底方案是系統的文字輸入 action。
-- [ ] 不同機型上 expanded island 是否超出 160 pt，例如 Pro Max 和標準尺寸、粗體字、動態字級。
+- [ ] 不同機型上 expanded island 是否超出 160 pt，例如 Pro Max 和標準尺寸、粗體字、動態字級（依 `Widgets/ScheduleLiveActivity.swift` 開頭的高度計算，最高的情況約 147–150 pt）。左上角「編輯」和右上角倒數的膠囊不被圓角切到，「接下來」最後一行離島的底部至少 12 pt、左右至少 14 pt（2026-10-18 實機截圖：舊版右上角倒數和底部全寬「編輯」的兩端被切到）；點「編輯」和點島上其他地方都打開快速輸入、鍵盤已叫出。
 - [ ] `GEMINI_MODEL_ID` 是否仍有效，以及 `thinkingLevel` 參數是否被該模型接受；正式 Worker 的 `SESSION_MODELS` 包含它，長按通知回覆可以用。
 - [ ] Testing 模式下 7 天 refresh token 到期後，重新登入的流程。
 - [ ] 專注模式過濾條件：開啟和關閉專注模式時 `CalendarFocusFilter.perform()` 都有被呼叫。

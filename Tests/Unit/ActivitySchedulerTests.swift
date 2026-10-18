@@ -114,6 +114,76 @@ final class ActivitySchedulerTests: XCTestCase {
         XCTAssertNil(attributes.eventID, "an older build's activity, which the scheduler ends")
     }
 
+    // MARK: Updates of a running activity
+
+    /// Every pass rebuilds the content; a running activity is updated only when what it shows changed: its event or
+    /// what comes after it ("Up next", the place), not the build time, the assistant's line or the week digest.
+    func testRunningActivityIsUpdatedOnlyWhenWhatItShowsChanges() {
+        let meeting = event("m", TestClock.local(2026, 10, 14, 10, 30), title: "Design review")
+        let lunch = event("lunch", TestClock.local(2026, 10, 14, 12), title: "Lunch")
+        let call = event("call", TestClock.local(2026, 10, 14, 13), title: "Call Ann")
+        let review = event("review", TestClock.local(2026, 10, 14, 14), title: "Review")
+        let gym = event("gym", TestClock.local(2026, 10, 14, 18), title: "Gym")
+        let friday = event("friday", TestClock.local(2026, 10, 16, 9), title: "Dentist")
+        let events = [meeting, lunch, call, review, gym, friday]
+        let now = self.now
+        let clock = self.clock
+        func state(_ events: [ScheduleEvent], at time: Date? = nil, lastLine: String? = "Added: Lunch") -> ScheduleActivityAttributes.ContentState {
+            LiveActivityStateBuilder.build(for: meeting, events: events, lastLine: lastLine, asOf: time ?? now, clock: clock)
+        }
+        let shown = state(events, at: now.addingTimeInterval(-300))
+        func needsUpdate(_ fresh: ScheduleActivityAttributes.ContentState, staleDate: Date? = nil) -> Bool {
+            ActivityPlanner.needsUpdate(shown: shown, shownStaleDate: meeting.start,
+                                        fresh: fresh, freshStaleDate: staleDate ?? meeting.start)
+        }
+        XCTAssertEqual(shown.upNext?.map(\.title), ["Lunch", "Call Ann", "Review"])
+        XCTAssertEqual(shown.upNextMore, 1)
+
+        XCTAssertFalse(needsUpdate(state(events)), "built again five minutes later: only the build time differs")
+        XCTAssertFalse(needsUpdate(state(events, lastLine: "Added: Gym")), "the assistant's line is not shown")
+        var movedFriday = friday
+        movedFriday.title = "Dentist (moved)"
+        XCTAssertFalse(needsUpdate(state([meeting, lunch, call, review, gym, movedFriday])), "only in the week digest")
+        var renamedGym = gym
+        renamedGym.title = "Evening gym"
+        XCTAssertFalse(needsUpdate(state([meeting, lunch, call, review, renamedGym, friday])), "counted in +1, not shown")
+
+        let added = event("dentist", TestClock.local(2026, 10, 14, 15), title: "Dentist")
+        XCTAssertTrue(needsUpdate(state(events + [added])), "a new event later today: +2")
+        var renamedLunch = lunch
+        renamedLunch.title = "Lunch with Andrew"
+        XCTAssertTrue(needsUpdate(state([meeting, renamedLunch, call, review, gym, friday])), "a shown row renamed")
+        XCTAssertTrue(needsUpdate(state([meeting, call, review, gym, friday])), "a shown row deleted")
+        var placed = meeting
+        placed.location = "Room 4"
+        XCTAssertTrue(needsUpdate(LiveActivityStateBuilder.build(for: placed, events: events, lastLine: nil, asOf: now, clock: clock)),
+                      "the place under the headline")
+        XCTAssertTrue(needsUpdate(state(events), staleDate: meeting.end), "the stale date moved")
+        let underway = state(events, at: TestClock.local(2026, 10, 14, 10, 45))
+        XCTAssertTrue(needsUpdate(underway), "under way: counts to the end")
+    }
+
+    /// A scheduled (iOS 26 pending) activity cannot be updated: it is replaced when "Up next" or the place it was
+    /// scheduled with (as of its trigger) no longer matches, and kept otherwise.
+    func testScheduledActivityComparesWhatComesAfterTheEvent() {
+        let clock = self.clock
+        let meeting = event("m", TestClock.local(2026, 10, 15, 9), title: "Design review")
+        let lunch = event("lunch", TestClock.local(2026, 10, 15, 12), title: "Lunch")
+        let item = ActivityPlanner.items(events: [meeting, lunch], leadMinutes: 30, now: now)[0]
+        let scheduled = LiveActivityStateBuilder.build(for: meeting, events: [meeting, lunch], lastLine: nil,
+                                                       asOf: item.triggerAt, clock: clock)
+        func planned(_ events: [ScheduleEvent], lastLine: String? = nil) -> ScheduleActivityAttributes.ContentState {
+            LiveActivityStateBuilder.build(for: meeting, events: events, lastLine: lastLine, asOf: item.triggerAt, clock: clock)
+        }
+        XCTAssertTrue(scheduled.hasSameUpNext(as: planned([meeting, lunch], lastLine: "Added: Lunch")))
+        XCTAssertFalse(scheduled.hasSameUpNext(as: planned([meeting, lunch, event("gym", TestClock.local(2026, 10, 15, 18))])))
+        XCTAssertFalse(scheduled.hasSameUpNext(as: planned([meeting])), "Lunch deleted: \"Nothing else today\"")
+        let taipei = WallClock(timeZone: TimeZone(identifier: "Asia/Taipei")!)
+        XCTAssertFalse(scheduled.hasSameUpNext(as: LiveActivityStateBuilder.build(for: meeting, events: [meeting, lunch], lastLine: nil,
+                                                                                 asOf: item.triggerAt, clock: taipei)),
+                       "times shown in another zone")
+    }
+
     // MARK: Push-to-start (iOS 18)
 
     /// Off (version 1.0, `AppConstants.pushToStartEnabled`): a pass asks iOS for no push-to-start token and registers,
@@ -134,9 +204,13 @@ final class ActivitySchedulerTests: XCTestCase {
         // Even when handed the assistant's last reply, the registration never carries it to the server.
         var state = LiveActivityStateBuilder.build(for: trip, events: [trip], lastLine: "Added: Dentist · Fri 10:00",
                                                    asOf: item.triggerAt, clock: clock)
+        XCTAssertEqual(state.location, "Terminal 2", "the island shows the place")
         let entry = try PushToStartRegistrar.event(for: item, attributes: ScheduleActivityAttributes(eventID: "ev1"), state: state)
         XCTAssertFalse(entry.contentStateJSON.contains("Dentist"), entry.contentStateJSON)
+        // Neither the place nor the time zone (roughly where the person is) goes to the server.
         state.lastAssistantLine = nil
+        state.location = nil
+        state.timeZoneIdentifier = nil
         XCTAssertEqual(entry.eventID, "ev1")
         XCTAssertEqual(entry.title, "Flight to Tokyo")
         XCTAssertEqual(entry.eventStart, TestClock.local(2026, 10, 15, 9))
@@ -148,6 +222,22 @@ final class ActivitySchedulerTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(ScheduleActivityAttributes.self, from: Data(entry.attributesJSON.utf8)).eventID, "ev1")
         let everything = entry.attributesJSON + entry.contentStateJSON
         XCTAssertFalse(everything.contains("Terminal 2") || everything.contains("passport"), "no places or notes")
+        XCTAssertFalse(everything.contains("London"), "no time zone")
+    }
+
+    /// "Up next" titles are short, but a character can be many Unicode scalars: capped like the headline.
+    func testPushToStartCapsUpNextTitles() throws {
+        let meeting = event("m", TestClock.local(2026, 10, 15, 9))
+        // 28 characters of 11 scalars each: 308 scalars.
+        let stacked = String(repeating: "e" + String(repeating: "\u{301}", count: 10), count: 28)
+        let later = event("later", TestClock.local(2026, 10, 15, 11), title: stacked)
+        let item = ActivityPlanner.items(events: [meeting, later], leadMinutes: 30, now: now)[0]
+        let state = LiveActivityStateBuilder.build(for: meeting, events: [meeting, later], lastLine: nil, asOf: item.triggerAt, clock: clock)
+        XCTAssertEqual(state.upNext?.first?.title.unicodeScalars.count, 308)
+        let entry = try PushToStartRegistrar.event(for: item, attributes: ScheduleActivityAttributes(eventID: "m"), state: state)
+        let decoded = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self, from: Data(entry.contentStateJSON.utf8))
+        XCTAssertEqual(decoded.upNext?.first?.title.unicodeScalars.count, PushToStartRegistrar.maxTitleScalars)
+        XCTAssertEqual(decoded.upNext?.first?.start, TestClock.local(2026, 10, 15, 11))
     }
 
     func testLongTitlesAreCutToWhatTheServerTakes() throws {
@@ -159,10 +249,22 @@ final class ActivitySchedulerTests: XCTestCase {
         XCTAssertEqual(entry.title.unicodeScalars.count, PushToStartRegistrar.maxTitleScalars)
         XCTAssertTrue(title.hasPrefix(entry.title))
         let decoded = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self, from: Data(entry.contentStateJSON.utf8))
-        XCTAssertEqual(decoded.headline, entry.title, "the pushed headline too")
+        XCTAssertEqual(decoded.headline, state.headline, "the pushed headline is the island's, already cut to 80 characters")
+        XCTAssertEqual(decoded.headline.count, LiveActivityStateBuilder.headlineLength)
         // Counted in Unicode scalars, as the server counts (JavaScript's Array.from): an emoji family is five.
         let families = String(repeating: "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", count: 50)
         XCTAssertEqual(PushToStartRegistrar.capped(families).unicodeScalars.count, 200)
+        // 80 characters of five scalars each are still more than the server takes: the pushed headline is cut too.
+        let family = event("f", TestClock.local(2026, 10, 15, 9), title: families + families)
+        let familyItem = ActivityPlanner.items(events: [family], leadMinutes: 30, now: now)[0]
+        let familyState = LiveActivityStateBuilder.build(for: family, events: [family], lastLine: nil,
+                                                         asOf: familyItem.triggerAt, clock: clock)
+        let familyEntry = try PushToStartRegistrar.event(for: familyItem, attributes: ScheduleActivityAttributes(eventID: "f"),
+                                                         state: familyState)
+        let pushed = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self,
+                                              from: Data(familyEntry.contentStateJSON.utf8))
+        XCTAssertEqual(pushed.headline.unicodeScalars.count, PushToStartRegistrar.maxTitleScalars)
+        XCTAssertTrue(familyState.headline.hasPrefix(pushed.headline))
         XCTAssertEqual(PushToStartRegistrar.capped("Dentist"), "Dentist")
     }
 
@@ -177,6 +279,8 @@ final class ActivitySchedulerTests: XCTestCase {
         sorted.outputFormatting = [.sortedKeys]
         var expected = state
         expected.lastAssistantLine = nil
+        expected.location = nil
+        expected.timeZoneIdentifier = nil
         XCTAssertEqual(entry.contentStateJSON, String(decoding: try sorted.encode(expected), as: UTF8.self))
         XCTAssertEqual(entry.attributesJSON, String(decoding: try sorted.encode(ScheduleActivityAttributes(eventID: "m")), as: UTF8.self))
     }

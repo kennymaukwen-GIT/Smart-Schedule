@@ -29,6 +29,12 @@ Deep link 定義（`Shared/Core/AppConstants.swift`）：
 
 **2026-10-17 更新（高度）：** 展開的動態島最高 160 pt，iPhone 上底部區域約從 60 pt 開始，只剩約 98 pt。原本週曆一天最多三行（兩個行程＋「+N」）約 71 pt，加上 36 pt 的按鈕會超過，底部被截掉（實機截圖）。現在一天最多兩行（兩個行程，或一個行程＋「+N」，`DayDigest.visibleRows(2)`，有單元測試），週曆約 51 pt，「編輯」按鈕 30 pt，間距 5 pt，底部留約 12 pt。
 
+**2026-10-18 更新（「編輯」移到左上角）：** 實機截圖裡底部全寬的「編輯」膠囊兩端被島的圓角切到，所以拿掉了；「編輯」改成左上角、鏡頭旁的小膠囊 `IslandEditPill`（取代原本的時鐘圖示）：`Link(destination: DeepLink.compose)` 包鉛筆圖示和 `Text("Edit")`（繁體中文「編輯」），目標不變，打開快速輸入、鍵盤已叫出。它是展開的動態島上唯一的控制項（HIG：互動最好只有一個元件），島上其他地方照樣由 T2 的 `widgetURL` 打開快速輸入。底部改顯示「接下來」的行程，沒有任何點擊目標。高度與圓角的計算寫在 `Widgets/ScheduleLiveActivity.swift` 開頭：最高的情況約 147–150 pt（上限 160），內容離島的左右 16 pt、底部 12 pt（`contentMargins`），左上「編輯」和右上倒數再往內 4 pt、往下 2 pt，外框畫在膠囊內側（`strokeBorder`）。
+
+| # | 位置 | 元件 | 呈現 | 目標 |
+|---|---|---|---|---|
+| T3″ | `IslandEditPill`（展開的動態島左上角「編輯」，取代 T3′） | `Link(destination: DeepLink.compose)` 包鉛筆圖示和 `Text("Edit")` | 展開的動態島 | `smartschedule://compose` |
+
 `Button(intent:)`：**0 個**。`DismissScheduleIntent`（Step 0 時在 `Shared/Intents/SummonScheduleIntent.swift`，Step 2 起移到 `Shared/Intents/DismissScheduleIntent.swift`）有定義，但沒有任何畫面使用它。
 
 驗證方式：每個改動 Live Activity 的 commit 之後執行
@@ -37,4 +43,4 @@ Deep link 定義（`Shared/Core/AppConstants.swift`）：
 grep -rn "widgetURL\|Link(destination\|Button(intent" Widgets Shared
 ```
 
-輸出必須是 T1、T2 和 T3′ 這三行（行號可以變，元件與目標不能變；2026-10-16 之前是 T1–T5 五行），且沒有新增 `Button(intent:)`。
+輸出必須是 T1、T2 和 T3″ 這三行（行號可以變，元件與目標不能變；2026-10-16 之前是 T1–T5 五行，2026-10-18 之前第三行是 T3′），且沒有新增 `Button(intent:)`。
