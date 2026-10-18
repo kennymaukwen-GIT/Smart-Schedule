@@ -33,7 +33,7 @@ Deep link 定義（`Shared/Core/AppConstants.swift`）：
 
 | # | 位置 | 元件 | 呈現 | 目標 |
 |---|---|---|---|---|
-| T3″ | `IslandEditPill`（展開的動態島左上角「編輯」，取代 T3′；鎖定畫面標題列左邊也放同一個，取代時鐘圖示） | `Link(destination: DeepLink.compose)` 包鉛筆圖示和 `Text("Edit")` | 展開的動態島、鎖定畫面（鎖定時先 Face ID） | `smartschedule://compose` |
+| T3″ | `IslandEditPill`（展開的動態島左上角「編輯」，取代 T3′；鎖定畫面沒有，標題列左邊是時鐘圖示，整張卡片由 T1 打開快速輸入） | `Link(destination: DeepLink.compose)` 包鉛筆圖示和 `Text("Edit")` | 展開的動態島 | `smartschedule://compose` |
 
 `Button(intent:)`：**0 個**。`DismissScheduleIntent`（Step 0 時在 `Shared/Intents/SummonScheduleIntent.swift`，Step 2 起移到 `Shared/Intents/DismissScheduleIntent.swift`）有定義，但沒有任何畫面使用它。
 

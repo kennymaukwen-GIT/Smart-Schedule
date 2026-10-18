@@ -23,7 +23,7 @@ import WidgetKit
 /// region at all (the island shrinks to its 84-pt minimum). Lock Screen (`LockScreenScheduleView`), worst case:
 ///
 ///     padding                                           14
-///     header: Edit pill, headline 17 + time · place 13, countdown   32
+///     header: clock, headline 17 + time · place 13, countdown   32
 ///     spacing                                            8
 ///     "Up next": 12 + 2 + 3 × 16                        62
 ///     padding                                           14
@@ -103,7 +103,7 @@ enum IslandLayout {
     static let labelHeight: CGFloat = 12
     static let rowHeight: CGFloat = 16
     static let labelSpacing: CGFloat = 2
-    /// Lock Screen: the header row ("✎ Edit" pill, headline and its time and place, countdown).
+    /// Lock Screen: the header row (clock glyph, headline and its time and place, countdown).
     static let lockScreenHeaderHeight: CGFloat = 32
     static let lockScreenHeadlineHeight: CGFloat = 17
 }
@@ -246,6 +246,17 @@ struct UpNextMarker: View {
     }
 }
 
+/// The Lock Screen header's clock (owner's choice, 2026-10-18: no Edit pill on the Lock Screen).
+struct IslandClockGlyph: View {
+    var body: some View {
+        Image(systemName: "clock")
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(.white)
+            .frame(width: 28, height: 28)
+            .overlay(Circle().stroke(Theme.hairline, lineWidth: 1))
+    }
+}
+
 /// "21 MIN" capsule. `Text(timerInterval:)` is the only countdown that ticks without pushes; the range always has
 /// its lower bound at or before the upper. Counts to the start, then (stale once the start passes) to the end. The
 /// outline is drawn inside the capsule's frame (`strokeBorder`), so no part of it falls outside the region. An ended
@@ -294,11 +305,10 @@ struct CompactCountdown: View {
 
 // MARK: - Lock Screen (also shown on devices without a Dynamic Island)
 
-/// The island's content stacked: the header row (the same "✎ Edit" pill as the island, then the headline, then the
-/// countdown), then "Up next". The pill shows what a tap does; a tap anywhere on the view opens Quick Capture too
-/// (after Face ID: a Live Activity cannot take text input on the Lock Screen). The assistant's last line is no
-/// longer shown: with it (8 spacing + a 13-pt line) the view would be ≈ 151 pt, over the 150-pt budget, and it is not
-/// about this event.
+/// The island's content stacked: the header row (clock glyph, headline, countdown), then "Up next". No Edit button
+/// (the owner's choice): a tap anywhere on the view opens Quick Capture, after Face ID when locked (a Live Activity
+/// cannot take text input on the Lock Screen). The assistant's last line is no longer shown: with it (8 spacing + a
+/// 13-pt line) the view would be ≈ 151 pt, over the 150-pt budget, and it is not about this event.
 struct LockScreenScheduleView: View {
     let state: ScheduleActivityAttributes.ContentState
     var isStale = false
@@ -307,7 +317,7 @@ struct LockScreenScheduleView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                IslandEditPill()
+                IslandClockGlyph()
                 VStack(alignment: .leading, spacing: 0) {
                     Text(state.headline)
                         .font(.system(size: 14, weight: .medium))
