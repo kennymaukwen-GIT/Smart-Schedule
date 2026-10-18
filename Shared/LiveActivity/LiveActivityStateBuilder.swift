@@ -2,10 +2,11 @@ import Foundation
 
 enum LiveActivityStateBuilder {
     private static let byteBudget = 3_200 // headroom under ActivityKit's 4 KB cap
-    /// Rows of "Up next" the island and the Lock Screen have room for (their height budget, `ScheduleLiveActivity`).
+    /// Most items `ContentState.upNext` holds: the rows the island's "Up next" list had room for. No view shows the
+    /// list since the countdown bar replaced it (2026-10-18); it is still built, so the list can come back.
     static let upNextLimit = 3
-    /// Longest "Up next" title kept: about what one row holds at 12 pt on the widest iPhones. A longer one ends in
-    /// "…" (`clipped`); a narrower iPhone's row cuts one too wide for it with its own "…".
+    /// Longest "Up next" title kept: about what one row of the list held at 12 pt on the widest iPhones. A longer one
+    /// ends in "…" (`clipped`).
     static let upNextTitleLength = 48
     /// Longest place kept for the line under the headline.
     static let locationLength = 40
@@ -14,8 +15,10 @@ enum LiveActivityStateBuilder {
     static let headlineLength = 80
 
     /// How hard the payload is squeezed, mildest first: the first level that fits the byte budget is used. What no
-    /// view shows goes first: the week digest (`days`), then the assistant's last line, so what is on screen never
-    /// depends on the assistant's last reply. Only then do the "Up next" titles and the place shrink.
+    /// view shows goes first: the week digest (`days`), then the assistant's last line, then the "Up next" titles (not
+    /// shown since 2026-10-18, kept for the list's return) down to none at all. Only then does the place under the
+    /// headline shrink, so what is on screen never depends on the assistant's last reply or on the titles of what
+    /// comes after the event (its rows keep their times and colours: a few dozen bytes each, bounded).
     private struct Squeeze {
         let chipsPerDay: Int
         let chipTitleLength: Int
@@ -39,7 +42,11 @@ enum LiveActivityStateBuilder {
                 keepsAssistantLine: false),
         Squeeze(chipsPerDay: 0, chipTitleLength: 0, upNextTitleLength: 16, locationLength: locationLength,
                 keepsAssistantLine: false),
-        Squeeze(chipsPerDay: 0, chipTitleLength: 0, upNextTitleLength: 10, locationLength: 20,
+        Squeeze(chipsPerDay: 0, chipTitleLength: 0, upNextTitleLength: 10, locationLength: locationLength,
+                keepsAssistantLine: false),
+        Squeeze(chipsPerDay: 0, chipTitleLength: 0, upNextTitleLength: 0, locationLength: locationLength,
+                keepsAssistantLine: false),
+        Squeeze(chipsPerDay: 0, chipTitleLength: 0, upNextTitleLength: 0, locationLength: 20,
                 keepsAssistantLine: false)
     ]
 
@@ -55,7 +62,8 @@ enum LiveActivityStateBuilder {
     }
 
     /// The state of `event`'s own activity as it looks at `asOf`: when a scheduled activity appears (iOS 26) or a
-    /// push starts it (iOS 18), so "Up next" and the countdown are right then, not when it was planned.
+    /// push starts it (iOS 18), so the countdown is right then, not when it was planned. The countdown bar's start
+    /// (`progressStart`, the trigger) is not known here: `ActivityPlanner.state(for:…)` adds it.
     static func build(for event: ScheduleEvent,
                       events: [ScheduleEvent],
                       lastLine: String?,
@@ -128,13 +136,10 @@ enum LiveActivityStateBuilder {
         if !fits {
             // Last resort, for characters of many Unicode scalars each (long emoji sequences, stacked accents), which
             // a count of characters does not bound: cut by scalars, which bounds the bytes, and leave out the place.
+            // The "Up next" titles are already empty (the last squeeze), so it is the event's own title and place,
+            // not what comes after it, that bring this about.
             state.headline = scalarPrefix(state.headline, 60)
             state.shortHeadline = scalarPrefix(state.shortHeadline, 16)
-            state.upNext = state.upNext?.map { original in
-                var row = original
-                row.title = scalarPrefix(row.title, 10)
-                return row
-            }
             state.location = nil
         }
         return state

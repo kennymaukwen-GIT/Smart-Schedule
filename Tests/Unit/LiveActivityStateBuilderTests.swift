@@ -9,8 +9,8 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         LiveActivityStateBuilder.build(events: events, lastLine: lastLine, now: now ?? self.now, clock: clock)
     }
 
-    /// `DayDigest.visibleRows` (the rows a day of the island's former week strip had, now replaced by "Up next"; kept
-    /// in Shared): two chips, or one chip and "+N" for every other event.
+    /// `DayDigest.visibleRows` (the rows a day of the island's former week strip had; kept in Shared): two chips, or
+    /// one chip and "+N" for every other event.
     func testADayShowsAtMostTwoRows() {
         let chip = { (title: String) in ScheduleActivityAttributes.Chip(title: title, colorHex: "#33B679", isTask: false) }
         func rows(_ chips: Int, overflow: Int) -> (titles: [String], more: Int) {
@@ -181,7 +181,7 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         XCTAssertLessThanOrEqual(state.shortHeadline.count, 16)
     }
 
-    // MARK: Up next (the island's bottom region and the Lock Screen)
+    // MARK: Up next (still built for the payload; no view shows it since the countdown bar replaced it)
 
     private func at(_ hour: Int, _ minute: Int = 0, day: Int = 14) -> Date {
         TestClock.local(2026, 10, day, hour, minute)
@@ -333,8 +333,9 @@ final class LiveActivityStateBuilderTests: XCTestCase {
     func testStateRoundTripsWithEveryField() throws {
         var next = item("next", "Drive to school", at(10, 30))
         next.location = "St Mary's School"
-        let state = build([next, item("lunch", "Lunch", at(12)), item("pay", "Pay bills", at(15), kind: .task)],
+        var state = build([next, item("lunch", "Lunch", at(12)), item("pay", "Pay bills", at(15), kind: .task)],
                           lastLine: "Added: Lunch")
+        state.progressStart = at(10)
         XCTAssertEqual(state.upNext?.count, 2)
         let decoded = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self,
                                                from: JSONEncoder().encode(state))
@@ -356,6 +357,7 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         XCTAssertNil(decoded.upNextMore)
         XCTAssertNil(decoded.timeZoneIdentifier)
         XCTAssertNil(decoded.hasEnded)
+        XCTAssertNil(decoded.progressStart)
         XCTAssertEqual(decoded.headline, "Drive to school")
         XCTAssertEqual(decoded.eventStart, at(10, 30))
         XCTAssertEqual(decoded.days, state.days)
@@ -375,6 +377,8 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         XCTAssertEqual(decoded.hasEnded, true)
         XCTAssertNil(decoded.countdownRange(isStale: true), "no timer, so the capsule reads Ended")
         XCTAssertNil(decoded.countdownRange(isStale: false))
+        XCTAssertNil(decoded.progressRange(isStale: true), "and no bar")
+        XCTAssertNil(decoded.progressRange(isStale: false))
     }
 
     func testPayloadStaysUnderBudgetWithLongUpNextTitlesAndPlace() throws {
@@ -393,6 +397,11 @@ final class LiveActivityStateBuilderTests: XCTestCase {
                                                    asOf: now, clock: clock)
         let encoded = try JSONEncoder().encode(state)
         XCTAssertLessThanOrEqual(encoded.count, 3_200, "ActivityKit content must stay well under 4 KB")
+        // The scheduler adds the bar's start (`ActivityPlanner.state`) after the builder's budget: about 30 bytes.
+        let scheduled = ActivityPlanner.state(for: ActivityPlanner.Item(event: next, leadMinutes: 30), events: events,
+                                              lastLine: String(repeating: "x", count: 500), asOf: now, clock: clock)
+        XCTAssertEqual(scheduled.progressStart, at(10))
+        XCTAssertLessThanOrEqual(try JSONEncoder().encode(scheduled).count, 3_264, "still well under 4 KB")
         let upNext = try XCTUnwrap(state.upNext)
         XCTAssertEqual(upNext.count, 3)
         XCTAssertEqual(state.upNextMore, 5, "Wednesday's eight items from 11:00 to 18:00, three of them shown")
@@ -448,6 +457,40 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         XCTAssertNil(heavy.lastAssistantLine)
     }
 
+    /// "Up next", which no view shows, is squeezed down to no titles at all before the place under the headline
+    /// shrinks: later events whose titles take 101 bytes a character (stacked accents) leave the place whole, so
+    /// adding, renaming or deleting one sends no update and replaces no scheduled activity.
+    func testLongTitlesAfterTheEventNeverShortenThePlace() throws {
+        var next = item("next", "School drop-off", at(10, 30))
+        next.location = "Riverside Primary School, 12 Long Road"
+        let stacked = String(repeating: "e" + String(repeating: "\u{301}", count: 50), count: 60)
+        let later = (0..<3).map { item("later\($0)", stacked, at(12 + $0)) }
+        func state(_ events: [ScheduleEvent]) -> ScheduleActivityAttributes.ContentState {
+            ActivityPlanner.state(for: ActivityPlanner.Item(event: next, leadMinutes: 30), events: events, lastLine: nil,
+                                  asOf: now, clock: clock)
+        }
+        let alone = state([next])
+        let busy = state([next] + later)
+        XCTAssertEqual(alone.location, "Riverside Primary School, 12 Long Road")
+        XCTAssertEqual(busy.location, alone.location, "the place stays whole")
+        XCTAssertLessThanOrEqual(try JSONEncoder().encode(busy).count, 3_264, "still well under 4 KB")
+        let rows = try XCTUnwrap(busy.upNext)
+        XCTAssertEqual(rows.map(\.start), [at(12), at(13), at(14)], "the rows stay, with their times")
+        XCTAssertTrue(rows.allSatisfy { $0.title.isEmpty }, "their titles went first")
+
+        let added = state([next] + later + [item("later3", stacked, at(15))])
+        XCTAssertEqual(added.upNextMore, 1)
+        var renamed = later
+        renamed[0].title = stacked + "x"
+        for fresh in [alone, added, state([next] + renamed), state([next] + later.dropLast())] {
+            XCTAssertEqual(fresh.location, busy.location)
+            XCTAssertTrue(fresh.looksTheSame(as: busy))
+            XCTAssertFalse(ActivityPlanner.needsUpdate(shown: busy, shownStaleDate: next.start,
+                                                       fresh: fresh, freshStaleDate: next.start))
+            XCTAssertTrue(ActivityPlanner.scheduledActivityMatches(busy, planned: fresh))
+        }
+    }
+
     /// A title longer than a row keeps ends in "…", so the cut does not read like a typo; one that fits stays whole.
     func testLongUpNextTitlesEndInAnEllipsis() throws {
         let next = item("next", "Drive to school", at(10, 30))
@@ -463,7 +506,7 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         XCTAssertEqual(LiveActivityStateBuilder.clipped("Dentist", 18), "Dentist")
     }
 
-    /// The previews' tallest island: time and place, three rows and "+1".
+    /// The previews' tallest island: time and place, and the bar from the 30-minute trigger to the start.
     func testSampleMorningFillsTheTallestLayout() throws {
         let state = ScheduleActivityAttributes.ContentState.sampleMorning(now: now, clock: clock)
         XCTAssertEqual(state.headline, "School drop-off")
@@ -472,10 +515,125 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         XCTAssertEqual(state.upNextMore, 1)
         XCTAssertEqual(state.eventStart, at(8, 15, day: 15), "the next 07:55 still to come is tomorrow's")
         XCTAssertEqual(state.countdownFrom, at(7, 55, day: 15))
+        XCTAssertEqual(state.progressStart, at(7, 45, day: 15))
+        XCTAssertEqual(state.progressRange(isStale: false), at(7, 45, day: 15)...at(8, 15, day: 15))
+    }
+
+    // MARK: Countdown bar (the island's bottom region and the Lock Screen)
+
+    /// Design review 10:30–11:00 with a 30-minute lead: the activity appeared at 10:00 (`progressStart`).
+    private func meetingState(asOf time: Date, progressStart: Date? = TestClock.local(2026, 10, 14, 10, 0)) -> ScheduleActivityAttributes.ContentState {
+        let meeting = item("m", "Design review", at(10, 30))
+        var state = LiveActivityStateBuilder.build(for: meeting, events: [meeting], lastLine: nil, asOf: time, clock: clock)
+        state.progressStart = progressStart
+        return state
+    }
+
+    /// Before the start: from when the activity appeared to the start, not from the last update (`countdownFrom`),
+    /// ending where the capsule's countdown ends.
+    func testBarRunsFromTheTriggerToTheStart() throws {
+        let state = meetingState(asOf: at(10, 5))
+        XCTAssertEqual(state.countdownFrom, at(10, 5), "rebuilt for an update five minutes in")
+        XCTAssertEqual(state.progressRange(isStale: false), at(10)...at(10, 30))
+        XCTAssertEqual(state.progressRange(isStale: false)?.upperBound, state.countdownRange(isStale: false)?.upperBound)
+        // An activity that started a little before its trigger (by the iPhone's clock): the bar waits, empty, until
+        // the trigger.
+        let early = meetingState(asOf: at(9, 58))
+        XCTAssertEqual(early.progressRange(isStale: false), at(10)...at(10, 30))
+        XCTAssertFalse(state.progressIsFull(isStale: false), "not full before the start")
+    }
+
+    /// Under way the bar only says the start has come: full, with no range, whether the state says so or the content
+    /// went stale at the start with no update from the app; the capsule switches at the same moment.
+    func testBarIsFullOnceUnderWay() throws {
+        let underWay = meetingState(asOf: at(10, 45))
+        XCTAssertTrue(underWay.isInProgress)
+        XCTAssertNil(underWay.progressRange(isStale: false))
+        XCTAssertNil(underWay.progressRange(isStale: true))
+        XCTAssertTrue(underWay.progressIsFull(isStale: false))
+        XCTAssertTrue(underWay.progressIsFull(isStale: true))
+        XCTAssertEqual(underWay.countdownRange(isStale: false)?.upperBound, at(11))
+
+        let stale = meetingState(asOf: at(10, 5))
+        XCTAssertFalse(stale.isInProgress)
+        XCTAssertEqual(stale.progressRange(isStale: false), at(10)...at(10, 30), "before the start: filling")
+        XCTAssertFalse(stale.progressIsFull(isStale: false))
+        XCTAssertNil(stale.progressRange(isStale: true), "stale at the start")
+        XCTAssertTrue(stale.progressIsFull(isStale: true), "the start has come: full")
+        XCTAssertEqual(stale.countdownRange(isStale: true), at(10, 30)...at(11), "the capsule counts to the end")
+    }
+
+    /// No bar once ended (the capsule reads "Ended") or with no event; and none when there is no countdown at all.
+    func testEndedOrNothingNextHasNoBar() {
+        var ended = meetingState(asOf: at(11, 1))
+        ended.isInProgress = false
+        ended.countdownTarget = nil
+        ended.eventEnd = nil
+        ended.hasEnded = true
+        XCTAssertNil(ended.progressRange(isStale: false))
+        XCTAssertNil(ended.progressRange(isStale: true))
+        XCTAssertFalse(ended.progressIsFull(isStale: false))
+        XCTAssertFalse(ended.progressIsFull(isStale: true))
+        // Marked ended, even with a countdown left in the state: no bar.
+        var markedEnded = meetingState(asOf: at(10, 5))
+        markedEnded.hasEnded = true
+        XCTAssertNil(markedEnded.progressRange(isStale: false))
+        var markedEndedUnderWay = meetingState(asOf: at(10, 45))
+        markedEndedUnderWay.hasEnded = true
+        XCTAssertFalse(markedEndedUnderWay.progressIsFull(isStale: false), "ended: no bar, not a full one")
+
+        var nothing = build([])
+        nothing.progressStart = at(10)
+        XCTAssertNil(nothing.eventID)
+        XCTAssertNil(nothing.progressRange(isStale: false))
+        XCTAssertNil(nothing.progressRange(isStale: true))
+        XCTAssertFalse(nothing.progressIsFull(isStale: false))
+    }
+
+    /// Without the bar's start (an older payload), or with one not before the start, the bar starts where the
+    /// capsule's countdown does (`countdownFrom`); when that is not before the start either, there is no bar.
+    func testBarWithoutAUsableStartFallsBackToTheCountdown() throws {
+        let older = meetingState(asOf: at(10, 5), progressStart: nil)
+        XCTAssertEqual(older.progressRange(isStale: false), at(10, 5)...at(10, 30))
+        XCTAssertEqual(older.progressRange(isStale: false), older.countdownRange(isStale: false))
+        let atTheStart = meetingState(asOf: at(10, 5), progressStart: at(10, 30))
+        XCTAssertEqual(atTheStart.progressRange(isStale: false), at(10, 5)...at(10, 30))
+        let afterTheStart = meetingState(asOf: at(10, 5), progressStart: at(10, 40))
+        XCTAssertEqual(afterTheStart.progressRange(isStale: false), at(10, 5)...at(10, 30))
+
+        var noCountdown = older
+        noCountdown.countdownFrom = at(10, 30)
+        XCTAssertNil(noCountdown.countdownRange(isStale: false))
+        XCTAssertNil(noCountdown.progressRange(isStale: false), "nothing left to count")
+
+        // Under way in a payload with no `eventStart` (it decodes as the countdown's target, the end): a full bar.
+        var object = try TestJSON.object(encoding: meetingState(asOf: at(10, 45)))
+        XCTAssertNotNil(object.removeValue(forKey: "eventStart"))
+        let noStart = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self,
+                                               from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertEqual(noStart.eventStart, at(11))
+        XCTAssertNil(noStart.progressRange(isStale: false), "under way: no range")
+        XCTAssertTrue(noStart.progressIsFull(isStale: false), "under way: full")
+    }
+
+    func testPayloadsWithoutProgressStartStillDecode() throws {
+        let state = meetingState(asOf: at(10, 5))
+        var object = try TestJSON.object(encoding: state)
+        XCTAssertNotNil(object.removeValue(forKey: "progressStart"))
+        let decoded = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self,
+                                               from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(decoded.progressStart)
+        XCTAssertEqual(decoded.headline, state.headline)
+        XCTAssertEqual(decoded.countdownFrom, at(10, 5))
+        XCTAssertEqual(decoded.progressRange(isStale: false), at(10, 5)...at(10, 30), "from the countdown's start")
+        // With it, it reads back exactly.
+        let full = try JSONDecoder().decode(ScheduleActivityAttributes.ContentState.self, from: JSONEncoder().encode(state))
+        XCTAssertEqual(full.progressStart, at(10))
+        XCTAssertEqual(full, state)
     }
 
     /// The island's and the Lock Screen's labels in Chinese (Localizable.xcstrings, compiled into this bundle).
-    func testUpNextLabelsAreTranslated() throws {
+    func testIslandLabelsAreTranslated() throws {
         let bundle = Bundle(for: LiveActivityStateBuilderTests.self)
         guard let strings = bundle.path(forResource: "Localizable", ofType: "strings", inDirectory: nil, forLocalization: "zh-Hant"),
               let table = Bundle(path: (strings as NSString).deletingLastPathComponent) else {
@@ -483,8 +641,9 @@ final class LiveActivityStateBuilderTests: XCTestCase {
         }
         func zh(_ key: String) -> String { table.localizedString(forKey: key, value: nil, table: "Localizable") }
         XCTAssertEqual(zh("Edit"), "編輯")
-        XCTAssertEqual(zh("Up next"), "接下來")
-        XCTAssertEqual(zh("Nothing else today"), "今天接下來沒有其他行程")
+        XCTAssertEqual(zh("Ended"), "已結束")
+        XCTAssertEqual(zh("NOW"), "現在")
+        // No longer on the island ("Up next" went), still used by the app's event rows and month cells.
         XCTAssertEqual(String(format: zh("Tomorrow %@"), "09:00"), "明天 09:00")
         XCTAssertEqual(String(format: zh("+%lld"), 2), "+2")
     }

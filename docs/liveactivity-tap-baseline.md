@@ -35,6 +35,8 @@ Deep link 定義（`Shared/Core/AppConstants.swift`）：
 |---|---|---|---|---|
 | T3″ | `IslandEditPill`（展開的動態島左上角「編輯」，取代 T3′；鎖定畫面沒有，標題列左邊是時鐘圖示，整張卡片由 T1 打開快速輸入） | `Link(destination: DeepLink.compose)` 包鉛筆圖示和 `Text("Edit")` | 展開的動態島 | `smartschedule://compose` |
 
+**2026-10-18 更新（倒數進度條）：** 展開的動態島和鎖定畫面只顯示這個行程（標題、時間和地點），底部的「接下來」換成一條倒數進度條 `CountdownBar`（`ProgressView(timerInterval:countsDown: false)`，只表示離開始還有多久：開始前從觸發時間慢慢填滿到開始，進行中保持全滿）。進度條**沒有點擊目標**：不是 `Link` 也不是 `Button`，點它和點島上其他地方一樣由 T2 的 `widgetURL`（鎖定畫面由 T1）打開快速輸入。點擊目標不變，仍是 T1、T2 和 T3″。高度最高的情況約 97–100 pt（鎖定畫面 74 pt）。
+
 `Button(intent:)`：**0 個**。`DismissScheduleIntent`（Step 0 時在 `Shared/Intents/SummonScheduleIntent.swift`，Step 2 起移到 `Shared/Intents/DismissScheduleIntent.swift`）有定義，但沒有任何畫面使用它。
 
 驗證方式：每個改動 Live Activity 的 commit 之後執行

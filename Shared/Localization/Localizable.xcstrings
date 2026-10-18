@@ -3145,17 +3145,6 @@
         }
       }
     },
-    "Nothing else today" : {
-      "comment" : "Dynamic Island / Lock Screen: nothing after this event today or tomorrow",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "今天接下來沒有其他行程"
-          }
-        }
-      }
-    },
     "Nothing is added until you tap Add." : {
       "localizations" : {
         "zh-Hant" : {
@@ -5125,17 +5114,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemini 的回應格式不符：%@"
-          }
-        }
-      }
-    },
-    "Up next" : {
-      "comment" : "Dynamic Island / Lock Screen: label above the items after this event",
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "接下來"
           }
         }
       }

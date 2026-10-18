@@ -99,11 +99,50 @@ enum ActivityPlanner {
     }
 
     /// Whether a running activity showing `shown` (stale at `shownStaleDate`) needs `fresh`: only when something on
-    /// screen changes (`ContentState.looksTheSame`) or the stale date moves (the start or end changed, or the event
-    /// got under way). A pass that changes nothing visible sends no update.
+    /// screen changes (`ContentState.looksTheSame`: the headline, its time and place, the countdown and where its
+    /// bar starts) or the stale date moves (the start or end changed, or the event got under way). A pass that
+    /// changes nothing visible sends no update; neither does a change to what comes after the event, which no view
+    /// shows since the countdown bar replaced "Up next".
     static func needsUpdate(shown: ScheduleActivityAttributes.ContentState, shownStaleDate: Date?,
                             fresh: ScheduleActivityAttributes.ContentState, freshStaleDate: Date?) -> Bool {
         !shown.looksTheSame(as: fresh) || shownStaleDate != freshStaleDate
+    }
+
+    /// Whether a scheduled (iOS 26 pending) activity, which cannot be updated, still shows what `planned` (its
+    /// content rebuilt as of its trigger) would; otherwise it is replaced. Compares what is on screen: the headline
+    /// as the builder makes it (a very long title is cut, so comparing the event's own title would replace it on
+    /// every pass), the line under it (`hasSameDetailLine`: start, end, place, time zone) and the trigger it was
+    /// scheduled with (`countdownFrom`; a new lead time needs a new one). The countdown bar starts at that trigger
+    /// too: from `progressStart`, or, in one scheduled by an earlier build without it, from `countdownFrom`, the same
+    /// time, so that one is kept. What comes after the event is not shown, so a change there replaces nothing.
+    static func scheduledActivityMatches(_ scheduled: ScheduleActivityAttributes.ContentState,
+                                         planned: ScheduleActivityAttributes.ContentState) -> Bool {
+        scheduled.headline == planned.headline && scheduled.countdownFrom == planned.countdownFrom
+            && scheduled.hasSameDetailLine(as: planned)
+    }
+
+    /// The content of `item`'s activity as of `asOf` (`LiveActivityStateBuilder.build(for:…)`), with the start of
+    /// its countdown bar (`ContentState.progressStart`): `progressStart` when given (a running activity's own,
+    /// `keptProgressStart(for:shown:now:)`), otherwise the trigger, when the activity appears.
+    static func state(for item: Item, events: [ScheduleEvent], lastLine: String?, asOf: Date,
+                      clock: WallClock = WallClock(),
+                      progressStart: Date? = nil) -> ScheduleActivityAttributes.ContentState {
+        var state = LiveActivityStateBuilder.build(for: item.event, events: events, lastLine: lastLine, asOf: asOf,
+                                                   clock: clock)
+        state.progressStart = progressStart ?? item.triggerAt
+        return state
+    }
+
+    /// Where a running activity's countdown bar starts after a pass. The bar's full width is the lead time from the
+    /// trigger (also for an activity that appeared late, on iOS 18 when the app was opened inside the lead time: its
+    /// bar is already partly filled, beside the time left). Once shown, the start stays (`shown`) while it is before
+    /// the event's start, so a new lead time or a move within the 3-minute tolerance neither moves the bar back
+    /// (towards empty) nor holds it empty while the capsule counts; otherwise (an activity from an earlier build
+    /// without one, or an event moved earlier than it) the trigger. Never after `now`: a bar starting later stands
+    /// empty and still.
+    static func keptProgressStart(for item: Item, shown: Date?, now: Date) -> Date {
+        let kept = shown.flatMap { $0 < item.event.start ? $0 : nil } ?? item.triggerAt
+        return min(kept, now)
     }
 }
 
@@ -119,8 +158,8 @@ enum ActivityPlanner {
 ///   app keeps running, a pass at the next trigger time (`dueWake`) starts that one on time.
 /// • Both: an event already due when the app is in front starts at once; a changed scheduled activity is replaced
 ///   (the old one ends only once the new one is requested); a running one is updated when what it shows changed
-///   (its event, or what comes after it: "Up next", the place); a deleted event's activity ends; an ended event's
-///   activity ends and leaves the Lock Screen 10 minutes after the end.
+///   (its title, time or place, or its countdown; not what comes after it, which no view shows); a deleted event's
+///   activity ends; an ended event's activity ends and leaves the Lock Screen 10 minutes after the end.
 ///
 /// Starting an activity (scheduled or not) only works while the app is in front; from the background the request
 /// fails and the next foreground pass makes it. Updating and ending work from the background too. Nothing can end an
@@ -264,14 +303,15 @@ final class ActivityScheduler {
                     ActivityPlanner.items(events: events, leadMinutes: lead, now: now, limit: PushToStartRegistrar.maxEvents),
                     now: now, showing: covered, shownTriggers: started)
                 : []
-            // What the server stores: only the registered events ("Up next" shows just those), no assistant reply
-            // and no place. The app fills in the rest with its first update once the activity is running.
+            // What the server stores: only the registered events (the content's "Up next", which no view shows,
+            // holds just those), no assistant reply and no place. The app fills in the rest with its first update
+            // once the activity is running.
             let registered = upcoming.map(\.event)
             let entries = upcoming.compactMap { item in
                 try? PushToStartRegistrar.event(for: item,
                                                  attributes: ScheduleActivityAttributes(eventID: item.eventID),
-                                                 state: LiveActivityStateBuilder.build(for: item.event, events: registered,
-                                                                                       lastLine: nil, asOf: item.triggerAt))
+                                                 state: ActivityPlanner.state(for: item, events: registered,
+                                                                              lastLine: nil, asOf: item.triggerAt))
             }
             let changed = await PushToStartRegistrar.sync(token: pushToStartToken ?? ScheduleActivity.pushToStartToken,
                                                           upcomingEvents: entries)
@@ -281,30 +321,30 @@ final class ActivityScheduler {
 
     /// What to do with `activity`, which stands for `item`'s event; a running one is brought up to date here.
     ///
-    /// Every pass rebuilds the content from the events, so an item added, renamed, moved or deleted after the event
-    /// reaches "Up next" with the next pass after the change (each write and sync runs one). A running activity is
-    /// updated only when what it shows differs (`ContentState.looksTheSame`, which leaves out the build time and the
-    /// week digest no view shows) or its stale date moved, so a pass that changes nothing on screen sends no update.
+    /// Every pass rebuilds the content from the events (each write and sync runs one). A running activity is updated
+    /// only when what it shows differs (`ContentState.looksTheSame`: the headline, its time and place, the countdown
+    /// and where its bar starts, which stays as shown unless the event moved before it; not the build time, "Up
+    /// next", the week digest or the assistant's line, which no view shows) or its stale date moved, so a pass that
+    /// changes nothing on screen sends no update.
     private func keep(_ activity: ScheduleActivity, as item: ActivityPlanner.Item,
                       events: [ScheduleEvent], lastLine: String?, now: Date) async -> Decision {
         let shown = activity.content.state
         if #available(iOS 26.0, *), activity.activityState == .pending {
-            // A scheduled activity cannot be changed: a new time, title or lead time, or a change in what comes after
-            // the event ("Up next", the place), needs a new one; the content is the one it was scheduled with, as of
-            // its trigger. Unchanged, it stays even past its trigger (iOS is about to start it). The headline is
-            // compared as the builder makes it (a very long title is cut), or a long title would look changed on
-            // every pass and its activity be replaced again and again.
+            // A scheduled activity cannot be changed: a new title, time, place or lead time needs a new one
+            // (`ActivityPlanner.scheduledActivityMatches`); the content is the one it was scheduled with, as of its
+            // trigger. A change after the event replaces nothing: no view shows it. Unchanged, it stays even past its
+            // trigger (iOS is about to start it).
             let planned = content(item, events: events, lastLine: lastLine, asOf: item.triggerAt).state
-            let sameEvent = shown.headline == planned.headline && shown.eventStart == item.event.start
-                && shown.eventEnd == item.event.end
-            return sameEvent && shown.countdownFrom == item.triggerAt && shown.hasSameUpNext(as: planned) ? .keep : .replace
+            return ActivityPlanner.scheduledActivityMatches(shown, planned: planned) ? .keep : .replace
         }
         if item.triggerAt > now.addingTimeInterval(ActivityPlanner.earlyStartTolerance) {
             // Moved later: no longer about to start. Planned again below.
             await activity.end(nil, dismissalPolicy: .immediate)
             return .ended
         }
-        let fresh = content(item, events: events, lastLine: lastLine, asOf: now)
+        // The bar keeps the start it shows (`ActivityPlanner.keptProgressStart`): a new lead time sends no update.
+        let barStart = ActivityPlanner.keptProgressStart(for: item, shown: shown.progressStart, now: now)
+        let fresh = content(item, events: events, lastLine: lastLine, asOf: now, progressStart: barStart)
         if ActivityPlanner.needsUpdate(shown: shown, shownStaleDate: activity.content.staleDate,
                                        fresh: fresh.state, freshStaleDate: fresh.staleDate) {
             await activity.update(fresh)
@@ -366,19 +406,21 @@ final class ActivityScheduler {
                            sound: .default)
     }
 
-    /// The content as of `asOf`. Stale at the start, so the island switches to the time left without an update
-    /// from the app; once under way, stale a minute after the end.
+    /// The content as of `asOf`, its countdown bar starting at `progressStart`, else the trigger
+    /// (`ActivityPlanner.state`). Stale at the start, so the island switches to the time left without an update from
+    /// the app; once under way, stale a minute after the end.
     private func content(_ item: ActivityPlanner.Item, events: [ScheduleEvent], lastLine: String?,
-                         asOf: Date) -> ActivityContent<ScheduleActivityAttributes.ContentState> {
-        let state = LiveActivityStateBuilder.build(for: item.event, events: events, lastLine: lastLine, asOf: asOf)
+                         asOf: Date, progressStart: Date? = nil) -> ActivityContent<ScheduleActivityAttributes.ContentState> {
+        let state = ActivityPlanner.state(for: item, events: events, lastLine: lastLine, asOf: asOf,
+                                          progressStart: progressStart)
         let staleDate = state.isInProgress ? item.end.addingTimeInterval(60) : item.event.start
         return ActivityContent(state: state, staleDate: staleDate, relevanceScore: state.isInProgress ? 100 : 50)
     }
 
-    /// The ended activity's last look: no countdown.
+    /// The ended activity's last look: no countdown and no bar ("Ended").
     private func finalContent(_ item: ActivityPlanner.Item, events: [ScheduleEvent], lastLine: String?,
                               now: Date) -> ActivityContent<ScheduleActivityAttributes.ContentState> {
-        var state = LiveActivityStateBuilder.build(for: item.event, events: events, lastLine: lastLine, asOf: now)
+        var state = ActivityPlanner.state(for: item, events: events, lastLine: lastLine, asOf: now)
         state.isInProgress = false
         state.countdownTarget = nil
         state.eventEnd = nil

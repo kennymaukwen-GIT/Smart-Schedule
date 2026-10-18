@@ -77,7 +77,16 @@ final class ActivitySchedulerTests: XCTestCase {
         let start = TestClock.local(2026, 10, 15, 9, 0) // Thursday
         let meeting = event("m", start, title: "Design review")
         let trigger = start.addingTimeInterval(-30 * 60)
-        let state = LiveActivityStateBuilder.build(for: meeting, events: [meeting], lastLine: nil, asOf: trigger, clock: clock)
+        let item = ActivityPlanner.items(events: [meeting], leadMinutes: 30, now: now)[0]
+        XCTAssertEqual(item.triggerAt, trigger)
+        let state = ActivityPlanner.state(for: item, events: [meeting], lastLine: nil, asOf: trigger, clock: clock)
+        XCTAssertEqual(state.progressStart, trigger, "the countdown bar starts when the activity appears")
+        XCTAssertEqual(state.progressRange(isStale: false), trigger...start)
+        // Rebuilt for an update later on, the bar still starts at the trigger; the build time moves.
+        let later = ActivityPlanner.state(for: item, events: [meeting], lastLine: nil, asOf: trigger.addingTimeInterval(600),
+                                          clock: clock)
+        XCTAssertEqual(later.countdownFrom, trigger.addingTimeInterval(600))
+        XCTAssertEqual(later.progressRange(isStale: false), trigger...start)
         XCTAssertEqual(state.headline, "Design review")
         XCTAssertEqual(state.eventID, "m")
         XCTAssertEqual(state.todayIndex, 4, "Thursday, the day it appears, not Wednesday when it was planned")
@@ -116,8 +125,9 @@ final class ActivitySchedulerTests: XCTestCase {
 
     // MARK: Updates of a running activity
 
-    /// Every pass rebuilds the content; a running activity is updated only when what it shows changed: its event or
-    /// what comes after it ("Up next", the place), not the build time, the assistant's line or the week digest.
+    /// Every pass rebuilds the content; a running activity is updated only when what it shows changed: the headline,
+    /// its time and place, the countdown or where its bar starts. Not the build time, the assistant's line, the week
+    /// digest, or what comes after the event ("Up next", which no view shows since the countdown bar replaced it).
     func testRunningActivityIsUpdatedOnlyWhenWhatItShowsChanges() {
         let meeting = event("m", TestClock.local(2026, 10, 14, 10, 30), title: "Design review")
         let lunch = event("lunch", TestClock.local(2026, 10, 14, 12), title: "Lunch")
@@ -128,8 +138,11 @@ final class ActivitySchedulerTests: XCTestCase {
         let events = [meeting, lunch, call, review, gym, friday]
         let now = self.now
         let clock = self.clock
-        func state(_ events: [ScheduleEvent], at time: Date? = nil, lastLine: String? = "Added: Lunch") -> ScheduleActivityAttributes.ContentState {
-            LiveActivityStateBuilder.build(for: meeting, events: events, lastLine: lastLine, asOf: time ?? now, clock: clock)
+        func state(_ events: [ScheduleEvent], for shownEvent: ScheduleEvent? = nil, at time: Date? = nil,
+                   lastLine: String? = "Added: Lunch", lead: Int = 30,
+                   progressStart: Date? = nil) -> ScheduleActivityAttributes.ContentState {
+            ActivityPlanner.state(for: ActivityPlanner.Item(event: shownEvent ?? meeting, leadMinutes: lead), events: events,
+                                  lastLine: lastLine, asOf: time ?? now, clock: clock, progressStart: progressStart)
         }
         let shown = state(events, at: now.addingTimeInterval(-300))
         func needsUpdate(_ fresh: ScheduleActivityAttributes.ContentState, staleDate: Date? = nil) -> Bool {
@@ -144,44 +157,146 @@ final class ActivitySchedulerTests: XCTestCase {
         var movedFriday = friday
         movedFriday.title = "Dentist (moved)"
         XCTAssertFalse(needsUpdate(state([meeting, lunch, call, review, gym, movedFriday])), "only in the week digest")
+
+        // What comes after the event is still in the payload but not on screen: no update.
         var renamedGym = gym
         renamedGym.title = "Evening gym"
         XCTAssertFalse(needsUpdate(state([meeting, lunch, call, review, renamedGym, friday])), "counted in +1, not shown")
-
         let added = event("dentist", TestClock.local(2026, 10, 14, 15), title: "Dentist")
-        XCTAssertTrue(needsUpdate(state(events + [added])), "a new event later today: +2")
+        XCTAssertEqual(state(events + [added]).upNextMore, 2)
+        XCTAssertFalse(needsUpdate(state(events + [added])), "a new event later today")
         var renamedLunch = lunch
         renamedLunch.title = "Lunch with Andrew"
-        XCTAssertTrue(needsUpdate(state([meeting, renamedLunch, call, review, gym, friday])), "a shown row renamed")
-        XCTAssertTrue(needsUpdate(state([meeting, call, review, gym, friday])), "a shown row deleted")
+        XCTAssertFalse(needsUpdate(state([meeting, renamedLunch, call, review, gym, friday])), "a later event renamed")
+        XCTAssertFalse(needsUpdate(state([meeting, call, review, gym, friday])), "a later event deleted")
+
+        // What is on screen does.
+        var renamed = meeting
+        renamed.title = "Design review with Joe"
+        XCTAssertTrue(needsUpdate(state(events, for: renamed)), "the headline")
         var placed = meeting
         placed.location = "Room 4"
-        XCTAssertTrue(needsUpdate(LiveActivityStateBuilder.build(for: placed, events: events, lastLine: nil, asOf: now, clock: clock)),
-                      "the place under the headline")
+        XCTAssertTrue(needsUpdate(state(events, for: placed)), "the place under the headline")
+        var longer = meeting
+        longer.end = meeting.end.addingTimeInterval(30 * 60)
+        XCTAssertTrue(needsUpdate(state(events, for: longer)), "the end, on the time line")
+        let taipei = WallClock(timeZone: TimeZone(identifier: "Asia/Taipei")!)
+        XCTAssertTrue(needsUpdate(ActivityPlanner.state(for: ActivityPlanner.Item(event: meeting, leadMinutes: 30), events: events,
+                                                        lastLine: nil, asOf: now, clock: taipei)),
+                      "the times shown in another zone")
         XCTAssertTrue(needsUpdate(state(events), staleDate: meeting.end), "the stale date moved")
         let underway = state(events, at: TestClock.local(2026, 10, 14, 10, 45))
         XCTAssertTrue(needsUpdate(underway), "under way: counts to the end")
+
+        // Where the bar starts stays as shown (`keptProgressStart`): a new lead time (30 → 15 minutes) sends no
+        // update. An activity started by an earlier build, whose content has no bar start, is updated once to the
+        // trigger, then left alone.
+        let fifteen = ActivityPlanner.Item(event: meeting, leadMinutes: 15)
+        let kept = ActivityPlanner.keptProgressStart(for: fifteen, shown: shown.progressStart, now: now)
+        XCTAssertEqual(kept, TestClock.local(2026, 10, 14, 10, 0), "the 30-minute trigger it was shown with")
+        XCTAssertFalse(needsUpdate(state(events, lead: 15, progressStart: kept)), "a new lead time")
+        XCTAssertTrue(needsUpdate(state(events, lead: 15)), "a bar start that moved would be on screen")
+        var older = shown
+        older.progressStart = nil
+        let thirty = ActivityPlanner.Item(event: meeting, leadMinutes: 30)
+        let first = state(events, progressStart: ActivityPlanner.keptProgressStart(for: thirty, shown: nil, now: now))
+        XCTAssertEqual(first.progressStart, thirty.triggerAt)
+        XCTAssertTrue(ActivityPlanner.needsUpdate(shown: older, shownStaleDate: meeting.start,
+                                                  fresh: first, freshStaleDate: meeting.start))
+        let minuteLater = now.addingTimeInterval(60)
+        let next = state(events, at: minuteLater,
+                         progressStart: ActivityPlanner.keptProgressStart(for: thirty, shown: first.progressStart,
+                                                                          now: minuteLater))
+        XCTAssertFalse(ActivityPlanner.needsUpdate(shown: first, shownStaleDate: meeting.start,
+                                                   fresh: next, freshStaleDate: meeting.start), "then left alone")
     }
 
-    /// A scheduled (iOS 26 pending) activity cannot be updated: it is replaced when "Up next" or the place it was
-    /// scheduled with (as of its trigger) no longer matches, and kept otherwise.
-    func testScheduledActivityComparesWhatComesAfterTheEvent() {
+    /// A running activity's bar keeps the start it shows, so a new lead time neither moves it back (30 → 15 minutes
+    /// with 14 to go: from 53% full to 7%) nor holds it empty while the capsule counts (with 17 to go, the 15-minute
+    /// trigger is 2 minutes away). It takes the trigger only when it has no start yet (an earlier build's activity)
+    /// or the event moved before it, and never starts after now.
+    func testRunningActivityKeepsWhereItsBarStarts() {
+        let start = TestClock.local(2026, 10, 14, 10, 30)
+        let meeting = event("m", start)
+        let thirty = ActivityPlanner.Item(event: meeting, leadMinutes: 30)
+        let fifteen = ActivityPlanner.Item(event: meeting, leadMinutes: 15)
+        let shown = thirty.triggerAt
+        XCTAssertEqual(shown, TestClock.local(2026, 10, 14, 10, 0))
+        XCTAssertEqual(ActivityPlanner.keptProgressStart(for: fifteen, shown: shown, now: TestClock.local(2026, 10, 14, 10, 16)),
+                       shown, "not moved back")
+        XCTAssertEqual(ActivityPlanner.keptProgressStart(for: fifteen, shown: shown, now: TestClock.local(2026, 10, 14, 10, 13)),
+                       shown, "not held empty until 10:15")
+        XCTAssertEqual(ActivityPlanner.keptProgressStart(for: thirty, shown: fifteen.triggerAt,
+                                                         now: TestClock.local(2026, 10, 14, 10, 20)),
+                       fifteen.triggerAt, "a longer lead time keeps it too")
+        XCTAssertEqual(ActivityPlanner.keptProgressStart(for: thirty, shown: nil, now: TestClock.local(2026, 10, 14, 10, 5)),
+                       shown, "an earlier build's activity: the trigger")
+        // Moved earlier but still after the bar's start: kept. Moved before it: the new trigger.
+        let soonerItem = ActivityPlanner.Item(event: event("m", TestClock.local(2026, 10, 14, 10, 20)), leadMinutes: 30)
+        XCTAssertEqual(ActivityPlanner.keptProgressStart(for: soonerItem, shown: shown, now: TestClock.local(2026, 10, 14, 10, 5)),
+                       shown)
+        let earlierItem = ActivityPlanner.Item(event: event("m", TestClock.local(2026, 10, 14, 9, 55)), leadMinutes: 30)
+        XCTAssertEqual(ActivityPlanner.keptProgressStart(for: earlierItem, shown: shown, now: TestClock.local(2026, 10, 14, 10, 5)),
+                       TestClock.local(2026, 10, 14, 9, 25))
+        // Never after now: one that started a little before its trigger (by the iPhone's clock) starts its bar now.
+        XCTAssertEqual(ActivityPlanner.keptProgressStart(for: thirty, shown: nil, now: TestClock.local(2026, 10, 14, 9, 58)),
+                       TestClock.local(2026, 10, 14, 9, 58))
+        // The bar then runs from the kept start to the start, where the capsule's countdown ends too.
+        let updated = ActivityPlanner.state(for: fifteen, events: [meeting], lastLine: nil,
+                                            asOf: TestClock.local(2026, 10, 14, 10, 16), clock: clock, progressStart: shown)
+        XCTAssertEqual(updated.progressRange(isStale: false), shown...start)
+        XCTAssertEqual(updated.countdownRange(isStale: false)?.upperBound, start)
+    }
+
+    /// A scheduled (iOS 26 pending) activity cannot be updated: it is replaced when what it would show no longer
+    /// matches its content rebuilt as of its trigger (the headline, its time and place, the trigger), and kept when
+    /// only what comes after the event changed, which no view shows.
+    func testScheduledActivityIsReplacedOnlyWhenWhatItShowsChanges() {
         let clock = self.clock
         let meeting = event("m", TestClock.local(2026, 10, 15, 9), title: "Design review")
         let lunch = event("lunch", TestClock.local(2026, 10, 15, 12), title: "Lunch")
-        let item = ActivityPlanner.items(events: [meeting, lunch], leadMinutes: 30, now: now)[0]
-        let scheduled = LiveActivityStateBuilder.build(for: meeting, events: [meeting, lunch], lastLine: nil,
-                                                       asOf: item.triggerAt, clock: clock)
-        func planned(_ events: [ScheduleEvent], lastLine: String? = nil) -> ScheduleActivityAttributes.ContentState {
-            LiveActivityStateBuilder.build(for: meeting, events: events, lastLine: lastLine, asOf: item.triggerAt, clock: clock)
+        func planned(_ events: [ScheduleEvent], for scheduledEvent: ScheduleEvent? = nil, lastLine: String? = nil,
+                     lead: Int = 30, zone: WallClock? = nil) -> ScheduleActivityAttributes.ContentState {
+            let item = ActivityPlanner.Item(event: scheduledEvent ?? meeting, leadMinutes: lead)
+            return ActivityPlanner.state(for: item, events: events, lastLine: lastLine, asOf: item.triggerAt,
+                                         clock: zone ?? clock)
         }
-        XCTAssertTrue(scheduled.hasSameUpNext(as: planned([meeting, lunch], lastLine: "Added: Lunch")))
-        XCTAssertFalse(scheduled.hasSameUpNext(as: planned([meeting, lunch, event("gym", TestClock.local(2026, 10, 15, 18))])))
-        XCTAssertFalse(scheduled.hasSameUpNext(as: planned([meeting])), "Lunch deleted: \"Nothing else today\"")
+        let scheduled = planned([meeting, lunch])
+        XCTAssertEqual(scheduled.countdownFrom, TestClock.local(2026, 10, 15, 8, 30))
+        XCTAssertEqual(scheduled.progressStart, TestClock.local(2026, 10, 15, 8, 30))
+        func matches(_ fresh: ScheduleActivityAttributes.ContentState) -> Bool {
+            ActivityPlanner.scheduledActivityMatches(scheduled, planned: fresh)
+        }
+        XCTAssertTrue(matches(planned([meeting, lunch], lastLine: "Added: Lunch")), "the assistant's line is not shown")
+
+        // Kept: what comes after the event changed (the payload's "Up next" did, the screen did not).
+        let gym = event("gym", TestClock.local(2026, 10, 15, 18))
+        XCTAssertFalse(scheduled.hasSameUpNext(as: planned([meeting, lunch, gym])))
+        XCTAssertTrue(matches(planned([meeting, lunch, gym])), "a new event after it")
+        XCTAssertFalse(scheduled.hasSameUpNext(as: planned([meeting])))
+        XCTAssertTrue(matches(planned([meeting])), "Lunch deleted")
+        // Kept: one scheduled by an earlier build, without the bar's start: its bar starts at `countdownFrom`, the
+        // same trigger.
+        var older = scheduled
+        older.progressStart = nil
+        XCTAssertEqual(older.progressRange(isStale: false), scheduled.progressRange(isStale: false))
+        XCTAssertTrue(ActivityPlanner.scheduledActivityMatches(older, planned: scheduled))
+
+        // Replaced: what it shows.
+        var renamed = meeting
+        renamed.title = "Design review with Joe"
+        XCTAssertFalse(matches(planned([renamed, lunch], for: renamed)), "the headline")
+        var placed = meeting
+        placed.location = "Room 4"
+        XCTAssertFalse(matches(planned([placed, lunch], for: placed)), "the place")
+        let later = event("m", TestClock.local(2026, 10, 15, 9, 30), title: "Design review")
+        XCTAssertFalse(matches(planned([later, lunch], for: later)), "the start (and with it the trigger)")
+        var longer = meeting
+        longer.end = meeting.end.addingTimeInterval(30 * 60)
+        XCTAssertFalse(matches(planned([longer, lunch], for: longer)), "the end")
+        XCTAssertFalse(matches(planned([meeting, lunch], lead: 15)), "a new lead time: a new trigger")
         let taipei = WallClock(timeZone: TimeZone(identifier: "Asia/Taipei")!)
-        XCTAssertFalse(scheduled.hasSameUpNext(as: LiveActivityStateBuilder.build(for: meeting, events: [meeting, lunch], lastLine: nil,
-                                                                                 asOf: item.triggerAt, clock: taipei)),
-                       "times shown in another zone")
+        XCTAssertFalse(matches(planned([meeting, lunch], zone: taipei)), "times shown in another zone")
     }
 
     // MARK: Push-to-start (iOS 18)

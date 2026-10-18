@@ -9,9 +9,10 @@ extension ScheduleActivityAttributes.ContentState {
                                        now: now)
     }
 
-    /// The island at its tallest, for Xcode Previews: a school drop-off at 08:15 with its place, then four more items
-    /// that morning and evening, so "Up next" shows three rows and "+1". Built as of 07:55 on the next morning still
-    /// to come, so the countdown has not run out in the canvas. Pure value construction, like `demo`.
+    /// The island at its tallest, for Xcode Previews: a school drop-off at 08:15 with its place (the time · place
+    /// line) and its countdown bar from 07:45 (`progressStart`, the default 30-minute lead), then four more items that
+    /// morning and evening (`upNext` holds three and "+1", which no view shows). Built as of 07:55 on the next morning
+    /// still to come, so the countdown has not run out in the canvas. Pure value construction, like `demo`.
     static func sampleMorning(now: Date = Date(), clock: WallClock = WallClock()) -> Self {
         let calendar = clock.calendar
         var day = calendar.startOfDay(for: now)
@@ -36,6 +37,8 @@ extension ScheduleActivityAttributes.ContentState {
             item("lunch", "Lunch with Andrew", at(12, 30), minutes: 60, location: "Café Lucia"),
             item("gym", "Gym", at(18, 30), minutes: 60, kind: .routine, colorHex: DemoData.gymHex)
         ]
-        return LiveActivityStateBuilder.build(for: dropOff, events: events, lastLine: nil, asOf: at(7, 55), clock: clock)
+        var state = LiveActivityStateBuilder.build(for: dropOff, events: events, lastLine: nil, asOf: at(7, 55), clock: clock)
+        state.progressStart = at(7, 45)
+        return state
     }
 }
