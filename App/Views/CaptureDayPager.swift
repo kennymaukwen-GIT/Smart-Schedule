@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// DAY mode of Quick Capture: the hour grid of one day, swiped sideways a day at a time with no end either way.
+/// DAY mode of Quick Capture: the hour grid of one day (DayTimelineView), swiped sideways a day at a time with no
+/// end either way. Each page scrolls its own grid to the hour that matters when it appears.
 /// `focusDay` is the source of truth both ways: a swipe that comes to rest makes its day the focus day (so the
 /// header's date disc and month follow), and a new focus day (a tap in WEEK or MONTH, the assistant, the Today
 /// pill) pages here.
@@ -44,7 +45,8 @@ struct CaptureDayPager: View {
                 LazyHStack(spacing: 0) {
                     ForEach(CalendarPaging.dayPages, id: \.self) { offset in
                         let day = CalendarPaging.day(offset, after: anchor, calendar: calendar)
-                        DayTimelineView(day: day, events: eventsOnDay(day), hourHeight: 46, onSelect: onSelectEvent)
+                        DayTimelineView(day: day, events: eventsOnDay(day), now: now, hourHeight: 46,
+                                        onSelect: onSelectEvent)
                             .containerRelativeFrame(.horizontal)
                     }
                 }
@@ -65,6 +67,9 @@ struct CaptureDayPager: View {
                 proxy.scrollTo(target)
             }
         }
+        // The same dark card as WEEK and MONTH.
+        .background(CaptureCardBackground())
+        .clipShape(RoundedRectangle(cornerRadius: CaptureCardBackground.radius, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
             CalendarStatusAccessory(showsToday: !calendar.isDate(focusDay, inSameDayAs: now),
                                     isLoading: isLoading,

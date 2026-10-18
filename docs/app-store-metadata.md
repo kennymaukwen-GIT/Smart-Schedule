@@ -587,7 +587,7 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 | 即時動態：開始前 30／15／10／5 分鐘出現、倒數、時間地點、倒數進度條、結束後消失 | `AppPreferences.liveActivityLeadChoices = [30, 15, 10, 5]`；`Shared/LiveActivity/ActivityScheduler.swift`；`Widgets/ScheduleLiveActivity.swift`（`CountdownBar`、`ProgressView(timerInterval:)`、`Text(timerInterval:)`） |
 | iOS 18 只有在提前時間內（或進行中）打開 App 才出現；iOS 26 不用打開 App 也準時出現 | `ActivityPlanner.schedulesOnDevice`、`ActivityPlanner.pushToStartStep`（`Shared/LiveActivity/ActivityScheduler.swift`）；`AppConstants.pushToStartEnabled = false`；`App/Views/Settings/NotificationSettingsView.swift` 的說明文字 |
 | 長按提醒回覆、延後 10 分鐘 | `NotificationContent/`；`Shared/Notifications/NotificationIDs.swift`（「Type in any plan to add or change」、「Snooze 10 min」） |
-| 月、週、日檢視，24 小時時間軸 | `App/Views/MonthGridView.swift`、`QuickCaptureView.swift`、`CaptureModePicker.swift`、`CaptureDayPager.swift` |
+| 月、週、日檢視，24 小時時間軸 | `App/Views/MonthGridView.swift`、`QuickCaptureView.swift`、`CaptureModePicker.swift`、`CaptureDayPager.swift`、`DayTimelineView.swift`、`Shared/Core/DayTimelineLayout.swift` |
 | 多個 Google 帳號、行事曆顯示或隱藏、新行程存到哪裡 | `App/Views/Navigation/CalendarDrawer.swift`、`App/Views/Settings/CalendarSettingsView.swift`、`Shared/Calendar/CalendarRouter.swift` |
 | 行程頁修改，重複行程只改這次或全部 | `App/Views/Events/EventPage.swift`、`Shared/Calendar/EventEditor.swift` |
 | 帶什麼的建議，離線，點一下加進備註；AI 建議 | `Shared/Orchestrator/NoteSuggester.swift`、`NoteSuggestionRules.swift`；`App/Views/Events/NoteSuggestionViews.swift`；`suggest_event_notes` |
