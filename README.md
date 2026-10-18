@@ -19,7 +19,7 @@
 | Artboard 4（04 Quick Capture） | 點了動態島之後出現的 Quick Capture：DAY／WEEK／MONTH 切換（記住上次的選擇）、24 小時制時間軸、可左右翻頁的週卡、可上下捲動的連續月曆、對話面板、建議膠囊 | `App/Views/QuickCaptureView.swift`、`CaptureModePicker.swift`、`WeekAgendaCard.swift`、`MonthScrollCard.swift`、`CaptureCalendarParts.swift`、`Shared/Core/CalendarPaging.swift`（日期運算）、`RootView.swift`（從島的位置放大出現的動畫） |
 | Artboard 5 | 主畫面：標頭（漢堡選單 ·「2027 October」· 頭像）、月份選擇、月曆格（multi-day bar、task、+N）、AI 對話區、行程頁（點行程打開，可直接修改，含備註） | `App/Views/MainView.swift`、`Navigation/AppHeader.swift`、`MonthGridView.swift`、`ChatPanel.swift`、`EventDetailSheet.swift`、`Events/EventPage.swift` |
 | Artboard 5（側邊選單） | 漢堡選單打開的抽屜：General、「行程」區（進行中和接下來的行程、全部行程）、每個 Google 帳號一區、列出該帳號的行事曆；點色塊顯示或隱藏，點列進入行事曆設定 | `App/Views/Navigation/CalendarDrawer.swift`、`CalendarDetailsView.swift`、`App/Views/Events/*` |
-| 頭像、General | 帳號（頭像；訂閱在 1.0 隱藏）；設定（General）：通知、行事曆與新行程、助理、AI 與隱私、資料、捷徑與 Siri、語言、示範模式、關於 | `App/Views/Account/AccountSheet.swift`、`App/Views/Settings/*`、`App/ViewModels/SettingsModel.swift` |
+| 頭像、General | 帳號（頭像；訂閱區塊目前隱藏，1.0 的 AI 訂閱建置時打開）；設定（General）：通知、行事曆與新行程、助理、AI 與隱私、資料、捷徑與 Siri、語言、示範模式、關於 | `App/Views/Account/AccountSheet.swift`、`App/Views/Settings/*`、`App/ViewModels/SettingsModel.swift` |
 | Artboard 5（6 個月健身計畫） | 長期目標拆成 phases 和 RRULE series | `Shared/AI/FunctionDeclarations.json`（`create_long_term_plan`）、`Shared/Calendar/CalendarEventMapper.swift` |
 
 ### 長期計畫：先審閱，按 Add 才加入
@@ -48,18 +48,19 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 
 ### 設定、帳號與訂閱
 
-規格在 [`docs/SETTINGS.md`](docs/SETTINGS.md)。分工一句話：**漢堡選單管「看什麼」**（帳號、行事曆、顯示與否），**頭像管「我是誰」**（Google 帳號；Smart Schedules Pro 在 1.0 隱藏），**General 管「App 怎麼運作」**。
+規格在 [`docs/SETTINGS.md`](docs/SETTINGS.md)。分工一句話：**漢堡選單管「看什麼」**（帳號、行事曆、顯示與否），**頭像管「我是誰」**（Google 帳號；Smart Schedules Pro 區塊目前隱藏，1.0 的 AI 訂閱建置時打開），**General 管「App 怎麼運作」**。
 
 - **多個 Google 帳號**：抽屜每個帳號一區，標題是 email，下面是該帳號的每個行事曆。點色塊一下就隱藏或顯示；點列進入行事曆設定（只在這台 iPhone 的顏色、這個行事曆要不要提醒、「用於新行程」）。最後一列「新增 Google 帳號」。
 - **新增 Google 帳號**（`App/Views/Account/AddAccountView.swift`）：抽屜、頭像的帳號頁、歡迎畫面的「新增 Google 帳號」／「連接 Google 日曆」都會打開這一頁。輸入自己的 email（例如 example@gmail.com），格式不完整會直接提示；按「前往 Google 登入」後，這個 email 會當作 Google 登入頁的 `login_hint`（Google 直接選好或填好這個帳號），使用者還是在 Google 自己的頁面登入、同意授權——只靠 email 沒辦法連結帳號，Smart Schedules 也看不到密碼。Google 回來後，App 比對 ID token 裡的 email 和輸入的 email（Gmail 會忽略大小寫、點和 `+標籤`）：相同就存下帳號、抓行事曆清單，顯示「已連接 example@gmail.com」，抽屜馬上出現它的行事曆；不同的話**先不存**，問「你登入的是 X，不是 Y。」，可以選「加入 X」、「改用 Y 重新登入」或「取消」（撤銷剛拿到的授權）；已經連接過的帳號只會更新，不會重複。Gmail、學校或公司的 Google Workspace 帳號都可以；學校或公司不允許時、沒有勾選日曆權限時、沒有網路時，都會用一句話說明怎麼辦。也可以按「從 Google 帳號清單選擇」不輸入 email。示範模式中繼續會先結束示範模式（頁面上有說明）。
 - **移除帳號**：頭像的帳號頁（每列的「⋯」選單或向左滑）和抽屜（帳號標題旁的「⋯」）都有「移除帳號」。確認視窗說明這個帳號的日曆和行程只會從這支 iPhone 的 Smart Schedules 移除，Google 日曆裡的資料不會被刪除；如果這個帳號還有變更沒送到 Google，會寫出「還有 N 項變更尚未同步到 Google，移除後會遺失。」並提供「先同步」。移除會撤銷 Google 授權、刪除 Keychain 裡的 token、清掉這個帳號的快取行程和待送出的變更、把它的行事曆從專注模式過濾條件拿掉；如果新行程原本存到這個帳號，會改回自動並顯示「新行程改存到「X」。」。移除最後一個帳號就回到歡迎畫面。
-- **AI 資料分享同意**（App Store 5.1.2(i)）：第一次送出訊息前先跳出說明，列出會傳給 Google Gemini API 的內容（輸入或說出的話、今天起 14 天內最多 40 個行程的標題、時間、備註和 Google 行程 ID、「AI 建議」那一個行程的地點、行事曆名稱和助理設定、時區和語言），按「允許」才送出；按「暫時不要」助理就不會呼叫 Gemini，輸入列上方會說明怎麼開啟。**Google 帳號的 email 不會送給 Gemini**：行事曆以「Account 1」「Account 2」區分，行程文字和錯誤訊息裡的帳號 email 先換成佔位字（[`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) §10.6）。說明改版時（目前第 5 版：1.0 不用 iOS 18 的 push-to-start，所以 iOS 18 也沒有伺服器那一段）每個人都會再被問一次。設定 › AI 與隱私可以查看和撤回。示範模式也要先同意；不同意時用離線規則。
+- **AI 資料分享同意**（App Store 5.1.2(i)）：第一次送出訊息前先跳出說明，列出會傳給 Google Gemini API 的內容（輸入或說出的話、附加的照片或 PDF（只有附加並送出時）、今天起 14 天內最多 40 個行程的標題、時間、備註和 Google 行程 ID、「AI 建議」那一個行程的地點、行事曆名稱和助理設定、時區和語言），按「允許」才送出；按「暫時不要」助理就不會呼叫 Gemini，輸入列上方會說明怎麼開啟。**Google 帳號的 email 不會送給 Gemini**：行事曆以「Account 1」「Account 2」區分，行程文字和錯誤訊息裡的帳號 email 先換成佔位字（[`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) §10.6）。說明改版時（目前第 6 版：加入附件那一項；第 5 版起 1.0 不用 iOS 18 的 push-to-start，所以 iOS 18 也沒有伺服器那一段）每個人都會再被問一次。設定 › AI 與隱私可以查看和撤回。示範模式也要先同意；不同意時用離線規則。
 - **用一句話改設定**：「以後 8 點前不要提醒我」「健身提前 2 小時提醒」「以後用學校帳號」會變成設定，對話裡出現「設定已更新」卡片（舊值 → 新值，可以復原），也記在設定 › AI 與隱私 ›「助理記得的事」，每一條都能刪除（回到預設值）。
-- **只能打字**：1.0 沒有 App 內的語音輸入：沒有麥克風按鈕，不要求麥克風和語音辨識權限。想用說的，用鍵盤的聽寫或 Siri（`AddPlanIntent`），App 收到的都是文字。`DeepLink.composeVoice`（`smartschedule://compose?mode=voice`）保留，打開的是一般的快速輸入；`AppPreferences` 的 `speechLanguage`、`speechOnDevice` 也保留（沒有畫面使用），Shared 的公開 API 不變。
+- **語音輸入**（2026-10-18 起，免費）：對話和快速輸入的輸入列有麥克風按鈕（`App/Voice/VoiceTranscriber.swift`，規則在 `Shared/Voice/VoiceInput.swift`）。語音只在 iPhone 上辨識：每個 `SFSpeechAudioBufferRecognitionRequest` 都設 `requiresOnDeviceRecognition = true`；這支 iPhone 不能在裝置上辨識所選的語言（設定 › 助理 › 語音辨識語言：自動／中文（台灣）／English (US)）時不顯示按鈕。聲音不寫入檔案、不送出；辨識出的文字填進輸入框，按送出才傳，和打字一樣。第一次點才詢問麥克風和語音辨識權限。鍵盤的聽寫和 Siri（`AddPlanIntent`）照常可用。`DeepLink.composeVoice`（`smartschedule://compose?mode=voice`）打開快速輸入，不需要詢問權限時直接開始收音。
 - **先問我**：設定 › 助理 › 加入行程選「先問我」時，單一行程會先停在「尚未加入行事曆」卡片，按「加入」才寫入，按「編輯」說要改什麼。
+- **當天的提醒**：當天才加、當天稍後開始的行程、待辦和截止日，沒有指定提醒時間就在 10 分鐘前和開始時提醒（「1個小時後買蛋」也一樣，已經過去的那一次會略過）；隔天以後、全天和重複的行程照「設定 › 通知」的預設。
 - **從習慣學習**：連續略過同一種預設提醒 5 次，對話裡會問要不要停掉；按「停止」才會改。
 - **對話紀錄**會保留（最多 200 則，7 天／30 天／永久），可以清除、匯出（JSON）或「清除這台裝置上的所有資料」。
-- **訂閱**：1.0 不賣訂閱，也沒有任何 App 內購買。`AppConstants.subscriptionsEnabled = false` 隱藏頭像頁的 Smart Schedules Pro 區塊（Debug 版的 StoreKit testing 也一起隱藏），頭像的 VoiceOver 標籤是「帳號」，清除資料的確認說明不提訂閱，啟動時也不呼叫 StoreKit。StoreKit 2 程式碼（`isPro`，沒有鎖任何功能）保留給之後的版本；`ReleaseConfigurationTests` 和 `validate_schema.py` 會擋下把它打開的改動。之後的價格和要鎖什麼見 `docs/SETTINGS.md` 第 16 節。
+- **AI 訂閱**（2026-10-18 決定，1.0 會賣，建置中）：AI 助理每月有少量免費的文字請求額度；自動續訂的訂閱（StoreKit 2，`Config/SmartSchedule.storekit` 目前的群組「Smart Schedules Pro」）有較多的每月額度和照片、PDF 附件，另有額度較少的免費試用；價格和數字不寫進文件和隱私權政策。伺服器驗證 Apple 簽署的購買紀錄，只保留原始交易 ID（`originalTransactionId`）、到期日和每月請求次數（收到的最晚到期日過後 30 天刪除）；免費額度的次數存在 App Attest 金鑰記錄裡（只留最近一個有使用的月份）。**目前程式還沒改**：`AppConstants.subscriptionsEnabled = false` 隱藏頭像頁的 Smart Schedules Pro 區塊（Debug 版的 StoreKit testing 也一起隱藏），啟動時不呼叫 StoreKit，`isPro` 沒有鎖任何功能；`ReleaseConfigurationTests` 和 `validate_schema.py` 第 7 項會擋下把它打開的改動，建置訂閱時一起改。隱私權政策第 4、6、7、13 節已照 1.0 寫好；細節見 `docs/SETTINGS.md` 第 16 節。
 
 ## 文件
 
@@ -78,10 +79,10 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 App/                    主 App target（SwiftUI、Quick Capture、Google 登入、Siri intents、BG refresh）
   Views/Navigation/     Artboard 5 標頭、行事曆抽屜、行事曆設定
   Views/Events/         抽屜的「行程」區、全部行程、行程頁（可編輯、備註、備註建議）
-  Views/Account/        帳號（訂閱區塊在 1.0 隱藏）
+  Views/Account/        帳號（訂閱區塊目前隱藏）
   Views/Settings/       設定（General）的每一頁
   Views/Chat/           AI 同意說明、同意提示列、設定已更新／學到的建議／先問我卡片
-  Auth/ Store/ Privacy/ 多帳號（AccountManager）、StoreKit 2（1.0 關閉）、匯出與清除
+  Auth/ Store/ Privacy/ 多帳號（AccountManager）、StoreKit 2（目前關閉；1.0 用於 AI 訂閱）、匯出與清除
 Widgets/                Widget extension：Live Activity（動態島和鎖定畫面）、Control Center 控制項
 NotificationContent/    Notification Content Extension：長按通知後原地對話
 Shared/
@@ -114,7 +115,7 @@ project.yml             XcodeGen 設定（三個 App target 加一個測試 targ
 | **網頁互動原型**（claude.ai Artifact） | 瀏覽器，手機也可以 | 5 個設計稿的流程、真實的自然語言解析（原型裡用 Claude 代替 Gemini，function schema 相同）、iOS App 會送出的 Google Calendar request |
 | **Xcode Previews** | Mac + Xcode 16 以上 | 每個畫面，包括動態島 expanded／compact／minimal 和鎖定畫面，不用執行 App |
 | **Simulator + Demo 模式** | Mac + Xcode | 完整 App：控制中心按鈕、Live Activity、長按通知回覆、主畫面、Quick Capture。不需要 Google 帳號或 Gemini key。Simulator 沒有 App Attest（除非設了開發 token），示範模式用離線規則 |
-| **單元測試** | Xcode 按 ⌘U，或 GitHub Actions 自動跑 | 時區和 DST、RRULE、event ID、mapper、Gemini 回應解析、4 KB 預算、偏好設定與紀錄、多帳號（新增帳號的 email 檢查與比對、移除帳號、送給 Gemini 的內容沒有任何帳號 email）、提醒排程、週一開始的月曆、備註建議的規則（出國、運動、排除「跑步機維修」這類誤判、已經寫在備註裡的不再建議）、1.0 不賣訂閱（`ReleaseConfigurationTests`） |
+| **單元測試** | Xcode 按 ⌘U，或 GitHub Actions 自動跑 | 時區和 DST、RRULE、event ID、mapper、Gemini 回應解析、4 KB 預算、偏好設定與紀錄、多帳號（新增帳號的 email 檢查與比對、移除帳號、送給 Gemini 的內容沒有任何帳號 email）、提醒排程、週一開始的月曆、備註建議的規則（出國、運動、排除「跑步機維修」這類誤判、已經寫在備註裡的不再建議）、訂閱旗標目前關閉（`ReleaseConfigurationTests`；1.0 的 AI 訂閱建置時一起改） |
 | **真機 + 真 API** | Apple ID（部分功能需付費開發者帳號）、Google OAuth client、已部署的 Worker 網址（`GEMINI_BASE_URL`，見 [`server/worker/README.md`](server/worker/README.md)；Gemini 金鑰只在 Worker 上） | 實際寫入 Google Calendar、Action Button、真正的鎖定畫面互動 |
 
 ### Simulator 步驟
@@ -143,20 +144,20 @@ open SmartSchedule.xcodeproj
 1. 在 Apple Developer 後台建立 App Group `group.com.smartschedule.shared`，三個 target 都勾選。如果要改 bundle ID 前綴，記得同步改 `AppConstants.appGroupID`。
 2. Google Cloud：啟用 Calendar API，OAuth consent screen 加入 `calendar.events` 和 `calendar.calendarlist.readonly`（抽屜列出每個行事曆要用），建立 **iOS** 類型的 OAuth client。
 3. Gemini：App 裡**沒有** API key。key 只放在 Smart Schedules 的伺服器（`server/worker/`，Cloudflare Worker 的 secret），App 以 App Attest 證明自己後經由伺服器呼叫 Gemini（通知擴充不能用 App Attest，改送 App 替它要的 session token）。`GEMINI_BASE_URL` 指向伺服器（`https://<worker 網域>/v1beta`）；Xcode 裝到 iPhone 的 Debug 版和 TestFlight 一樣以 App Attest 的 production 環境 attest，連正式版 Worker 就能用；模擬器沒有 App Attest，Debug 版改送 `SS_DEV_TOKEN`（只有開發版 Worker 接受，Release 一律為空）。上線前替 Gemini API 的專案開啟 Cloud Billing（付費層級）：免費層級下 Google 可能用請求內容改善產品，App 裡不會也不能宣稱「不用於訓練」。
-4. 訂閱（1.0 關閉）：要在模擬器測試，暫時把 `AppConstants.subscriptionsEnabled` 改成 true，Scheme 的 StoreKit Configuration 會用 `Config/SmartSchedule.storekit`；不要提交這個改動（`validate_schema.py` 和 `ReleaseConfigurationTests` 會擋下來）。
+4. 訂閱（目前關閉；1.0 會打開，見上架前檢查清單）：要在模擬器測試，暫時把 `AppConstants.subscriptionsEnabled` 改成 true，Scheme 的 StoreKit Configuration 會用 `Config/SmartSchedule.storekit`；不要提交這個改動（`validate_schema.py` 和 `ReleaseConfigurationTests` 會擋下來）。
 5. 實機執行，到控制中心加入「Smart Schedules」控制項（設定 › 捷徑與 Siri 有步驟說明）。
 
 ## 上架前檢查清單
 
-完整清單、1.0 已決定的事（不賣訂閱、年齡分級 18+、不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架、不用 iOS 18 的即時動態 push-to-start、網站在 https://www.smart-schedules.com、開發者在英國）和待決定事項（之後版本的訂閱價格和 Pro 要鎖什麼、使用條款）在 [`docs/SETTINGS.md`](docs/SETTINGS.md) 第 16 節。App Store Connect 要貼的文字和每個問卷的答案在 [`docs/app-store-metadata.md`](docs/app-store-metadata.md)。
+完整清單、1.0 已決定的事（AI 訂閱：免費使用者有少量每月額度，訂閱有較多額度和照片／PDF 附件；語音輸入只在 iPhone 上辨識；年齡分級 18+、不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架、不用 iOS 18 的即時動態 push-to-start、網站在 https://www.smart-schedules.com、開發者在英國）和待決定事項（訂閱的價格、額度和試用長度、使用條款）在 [`docs/SETTINGS.md`](docs/SETTINGS.md) 第 16 節。App Store Connect 要貼的文字和每個問卷的答案在 [`docs/app-store-metadata.md`](docs/app-store-metadata.md)。
 
 - [ ] **Gemini 付費層級**：替 Gemini API 的 Google Cloud 專案開啟 Cloud Billing。免費層級下 Google 可能用請求內容改善產品；App 和隱私權政策都不能宣稱「不用於訓練」。App 經由 `server/worker/` 呼叫 Gemini，API key 不在 App 裡。
 - [ ] **Google OAuth 驗證**：`calendar.events` 和 `calendar.calendarlist.readonly` 都是敏感 scope。送審 consent screen（App 名稱、logo、首頁、隱私權政策、授權網域）、每個 scope 的用途說明，以及一段示範影片（OAuth 流程、新增行程、抽屜列出行事曆）。consent screen 還在 Testing 時，refresh token 7 天就會失效。步驟、要貼的英文和影片腳本見 [`docs/google-oauth-verification.md`](docs/google-oauth-verification.md)。
 - [ ] **Apple Developer 帳號**：Apple Developer Program 已核准。Team ID（developer.apple.com › Membership details）填進 `Config/Secrets.xcconfig`，也用 `npx wrangler secret put APPLE_TEAM_ID` 設給正式環境的 Worker，兩邊必須是同一個 Team ID（沒設時 `POST /attest` 回 500；不同時回 `401 invalid_attestation`，App 顯示「Smart Schedules 的伺服器無法驗證這個 App，所以目前無法使用助理。」；見 [`server/worker/README.md`](server/worker/README.md)）。
 - [ ] **App ID 和功能**：`com.smartschedules.app`、`com.smartschedules.app.widgets`、`com.smartschedules.app.notification-content` 三個都勾 App Groups（`group.com.smartschedule.shared`）；主 App 另外要 App Attest 和 Time Sensitive Notifications。**不需要 Push Notifications**：1.0 沒有 `aps-environment`（`AppConstants.pushToStartEnabled = false`）。
 - [ ] **Worker（1.0）**：只要 `GEMINI_API_KEY` 和 `APPLE_TEAM_ID` 兩個 secret；正式環境 `crons = []`，不用建立 APNs 的 `.p8`，也不用設 `APNS_*` secrets（`server/worker/README.md`「1.0：push-to-start 關閉」）。
-- [ ] **App Store 隱私標籤**（與 `App/PrivacyInfo.xcprivacy` 一致）：Other User Content（請求內容和跟請求一起送出的行程，經 Smart Schedules 的伺服器（Cloudflare Worker）轉給 Google Gemini，伺服器不保存；1.0 沒有 push-to-start，伺服器不存任何行程；Google 帳號 email 不送給 Gemini）、Device ID（App Attest 金鑰 ID：每個請求都帶，伺服器用來驗證請求和依安裝限制次數；1.0 沒有安裝 ID 或 push token），用途都是 App 功能、連結身分、不用於追蹤。隱私權政策要寫明 Cloudflare 是處理者、Google 是接收者。
-- [ ] **不賣訂閱（1.0）**：`AppConstants.subscriptionsEnabled` 保持 false；不要把任何 App 內購買項目或訂閱附加到 1.0 送審（App Store Connect 裡如果已經建立「Smart Schedules Pro」群組或商品，就留著不送審）；App 隱私問卷不勾 Purchases。之後要賣時再把旗標和 `ReleaseConfigurationTests`、`validate_schema.py` 第 7 項一起改，建立跟 `Config/SmartSchedule.storekit` 相同 ID 的商品（`com.smartschedule.pro.monthly`、`com.smartschedule.pro.yearly`），簽署 Paid Apps 協議，加上各語系的訂閱名稱，用 sandbox 測試，並把支援頁的訂閱問答和隱私權政策第 7 節改回來。
+- [ ] **App Store 隱私標籤**（與 `App/PrivacyInfo.xcprivacy` 一致；完整答案見 [`docs/app-store-metadata.md`](docs/app-store-metadata.md) §5.1）：五種類型。Photos or Videos（附加的照片）、Other User Content（請求內容，包括麥克風按鈕在 iPhone 上轉好的文字、附加的 PDF 和跟請求一起送出的行程，經 Smart Schedules 的伺服器（Cloudflare Worker）轉給 Google Gemini，伺服器不保存；1.0 沒有 push-to-start，伺服器不存任何行程；Google 帳號 email 不送給 Gemini）、Device ID（App Attest 金鑰 ID：每個請求都帶，伺服器用來驗證請求和依安裝限制次數；1.0 沒有安裝 ID 或 push token）、Purchase History（訂閱的原始交易 ID 和到期日）、Product Interaction（每月額度用的 AI 請求次數）。用途都是 App 功能、連結身分、不用於追蹤；不勾 Audio Data。要不要為原始交易 ID 另外勾 User ID 待決定（同一份文件 §5.3）。`PrivacyInfo.xcprivacy` 目前只宣告 Other User Content 和 Device ID，建置附件和訂閱時加上另外三種。隱私權政策要寫明 Cloudflare 是處理者、Google 是接收者。
+- [ ] **AI 訂閱（1.0，2026-10-18 決定）**：把 `AppConstants.subscriptionsEnabled` 和 `ReleaseConfigurationTests`、`validate_schema.py` 第 7 項一起改；在 App Store Connect 建立跟 `Config/SmartSchedule.storekit` 相同 ID 的商品（目前是 `com.smartschedule.pro.monthly`、`com.smartschedule.pro.yearly`），加上各語系的訂閱名稱和免費試用，簽署 Paid Apps 協議（稅務、銀行），把商品附加到 1.0 一起送審，用 sandbox 測試；paywall 連到使用條款和隱私權政策；App 隱私問卷勾 Purchase History、Photos or Videos、Product Interaction（`docs/app-store-metadata.md` 第 0、5 節）。支援頁的訂閱問答和隱私權政策第 7 節已經改好。
 - [ ] **年齡分級 18+**：在 App Store Connect 填年齡分級問卷，分級設為 18+（問卷算出來比較低就選較高的分級），因為 Gemini API 的條款要求使用者年滿 18 歲。隱私權政策和支援頁寫同樣的最低年齡。
 - [ ] **不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架**：價格與供應狀況裡取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登和瑞士，以及香港、澳門和中國大陸（Gemini API 不在那裡提供）；英國和其他地區照常上架（`docs/app-store-metadata.md` §4.3）。數位服務法（DSA）仍要先聲明一次「不是交易商」（見 `docs/app-store-metadata.md` §4.3），交易商驗證等之後的版本加入歐盟時再處理。
 - [ ] **英國**：開發者在英國，不需要英國 GDPR 第 27 條的代表人。到 ico.org.uk 的「Do I need to pay the fee?」確認要不要繳 ICO 的資料保護費（data protection fee），金額以 ICO 網站為準（`docs/app-store-metadata.md` §4.4）。
@@ -172,7 +173,7 @@ open SmartSchedule.xcodeproj
 
 | 項目 | 狀態 |
 |---|---|
-| Gemini schema lint（OpenAPI subset，9 個函式）、16 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文）、1.0 不賣訂閱（`AppConstants.subscriptionsEnabled` 是 false，用到 StoreKit 或訂閱文字的檔案都讀這個旗標） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
+| Gemini schema lint（OpenAPI subset，9 個函式）、16 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文）、訂閱旗標（`AppConstants.subscriptionsEnabled` 目前是 false，用到 StoreKit 或訂閱文字的檔案都讀這個旗標；1.0 的 AI 訂閱建置時一起改） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
 | Swift 編譯（App、Widgets、Notification extension） | ⏳ 設定、多帳號改動後待 CI 重新編譯（GitHub Actions 的 macOS runner：xcodegen 加 xcodebuild） |
 | 單元測試 | ⏳ 設定、多帳號改動後待 CI 重跑（hostless `SmartScheduleCoreTests`） |
 | 只能在實機上確認的行為（控制中心打開快速輸入、iOS 26 排程啟動的 Live Activity、iOS 18 打開 App 時出現的 Live Activity（1.0 沒有 push-to-start）、通知內 inline TextField、160 pt 高度） | ⏳ 清單在 `docs/ARCHITECTURE.md` 第 7 節 |

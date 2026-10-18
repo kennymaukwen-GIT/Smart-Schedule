@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>支援 Support · Smart Schedules</title>
-<meta name="description" content="Smart Schedules 支援與常見問題：聯絡方式、刪除資料、移除 Google 帳號、停止 AI 分享、動態島、匯出資料。Smart Schedules support and FAQ: contact, deleting data, removing a Google account, stopping AI sharing, the Dynamic Island, exporting data.">
+<meta name="description" content="Smart Schedules 支援與常見問題：聯絡方式、刪除資料、移除 Google 帳號、停止 AI 分享、動態島、訂閱、匯出資料。Smart Schedules support and FAQ: contact, deleting data, removing a Google account, stopping AI sharing, the Dynamic Island, subscriptions, exporting data.">
 <link rel="canonical" href="https://www.smart-schedules.com/support">
 <link rel="icon" type="image/png" href="/logo.png">
 <style>
@@ -162,7 +162,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li>向 Google 要求撤銷授權（需要網路連線），並刪除所有登入權杖；</li>
   <li>刪除帳號、快取的行程、待送出的變更、設定、聊天記錄和匯出檔。</li>
 </ul>
-<p>Google 日曆裡的行程不會被刪除；要刪除行程本身，請在 Google 日曆裡刪除。我們伺服器上剩下的少量技術資料不含行程內容，大部分會在幾天內到期（見隱私權政策的<a href="/privacy#zh-retention">保存期限</a>）。</p>
+<p>Google 日曆裡的行程不會被刪除；要刪除行程本身，請在 Google 日曆裡刪除。我們伺服器上剩下的少量技術資料不含行程內容，大部分會在幾天內到期；訂閱記錄會在伺服器收到的最晚到期日過後 30 天刪除（見隱私權政策的<a href="/privacy#zh-retention">保存期限</a>）。清除資料不會取消訂閱，取消方法見下方的訂閱問答。</p>
 <p>打算刪除 App 的話，請在有網路時先清除資料：刪除 App 不會撤銷 Google 授權，iOS 也可能保留登入權杖。清除後，可以到 Google 帳號的<a href="https://myaccount.google.com/connections">第三方應用程式和服務</a>確認 Smart Schedules 已經不在清單上。</p>
 
 <h3 id="zh-remove-account">怎麼移除 Google 帳號？</h3>
@@ -181,7 +181,12 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>一直沒有出現的話，確認「顯示下一個行程」不是「關閉」，以及 iPhone 設定 › App › Smart Schedules 裡的「即時動態」是開著的。詳細說明見隱私權政策的<a href="/privacy#zh-live">第 5 節</a>。</p>
 
 <h3 id="zh-purchases">有 App 內購買或訂閱嗎？</h3>
-<p>沒有。這個版本（1.0）沒有任何 App 內購買或訂閱，所以沒有需要取消或回復的購買項目。</p>
+<p>有。AI 助理每月有少量免費的文字請求額度（打字，或用說的）。透過 Apple 在 App 內購買的自動續訂訂閱，提供較多的每月額度，並可以附加照片和 PDF；另有額度較少的免費試用。訂閱前，App 會顯示價格和內容。</p>
+<ul>
+  <li>付款由 Apple 處理，我們不會收到你的付款資料，也不會收到你 Apple 帳號的姓名或 email。</li>
+  <li>取消訂閱：iPhone 設定 › 你的名字 › 訂閱項目。刪除 App 或清除資料不會取消訂閱。</li>
+  <li>訂閱時，伺服器只保留 Apple 為訂閱指定的原始交易 ID、到期日和本月（以及試用期間）的 AI 請求次數，在它收到的最晚到期日過後 30 天刪除；免費額度只在這個安裝的 App Attest 記錄裡計算當月的請求次數。詳見隱私權政策的<a href="/privacy#zh-purchases">第 7 節</a>。</li>
+</ul>
 
 <h3 id="zh-needs">AI 助理需要什麼才能運作？</h3>
 <ul>
@@ -189,12 +194,14 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li>允許 AI 資料分享（第一次使用時的說明，或 設定 › AI 與隱私 › 允許）。</li>
   <li>連接 Google 帳號，助理才能讀寫你的行事曆。不登入的話，示範模式會用虛構的範例行事曆；允許 AI 資料分享後可以試用真正的 AI 助理，否則用離線規則。</li>
   <li>年滿 18 歲：Smart Schedules 只提供給年滿 18 歲的人使用（App Store 分級 18+），這是 Google Gemini API 條款的規定。</li>
-  <li>想用說的：用 iPhone 鍵盤上的聽寫鍵，或透過 Siri 與捷徑。App 本身不使用麥克風，也不需要麥克風或語音辨識權限。</li>
+  <li>還有每月額度：免費使用者每月有少量額度，訂閱有較多額度（見上方的訂閱問答）。</li>
+  <li>想用說的：在對話或快速輸入點麥克風按鈕，iOS 詢問時允許語音辨識和麥克風。語音在你的 iPhone 上轉成文字，聲音不會被錄下或傳送到任何地方；你按送出之前，什麼都不會傳送。沒有看到麥克風按鈕，表示這支 iPhone 還不能在裝置上辨識這個語言；鍵盤的聽寫鍵和 Siri 仍然可以用。</li>
+  <li>附加照片或 PDF：需要訂閱。「拍照」會詢問相機權限；從照片選擇器選照片或從「檔案」選 PDF 不需要權限，App 只會收到你選的那一個。找到的行程會先給你確認，按「加入」才會加入。</li>
 </ul>
 <p>助理會傳送什麼，請看隱私權政策的 <a href="/privacy#zh-ai">AI 助理</a>一節。</p>
 
 <h3 id="zh-export">怎麼匯出我的資料？</h3>
-<p>到 設定 › 資料 › 匯出我的資料。App 會產生一個 JSON 檔案，包含設定、助理記得的事、帳號和行事曆、快取的行程和聊天記錄，用分享選單存到你想要的地方。檔案不含登入權杖。</p>
+<p>到 設定 › 資料 › 匯出我的資料。App 會產生一個 JSON 檔案，包含設定、助理記得的事、帳號和行事曆、快取的行程和聊天記錄，用分享選單存到你想要的地方。檔案不含登入權杖。你附加過的照片和 PDF 不會保留，所以也不在匯出檔裡。</p>
 
 <h3 id="zh-provenance">為什麼 Google 日曆的行程說明出現「由 Smart Schedules 智慧助理自動排程」？</h3>
 <p>助理建立的行程，說明欄開頭會寫這一行，加上你當時說的話，讓你知道行程是怎麼來的。能看到這個行程的人（包括邀請對象）也看得到。你可以在 Google 日曆裡編輯說明，把這一行刪掉。</p>
@@ -243,7 +250,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li>asks Google to revoke access (this needs an internet connection) and deletes every sign-in token;</li>
   <li>deletes accounts, cached events, pending changes, settings, chat history and exports.</li>
 </ul>
-<p>Events in Google Calendar are not deleted; to delete the events themselves, delete them in Google Calendar. The little technical data left on our server holds no event content, and most of it expires within days (see <a href="/privacy#en-retention">How long we keep data</a> in the Privacy Policy).</p>
+<p>Events in Google Calendar are not deleted; to delete the events themselves, delete them in Google Calendar. The little technical data left on our server holds no event content, and most of it expires within days; a subscription record is deleted 30 days after the latest expiry date our server has received (see <a href="/privacy#en-retention">How long we keep data</a> in the Privacy Policy). Erasing data does not cancel a subscription; see the subscription answer below.</p>
 <p>If you plan to delete the app, erase your data first, while you're online: deleting the app does not revoke Google access, and iOS may keep sign-in tokens. Afterwards you can check under <a href="https://myaccount.google.com/connections">Third-party apps &amp; services</a> in your Google Account that Smart Schedules is no longer listed.</p>
 
 <h3 id="en-remove-account">How do I remove a Google account?</h3>
@@ -262,7 +269,12 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 <p>If an event never appears, check that "Show next event" isn't Off, and that Live Activities are turned on in iPhone Settings › Apps › Smart Schedules. For details, see <a href="/privacy#en-live">section 5</a> of the Privacy Policy.</p>
 
 <h3 id="en-purchases">Are there in-app purchases or subscriptions?</h3>
-<p>No. This version (1.0) has no in-app purchases or subscriptions, so there is nothing to cancel or restore.</p>
+<p>Yes. The AI assistant has a small free monthly allowance of text requests (typed, or spoken). An auto-renewable subscription, bought through Apple in the app, gives a larger monthly allowance and lets you attach photos and PDFs; there is a free trial with a smaller allowance. The app shows the price and what is included before you subscribe.</p>
+<ul>
+  <li>Apple handles payment; we never receive your payment details or your Apple Account name or email.</li>
+  <li>To cancel: iPhone Settings › your name › Subscriptions. Deleting the app or erasing data does not cancel the subscription.</li>
+  <li>For a subscription, our server keeps only the original transaction ID Apple assigns to it, the expiry date and the number of AI requests this month (and in the trial), and deletes them 30 days after the latest expiry date it has received; for the free allowance it only counts the month's requests in the installation's App Attest record. See <a href="/privacy#en-purchases">section 7</a> of the Privacy Policy.</li>
+</ul>
 
 <h3 id="en-needs">What does the AI assistant need to work?</h3>
 <ul>
@@ -270,12 +282,14 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li>AI data sharing allowed (in the dialog the first time you use it, or Settings › AI &amp; privacy › Allow).</li>
   <li>A connected Google account, so the assistant can read and write your calendar. Without signing in, demo mode uses fictional sample calendars; allow AI data sharing to try the real assistant on them, otherwise it uses offline rules.</li>
   <li>You must be 18 or older: Smart Schedules is only for people aged 18 or older (rated 18+ on the App Store), as Google's Gemini API terms require.</li>
-  <li>To speak instead of typing: use the dictation key on the iPhone keyboard, or Siri and Shortcuts. The app itself does not use the microphone and needs no microphone or speech recognition permission.</li>
+  <li>Allowance left for the month: free users have a small monthly allowance, and the subscription gives more (see the subscription answer above).</li>
+  <li>To speak instead of typing: tap the microphone button in the chat or Quick Capture and allow Speech Recognition and the microphone when iOS asks. Your speech is turned into text on your iPhone, and the audio is not recorded or sent anywhere; nothing is sent until you tap Send. If there is no microphone button, this iPhone can't recognise that language on the device yet; the keyboard's dictation key and Siri still work.</li>
+  <li>To attach a photo or PDF: the subscription. Take Photo asks for Camera permission; choosing a photo in the photo picker or a PDF from Files needs no permission, and the app receives only the one you pick. Events found in it are shown for you to review and added only when you tap Add.</li>
 </ul>
 <p>For what the assistant sends, see <a href="/privacy#en-ai">The AI assistant</a> in the Privacy Policy.</p>
 
 <h3 id="en-export">How do I export my data?</h3>
-<p>Go to Settings › Data › Export my data. The app creates a JSON file with your settings, what the assistant remembers, accounts and calendars, cached events and chat history, and you choose where to save or send it from the share sheet. The file never contains sign-in tokens.</p>
+<p>Go to Settings › Data › Export my data. The app creates a JSON file with your settings, what the assistant remembers, accounts and calendars, cached events and chat history, and you choose where to save or send it from the share sheet. The file never contains sign-in tokens. Photos and PDFs you attached are not kept, so they are not in the export either.</p>
 
 <h3 id="en-provenance">Why do my Google Calendar events say "由 Smart Schedules 智慧助理自動排程"?</h3>
 <p>Events the assistant creates begin their description with this line ("scheduled automatically by the Smart Schedules assistant") followed by what you said, so you can see where the event came from. Anyone who can see the event, including guests, can read it. You can edit the description in Google Calendar to remove the line.</p>

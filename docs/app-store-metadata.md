@@ -2,11 +2,12 @@
 
 可以直接貼到 App Store Connect 的文字（繁體中文和英文），以及每個問卷該怎麼填、為什麼這樣填。
 每個功能說法都對照過 2026-10-16 的程式碼（`App/`、`Shared/`、`Widgets/`、`NotificationContent/`、`server/worker/`），
-對照表在第 11 節。程式碼改了功能、或 AI 同意說明改版（`AIConsent.disclosureVersion`，目前是 **5**），這份文件要一起更新。
+對照表在第 11 節。程式碼改了功能、或 AI 同意說明改版（`AIConsent.disclosureVersion`，程式目前是 **6**：加入附件那一項的改動把它從 5 改成 6，因為同意的內容變了，已允許過第 5 版的 TestFlight 使用者也要重新同意），這份文件要一起更新。
+第 0、4、5、8 節在 2026-10-18 改成 1.0 上架時的樣子：語音輸入（已在程式裡）、照片和 PDF 附件、AI 訂閱（這兩項還在建置，對應的程式檔案用 `[建置中]` 標示）。
 
-1.0 已決定的事：年齡分級 **18+**（Gemini API 條款要求年滿 18 歲）、**不賣訂閱也沒有任何 App 內購買**、
+1.0 已決定的事：年齡分級 **18+**（Gemini API 條款要求年滿 18 歲）、**AI 訂閱**（2026-10-18 決定：免費使用者每月有少量文字 AI 額度；透過 Apple 在 App 內購買的自動續訂訂閱有較多額度，加上照片和 PDF 附件；另有額度較少的免費試用。價格和數字不寫進政策和這份文件的商店文字）、
 **不在歐洲經濟區（歐盟、挪威、冰島、列支敦斯登）、瑞士、香港、澳門和中國大陸上架**（英國和其他地區照常）、**Google 帳號的 email 不會傳給 Gemini**（同意說明第 4 版起）、
-**不用 iOS 18 的即時動態 push-to-start**（`AppConstants.pushToStartEnabled = false`：伺服器不存任何行程、App 不用遠端推播（APNs）；同意說明第 5 版）、**開發者在英國**（不需要英國 GDPR 第 27 條的代表人）、**沒有 App 內的語音輸入**（不用麥克風和語音辨識；Siri 和鍵盤的聽寫是 Apple 的系統功能，App 只收到文字）。
+**不用 iOS 18 的即時動態 push-to-start**（`AppConstants.pushToStartEnabled = false`：伺服器不存任何行程、App 不用遠端推播（APNs）；同意說明第 5 版起沒有 iOS 18 伺服器那一段，程式目前是第 6 版）、**開發者在英國**（不需要英國 GDPR 第 27 條的代表人）、**語音輸入只在 iPhone 上辨識**（2026-10-18 決定，免費：聊天和快速輸入的麥克風按鈕，`requiresOnDeviceRecognition = true`，聲音不存也不送出；Siri 和鍵盤的聽寫是 Apple 的系統功能，App 只收到文字）。
 
 `<!-- asc:… -->` 標記後面的區塊就是要貼的內容；`python3 -I <腳本> docs/app-store-metadata.md` 可以檢查字數上限
 （第 12 節）。方括號 `[…]` 是送審前要填的佔位值。
@@ -22,7 +23,13 @@
 - [ ] Google OAuth consent screen 已通過驗證並設為「In production」（步驟見 [`google-oauth-verification.md`](google-oauth-verification.md)）。還在 Testing 時，審核員會看到「Google 尚未驗證這個應用程式」，測試帳號也必須先加進 test users，而且 refresh token 7 天就失效。
 - [ ] 價格與供應狀況已取消歐洲經濟區、瑞士、香港、澳門和中國大陸（第 4.3 節；後三個是因為 Gemini API 不在那裡提供，第 4.4 節）。
 - [ ] 到 ICO 網站的「Do I need to pay the fee?」確認要不要繳資料保護費（data protection fee），金額以 ICO 網站為準（第 4.4 節第 4 點）。
-- [ ] 上傳的 build 的 Info.plist 沒有 `NSMicrophoneUsageDescription` 和 `NSSpeechRecognitionUsageDescription`（`plutil -p SmartSchedule.app/Info.plist | grep -E 'NSMicrophone|NSSpeech'` 什麼都不印）：1.0 沒有麥克風和語音辨識，App 隱私問卷也不勾 Audio Data（第 5.3 節）。
+- [ ] 上傳的 build 的 App Info.plist **有** `NSMicrophoneUsageDescription`、`NSSpeechRecognitionUsageDescription`（語音輸入只在 iPhone 上辨識，`requiresOnDeviceRecognition = true`；iOS 18 走 `SFSpeechRecognizer`，沒有這兩個 key 會當掉）和 `NSCameraUsageDescription`（附件的「拍照」），三個都有繁體中文（`zh-Hant.lproj/InfoPlist.strings`）；兩個 extension 的 Info.plist 都沒有。`plutil -p SmartSchedule.app/Info.plist | grep -E 'NSMicrophone|NSSpeech|NSCamera'` 印出三行。照片用系統的照片選擇器，**不要**加 `NSPhotoLibraryUsageDescription`。App 隱私問卷不勾 Audio Data（聲音不離開 iPhone），但要勾 Photos or Videos、Purchase History 和 Product Interaction（第 5 節）。
+- [ ] AI 訂閱：簽好 Paid Apps 協議、填好稅務和銀行資料；在 App Store Connect 建立訂閱群組和商品（ID 和 `Config/SmartSchedule.storekit` 一致）、各語系的訂閱名稱和說明、免費試用（介紹性優惠）、審核用截圖（paywall），並把它們**附加到 1.0 這個版本一起送審**（第一個 App 內購買項目必須和新版本一起送審，第 4.1 節）。用 sandbox 帳號在 TestFlight 買過一次。
+- [ ] Paywall（訂閱前的畫面）寫清楚訂閱給什麼（較多的每月 AI 額度、照片和 PDF 附件）、價格和週期、免費試用，並連到使用條款（Apple 標準 EULA，`SSTermsURL`）和隱私權政策（Guideline 3.1.2、Schedule 2）。商店頁也要有使用條款的連結：App 資訊的授權合約欄用 Apple 標準 EULA（第 1 節），或在描述最後加一行「使用條款：https://www.apple.com/legal/internet-services/itunes/dev/stdeula/」／「Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/」（加了要重算字數）。
+- [ ] 伺服器驗證 Apple 簽署的購買紀錄（JWS）時，要接受 `environment` 是 `Sandbox` 的紀錄：App Review 用 sandbox 帳號購買，用的是正式版的 App 和伺服器。只保留原始交易 ID（`originalTransactionId`，續訂時不變）、到期日和請求次數，在收到的購買紀錄中最晚的到期日過後 30 天刪除（隱私權政策第 7、13 節；退款或撤銷的訂閱也一樣保存到原本的到期日過後 30 天，除非之後做了撤銷的處理並改寫政策）。
+- [ ] 購買紀錄和 Gemini 請求分開：App 把 Apple 簽署的購買紀錄放在自己的 header 或送到自己的 endpoint，**絕不放進 Gemini 請求的 body**（Worker 把 body 原封不動轉給 Google，只轉 `content-type` 和 `accept` 兩個 header，`server/worker/src/gemini.ts`；放進 body 就會送到 Google，違反政策第 7 節「不會分享給其他任何人」）。Worker 的記錄（`log()`）絕不寫簽署的購買紀錄或交易 ID（政策第 6 節列出記錄包含什麼）。
+- [ ] 上傳的 build 裡，主畫面對話輸入列的迴紋針已經改成附件（拍照、照片、「檔案」的 PDF），不再是貼上剪貼簿的文字（目前的程式：`App/Views/ChatPanel.swift` 的 `showsAttachment: true` 和 `pasteLink()`，無障礙標籤「Paste a link」）；沒有訂閱時無法附加照片或 PDF（政策第 4 節寫的是建置後的樣子）。
+- [ ] 附件送 Gemini 用 `inline_data`，不要用 Files API（會在 Google 存 48 小時）；Gemini 專案的 AI Studio「Logs and datasets」保持關閉；不要開 Google Search grounding（資料會存 30 天、不能關）。這三項是政策「Google 最多保存 55 天」成立的條件。
 
 ---
 
@@ -132,7 +139,7 @@ Smart Schedules 是搭配 Google 日曆的 iPhone AI 行程助理。輸入一句
 
 ### 2.5 關鍵字（Keywords，最多 100 位元組，逗號後不加空格）
 
-中文字在 UTF-8 是 3 個位元組，所以大約只能放 30 個中文字。名稱和副標題裡的字（Smart、Schedules、行程）已經會被搜尋，不再重複。名稱只有「Smart Schedules」，「AI」「助理」不在名稱裡：「助理」放在關鍵字裡（取代原本的「語音」，1.0 沒有 App 內的語音輸入）；想讓「AI」也被搜尋，可以改用備用名稱 1，或換掉下面的某個關鍵字（已經 99 位元組）。
+中文字在 UTF-8 是 3 個位元組，所以大約只能放 30 個中文字。名稱和副標題裡的字（Smart、Schedules、行程）已經會被搜尋，不再重複。名稱只有「Smart Schedules」，「AI」「助理」不在名稱裡：「助理」放在關鍵字裡（2026-10-16 取代原本的「語音」；2026-10-18 起 1.0 又有語音輸入了，想用「語音」可以換掉其他詞放回去）；想讓「AI」也被搜尋，可以改用備用名稱 1，或換掉下面的某個關鍵字（已經 99 位元組）。
 「計畫」（台灣）和「計劃」（香港常用）兩種寫法都放；1.0 不在香港上架，「計劃」留著不影響其他關鍵字，要換成別的詞也可以。不放其他 App 或公司的名稱（包括 Google、Gemini）。
 
 <!-- asc:zh-Hant/keywords -->
@@ -238,7 +245,7 @@ Privacy Policy: https://www.smart-schedules.com/privacy
 
 ### 3.5 Keywords (100 bytes max, no spaces after commas)
 
-Words already in the name and subtitle (smart, schedules, plan, day, sentence) are left out, and so are other apps' and companies' names. The name is just "Smart Schedules", so "AI" and "planner" are not in it; to be found for them too, use backup name 1 or swap one of the keywords below (the list is at the 100-byte limit). "diary" replaces "voice": 1.0 has no in-app speech input.
+Words already in the name and subtitle (smart, schedules, plan, day, sentence) are left out, and so are other apps' and companies' names. The name is just "Smart Schedules", so "AI" and "planner" are not in it; to be found for them too, use backup name 1 or swap one of the keywords below (the list is at the 100-byte limit). "diary" replaced "voice" on 2026-10-16, when 1.0 had no in-app speech input; since 2026-10-18 it has voice input again, so "voice" (5 bytes, the same as "diary") can go back if you prefer.
 
 <!-- asc:en/keywords -->
 ```text
@@ -262,7 +269,7 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,diary,assistant,o
 | 宣傳文字 | 63 字元 | 151 字元 | 170 字元 |
 | 描述 | 1,693 字元 | 3,825 字元 | 4,000 字元 |
 | 關鍵字 | 99 位元組 | 100 位元組 | 100 位元組 |
-| 審核備註（第 8.2 節） | — | 3,930 位元組（填入備用驗證碼後要重算） | 4,000 位元組 |
+| 審核備註（第 8.2 節） | — | 3,912 位元組（填入訂閱名稱、paywall 路徑和備用驗證碼後要重算，剩不到 90 位元組） | 4,000 位元組 |
 
 精確數字用第 12 節的腳本算；改了文字就重跑一次。
 
@@ -277,13 +284,12 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,diary,assistant,o
 | 版本號 | `1.0.0`（要和 `MARKETING_VERSION` 一致，見 `project.yml`） |
 | 版權（Copyright） | `2026 SHENG HAN HSIEH`（不要自己加 ©，App Store Connect 會自動加；年份是取得權利的那一年） |
 | What's New | 第一版沒有這個欄位 |
-| App 內購買項目 | **一個都不要附加。** 如果 App Store Connect 裡已經建立「Smart Schedules Pro」群組或商品，就留著不送審。 |
+| App 內購買項目 | **附加 1.0 的 AI 訂閱商品**（第 0 節）。第一個 App 內購買項目必須和新版本一起送審，所以要在這個版本頁的「App 內購買項目和訂閱」區塊選取它們。 |
 
 ### 4.2 價格
 
-**免費（Free）**，沒有 App 內購買、沒有訂閱。免費 App 不需要簽 Paid Apps 協議，也不用填稅務和銀行資料。
-1.0 的 App 裡完全不會呼叫 StoreKit（`AppConstants.subscriptionsEnabled = false`，`ReleaseConfigurationTests` 和
-`scripts/validate_schema.py` 會擋下把它打開的改動），商店頁也就不會出現「App 內購買」。描述和截圖都不要提訂閱或 Pro。
+App 本身**免費下載**。AI 助理每月有少量免費的文字請求額度；透過 Apple 在 App 內購買的**自動續訂訂閱**有較多的每月額度和照片、PDF 附件，另有額度較少的免費試用（2026-10-18 決定）。價格、週期和額度在 App Store Connect 的訂閱商品和 paywall 設定，這份文件和隱私權政策都不寫數字。
+有 App 內購買，所以要簽 Paid Apps 協議、填稅務和銀行資料（第 0 節）；商店頁會出現「App 內購買」。目前程式還是 `AppConstants.subscriptionsEnabled = false`（`ReleaseConfigurationTests` 和 `scripts/validate_schema.py` 第 7 項會擋下打開它的改動），建置訂閱時要一起改。描述不寫價格。
 
 ### 4.3 供應地區：不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架（英國照常）
 
@@ -325,31 +331,37 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,diary,assistant,o
 
 ## 5. App 隱私問卷（App Privacy）
 
-答案和 `App/PrivacyInfo.xcprivacy` 一致（兩種資料類型、都連結到使用者、都不用於追蹤、用途都只有 App 功能），而且逐項對照過目前的程式碼，見 5.3 和 5.4。
+1.0 的答案（五種資料類型，都連結到使用者、都不用於追蹤、用途都只有 App 功能），逐項對照過程式碼和 2026-10-18 決定的功能，見 5.2、5.3。附件和訂閱還在建置；`App/PrivacyInfo.xcprivacy` 目前只宣告其中兩種，要在建置時改成一致（5.4）。
 
 ### 5.1 怎麼填
 
 1. 「Do you or your third-party partners collect data from this app?」→ **Yes, we collect data from this app**。
-2. 勾選資料類型，**只勾這兩個**：
-   - **User Content › Other User Content**
-   - **Identifiers › Device ID**
+2. 勾選資料類型，**只勾這五個**：
+   - **User Content › Photos or Videos**（附加的照片）
+   - **User Content › Other User Content**（請求文字，包括用麥克風按鈕說的；附加的 PDF；跟著請求送出的行程）
+   - **Identifiers › Device ID**（App Attest 金鑰 ID）
+   - **Purchases › Purchase History**（訂閱的原始交易 ID 和到期日）
+   - **Usage Data › Product Interaction**（每月額度用的 AI 請求次數）
 3. 每一種都這樣回答：
 
-| 問題 | Other User Content | Device ID |
-|---|---|---|
-| 用途（purposes） | 只勾 **App Functionality** | 只勾 **App Functionality** |
-| Is this data linked to the user's identity? | **Yes** | **Yes** |
-| Is this data used for tracking purposes? | **No** | **No** |
+| 問題 | Photos or Videos | Other User Content | Device ID | Purchase History | Product Interaction |
+|---|---|---|---|---|---|
+| 用途（purposes） | 只勾 **App Functionality** | 只勾 **App Functionality** | 只勾 **App Functionality** | 只勾 **App Functionality** | 只勾 **App Functionality** |
+| Is this data linked to the user's identity? | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
+| Is this data used for tracking purposes? | **No** | **No** | **No** | **No** | **No** |
 
-產品頁會顯示：「Data Linked to You：User Content、Identifiers」；沒有「Data Used to Track You」。
-Apple 的定義（[App privacy details](https://developer.apple.com/app-store/app-privacy-details/)）：「collect」是指資料離開裝置，而且你或第三方能存取的時間超過即時處理請求所需；「Personal Information」和「Personal Data」一律算連結到使用者。
+產品頁會顯示：「Data Linked to You：Purchases、User Content、Identifiers、Usage Data」；沒有「Data Used to Track You」。
+Apple 的定義（[App privacy details](https://developer.apple.com/app-store/app-privacy-details/)）：「collect」是指資料離開裝置，而且你或第三方能存取的時間超過即時處理請求所需；「Personal Information」和「Personal Data」一律算連結到使用者。「Data that is processed only on device is not "collected"」，所以只在 iPhone 上處理的語音不算。
 
-### 5.2 為什麼是這兩項
+### 5.2 為什麼是這五項
 
 | 資料 | 去哪裡、留多久 | 歸類 | 程式碼 |
 |---|---|---|---|
-| 使用者輸入的請求（對 Siri 說或用鍵盤聽寫的，App 收到的也是 Apple 轉好的文字）；最多 40 個、今天起 14 天內行程的標題、時間、備註和 Google 行程 ID；回覆的那則提醒的行程；行事曆名稱（以「Account 1」這類代稱區分帳號）和助理設定；時區和語言；「AI 建議」那一個行程的地點 | 經 Smart Schedules 伺服器（Cloudflare Worker）原封不動轉給 Google Gemini API，伺服器不保存；Google 為偵測濫用最多保存 55 天（[Gemini API 使用政策](https://ai.google.dev/gemini-api/docs/usage-policies)，付費層級也一樣） | Other User Content（第三方保存超過即時處理所需，所以算 collect；每個請求都帶這個安裝的 App Attest 金鑰 ID，所以宣告為連結到使用者） | `Shared/AI/AssistantPrompt.swift`、`Shared/AI/NoteSuggestionPrompt.swift`、`Shared/AI/GeminiClient.swift`、`server/worker/src/gemini.ts` |
+| 使用者輸入的請求，或用麥克風按鈕說、在 iPhone 上轉好的文字（對 Siri 說或用鍵盤聽寫的，App 收到的也是 Apple 轉好的文字）；最多 40 個、今天起 14 天內行程的標題、時間、備註和 Google 行程 ID；回覆的那則提醒的行程；行事曆名稱（以「Account 1」這類代稱區分帳號）和助理設定；時區和語言；「AI 建議」那一個行程的地點；使用者附加的 PDF（只有訂閱者，附加並送出時） | 經 Smart Schedules 伺服器（Cloudflare Worker）原封不動轉給 Google Gemini API，伺服器不保存；Google 為偵測濫用最多保存 55 天（[Gemini API 使用政策](https://ai.google.dev/gemini-api/docs/usage-policies)，付費層級也一樣） | Other User Content（第三方保存超過即時處理所需，所以算 collect；每個請求都帶這個安裝的 App Attest 金鑰 ID，所以宣告為連結到使用者）。Apple 沒有「文件」這一類，PDF 算在這裡 | `Shared/AI/AssistantPrompt.swift`、`Shared/AI/NoteSuggestionPrompt.swift`、`Shared/AI/GeminiClient.swift`、`server/worker/src/gemini.ts`；語音：`App/Voice/VoiceTranscriber.swift`；PDF：`[建置中]` |
+| 使用者附加的照片（拍照，或從系統照片選擇器選的；送出前縮小並重新編碼，去掉位置和其他中繼資料） | 和請求一起經伺服器轉給 Gemini，伺服器不保存；Google 和其他請求一樣最多 55 天；App 回覆後不留副本 | Photos or Videos（理由同上：Google 保存 55 天，請求帶金鑰 ID） | `[建置中]` |
 | App Attest 金鑰 ID（這個安裝在 Secure Enclave 產生的金鑰，每個請求都帶）；給通知擴充用的 session（只存 token 的雜湊） | 伺服器以金鑰 ID 保存公開金鑰和計數器，用來驗證每個請求、依安裝限制請求次數，沒有到期時間；session 7 天 | Device ID（用途：驗證、防濫用，屬於 App Functionality） | `Shared/Security/AppAttestClient.swift`、`server/worker/src/attest-routes.ts`、`session.ts` |
+| 免費額度：這個安裝本月的 AI 請求次數，存在同一筆 App Attest 金鑰記錄裡；訂閱者的本月（和試用期間）請求次數存在訂閱記錄裡 | 免費的計數只留最近一個有使用的月份：新月份的第一個請求重新計算，否則和金鑰記錄一起保存（沒有到期時間）；訂閱的計數和訂閱記錄一起，在收到的最晚到期日過後 30 天刪除 | Product Interaction（App 怎麼被使用的資料，保存超過單次請求；連結到金鑰 ID 或交易 ID）。也可以改填 Other Usage Data，這是判斷題；兩種都只勾 App Functionality | `[建置中]`（Worker） |
+| Apple 簽署的訂閱購買紀錄（StoreKit 2 的 `jwsRepresentation`）：裡面有產品、購買和到期日、價格、幣別、店面國家或地區、交易 ID，沒有姓名、email、Apple 帳號或付款資料 | 伺服器驗證 Apple 的簽章後只保留原始交易 ID（`originalTransactionId`，續訂時不變）和到期日（加上上一列的請求次數），在收到的最晚到期日過後 30 天刪除；其他欄位不保存 | Purchase History（「An account's or individual's purchases」）。不要設定 `appAccountToken`；設了就要另外說明 | `App/Store/SubscriptionStore.swift`（建置時改）、`[建置中]`（Worker） |
 | 連線 IP（IPv4，或 IPv6 的 /64） | 只用來限制 `/attest` 的頻率，每日計數保存 2 天 | Device ID。Apple 要求依用途歸類 IP；這裡的用途是防濫用 | `server/worker/src/ratelimit.ts` |
 | 伺服器日誌：金鑰 ID、App 識別碼、HTTP 狀態和錯誤代碼 | Workers Logs 最多 7 天，不含請求內容、標題、token 或 IP | 已包含在 Device ID（App Functionality：安全與服務穩定） | `server/worker/src/http.ts` 的 `log()`；`wrangler.toml` 關掉 invocation logs |
 
@@ -359,21 +371,22 @@ Apple 的定義（[App privacy details](https://developer.apple.com/app-store/ap
 
 | 類型 | 為什麼不勾 |
 |---|---|
-| Contact Info › Email Address | Google 帳號的 email 只存在 iPhone（Keychain、`accounts.json`），只在 OAuth 登入時當 `login_hint` 送給 Google 自己。同意說明第 4 版起，帳號 email 不會以帳號資訊送到伺服器或 Gemini：使用者的請求和行程文字裡的帳號 email 都換成佔位字（`Shared/AI/CalendarAliases.swift`、`Shared/Models/PromptRedaction.swift`，測試在 `Tests/Unit/AccountEmailPrivacyTests.swift`）。使用者自己打進請求裡的其他 email（例如邀請對象）也屬於 Other User Content。 |
+| Contact Info › Email Address | Google 帳號的 email 只存在 iPhone（Keychain、`accounts.json`），只在 OAuth 登入時當 `login_hint` 送給 Google 自己。同意說明第 4 版起，帳號 email 不會以帳號資訊送到伺服器或 Gemini：使用者的請求和行程文字裡的帳號 email 都換成佔位字（`Shared/AI/CalendarAliases.swift`、`Shared/Models/PromptRedaction.swift`，測試在 `Tests/Unit/AccountEmailPrivacyTests.swift`）。使用者自己打進請求裡的其他 email（例如邀請對象），以及照片或 PDF 裡出現的 email，屬於 Other User Content／Photos or Videos。 |
 | Google 日曆的行程本身 | 行程在 iPhone 和使用者自己的 Google 帳號之間直接同步（`Shared/Calendar/GoogleCalendarClient.swift`），開發者拿不到；App 裡沒有任何 Google 的 SDK，所以 Google 不是 Apple 定義的「third-party partner」（加進 App 的程式碼的提供者）。送到伺服器和 Gemini 的那部分已算在 Other User Content。 |
-| User Content › Audio Data | App 不使用麥克風和語音辨識：Info.plist 沒有 `NSMicrophoneUsageDescription`、`NSSpeechRecognitionUsageDescription`，程式裡沒有 Speech 或 AVAudio。使用者對 Siri 說話或用鍵盤聽寫時由 Apple 轉成文字，App 只收到文字；Apple：「You are not responsible for disclosing data collected by Apple.」 |
-| Purchases | 1.0 完全不呼叫 StoreKit。 |
+| User Content › Audio Data | 麥克風按鈕的語音只在 iPhone 上辨識（`SFSpeechAudioBufferRecognitionRequest.requiresOnDeviceRecognition = true`；不支援裝置端辨識的語言不顯示按鈕），聲音不寫入檔案、不送到任何地方（`scripts/validate_schema.py` 第 9 項檢查）。Apple：「Data that is processed only on device is not "collected"」；轉好的文字送出時已算在 Other User Content。Siri 和鍵盤聽寫由 Apple 轉成文字；Apple：「You are not responsible for disclosing data collected by Apple.」 |
+| Financial Info › Payment Info | 付款在 App 外由 Apple 處理，開發者拿不到付款資料。Apple：「If your app uses a payment service, the payment information is entered outside your app, and you as the developer never have access to the payment information, it is not collected and does not need to be disclosed.」 |
+| User ID（**待決定**） | App 沒有自己的帳號系統。訂閱記錄以 Apple 的原始交易 ID（`originalTransactionId`，續訂時不變）為索引：隱私權政策第 7 節已經這樣寫，因為每次續訂的 `transactionId` 都不同，要跨續訂計數就只能用它。它是購買的識別碼，已算在 Purchase History；但它在整個訂閱期間不變，要不要也勾 User ID 是判斷題，請在送審前決定。保守的做法是勾（App Functionality、連結、不追蹤），勾了就在 5.1 加上這一項，並把 `PrivacyInfo.xcprivacy` 一起改（5.4）。 |
+| 照片圖庫 | 系統的照片選擇器在 App 之外執行，只把使用者選的那張照片交給 App（只讀圖片資料，不讀 `PHAsset`），所以不要求照片圖庫權限，也沒有 `NSPhotoLibraryUsageDescription`。只有使用者附加並送出的照片才會離開 iPhone（Photos or Videos）。 |
 | Contacts | 沒有使用 Contacts framework。 |
-| Location（Precise / Coarse） | 沒有使用 CoreLocation；行程地點是使用者內容（Other User Content），IP 不用來推算位置。 |
+| Location（Precise / Coarse） | 沒有使用 CoreLocation；行程地點是使用者內容（Other User Content），照片送出前去掉位置中繼資料，IP 不用來推算位置。 |
 | Health & Fitness | 沒有 HealthKit 或動作感測資料；「我想半年內變壯」這類目標是使用者輸入的內容。 |
-| Usage Data、Diagnostics（含 Crash Data）、Advertising | 沒有分析、廣告、當機回報或追蹤的 SDK（`project.yml` 只有 target 之間的相依，沒有任何第三方套件），也沒有用 MetricKit、AdSupport 或 App Tracking Transparency。 |
-| User ID | App 沒有自己的帳號系統。 |
-| 對話紀錄、偏好設定、「助理記得的事」、匯出檔 | 只存在 iPhone，不會上傳。 |
+| Usage Data 的其他項目（Advertising Data、Other Usage Data）、Diagnostics（含 Crash Data）、Advertising | 沒有分析、廣告、當機回報或追蹤的 SDK（`project.yml` 只有 target 之間的相依，沒有任何第三方套件），也沒有用 MetricKit、AdSupport 或 App Tracking Transparency。Usage Data 只為每月額度勾 Product Interaction（5.2）。 |
+| 對話紀錄、偏好設定、「助理記得的事」、匯出檔 | 只存在 iPhone，不會上傳。附加的照片和 PDF 不存在 iPhone 上，對話紀錄只寫「附加了照片／PDF」。 |
 
-### 5.4 對照 `PrivacyInfo.xcprivacy` 的結果
+### 5.4 對照 `PrivacyInfo.xcprivacy`
 
-- `App/PrivacyInfo.xcprivacy`：`NSPrivacyTracking` false、沒有 tracking domains；宣告 Other User Content 和 Device ID，都 linked、不追蹤、用途 App Functionality。和 5.1 一致。Device ID 指的是 App Attest 金鑰 ID（1.0 沒有 push-to-start 的安裝 ID 或 push token）。
-- `NotificationContent/PrivacyInfo.xcprivacy`：只宣告 Other User Content（擴充會送 AI 請求，帶的是 App 替它取得的 session token；金鑰 ID 由主 App 的 Device ID 宣告）；`Widgets/PrivacyInfo.xcprivacy`：沒有收集任何資料。App Privacy 問卷是整個 App 一份，以主 App 為準。
+- `App/PrivacyInfo.xcprivacy` **目前**：`NSPrivacyTracking` false、沒有 tracking domains；宣告 Other User Content 和 Device ID，都 linked、不追蹤、用途 App Functionality。**建置附件和訂閱時要加上** Photos or Videos、Purchase History、Product Interaction（都 linked、不追蹤、App Functionality；常數名稱大概是 `NSPrivacyCollectedDataTypePhotosorVideos`、`NSPrivacyCollectedDataTypePurchaseHistory`、`NSPrivacyCollectedDataTypeProductInteraction`，加之前對照 Apple 的清單），讓它和 5.1 一致。不宣告 Audio Data。Device ID 指的是 App Attest 金鑰 ID（1.0 沒有 push-to-start 的安裝 ID 或 push token）。
+- `NotificationContent/PrivacyInfo.xcprivacy`：只宣告 Other User Content（擴充會送 AI 請求，帶的是 App 替它取得的 session token；金鑰 ID 由主 App 的 Device ID 宣告）。擴充的回覆也算進每月額度，要不要在它的 manifest 也宣告 Product Interaction，建置時決定。`Widgets/PrivacyInfo.xcprivacy`：沒有收集任何資料。App Privacy 問卷是整個 App 一份，以主 App 為準。
 
 ---
 
@@ -444,33 +457,39 @@ Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級�
 
 ### 8.2 備註（Notes，最多 4000 位元組，英文）
 
-**要貼的是下面這一段**（唯一的貼上來源）。`docs/review-notes.md` 是背景說明：英文段落超過 App Store Connect 的 4000 位元組上限，也沒有測試帳號，不要整份貼上。下面是重寫並更新到同意說明第 5 版（1.0 沒有 iOS 18 push-to-start）、且放得下的版本；`☰`、`›`、`⋯` 每個佔 3 位元組，已經算進去。
+**要貼的是下面這一段**（唯一的貼上來源）。`docs/review-notes.md` 是背景說明：英文段落超過 App Store Connect 的 4000 位元組上限，也沒有測試帳號，不要整份貼上。下面是重寫並更新到同意說明第 6 版（第 5 版起 1.0 沒有 iOS 18 push-to-start；第 6 版加入附件那一項）、加上 2026-10-18 決定的語音輸入、AI 訂閱和照片／PDF 附件、且放得下的版本（`[NAME]` 填訂閱群組的顯示名稱，`[PAYWALL PATH]` 填打開 paywall 的路徑，例如頭像 › 訂閱區塊；填完重算位元組）；`☰`、`›`、`⋯` 每個佔 3 位元組，已經算進去。
 
 <!-- asc:en/review-notes -->
 ```text
 TRY IT WITHOUT SIGNING IN
-On first launch the main screen shows "Connect Google Calendar" and "Try without signing in". Tap "Try without signing in" (also: avatar at top right, or ☰ › General › Demo mode). Demo mode has fictional sample calendars and needs no Google account. Its assistant is the real AI (see below) on the sample data; without AI permission or a connection, offline rules answer and say so. Try the chips, e.g. "I want to be muscular in 6 months" (a plan card with Add / Keep editing). Please allow notifications at launch: the sample "Online meeting with Joe" starts 21 minutes after the demo starts, its Live Activity appears at once and a reminder arrives about a minute later.
+On first launch tap "Try without signing in" (also: ☰ › General › Demo mode). Demo mode needs no Google account and runs the real AI (see below) on fictional sample calendars; without AI permission or a connection, offline rules answer and say so. Try the chips, e.g. "I want to be muscular in 6 months" (a plan card with Add / Keep editing). Allow notifications: the sample "Online meeting with Joe" starts 21 minutes after the demo starts, so its Live Activity appears at once and a reminder about a minute later.
 
 FULL FEATURES: TEST GOOGLE ACCOUNT
-The account in Sign-In Information is a test Google account with sample events. Tap "Connect Google Calendar", enter its address, tap "Continue with Google", sign in on Google's page and allow calendar access. If Google asks for a code, use a backup code: [CODE 1] [CODE 2] [CODE 3]. A Google account is needed only to read and write Google Calendar. Google sign-in only connects the person's own Google Calendar; the app has no accounts of its own, so Sign in with Apple is not required (4.8).
+The account in Sign-In Information is a test Google account with sample events. Tap "Connect Google Calendar", enter its address, tap "Continue with Google", sign in and allow calendar access. If Google asks for a code, use a backup code: [CODE 1] [CODE 2] [CODE 3]. The app has no accounts of its own; Google sign-in only connects Google Calendar, so Sign in with Apple is not required (4.8).
 
 AI ASSISTANT AND CONSENT (5.1.2(i))
-The assistant uses Google's Gemini API through our server (it holds the API key; the app has none and uses App Attest), so the server must be reachable; calendar features work without it. The first message opens "Use the AI assistant?", which lists what is sent: the request text; titles, times, notes and Google event IDs of up to 40 events in the next 14 days; one event's location only for AI suggestions; calendar names and assistant settings; time zone and language. It names Google as the recipient and asks Allow / Not now. Google account email addresses are never sent (calendars appear as "Account 1", "Account 2"). Not now keeps the assistant off. Settings (☰ › General) › AI & privacy shows the status, "What is sent", Allow and Stop sharing. Siri and notification replies refuse until permission is given in the app (demo mode: offline rules). Demo requests carry only the fictional sample events, never Google data.
+The assistant uses Google's Gemini API through our server (it holds the API key; the app uses App Attest); calendar features work without it. The first message opens "Use the AI assistant?", which lists what is sent: the request text; a photo or PDF the person attaches; titles, times, notes and Google event IDs of up to 40 events in the next 14 days; one event's location only for AI suggestions; calendar names and assistant settings; time zone and language. It names Google as the recipient (no Google account email is ever sent) and asks Allow / Not now; Not now keeps the assistant off. Settings › AI & privacy shows "What is sent", Allow and Stop sharing. Siri and notification replies refuse until permission is given in the app. Demo requests carry only the sample events, never Google data.
+
+VOICE INPUT (FREE)
+The mic button in the chat and Quick Capture turns speech into text on the iPhone only (requiresOnDeviceRecognition = true; hidden if the language has no on-device support). Microphone and Speech Recognition are asked on the first tap. No audio is stored or sent; nothing is sent until Send.
+
+SUBSCRIPTION (SANDBOX) AND ATTACHMENTS
+The AI has a small free monthly allowance; the auto-renewable subscription [NAME] (free trial) adds a larger one and photo/PDF attachments. Buy it with a sandbox account at [PAYWALL PATH]; the paywall links to the Terms of Use (Apple's standard EULA) and Privacy Policy. Then tap the paperclip: Take Photo (Camera permission), Photo Library (system picker, no library permission) or a PDF from Files. Send a photo of a dated ticket: the events found wait on a card with Add / Edit and are never added directly. Without the subscription the paperclip offers it.
 
 LIVE ACTIVITY / DYNAMIC ISLAND
-One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island; default 30, or Off) until it ends; it leaves the Lock Screen 10 minutes after the end. No upcoming event, no Live Activity. Everything happens on the iPhone: nothing is sent to our server and no AI permission is needed. iOS 26: opening the app schedules the next two days' activities (Activity.request with a start date), so each appears on time with the app closed. iOS 18 cannot schedule them: an activity appears when the app is opened during the lead time or the event, and stays after the app closes. The countdown is a system timer. Tapping it opens Quick Capture.
+One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island) until it ends, made on the iPhone (nothing goes to our server, no AI permission needed). iOS 26 schedules the next two days' activities when the app opens, so they appear with the app closed; on iOS 18 one appears when the app is opened during the lead time or the event. Tapping it opens Quick Capture.
 
 CONTROL CENTER
-The "Smart Schedules" control (Control Center › + › Add a Control) opens Quick Capture with the keyboard up. It never starts a Live Activity.
+The "Smart Schedules" control opens Quick Capture with the keyboard up.
 
 NOTIFICATION REPLIES
-Long-press a reminder and type, e.g. "push this 30 minutes later". The extension updates the event (Google Calendar, or the sample data in demo mode) before the notification closes; deleting needs a red Confirm button. "Snooze 10 min" is also offered.
+Long-press a reminder and type, e.g. "push this 30 minutes later"; the event is updated before the notification closes (deleting needs a red Confirm). "Snooze 10 min" is also offered.
 
 DATA DELETION (5.1.1(v))
-Remove account (avatar › ⋯ next to the account, or swipe left; or ☰ › ⋯ next to the address) revokes Google access and deletes its tokens and cached events. ☰ › General › Data › "Erase all data on this device" revokes every Google account, withdraws AI permission and deletes all local data. Events in Google Calendar are not deleted.
+Remove account (avatar › ⋯ next to the account, or ☰ › ⋯) revokes Google access and deletes its tokens and cached events. ☰ › General › Data › "Erase all data on this device" revokes every Google account, withdraws AI permission and deletes all local data. Events in Google Calendar are not deleted.
 
 OTHER
-No in-app purchases or subscriptions. Rated 18+ because Google's Gemini API terms require users to be 18 or older. The app does not use the microphone or speech recognition.
+Rated 18+ because Google's Gemini API terms require users to be 18 or older.
 ```
 
 ### 8.3 審核員追問時可以用的回答（英文，不受 4000 位元組限制）
@@ -484,9 +503,15 @@ Background modes: only "fetch", which lets background app refresh sync Google Ca
 
 NSSupportsLiveActivitiesFrequentUpdates: declared, but Live Activities get no updates from a server at all; the countdown uses Text(timerInterval:).
 
-What our server keeps: AI requests are passed to Google's Gemini API and not stored, and no calendar data is stored at all (Live Activities are made on the iPhone). The server keeps the App Attest key record used to verify the app.
+What our server keeps: AI requests, including attached photos and PDFs, are passed to Google's Gemini API and not stored, and no calendar data is stored at all (Live Activities are made on the iPhone). The server keeps the App Attest key record used to verify the app, with this installation's number of AI requests in the latest month it was used, for the free allowance. For a subscription it checks the purchase record Apple signed and keeps only the original transaction ID, the expiry date and the monthly request count, deleted 30 days after the latest expiry date it received. The purchase record goes to the server separately from the Gemini request and never reaches Google. It never receives payment details or the person's Apple Account name or email.
 
-Speech: the app has no microphone or speech-recognition feature and asks for neither permission. People can speak a request to Siri ("Add a plan in Smart Schedules") or use the keyboard's dictation key; Apple turns the speech into text, and the app only receives the text.
+Speech: the mic button in the chat and Quick Capture uses SFSpeechRecognizer with requiresOnDeviceRecognition = true, so speech is recognised on the iPhone only and no audio leaves it; the button is hidden when the iPhone has no on-device support for the chosen language (Chinese (Taiwan) or English (US)). Microphone and Speech Recognition permission are asked on the first tap. The audio is not saved; the words fill the text field and nothing is sent until the person taps Send. Voice input is free. People can also speak to Siri ("Add a plan in Smart Schedules") or use the keyboard's dictation key; Apple turns that speech into text, and the app receives text.
+
+Photos and PDFs (subscription): the paperclip offers Take Photo (Camera permission), Photo Library (the system photo picker, so no photo-library permission is requested and the app receives only the picked photo) and a PDF from Files. The file is sent with that one request through our server, which does not store it, to the Gemini API; photos are reduced in size and re-encoded first, which removes location and other metadata. The app keeps no copy after the reply. Events found are always shown on a review card (Add / Edit) and never added directly. The consent dialog lists attachments, so nothing is sent before Allow.
+
+Paid features and AI permission (5.1.1(ii)): the subscription buys a larger AI allowance and attachments. Every AI request, free or paid, is sent to Google's Gemini API, which is how the assistant works; the consent dialog asks before anything is sent, and the subscription asks for no other data access. Calendar views, editing events, reminders and Live Activities work without AI permission.
+
+Subscription: an auto-renewable subscription bought with StoreKit 2. The app checks entitlements on the iPhone and sends the signed transaction to our server, which verifies Apple's signature (sandbox transactions included, for review) to apply the monthly allowance. The paywall shows the price, period, free trial and what is included, and links to the Terms of Use and the Privacy Policy.
 
 Siri: "Add a plan in Smart Schedules" runs without opening the app. It checks AI permission first and answers "Turn on AI data sharing in the Smart Schedules settings first." when it is missing. Long-term plans made through Siri wait in the app until the person taps Add. In demo mode Siri uses the real assistant on the sample data when AI permission was given in the app, and the offline demo rules otherwise.
 
@@ -497,8 +522,7 @@ iPhone only: the app targets iPhone. The Dynamic Island needs an iPhone that has
 Accounts: Smart Schedules has no accounts of its own, so there is no account to delete (5.1.1(v)). Connected Google accounts can be removed one by one, which revokes the app's access at Google, and "Erase all data on this device" removes everything. Google sign-in tokens never leave the iPhone except to Google.
 ```
 
-如果你決定說明二進位檔裡保留的 StoreKit 程式碼（Guideline 2.3.1 不允許隱藏功能；這段程式碼在 1.0 執行不到），可以在上面加一句：
-`The binary contains StoreKit code for a possible later subscription; it is switched off at build time and can only be turned on in a later version submitted for review.`
+1.0 會賣 AI 訂閱（2026-10-18 決定），StoreKit 程式碼在 1.0 是開著的，所以不再需要說明「關閉的 StoreKit 程式碼」那一句。
 
 ---
 
@@ -572,15 +596,16 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 | 專注模式過濾條件 | `App/Intents/CalendarFocusFilter.swift` |
 | 一直略過的提醒會問要不要停掉 | `Shared/Notifications/ReminderEngagement.swift`、`Shared/Storage/PreferencesStore.swift`（連續 `LearnedSuggestion.dismissThreshold` = 5 次，`Shared/Models/PreferenceLedger.swift`） |
 | 示範模式：允許 AI 後用真正的助理處理範例行程；沒有允許或 AI 無法使用時用離線規則 | `Shared/Orchestrator/DemoModeAssistant.swift`；`Shared/Calendar/CalendarRouter+Sample.swift`；`ChatViewModel.enableDemo()` |
-| 同意前不送任何資料給 AI；同意說明的內容 | `GeminiClient.generate` 的 `consentRequired`；`Shared/Storage/AIConsentStore.swift`（`AIConsentDisclosure`，第 5 版；`serverNote` 在 1.0 是 nil） |
+| 同意前不送任何資料給 AI；同意說明的內容 | `GeminiClient.generate` 的 `consentRequired`；`Shared/Storage/AIConsentStore.swift`（`AIConsentDisclosure`，程式目前第 6 版（第 6 版加入附件那一項）；`serverNote` 在 1.0 是 nil） |
 | 帳號 email 不會傳給 AI | `Shared/AI/CalendarAliases.swift`、`Shared/Models/PromptRedaction.swift`、`Tests/Unit/AccountEmailPrivacyTests.swift` |
 | 伺服器不保存請求，也不存任何行程（1.0 沒有 push-to-start） | `server/worker/src/gemini.ts`；`AppConstants.pushToStartEnabled = false`、`PushToStartRegistrar.install(enabled:upload:)`；`server/worker/wrangler.toml` 的 `crons = []` |
 | 沒有廣告、沒有追蹤 | `project.yml` 沒有第三方套件；`App/PrivacyInfo.xcprivacy` 的 `NSPrivacyTracking` 是 false |
 | 匯出、移除帳號（撤銷授權）、清除所有資料 | `App/Privacy/DataExporter.swift`、`App/Auth/AccountManager.swift`、`App/Privacy/DataEraser.swift` |
 | iOS 18 以上；繁體中文和英文 | `project.yml`（`deploymentTarget iOS 18.0`）；`Shared/Localization/Localizable.xcstrings` |
 
-刻意**沒有**寫進商店文字的：主畫面小工具（沒有）、貼上連結就讀網頁內容（迴紋針只把網址文字貼進輸入框，Gemini 只看到網址文字）、
-訂閱或 Pro、iPad 或 Mac、特定的 Gemini 模型版本、語音輸入（1.0 沒有麥克風；Siri 和鍵盤的聽寫是系統功能）。
+刻意**沒有**寫進商店文字的：主畫面小工具（沒有）、貼上連結就讀網頁內容（Gemini 只看到網址文字）、
+iPad 或 Mac、特定的 Gemini 模型版本、價格。語音輸入（已在程式裡，`App/Voice/VoiceTranscriber.swift`）、照片和 PDF 附件、AI 訂閱（建置中；迴紋針會改成拍照、照片和 PDF）
+目前也還沒寫進描述：功能做好、對照過程式碼之後再加，並在這張表補上依據。
 
 ---
 
