@@ -170,6 +170,10 @@ NSExtensionAttributes:
   UNNotificationExtensionDefaultContentHidden: true      # header 由我們自己畫（「31」圖示加大寫標題）
 ```
 
+**擴充功能一定要明確連結 `UserNotifications.framework` 和 `UserNotificationsUI.framework`**（project.yml 裡這個 target 的 `dependencies: - sdk:`）。程式只用到 `UNNotificationContentExtension` 這個 protocol 和幾個 enum，沒有用到 UserNotificationsUI 的任何符號，所以光寫 `import UserNotificationsUI` 的自動連結會被 linker 拿掉；iOS 找不到擴充功能的 context class（`_UNNotificationContentExtensionVendorContext`），長按後只剩一個 0.75 比例的空白框，按鈕照樣出現（2026-10-18 實機）。`scripts/validate_schema.py` 檢查 project.yml，CI 用 `otool -L` 檢查建好的擴充功能真的連結了它。
+
+擴充功能的第一個畫面只用通知本身的文字：`NotificationChatModel` 等到第一次回覆才建立助理（`ScheduleAssistant` 會讀設定檔和函式定義）。`Logger.card` 在 Console.app 記下 `viewDidLoad` 和 `didReceive`：搜尋 `SmartScheduleNotificationContent`，沒有 `viewDidLoad` 就代表 iOS 根本沒載入擴充功能。
+
 ## 12. 兩條輸入路徑
 
 | 路徑 | 可靠度 | 說明 |

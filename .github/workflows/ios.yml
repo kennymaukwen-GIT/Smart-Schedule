@@ -211,6 +211,24 @@ jobs:
             echo "bundled: ${f#$APP/}"
           done
 
+      - name: Notification extension links UserNotificationsUI
+        # Without that load command iOS cannot load the long-press card and shows a blank box (2026-10-18).
+        run: |
+          set -euo pipefail
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -type d -path "*/Build/Products/Debug-iphonesimulator/SmartSchedule.app" | head -1)
+          APPEX="$APP/PlugIns/SmartScheduleNotificationContent.appex"
+          test -d "$APPEX" || { echo "::error::SmartScheduleNotificationContent.appex is not embedded"; exit 1; }
+          found=""
+          for bin in "$APPEX/SmartScheduleNotificationContent" "$APPEX/SmartScheduleNotificationContent.debug.dylib"; do
+            if [ -f "$bin" ]; then
+              echo "== ${bin#$APP/}"
+              xcrun otool -L "$bin" | grep -i usernotifications || true
+              if xcrun otool -L "$bin" | grep -q "/UserNotificationsUI.framework/UserNotificationsUI"; then found=yes; fi
+            fi
+          done
+          test -n "$found" || { echo "::error::the notification extension does not link UserNotificationsUI.framework"; exit 1; }
+          find "$APPEX" -name FunctionDeclarations.json | grep -q . || { echo "::error::FunctionDeclarations.json is missing from the notification extension"; exit 1; }
+
       - name: Run unit tests
         run: |
           set -o pipefail

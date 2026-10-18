@@ -194,6 +194,13 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.smartschedules.app.notification-content
         SKIP_INSTALL: YES
+    # Linked explicitly. The extension uses no symbol of UserNotificationsUI (only its protocol and enums), so the
+    # linker drops the framework `import UserNotificationsUI` merely auto-links; iOS then cannot find the extension's
+    # context class (_UNNotificationContentExtensionVendorContext) and the long-pressed reminder stays a blank box at
+    # the 0.75 initial size (seen on the owner's iPhone, 2026-10-18). scripts/validate_schema.py and CI check this.
+    dependencies:
+      - sdk: UserNotifications.framework
+      - sdk: UserNotificationsUI.framework
     info:
       path: NotificationContent/Info.plist
       properties:

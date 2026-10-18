@@ -1,7 +1,14 @@
+import os
 import SwiftUI
 import UIKit
 import UserNotifications
 import UserNotificationsUI
+
+extension Logger {
+    /// How far the long-press card got (Console.app › the iPhone › search "SmartScheduleNotificationContent"): no
+    /// "viewDidLoad" line means iOS never loaded the extension (project.yml links UserNotificationsUI for that).
+    static let card = Logger(subsystem: "com.smartschedules.app.notification-content", category: "card")
+}
 
 /// "HOLD MESSAGE TO SPAWN" (Artboard 1).
 ///
@@ -14,6 +21,7 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        Logger.card.notice("viewDidLoad")
         let host = UIHostingController(rootView: NotificationChatView(model: model))
         host.view.backgroundColor = .clear
         addChild(host)
@@ -35,7 +43,12 @@ final class NotificationViewController: UIViewController, UNNotificationContentE
     }
 
     func didReceive(_ notification: UNNotification) {
+        Logger.card.notice("didReceive \(notification.request.content.categoryIdentifier, privacy: .public)")
         model.load(notification.request.content)
+        // Again now that the view has its real width (in viewDidLoad it may still be 0).
+        if model.turns.isEmpty {
+            preferredContentSize = CGSize(width: view.bounds.width, height: NotificationChatModel.collapsedHeight)
+        }
     }
 
     func didReceive(_ response: UNNotificationResponse,

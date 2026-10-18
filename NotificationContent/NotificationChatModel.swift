@@ -103,19 +103,33 @@ final class NotificationChatModel {
 
     @ObservationIgnored var onPreferredHeightChange: ((CGFloat) -> Void)?
     @ObservationIgnored private var focusEventID: String?
-    @ObservationIgnored private let assistant: any ScheduleAssisting
-    @ObservationIgnored private let clock = WallClock()
+    @ObservationIgnored private let injectedAssistant: (any ScheduleAssisting)?
+    @ObservationIgnored private var madeAssistant: (any ScheduleAssisting)?
+    @ObservationIgnored private var madeClock: WallClock?
 
     /// `assistant` nil = `DemoModeAssistant` in demo mode (the AI on the sample data with consent given in the app,
-    /// its offline rules otherwise; it never refuses), otherwise a `ScheduleAssistant`.
+    /// its offline rules otherwise; it never refuses), otherwise a `ScheduleAssistant`. Nothing is built here: iOS
+    /// creates this model before the card's first frame, which needs only the notification's own text.
     init(assistant: (any ScheduleAssisting)? = nil) {
-        if let assistant {
-            self.assistant = assistant
-        } else if AppConstants.isDemoMode {
-            self.assistant = DemoModeAssistant()
-        } else {
-            self.assistant = ScheduleAssistant() // own instance: the extension is a separate process from the app
-        }
+        injectedAssistant = assistant
+    }
+
+    /// Made at first use (the first reply or card), not with the card: building it reads the preferences file and
+    /// the function declarations.
+    private var assistant: any ScheduleAssisting {
+        if let existing = injectedAssistant ?? madeAssistant { return existing }
+        // Own instance: the extension is a separate process from the app.
+        let made: any ScheduleAssisting = AppConstants.isDemoMode ? DemoModeAssistant() : ScheduleAssistant()
+        madeAssistant = made
+        return made
+    }
+
+    /// Made at first use: WallClock() reads the preferences file through a file coordinator.
+    private var clock: WallClock {
+        if let madeClock { return madeClock }
+        let made = WallClock()
+        madeClock = made
+        return made
     }
 
     var isDemo: Bool { assistant is DemoAssistant || assistant is DemoModeAssistant }

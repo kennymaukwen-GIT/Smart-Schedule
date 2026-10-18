@@ -631,6 +631,30 @@ def microphone_checks() -> None:
                 errors.append(f"{path.relative_to(ROOT)}: {key} is declared, but 1.0 has no microphone")
 
 
+def notification_extension_checks() -> None:
+    """The long-press card (SmartScheduleNotificationContent) only loads when the extension binary links
+    UserNotificationsUI: it uses no symbol of it, so `import UserNotificationsUI` alone is dropped by the linker and iOS
+    shows a blank box (owner's iPhone, 2026-10-18). project.yml must link both frameworks explicitly, and the
+    extension's categories must be the ones the app posts (NotificationIDs.Category)."""
+    text = re.sub(r"(^|\s)#.*", r"\1", (ROOT / "project.yml").read_text(encoding="utf-8"))
+    block = re.search(r"^  SmartScheduleNotificationContent:\n(.*?)(?=^  \S|\Z)", text, re.M | re.S)
+    if not block:
+        errors.append("project.yml: target SmartScheduleNotificationContent not found")
+        return
+    for framework in ("UserNotifications.framework", "UserNotificationsUI.framework"):
+        if not re.search(rf"^\s*- sdk: {re.escape(framework)}\s*$", block.group(1), re.M):
+            errors.append(f"project.yml: SmartScheduleNotificationContent must link {framework} (dependencies: - sdk:)")
+    listed = re.search(r"UNNotificationExtensionCategory:\s*\[([^\]]*)\]", block.group(1))
+    ids = (ROOT / "Shared/Notifications/NotificationIDs.swift").read_text(encoding="utf-8")
+    category_enum = re.search(r"enum Category \{(.*?)\}", ids, re.S)
+    posted = sorted(re.findall(r'static let \w+ = "([^"]+)"', category_enum.group(1))) if category_enum else []
+    configured = sorted(c.strip() for c in listed.group(1).split(",")) if listed else []
+    if not posted or configured != posted:
+        errors.append(f"project.yml: UNNotificationExtensionCategory {configured} must equal NotificationIDs.Category {posted}")
+    else:
+        print(f"✓ Notification content extension links UserNotifications + UserNotificationsUI; categories {configured}")
+
+
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
     by_name = {}
@@ -690,6 +714,7 @@ def main() -> int:
     print(f"✓ Subscriptions off: {subscription_checks()} files gated by {SUBSCRIPTION_FLAG}")
     print(f"✓ Push-to-start off, no aps-environment: {push_checks()} files gated by {PUSH_TO_START_FLAG}")
     microphone_checks()
+    notification_extension_checks()
     print("✓ No microphone or speech recognition, no usage descriptions for them")
 
     if errors:
