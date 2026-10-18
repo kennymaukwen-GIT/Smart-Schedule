@@ -3,7 +3,7 @@
 Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.events`、`calendar.calendarlist.readonly`），所以正式上線前要在 Google Auth Platform 完成兩件事：**品牌驗證**（App 名稱和 logo 才會出現在同意畫面）和**敏感 scope 驗證**。這份文件列出要填的每個欄位、要貼進表單的英文、示範影片的分鏡腳本、送審順序、常見退件原因，以及回覆審查信的範本。
 
 - 中文是說明；`text` 區塊裡的英文是要**原樣貼進 Google 表單或回信**的內容。
-- 依據的程式是 2026-10-16 的工作目錄（AI 同意說明第 5 版，2026-10-18 加入附件那一項後是第 6 版：Google 帳號 email 不送給 Gemini（第 4 版起）；1.0 不用 iOS 18 的即時動態 push-to-start，伺服器不存任何行程，同意畫面在 iOS 18 也沒有伺服器那一段），加上 2026-10-18 決定、1.0 會一起上的三項：App 自己的語音輸入（只在 iPhone 上辨識，已在程式裡）、照片和 PDF 附件（訂閱功能），以及 AI 訂閱（免費使用者有少量每月額度）。後兩項在審查期間建置；隱私權政策已先照 1.0 上架時的樣子寫好，審查期間不再改政策。網站在 **https://www.smart-schedules.com**（Vercel，DNS 留在 Squarespace，見 [`site/README.md`](../site/README.md) §3）。程式的 scope、同意說明或網站改了，這份文件、表單和影片都要跟著改。
+- 依據的程式是 2026-10-16 的工作目錄（AI 同意說明第 5 版，2026-10-18 加入附件那一項後是第 6 版：Google 帳號 email 不送給 Gemini（第 4 版起）；1.0 不用 iOS 18 的即時動態 push-to-start，伺服器不存任何行程，同意畫面在 iOS 18 也沒有伺服器那一段），加上 2026-10-18 決定、1.0 會一起上的四項：App 自己的語音輸入（只在 iPhone 上辨識，已在程式裡）、照片和 PDF 附件（訂閱功能）、AI 訂閱（免費使用者有少量每月額度），以及出發提醒「該出發了」（只有使用者問什麼時候該出發、或說要在什麼時間到哪裡時才取得位置，只送到 Apple 的地圖服務；行程的地點和開始時間也送到那裡，見 5.1）。後三項在審查期間建置；隱私權政策已先照 1.0 上架時的樣子寫好，審查期間不再改政策。網站在 **https://www.smart-schedules.com**（Vercel，DNS 留在 Squarespace，見 [`site/README.md`](../site/README.md) §3）。程式的 scope、同意說明或網站改了，這份文件、表單和影片都要跟著改。
 - Google 的官方頁面（developers.google.com、support.google.com）在撰寫環境打不開，下面的規定來自這些頁面的搜尋摘要，另有幾項來自第三方或開發者論壇（會註明）。**送審前請再讀一次第 10 節列出的原文**，按鈕名稱以控制台實際顯示為準。
 
 > **重要，先讀這段：Cloud 專案在 Google Workspace 組織 `smart-schedules.com` 底下（2026-10-15 依 Admin console 截圖更新）**
@@ -55,7 +55,7 @@ Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.eve
 
 - [ ] **網站已上線**：`https://www.smart-schedules.com` 和 `https://www.smart-schedules.com/privacy` 直接回 200（不要用 `/privacy.html`、`http://` 或沒有 `www` 的根網域：前兩個會轉址，根網域不提供網站，最多轉到 www）。`grep -rn 'class="todo"' site/public` 什麼都不印（開發者名稱等佔位字已替換，見 [`site/README.md`](../site/README.md) 第 1 節）。網站沒有會擋機器人的驗證頁（DNS 不在 Cloudflare，所以沒有 Cloudflare 區域層級的 Bot Fight Mode、Under Attack 這些設定；用 `curl -sI https://www.smart-schedules.com/privacy` 看到 `200` 就好）。
 - [ ] **首頁**：說明 App 做什麼、為什麼要用 Google 日曆，連到隱私權政策，有 Limited Use 聲明（`index.html` 的「AI and privacy」）。不是登入頁。
-- [ ] **隱私權政策**：第 3 節逐一列出四個 scope 和用途，第 4 節說明 AI 送出什麼（和 App 的同意說明逐字相同，包括 2026-10-18 加的附件那一項「A photo or PDF you attach (only when you attach one and send)」）和照片、PDF 附件，第 5 節說明即時動態只在 iPhone 上產生，第 7 節訂閱和每月額度，第 8 節語音輸入只在 iPhone 上辨識，第 11 節 Limited Use，第 13 節保存期限，第 15 節刪除方式。
+- [ ] **隱私權政策**：第 3 節逐一列出四個 scope 和用途，第 4 節說明 AI 送出什麼（和 App 的同意說明逐字相同，包括 2026-10-18 加的附件那一項「A photo or PDF you attach (only when you attach one and send)」）和照片、PDF 附件，第 5 節說明即時動態只在 iPhone 上產生，第 7 節訂閱和每月額度，第 8 節語音輸入只在 iPhone 上辨識和出發提醒（位置只送到 Apple 的地圖服務，行程只存提早分鐘數、交通方式和開始前幾分鐘出發），第 11 節 Limited Use（傳輸清單包括出發提醒用的 Apple 地圖服務和 Google 地圖），第 13 節保存期限，第 15 節刪除方式。
 - [ ] **App**：TestFlight 上的版本已包含同意說明第 6 版（`AIConsent.disclosureVersion` = 6：加入附件那一項的同一個改動把 5 改成 6，因為同意的內容變了，已在 TestFlight 上允許過第 5 版的人也要重新同意，符合政策第 18 節；`CalendarAliases` 取代帳號 email，`AppConstants.pushToStartEnabled = false`），CI 的 `AccountEmailPrivacyTests` 通過。影片要用這個版本錄。**錄影前**同意畫面要已經有附件那一項（緊接在第一項後面，共六項），語音那一句要是目前程式的文字（「… The microphone button in Smart Schedules does it on your iPhone. Smart Schedules sends only the text, never audio.」），這樣影片裡的同意畫面才和政策第 4 節的引用一致；附件功能本身還沒做好也沒關係，影片不用示範它。
 - [ ] **Gemini 是付費層級**：Gemini API 的 Google Cloud 專案已連結有效的 Cloud Billing，AI Studio 的記錄（Logs）關閉、沒有選擇把資料集分享給 Google（[`site/README.md`](../site/README.md) 第 2 節）。這是下面「不用於訓練」那些句子成立的條件；免費層級時**不要送審**。英國也在上架範圍，Gemini 條款要求對英國使用者只能用付費服務，所以本來就必須是付費層級。
 - [ ] **Cloud 專案**：已啟用 Google Calendar API；Google Auth Platform › Clients 只有一個 iOS client（Bundle ID `com.smartschedules.app`，填好 Team ID）。測試時建立的 Web／Desktop client 先刪掉：Google 要求影片涵蓋專案裡所有 OAuth client。
@@ -141,22 +141,22 @@ Smart Schedules is an iPhone calendar app and AI scheduling assistant for Google
 Calendar sync runs directly between the iPhone and the Google Calendar API. OAuth tokens are kept in the iOS Keychain and are only ever sent to Google (the Calendar API and Google's token and revoke endpoints). Users can remove an account in the app, which revokes the app's access at Google.
 
 Home page: https://www.smart-schedules.com
-Privacy policy: https://www.smart-schedules.com/privacy (Google permissions: section 3; AI assistant: section 4; Limited Use: section 11)
+Privacy policy: https://www.smart-schedules.com/privacy (Google permissions: section 3; AI assistant: section 4; departure reminders: section 8; Limited Use: section 11)
 ```
 
 ### 4.2 `calendar.events`
 
 ```text
 Smart Schedules is a Google Calendar client for iPhone. It uses calendar.events to:
-1. Read events (events.list, events.get) in the user's calendars to show them in month, week and day views and in the event list, and to schedule reminders and Live Activities on the iPhone.
+1. Read events (events.list, events.get) in the user's calendars to show them in month, week and day views and in the event list, and to schedule reminders, departure reminders and Live Activities on the iPhone.
 2. Create events (events.insert) when the user adds them, for example by typing "lunch with Joe tomorrow at 12:30" to the in-app assistant (or saying it to Siri), or by tapping Add on events or a plan the assistant proposed.
-3. Change events (events.patch) when the user edits the title, time, location, reminders or notes on the event page, or asks the assistant to move an event.
+3. Change events (events.patch) when the user edits the title, time, location, reminders or notes on the event page, or asks the assistant to move an event or when to leave for it (the app then saves in the event's private extended properties only how many minutes early the user wants to arrive, the travel mode and how many minutes before the start to leave).
 4. Delete events (events.delete) when the user taps Delete event or confirms a deletion the assistant proposed.
 All calls are made by the app on the user's iPhone directly to the Google Calendar API, in response to the user's actions or to keep the on-device copy in sync.
 
 Why a narrower scope is not enough: calendar.events.readonly and calendar.events.owned.readonly cannot create, change or delete events. calendar.events.owned covers only calendars the user owns, but users also see calendars other people share with them and edit the shared calendars they have "Make changes to events" access to (family or team calendars). calendar.app.created covers only calendars the app itself creates, while users manage events in their existing calendars. calendar.events.freebusy returns no event details. We do not request the full calendar scope: the app never changes calendar settings or sharing, and never creates or deletes calendars.
 
-Data handling: calendar data is cached on the iPhone. Our server is not involved in sync and never receives OAuth tokens. Only after the user taps Allow in the in-app "Use the AI assistant?" dialog does the assistant send the request with limited event details (titles, times, notes and event IDs of up to 40 events in the 14 days from today; never Google account email addresses) through our server, which does not store it, to Google's Gemini API on a billed (paid) Cloud project. Reminders and Live Activities are created on the iPhone; no calendar data is stored on our server. We never sell Google user data, use it for ads, or use it to train any AI or ML model.
+Data handling: calendar data is cached on the iPhone. Our server is not involved in sync and never receives OAuth tokens. Only after the user taps Allow in the in-app "Use the AI assistant?" dialog does the assistant send the request with limited event details (titles, times, notes and event IDs of up to 40 events in the 14 days from today; never Google account email addresses) through our server, which does not store it, to Google's Gemini API on a billed (paid) Cloud project. When the user asks when to leave for an event, the app sends that event's location and the time the user needs to arrive (from its start time), with the iPhone's current location (only with the iOS When In Use permission), from the iPhone to Apple's map service (MapKit) to estimate the travel time; this does not go through our server or to Gemini, and the location is not stored. If the user taps the leave button on the departure notification, the app opens Google Maps with the event's location text only. Reminders and Live Activities are created on the iPhone; no calendar data is stored on our server. We never sell Google user data, use it for ads, or use it to train any AI or ML model.
 ```
 
 ### 4.3 `calendar.calendarlist.readonly`
@@ -169,13 +169,13 @@ Why a narrower scope is not enough: calendar.calendars.readonly reads a calendar
 
 ### 4.4 合併版（表單只有一個欄位，或欄位有字數限制時）
 
-4.2 約 2,300 字元、4.3 約 900 字元，下面這段不到 1,000 字元。
+4.2 約 3,000 字元、4.3 約 900 字元，下面這段不到 1,000 字元（998 字元）。
 
 ```text
 Smart Schedules is a Google Calendar client and AI scheduling assistant for iPhone.
-calendar.events: reads events for month, week and day views, reminders and Live Activities; creates, changes and deletes events when the user does so or asks the in-app assistant. Narrower scopes do not fit: readonly scopes cannot write, calendar.events.owned excludes calendars shared with the user, calendar.app.created covers only app-created calendars.
-calendar.calendarlist.readonly: calendarList.list only, to list the user's calendars (name, colour, access role) to show or hide them and pick where new events go. calendar.calendars.readonly cannot list calendars.
-Sync is direct between iPhone and Google. Only with in-app consent: limited event details (never account emails) pass through our server, which does not store them, to the paid Gemini API. Reminders and Live Activities are made on the iPhone; our server stores no calendar data. No ads, no sale, no AI training.
+calendar.events: reads events for calendar views, reminders and Live Activities; creates, changes and deletes events when the user does so or asks the assistant. Narrower scopes do not fit: readonly scopes cannot write, calendar.events.owned excludes shared calendars, calendar.app.created covers only app-created calendars.
+calendar.calendarlist.readonly: calendarList.list only, to list the user's calendars to show or hide them and pick where new events go. calendar.calendars.readonly cannot list calendars.
+Sync is direct between iPhone and Google. Only with in-app consent: limited event details (no account emails) pass through our server (not stored) to the paid Gemini API. Departure reminders send an event's place and start time to Apple's MapKit, its place to Google Maps on tap. Reminders and Live Activities are made on the iPhone; our server stores no calendar data. No ads, no sale, no AI training.
 ```
 
 ### 4.5 `openid`、`email`（非敏感，表單通常不問；審查員問到時用）
@@ -201,11 +201,12 @@ openid and email identify which Google account the user connected. The app reads
 - **語音輸入只在 iPhone 上辨識**（已在程式裡）：聊天和快速輸入的麥克風按鈕用 iPhone 上的 Apple 語音辨識（`SFSpeechAudioBufferRecognitionRequest.requiresOnDeviceRecognition = true`；不支援裝置端辨識的語言不顯示按鈕）。聲音不錄、不存、不送出；轉好的文字出現在輸入框，使用者按送出才傳，和打字完全一樣（第 1 項）。
 - **照片和 PDF 附件**（訂閱功能，審查期間建置）：使用者自己選的照片（拍照，或系統照片選擇器）或 PDF（「檔案」）跟著那一次請求經伺服器（不保存、不記錄）送到付費的 Gemini API，讓助理讀出裡面的日期和時間。附件**不是** Google 使用者資料；同一個請求帶的行事曆資料和其他請求一樣有限（上面第 3–6 項），沒有多送任何 Google 使用者資料，也沒有新的收件者。照片先縮小、重新編碼，去掉位置等中繼資料；PDF 照原樣送出（包括作者之類的文件資訊）；照片或 PDF 裡看得到的姓名和 email（包括使用者自己的）照原樣送出，這是使用者選擇附加的內容，不是 App 從 Google 帳號取得的資料（政策第 4 節寫明，第 11 節不變）。App 回覆後不留副本。找到的行程一定先顯示給使用者確認，按 Add 才用 `calendar.events` 寫入（scope 的用途不變）。**建置時要守住的兩件事**（政策和下面 5.2 的說法靠它們成立）：附件一律以 `inlineData` 放在同一個 `generateContent` 請求裡，不用 Files API（Files API 會在 Google 另存 48 小時，政策第 13 節「和其他 AI 請求相同」就不成立）；附件的大小上限（預計 PDF 最多 20 頁、10 MB）只寫在 App 裡，不寫進政策，Worker 的 `MAX_GEMINI_BODY`（`server/worker/src/index.ts`，目前 2 MB）要調高到放得下 base64 後的附件（10 MB 的 PDF 約 13.4 MB，所以至少約 15 MB，只限 App Attest 的路由）。
 - **訂閱和每月額度**（審查期間建置）：和 Google 使用者資料無關。伺服器只存 Apple 簽署的購買紀錄裡的原始交易 ID（`originalTransactionId`，續訂時不變）、到期日和本月的請求次數，在收到的最晚到期日過後 30 天刪除；免費額度的次數存在 App Attest 金鑰記錄裡（只留最近一個有使用的月份）。不含行事曆內容或 Google 帳號。Apple 簽署的購買紀錄用另外的 header 或另外的 endpoint 送到伺服器，**絕不放進轉給 Gemini 的 body**（Worker 逐位元組轉送 body，只轉 `content-type` 和 `accept` 兩個 header，見 `server/worker/src/gemini.ts`）；Worker 的記錄也不寫購買紀錄或交易 ID（政策第 6 節列出記錄的內容）。
+- **出發提醒「該出發了」**（2026-10-18 決定，1.0，審查期間建置）：使用者告訴助理要在什麼時間到哪裡（「今天 5 點要到台北 101 開會，想提早 30 分鐘到」），或問某個行程什麼時候該出發時（只是加入有地點和時間的行程不會），App 才在 iPhone 上、只在 App 裡、只有「使用 App 期間」的位置權限時取得目前位置，連同目的地和需要到達的時間送到 **Apple 的地圖服務**（MapKit：地點搜尋，加上考慮預估路況的「在某時間前到達」交通時間估算）；回覆裡小張 Apple 地圖的範圍也會送到 Apple。App 扣 10 分鐘緩衝、自己寫回覆，排兩則本機通知（「準備出門」、「該出發了」）。既有行程時，目的地是行程的地點、到達時間依它的開始時間計算，所以這是**新的 Google 使用者資料傳輸**：行程的地點和開始時間送到 Apple，只在使用者要求時、為了這個使用者看得到的功能（Limited Use 允許為使用者看得到的功能傳輸）。點通知的「出發」時，App 用行程地點欄位（或使用者打的字）的**文字**打開 Google 地圖（App 或網站），不帶座標、Apple 找到的地點或出發地點；這也是一個傳輸，政策第 11 節一併列出。政策的重點摘要和第 2、3、4、8、11、12、13、15 節都已寫好（2026-10-18）。**不用新的 scope**：行程上只用 `calendar.events`（`events.patch`）在私人 extended properties 寫入提早幾分鐘到、交通方式和開始前幾分鐘出發；不存目前位置、出發地點或路線，也不另外存交通時間（助理建立的行程，說明欄本來就照政策第 3 節保留使用者的原話，其中可能有使用者打的出發地點）。**AI 同意說明不變（第 6 版），政策第 4 節的引用一字不改**：Gemini 收不到位置、交通時間、出發時間或算不出的原因（回覆由 App 自己寫）；它收到的和任何請求一樣：使用者打的字由同意說明第 1 項「What you type or say to the assistant」涵蓋（其中可能有目的地或出發地點），行程資訊照同意說明列出的項目（聊天請求的行程不含地點）；關於出發，它只知道有沒有排好出發提醒或需要問出發地點。出發提醒不會把位置、行程地點、交通時間或出發時間送到 Smart Schedules 的伺服器（Cloudflare Worker）；使用者打的字（可能包括目的地或出發地點）和任何請求一樣經伺服器轉給 Gemini、不保存。**建置時要守住**（這段和 5.2 的說法靠它成立）：App 放進請求的函式結果和錯誤訊息都不帶位置、Apple 找到的地點、交通時間、出發時間或算不出的原因（例如太遠或找不到路線），系統提示的行程資料也不帶出發的私人屬性（下一則訊息會把函式結果帶回 Gemini，Google 最多保存 55 天）；Google 地圖的網址只帶目的地的文字。
 - **Google 帳號 email 不會送到 Gemini**：行事曆以 `CalendarAliases` 命名（多帳號時是「Account 1」「Account 2」，名稱是 email 的共用行事曆叫「Shared calendar」），行程文字和錯誤訊息裡的帳號 email 換成 `[account email]` 之類的佔位字（[`docs/GEMINI_FUNCTION_CALLING.md`](GEMINI_FUNCTION_CALLING.md) 10.6 節）。使用者打出或說出已連接帳號的 email 時也換成佔位字；別人的 email 照原樣送出（第 1 項寫明）。
 - **經過我們的伺服器**：App 沒有 API key，不直接連 Gemini。Cloudflare Worker 驗證 App Attest，移除 IP、裝置和語言標頭，把 body 原封不動轉給 Gemini API，不保存也不記錄內容。
 - **付費層級，不用於訓練**：Gemini API 專案有 Cloud Billing（Paid Services），依條款 Google 不用 prompt 和回覆改善產品，只為偵測濫用和法律要求保留最多 55 天。我們自己也不用 Google 使用者資料或其衍生資料訓練任何模型（隱私權政策第 11 節）。這兩點對 Limited Use 很重要：Google 的常見問題寫 Google 使用者資料只能用在執行使用者看得到的功能的個人化用途，不能用來訓練或改善基礎模型；有人在 2026 年被拒，原因是把 Workspace 資料送給條款保留訓練權利的 AI 供應商（只是個案報告）。
 - **動態島和即時動態**：只在 iPhone 上產生，不上傳任何行程，也不需要 AI 同意。1.0 不用 iOS 18 的 push-to-start（`AppConstants.pushToStartEnabled = false`）：不要求 push token、不呼叫 `POST /devices/push-to-start`，伺服器不存任何行程（同意說明第 5 版因此拿掉 iOS 18 的伺服器說明）。iOS 26 在 iPhone 上排程；iOS 18 只有在提前時間內打開 App 才出現。
-- **目前版本只有 Gemini**（2026-10-18）：隱私權政策第 4、11 節寫「在目前版本中」，第 18 節說之後如果有其他 AI 選項（例如 Apple 的裝置端模型或使用者自己連結的 AI 帳號），會先更新政策、寫明收件者並在 App 裡再次徵求同意，而且只用條款寫明不拿資料訓練模型的服務。送審內容和影片只示範 Gemini，不提還沒做的其他 AI 選項；照片和 PDF 附件、AI 訂閱還在建置，只在 5.1、5.2 說明資料怎麼處理，影片不示範（審查員要求時照第 8.5 節最後的方式補件）；之後真的加入其他 AI 時，先寫信告訴審查團隊。
+- **目前版本只有 Gemini**（2026-10-18）：隱私權政策第 4、11 節寫「在目前版本中」（第 4 節現在寫「唯一會把行事曆資料送到 AI 服務的功能」，另外指出出發提醒是唯一另一個把行事曆資料送到 Google 日曆以外的功能；第 11 節的傳輸清單加上了出發提醒用的 Apple 地圖服務和 Google 地圖），第 18 節說之後如果有其他 AI 選項（例如 Apple 的裝置端模型或使用者自己連結的 AI 帳號），會先更新政策、寫明收件者並在 App 裡再次徵求同意，而且只用條款寫明不拿資料訓練模型的服務。送審內容和影片只示範 Gemini，不提還沒做的其他 AI 選項；照片和 PDF 附件、AI 訂閱和出發提醒還在建置，只在 5.1、5.2 說明資料怎麼處理，影片不示範（審查員要求時照第 8.5 節最後的方式補件）；之後真的加入其他 AI 時，先寫信告訴審查團隊。
 - **使用者可以隨時停止**：設定 › AI & privacy › Stop sharing；Remove account 撤銷 Google 授權。
 
 ### 5.2 英文（貼進 Additional information，或回覆 AI 相關的提問）
@@ -224,6 +225,8 @@ Attachments (part of the paid subscription): the user can attach a photo they ta
 Path and recipient: the request goes from the app to our server (a Cloudflare Worker), which verifies with Apple App Attest that it comes from our app, removes the user's IP address and device headers, and forwards the body unchanged to Google's Gemini API with our API key. The server does not store or log the content. The app contains no API key. In this version the only AI provider is Google's Gemini API (paid tier).
 
 Training and retention: our Gemini API project has Cloud Billing enabled, so it is a Paid Service under the Gemini API terms: Google does not use the prompts or responses to improve its products, and keeps them for up to 55 days only to detect abuse and for legally required disclosures. We do not use Google user data, or data derived from it, to develop, improve or train any AI or machine-learning model, generalized or personalized, and we do not allow anyone else to do so (privacy policy, section 11: https://www.smart-schedules.com/privacy#en-limited-use).
+
+Departure reminders (being built for this version): when the user tells the assistant where they need to be and when, or asks how long a trip takes or when to leave for an event (just adding an event with a place and a time does not count), the app on the iPhone gets the current location (only in the app, with the iOS When In Use permission) and sends it, with the destination and the time the user needs to arrive, to Apple's map service (MapKit) for a place search and a travel-time estimate. For an existing event, the destination is the event's location and the arrival time comes from its start time: these Google user data go to Apple only at the user's request, for this user-facing feature. This feature adds none of the following to any request to our server or to Gemini: the iPhone's location, the event's location field, the travel time and the departure time. The app works out the time and writes the reply itself; of the departure details, Gemini sees only what the user typed (which may name the destination or a starting point), as with any request, and learns only whether departure reminders were set or a starting point is needed. The location is not stored. On the event, the app saves only, in its private extended properties (calendar.events, events.patch), how many minutes early the user wants to arrive, the travel mode and how many minutes before the start to leave; it adds no current location, starting point or route. Two local notifications remind the user; their leave button opens Google Maps with the destination text only (the event's location field as written, or what the user typed), never coordinates and no starting point. No new scope is needed, and the AI consent text is unchanged.
 
 Other features: reminders and Live Activities are created on the iPhone from the events already there. No calendar data is uploaded or stored on our server for them, and they need no AI consent. The AI subscription and its monthly allowance involve no Google user data: our server keeps only the original transaction ID and expiry date from the purchase record Apple signs, and a count of AI requests.
 ```
@@ -249,6 +252,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 5. iOS 18 或 iOS 26 的 iPhone 都可以錄：1.0 的同意畫面在兩種系統上相同（沒有伺服器那一段）。
 6. 打開勿擾模式，關掉通知預覽。
 7. 錄影時不要點主畫面對話輸入列的迴紋針：目前的建置是貼上剪貼簿的文字（`App/Views/ChatPanel.swift` 的 `pasteLink()`），附件建置後才改成拍照、照片和 PDF（政策第 4 節寫的是建置後的樣子）。
+8. **出發提醒不用新的鏡頭**：沒有新的 scope（寫入行程私人屬性用的是 `calendar.events`，它的寫入已在鏡頭 11、12 拍到），AI 同意說明也不變（第 6 版，鏡頭 10）。鏡頭 3 會拍到隱私權政策，所以要在加了出發提醒（第 8 節）的政策上線之後才錄。錄影用的請求（「Lunch with Joe tomorrow at 12:30」）沒有地點、也不問出發時間；不要用會觸發出發提醒的句子（「… when should I leave?」或有地點和到達時間的請求），否則會跳出位置權限，影片沒有說明它。
 
 ### 6.3 分鏡腳本（約 5 分鐘）
 
@@ -373,7 +377,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
 | 審核員或使用者登入時被擋，只有 `@smart-schedules.com` 的帳號能登入 | Audience › User type 是 Internal：改成 External（3.5），發佈到 In production |
 | 首頁沒說明 App 用途、是登入頁、或 App 名稱和同意畫面不同 | 首頁開頭就是「Smart Schedules」和用途說明；Branding 的 App name 一字不差 |
 | 首頁「unresponsive」 | 填 `https://www.smart-schedules.com`（不要 http、沒有 www 的根網域或會轉址的網址）；網站不要對機器人出驗證頁。論壇上也有網站正常仍被標記的案例，這時在 View issues 申請人工複查 |
-| 隱私權政策不在同一網域、沒從首頁連過去、沒說明怎麼存取／使用／保存／分享 Google 使用者資料 | `https://www.smart-schedules.com/privacy`，首頁有連結；第 3、4、5、11、13 節分別說明 |
+| 隱私權政策不在同一網域、沒從首頁連過去、沒說明怎麼存取／使用／保存／分享 Google 使用者資料 | `https://www.smart-schedules.com/privacy`，首頁有連結；第 3、4、5、8、11、13 節分別說明 |
 | 缺 Limited Use 聲明 | 首頁和政策第 11 節都有 Google 範本的那一句 |
 | App 要求的 scope 和 Data access 不一致 | 只有第 1 節的四個；程式改 scope 就要重新送審 |
 | 要求的 scope 比需要的大 | 第 4.2、4.3 節的「Why a narrower scope is not enough」；回信範本 8.2 |
@@ -436,7 +440,7 @@ Hello,
 Thank you. Here is where each requirement is met:
 
 - Home page: https://www.smart-schedules.com (no sign-in required). It names the app, describes what it does and why it needs Google Calendar, links to the privacy policy, and includes the Limited Use statement under "AI and privacy".
-- Privacy policy: https://www.smart-schedules.com/privacy, on the same domain and linked from the home page and the consent screen. Section 3 lists each Google permission and how it is used; section 4 explains what the optional AI assistant sends and when; section 5 that Live Activities are created on the iPhone; section 11 Google user data and Limited Use; section 13 retention; section 15 how users revoke access and delete data.
+- Privacy policy: https://www.smart-schedules.com/privacy, on the same domain and linked from the home page and the consent screen. Section 3 lists each Google permission and how it is used; section 4 explains what the optional AI assistant sends and when; section 5 that Live Activities are created on the iPhone; section 8 how departure reminders use the location and send an event's place and start time to Apple's map service; section 11 Google user data and Limited Use; section 13 retention; section 15 how users revoke access and delete data.
 - Limited Use statement: "Smart Schedules' use and transfer to any other app of information received from Google APIs will adhere to Google API Services User Data Policy, including the Limited Use requirements." (https://www.smart-schedules.com/privacy#en-limited-use)
 - Domain: smart-schedules.com is verified in Google Search Console as a Domain property by an Owner of this project; it is our authorized domain, and the website is served on its www subdomain.
 
@@ -453,6 +457,8 @@ support@smart-schedules.com
 
 審查員要求示範照片或 PDF 附件時：附件在審查期間建置，影片沒有拍（4.1 的 App 說明也沒寫，只在 5.2 說明資料怎麼處理）。附件不用新的 scope，找到的行程按 Add 才用已經拍到的 `calendar.events` 寫入。功能做好、裝到 TestFlight 後，錄一段短片補件（打開同意畫面的附件那一項 → 迴紋針 → 選一張有日期的票券照片 → 送出 → 確認卡片 → Add → Google Calendar 裡出現行程），回信寫「Attachments were built after our first video; this clip shows them: <YouTube link> (unlisted).」。
 
+審查員問出發提醒或位置時：回信貼第 5.2 節的「Departure reminders」段落。它不用新的 scope，寫入行程用的是影片已經拍到的 `calendar.events`，AI 同意說明也沒變，所以第一支影片不用重錄。審查員要求示範時，功能做好、裝到 TestFlight 後錄一段短片補件（說「Meeting at <地點> at 5 pm, I want to be there 30 minutes early」→ iOS 的位置權限（使用 App 期間）→ 回覆裡的建議出發時間和小張 Apple 地圖 → 鎖定畫面上的通知 → 點出發打開 Google 地圖），回信寫「Departure reminders were built after our first video; this clip shows them: <YouTube link> (unlisted).」。
+
 ### 8.6 範本：補件後追蹤
 
 ```text
@@ -468,7 +474,7 @@ support@smart-schedules.com
 ## 9. 核准之後
 
 - 新增 scope、改 App 名稱、logo、首頁或隱私權政策網址、新增 OAuth client，都會再審（Google「Changes to approved app」）。程式裡改 `GoogleTokenProvider.scopes` 之前先看這份文件。
-- 網站要一直在線上，Search Console 的 TXT 記錄、隱私權政策第 3、4、11 節要和 App 一致；同意說明改版時（`AIConsent.disclosureVersion` 加 1）同時改網站，必要時主動通知審查團隊。
+- 網站要一直在線上，Search Console 的 TXT 記錄、隱私權政策第 3、4、8、11 節要和 App 一致；同意說明改版時（`AIConsent.disclosureVersion` 加 1）同時改網站，必要時主動通知審查團隊。
 - Gemini 專案一直保持付費層級。改用其他 AI 供應商，或改變送出的資料，都要先確認符合 Limited Use，並更新政策和同意說明。
 - 專案的擁有者、聯絡信箱有變動時立刻更新；Google 寄到專案聯絡人的通知沒處理，可能失去 API 存取權。
 

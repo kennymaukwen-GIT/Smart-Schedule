@@ -3,11 +3,12 @@
 可以直接貼到 App Store Connect 的文字（繁體中文和英文），以及每個問卷該怎麼填、為什麼這樣填。
 每個功能說法都對照過 2026-10-16 的程式碼（`App/`、`Shared/`、`Widgets/`、`NotificationContent/`、`server/worker/`），
 對照表在第 11 節。程式碼改了功能、或 AI 同意說明改版（`AIConsent.disclosureVersion`，程式目前是 **6**：加入附件那一項的改動把它從 5 改成 6，因為同意的內容變了，已允許過第 5 版的 TestFlight 使用者也要重新同意），這份文件要一起更新。
-第 0、4、5、8 節在 2026-10-18 改成 1.0 上架時的樣子：語音輸入（已在程式裡）、照片和 PDF 附件、AI 訂閱（這兩項還在建置，對應的程式檔案用 `[建置中]` 標示）。
+第 0、4、5、8 節在 2026-10-18 改成 1.0 上架時的樣子：語音輸入（已在程式裡）、照片和 PDF 附件、AI 訂閱，以及出發提醒「該出發了」（後三項還在建置，對應的程式檔案用 `[建置中]` 標示）。
 
 1.0 已決定的事：年齡分級 **18+**（Gemini API 條款要求年滿 18 歲）、**AI 訂閱**（2026-10-18 決定：免費使用者每月有少量文字 AI 額度；透過 Apple 在 App 內購買的自動續訂訂閱有較多額度，加上照片和 PDF 附件；另有額度較少的免費試用。價格和數字不寫進政策和這份文件的商店文字）、
 **不在歐洲經濟區（歐盟、挪威、冰島、列支敦斯登）、瑞士、香港、澳門和中國大陸上架**（英國和其他地區照常）、**Google 帳號的 email 不會傳給 Gemini**（同意說明第 4 版起）、
-**不用 iOS 18 的即時動態 push-to-start**（`AppConstants.pushToStartEnabled = false`：伺服器不存任何行程、App 不用遠端推播（APNs）；同意說明第 5 版起沒有 iOS 18 伺服器那一段，程式目前是第 6 版）、**開發者在英國**（不需要英國 GDPR 第 27 條的代表人）、**語音輸入只在 iPhone 上辨識**（2026-10-18 決定，免費：聊天和快速輸入的麥克風按鈕，`requiresOnDeviceRecognition = true`，聲音不存也不送出；Siri 和鍵盤的聽寫是 Apple 的系統功能，App 只收到文字）。
+**不用 iOS 18 的即時動態 push-to-start**（`AppConstants.pushToStartEnabled = false`：伺服器不存任何行程、App 不用遠端推播（APNs）；同意說明第 5 版起沒有 iOS 18 伺服器那一段，程式目前是第 6 版）、**開發者在英國**（不需要英國 GDPR 第 27 條的代表人）、**語音輸入只在 iPhone 上辨識**（2026-10-18 決定，免費：聊天和快速輸入的麥克風按鈕，`requiresOnDeviceRecognition = true`，聲音不存也不送出；Siri 和鍵盤的聽寫是 Apple 的系統功能，App 只收到文字）、
+**出發提醒「該出發了」**（2026-10-18 決定，1.0，建置中：使用者說要在什麼時間到哪裡、或問某個行程什麼時候該出發時（只是加入有地點和時間的行程不會），App 才在 App 裡以「使用 App 期間」的位置權限取得目前位置，連同目的地和需要到達的時間只送到 Apple 的地圖服務（MapKit）；App 自己寫回覆、扣 10 分鐘緩衝，排兩則本機通知「準備出門」和「該出發了」，「出發」打開 Google 地圖時只帶目的地的文字。出發提醒不會把位置、行程地點、交通時間或出發時間送到 Smart Schedules 的伺服器或 Gemini（使用者打的字照舊經伺服器轉給 Gemini、不保存）；Gemini 收到的和任何請求一樣（使用者打的字和同意說明列出的行程資訊），關於出發只知道有沒有排好出發提醒或需要問出發地點；行程的私人屬性只存提早幾分鐘到、交通方式和開始前幾分鐘出發。App 隱私問卷**不勾 Location**，理由見第 5.3 節）。
 
 `<!-- asc:… -->` 標記後面的區塊就是要貼的內容；`python3 -I <腳本> docs/app-store-metadata.md` 可以檢查字數上限
 （第 12 節）。方括號 `[…]` 是送審前要填的佔位值。
@@ -29,6 +30,7 @@
 - [ ] 伺服器驗證 Apple 簽署的購買紀錄（JWS）時，要接受 `environment` 是 `Sandbox` 的紀錄：App Review 用 sandbox 帳號購買，用的是正式版的 App 和伺服器。只保留原始交易 ID（`originalTransactionId`，續訂時不變）、到期日和請求次數，在收到的購買紀錄中最晚的到期日過後 30 天刪除（隱私權政策第 7、13 節；退款或撤銷的訂閱也一樣保存到原本的到期日過後 30 天，除非之後做了撤銷的處理並改寫政策）。
 - [ ] 購買紀錄和 Gemini 請求分開：App 把 Apple 簽署的購買紀錄放在自己的 header 或送到自己的 endpoint，**絕不放進 Gemini 請求的 body**（Worker 把 body 原封不動轉給 Google，只轉 `content-type` 和 `accept` 兩個 header，`server/worker/src/gemini.ts`；放進 body 就會送到 Google，違反政策第 7 節「不會分享給其他任何人」）。Worker 的記錄（`log()`）絕不寫簽署的購買紀錄或交易 ID（政策第 6 節列出記錄包含什麼）。
 - [ ] 上傳的 build 裡，主畫面對話輸入列的迴紋針已經改成附件（拍照、照片、「檔案」的 PDF），不再是貼上剪貼簿的文字（目前的程式：`App/Views/ChatPanel.swift` 的 `showsAttachment: true` 和 `pasteLink()`，無障礙標籤「Paste a link」）；沒有訂閱時無法附加照片或 PDF（政策第 4 節寫的是建置後的樣子）。
+- [ ] 出發提醒（建置中）：上傳的 build 的 App Info.plist 有 `NSLocationWhenInUseUsageDescription`（英文，加上 `zh-Hant.lproj/InfoPlist.strings` 的繁體中文；寫明只在算出發時間時用來估算交通時間），**沒有** `NSLocationAlwaysAndWhenInUseUsageDescription`，`UIBackgroundModes` 也沒有 `location`；兩個 extension 的 Info.plist 都沒有位置的 key。`plutil -p SmartSchedule.app/Info.plist | grep NSLocation` 只印出 `NSLocationWhenInUseUsageDescription` 一行。位置權限只在使用者第一次要求算出發時間時才詢問（Guideline 5.1.5）；不允許時仍可輸入出發地點（5.1.1(iv)）。App **不把**位置、交通時間、出發時間、算不出時間的原因（太遠、找不到路線）和 Apple 找到的地點資料**放進 Gemini 請求**（包括下一則訊息帶回的函式結果、系統提示的行程資料和錯誤訊息，Gemini 只知道有沒有排好出發提醒或需要問出發地點；使用者自己打的目的地或出發地點本來就是請求文字，App 不把它轉成座標或 Apple 找到的地址再放進 Gemini 請求），也**不送到 Worker**；行程的私人屬性只存提早分鐘數、交通方式和開始前幾分鐘出發；「出發」打開 Google 地圖時只帶目的地的文字，不帶座標或出發地點。這幾項是第 5.3 節「不勾 Location」和隱私權政策第 8 節成立的條件。
 - [ ] 附件送 Gemini 用 `inline_data`，不要用 Files API（會在 Google 存 48 小時）；Gemini 專案的 AI Studio「Logs and datasets」保持關閉；不要開 Google Search grounding（資料會存 30 天、不能關）。這三項是政策「Google 最多保存 55 天」成立的條件。
 
 ---
@@ -267,9 +269,9 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,diary,assistant,o
 | 名稱（主要／備用 1／備用 2） | 15／23／22 字元 | 15／27／29 字元 | 30 字元 |
 | 副標題 | 13 字元 | 29 字元 | 30 字元 |
 | 宣傳文字 | 63 字元 | 151 字元 | 170 字元 |
-| 描述 | 1,693 字元 | 3,825 字元 | 4,000 字元 |
+| 描述 | 1,713 字元 | 3,869 字元 | 4,000 字元 |
 | 關鍵字 | 99 位元組 | 100 位元組 | 100 位元組 |
-| 審核備註（第 8.2 節） | — | 3,912 位元組（填入訂閱名稱、paywall 路徑和備用驗證碼後要重算，剩不到 90 位元組） | 4,000 位元組 |
+| 審核備註（第 8.2 節） | — | 3,921 位元組（2026-10-18 加了位置那一行，同時精簡了幾句；填入訂閱名稱、paywall 路徑和備用驗證碼後要重算，剩不到 80 位元組） | 4,000 位元組 |
 
 精確數字用第 12 節的腳本算；改了文字就重跑一次。
 
@@ -331,7 +333,7 @@ App 本身**免費下載**。AI 助理每月有少量免費的文字請求額度
 
 ## 5. App 隱私問卷（App Privacy）
 
-1.0 的答案（五種資料類型，都連結到使用者、都不用於追蹤、用途都只有 App 功能），逐項對照過程式碼和 2026-10-18 決定的功能，見 5.2、5.3。附件和訂閱還在建置；`App/PrivacyInfo.xcprivacy` 目前只宣告其中兩種，要在建置時改成一致（5.4）。
+1.0 的答案（五種資料類型，都連結到使用者、都不用於追蹤、用途都只有 App 功能），逐項對照過程式碼和 2026-10-18 決定的功能，見 5.2、5.3。附件、訂閱和出發提醒還在建置（出發提醒不增加任何類型，第 5.3 節的 Location）；`App/PrivacyInfo.xcprivacy` 目前只宣告其中兩種，要在建置時改成一致（5.4）。
 
 ### 5.1 怎麼填
 
@@ -351,7 +353,7 @@ App 本身**免費下載**。AI 助理每月有少量免費的文字請求額度
 | Is this data used for tracking purposes? | **No** | **No** | **No** | **No** | **No** |
 
 產品頁會顯示：「Data Linked to You：Purchases、User Content、Identifiers、Usage Data」；沒有「Data Used to Track You」。
-Apple 的定義（[App privacy details](https://developer.apple.com/app-store/app-privacy-details/)）：「collect」是指資料離開裝置，而且你或第三方能存取的時間超過即時處理請求所需；「Personal Information」和「Personal Data」一律算連結到使用者。「Data that is processed only on device is not "collected"」，所以只在 iPhone 上處理的語音不算。
+Apple 的定義（[App privacy details](https://developer.apple.com/app-store/app-privacy-details/)）：「collect」是指資料離開裝置，而且你或你的第三方夥伴（third-party partners）能存取的時間超過即時處理請求所需；「Personal Information」和「Personal Data」一律算連結到使用者。「Data that is processed only on device is not "collected"」，所以只在 iPhone 上處理的語音不算。用 MapKit 這類 Apple 服務時，Apple 寫明「You are not responsible for disclosing data collected by Apple.」，所以出發提醒只送到 Apple 地圖服務的位置也不算（第 5.3 節）。
 
 ### 5.2 為什麼是這五項
 
@@ -378,14 +380,14 @@ Apple 的定義（[App privacy details](https://developer.apple.com/app-store/ap
 | User ID（**待決定**） | App 沒有自己的帳號系統。訂閱記錄以 Apple 的原始交易 ID（`originalTransactionId`，續訂時不變）為索引：隱私權政策第 7 節已經這樣寫，因為每次續訂的 `transactionId` 都不同，要跨續訂計數就只能用它。它是購買的識別碼，已算在 Purchase History；但它在整個訂閱期間不變，要不要也勾 User ID 是判斷題，請在送審前決定。保守的做法是勾（App Functionality、連結、不追蹤），勾了就在 5.1 加上這一項，並把 `PrivacyInfo.xcprivacy` 一起改（5.4）。 |
 | 照片圖庫 | 系統的照片選擇器在 App 之外執行，只把使用者選的那張照片交給 App（只讀圖片資料，不讀 `PHAsset`），所以不要求照片圖庫權限，也沒有 `NSPhotoLibraryUsageDescription`。只有使用者附加並送出的照片才會離開 iPhone（Photos or Videos）。 |
 | Contacts | 沒有使用 Contacts framework。 |
-| Location（Precise / Coarse） | 沒有使用 CoreLocation；行程地點是使用者內容（Other User Content），照片送出前去掉位置中繼資料，IP 不用來推算位置。 |
+| Location（Precise / Coarse） | **不勾**（2026-10-18 決定；出發提醒建置中）。出發提醒用 CoreLocation 取得目前位置（只在使用者問到某地要多久、什麼時候該出發，或說要在什麼時間到哪裡時，只在 App 裡、只有「使用 App 期間」權限），但**只送到 Apple 的地圖服務**（MapKit 的地點搜尋和交通時間估算，加上回覆裡小地圖的範圍）。Apple 在「You use Apple frameworks or services, such as MapKit」底下寫明「You are not responsible for disclosing data collected by Apple.」（[App privacy details](https://developer.apple.com/app-store/app-privacy-details/)）。位置會離開 iPhone，但只到 Apple：它不送到 Smart Schedules 的伺服器或 Gemini，App 也不保存它，所以開發者（包括我們的伺服器和我們轉送請求的 Gemini）和開發者的第三方夥伴（third-party partners）都拿不到，不符合「collect」的定義（你或你的第三方夥伴能存取的時間超過即時處理請求所需）；Apple 自己收到的部分，照上面那句不用申報。**衍生的資料另外判斷**（Apple：「If you derive anything from that data and send it off device, the resulting data should be considered separately.」）：(1) 寫進行程私人屬性的提早幾分鐘到、交通方式和開始前幾分鐘出發，存在使用者自己的 Google 日曆，和行程本身一樣開發者拿不到；App 裡沒有 Google 的 SDK，Google 不是 Apple 定義的 third-party partner（見上面「Google 日曆的行程本身」那一列），所以不算 collect；這三個值也不描述使用者或裝置在哪裡。(2) Gemini 收到的和任何請求一樣，關於出發只知道有沒有排好出發提醒或需要問出發地點，收不到位置、交通時間、出發時間或算不出的原因。(3)「出發」打開 Google 地圖時只帶目的地的文字（使用者打的或行程的地點，本來就是使用者內容），不帶座標或出發地點，是使用者自己用另一個 Google 服務。使用者打的目的地和「你從哪裡出發？」的回答是送給 Gemini 的請求文字，已算在 Other User Content，和行程地點一樣。「你從哪裡出發？」是 App 自己問的，回答描述使用者現在在哪裡，Google 最多保存 55 天；Apple 的 Precise Location 是「Information that describes the location of a user or device with the same or greater resolution as a latitude and longitude with three or more decimal places」。歸在 Other User Content 的理由：它是使用者自己決定要打的文字（可以只打「家裡」「公司」或地標），不是裝置的定位，App 也不把它轉成座標或 Apple 找到的地址送給 Gemini。**送審前決定**：保守的做法是另外勾 Coarse Location（App Functionality、連結、不追蹤，`PrivacyInfo.xcprivacy` 一起改，5.4）；不勾就照這段理由。照片送出前去掉位置中繼資料，IP 不用來推算位置。**這個答案成立的條件**見第 0 節出發提醒那一項：座標或 Apple 找到的地址一旦進了 Gemini 請求（包括下一則訊息帶回的函式結果和錯誤訊息）或 Worker，就要勾 Precise Location 並改政策；交通時間或出發時間送出去也要重新判斷（也和政策第 8 節不符）。 |
 | Health & Fitness | 沒有 HealthKit 或動作感測資料；「我想半年內變壯」這類目標是使用者輸入的內容。 |
 | Usage Data 的其他項目（Advertising Data、Other Usage Data）、Diagnostics（含 Crash Data）、Advertising | 沒有分析、廣告、當機回報或追蹤的 SDK（`project.yml` 只有 target 之間的相依，沒有任何第三方套件），也沒有用 MetricKit、AdSupport 或 App Tracking Transparency。Usage Data 只為每月額度勾 Product Interaction（5.2）。 |
 | 對話紀錄、偏好設定、「助理記得的事」、匯出檔 | 只存在 iPhone，不會上傳。附加的照片和 PDF 不存在 iPhone 上，對話紀錄只寫「附加了照片／PDF」。 |
 
 ### 5.4 對照 `PrivacyInfo.xcprivacy`
 
-- `App/PrivacyInfo.xcprivacy` **目前**：`NSPrivacyTracking` false、沒有 tracking domains；宣告 Other User Content 和 Device ID，都 linked、不追蹤、用途 App Functionality。**建置附件和訂閱時要加上** Photos or Videos、Purchase History、Product Interaction（都 linked、不追蹤、App Functionality；常數名稱大概是 `NSPrivacyCollectedDataTypePhotosorVideos`、`NSPrivacyCollectedDataTypePurchaseHistory`、`NSPrivacyCollectedDataTypeProductInteraction`，加之前對照 Apple 的清單），讓它和 5.1 一致。不宣告 Audio Data。Device ID 指的是 App Attest 金鑰 ID（1.0 沒有 push-to-start 的安裝 ID 或 push token）。
+- `App/PrivacyInfo.xcprivacy` **目前**：`NSPrivacyTracking` false、沒有 tracking domains；宣告 Other User Content 和 Device ID，都 linked、不追蹤、用途 App Functionality。**建置附件和訂閱時要加上** Photos or Videos、Purchase History、Product Interaction（都 linked、不追蹤、App Functionality；常數名稱大概是 `NSPrivacyCollectedDataTypePhotosorVideos`、`NSPrivacyCollectedDataTypePurchaseHistory`、`NSPrivacyCollectedDataTypeProductInteraction`，加之前對照 Apple 的清單），讓它和 5.1 一致。不宣告 Audio Data，也不宣告 Location（出發提醒的位置只送到 Apple 的地圖服務，第 5.3 節）。Device ID 指的是 App Attest 金鑰 ID（1.0 沒有 push-to-start 的安裝 ID 或 push token）。
 - `NotificationContent/PrivacyInfo.xcprivacy`：只宣告 Other User Content（擴充會送 AI 請求，帶的是 App 替它取得的 session token；金鑰 ID 由主 App 的 Device ID 宣告）。擴充的回覆也算進每月額度，要不要在它的 manifest 也宣告 Product Interaction，建置時決定。`Widgets/PrivacyInfo.xcprivacy`：沒有收集任何資料。App Privacy 問卷是整個 App 一份，以主 App 為準。
 
 ---
@@ -403,7 +405,7 @@ Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級�
 |---|---|---|---|
 | In-App Controls | Parental Controls | 不勾 | 沒有家長控制功能 |
 | | Age Assurance | 不勾 | 沒有年齡驗證機制 |
-| Capabilities | Unrestricted Web Access | **No** | App 裡沒有瀏覽器；連結（Meet、Google 日曆）交給 Safari 或其他 App 打開；Google 登入用系統的登入視窗（ASWebAuthenticationSession） |
+| Capabilities | Unrestricted Web Access | **No** | App 裡沒有瀏覽器；連結（Meet、Google 日曆，以及出發提醒的 Google 地圖）交給 Safari 或其他 App 打開；Google 登入用系統的登入視窗（ASWebAuthenticationSession） |
 | | User-Generated Content | **No** | 內容不會分享給其他使用者 |
 | | Messaging and Chat | **No** | 對話對象是助理，不是其他人 |
 | | Advertising | **No** | 沒有廣告 |
@@ -457,18 +459,18 @@ Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級�
 
 ### 8.2 備註（Notes，最多 4000 位元組，英文）
 
-**要貼的是下面這一段**（唯一的貼上來源）。`docs/review-notes.md` 是背景說明：英文段落超過 App Store Connect 的 4000 位元組上限，也沒有測試帳號，不要整份貼上。下面是重寫並更新到同意說明第 6 版（第 5 版起 1.0 沒有 iOS 18 push-to-start；第 6 版加入附件那一項）、加上 2026-10-18 決定的語音輸入、AI 訂閱和照片／PDF 附件、且放得下的版本（`[NAME]` 填訂閱群組的顯示名稱，`[PAYWALL PATH]` 填打開 paywall 的路徑，例如頭像 › 訂閱區塊；填完重算位元組）；`☰`、`›`、`⋯` 每個佔 3 位元組，已經算進去。
+**要貼的是下面這一段**（唯一的貼上來源）。`docs/review-notes.md` 是背景說明：英文段落超過 App Store Connect 的 4000 位元組上限，也沒有測試帳號，不要整份貼上。下面是重寫並更新到同意說明第 6 版（第 5 版起 1.0 沒有 iOS 18 push-to-start；第 6 版加入附件那一項）、加上 2026-10-18 決定的語音輸入、AI 訂閱和照片／PDF 附件，以及出發提醒的位置那一行（OTHER；為了放得下，同時拿掉了「see below」、App Attest 的括號和「Tapping it opens Quick Capture.」，詳細說明在第 8.3 節和 `docs/review-notes.md`）、且放得下的版本（`[NAME]` 填訂閱群組的顯示名稱，`[PAYWALL PATH]` 填打開 paywall 的路徑，例如頭像 › 訂閱區塊；填完重算位元組）；`☰`、`›`、`⋯` 每個佔 3 位元組，已經算進去。
 
 <!-- asc:en/review-notes -->
 ```text
 TRY IT WITHOUT SIGNING IN
-On first launch tap "Try without signing in" (also: ☰ › General › Demo mode). Demo mode needs no Google account and runs the real AI (see below) on fictional sample calendars; without AI permission or a connection, offline rules answer and say so. Try the chips, e.g. "I want to be muscular in 6 months" (a plan card with Add / Keep editing). Allow notifications: the sample "Online meeting with Joe" starts 21 minutes after the demo starts, so its Live Activity appears at once and a reminder about a minute later.
+On first launch tap "Try without signing in" (also: ☰ › General › Demo mode). Demo mode needs no Google account and runs the real AI on fictional sample calendars; without AI permission or a connection, offline rules answer and say so. Try the chips, e.g. "I want to be muscular in 6 months" (a plan card with Add / Keep editing). Allow notifications: the sample "Online meeting with Joe" starts 21 minutes into the demo, so its Live Activity appears at once and a reminder about a minute later.
 
 FULL FEATURES: TEST GOOGLE ACCOUNT
 The account in Sign-In Information is a test Google account with sample events. Tap "Connect Google Calendar", enter its address, tap "Continue with Google", sign in and allow calendar access. If Google asks for a code, use a backup code: [CODE 1] [CODE 2] [CODE 3]. The app has no accounts of its own; Google sign-in only connects Google Calendar, so Sign in with Apple is not required (4.8).
 
 AI ASSISTANT AND CONSENT (5.1.2(i))
-The assistant uses Google's Gemini API through our server (it holds the API key; the app uses App Attest); calendar features work without it. The first message opens "Use the AI assistant?", which lists what is sent: the request text; a photo or PDF the person attaches; titles, times, notes and Google event IDs of up to 40 events in the next 14 days; one event's location only for AI suggestions; calendar names and assistant settings; time zone and language. It names Google as the recipient (no Google account email is ever sent) and asks Allow / Not now; Not now keeps the assistant off. Settings › AI & privacy shows "What is sent", Allow and Stop sharing. Siri and notification replies refuse until permission is given in the app. Demo requests carry only the sample events, never Google data.
+The assistant uses Google's Gemini API through our server (which holds the API key); calendar features work without it. The first message opens "Use the AI assistant?", which lists what is sent: the request text; a photo or PDF the person attaches; titles, times, notes and Google event IDs of up to 40 events in the next 14 days; one event's location only for AI suggestions; calendar names and assistant settings; time zone and language. It names Google as the recipient (no Google account email is ever sent) and asks Allow / Not now; Not now keeps the assistant off. Settings › AI & privacy shows "What is sent", Allow and Stop sharing. Siri and notification replies refuse until permission is given in the app. Demo requests carry only the sample events, never Google data.
 
 VOICE INPUT (FREE)
 The mic button in the chat and Quick Capture turns speech into text on the iPhone only (requiresOnDeviceRecognition = true; hidden if the language has no on-device support). Microphone and Speech Recognition are asked on the first tap. No audio is stored or sent; nothing is sent until Send.
@@ -477,7 +479,7 @@ SUBSCRIPTION (SANDBOX) AND ATTACHMENTS
 The AI has a small free monthly allowance; the auto-renewable subscription [NAME] (free trial) adds a larger one and photo/PDF attachments. Buy it with a sandbox account at [PAYWALL PATH]; the paywall links to the Terms of Use (Apple's standard EULA) and Privacy Policy. Then tap the paperclip: Take Photo (Camera permission), Photo Library (system picker, no library permission) or a PDF from Files. Send a photo of a dated ticket: the events found wait on a card with Add / Edit and are never added directly. Without the subscription the paperclip offers it.
 
 LIVE ACTIVITY / DYNAMIC ISLAND
-One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island) until it ends, made on the iPhone (nothing goes to our server, no AI permission needed). iOS 26 schedules the next two days' activities when the app opens, so they appear with the app closed; on iOS 18 one appears when the app is opened during the lead time or the event. Tapping it opens Quick Capture.
+One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island) until it ends, made on the iPhone (nothing goes to our server, no AI permission needed). iOS 26 schedules the next two days' activities when the app opens, so they appear with the app closed; on iOS 18 one appears when the app is opened during the lead time or the event.
 
 CONTROL CENTER
 The "Smart Schedules" control opens Quick Capture with the keyboard up.
@@ -489,7 +491,8 @@ DATA DELETION (5.1.1(v))
 Remove account (avatar › ⋯ next to the account, or ☰ › ⋯) revokes Google access and deletes its tokens and cached events. ☰ › General › Data › "Erase all data on this device" revokes every Google account, withdraws AI permission and deletes all local data. Events in Google Calendar are not deleted.
 
 OTHER
-Rated 18+ because Google's Gemini API terms require users to be 18 or older.
+Location (5.1.5): asked only when someone plans a departure; sent only to Apple's MapKit.
+Rated 18+: Google's Gemini API terms require users to be 18 or older.
 ```
 
 ### 8.3 審核員追問時可以用的回答（英文，不受 4000 位元組限制）
@@ -497,7 +500,9 @@ Rated 18+ because Google's Gemini API terms require users to be 18 or older.
 需要時貼到 App Review 的回覆（App Review 訊息或 Resolution Center）。
 
 ```text
-Time Sensitive notifications: reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning briefing and suggestions are Normal. People can change the urgency for each kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off. During quiet hours reminders arrive silently.
+Time Sensitive notifications: reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning briefing and suggestions are Normal. People can change the urgency for each kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off. The one other Time Sensitive notification is the "time to leave" departure reminder, at the departure time the app worked out for an event the person asked about (the "get ready" one 10 minutes earlier is Normal); departure reminders exist only when the person asked when to leave or said where they need to be and when, are not counted in the daily reminder limit, and do not replace the event's own reminders. During quiet hours all of these arrive silently.
+
+Location (5.1.5): used only for departure reminders. When someone tells the assistant where they need to be and when, or asks how long a trip takes or when to leave (just adding an event with a place and a time does not count), the app (in the foreground only, with When In Use permission, asked the first time) gets the current location and sends it, with the destination and the arrival time, to Apple's MapKit for a place search and a travel-time estimate; the reply shows a small Apple map. The app schedules two local notifications, and its "leave" action opens Google Maps with the destination text only. The location is not stored and never reaches our server or Google's Gemini API; for departure reminders the app adds to the Google Calendar event, in private extended properties, only the minutes early, the travel mode and the minutes before the start to leave. If permission is denied, the person can type a starting point instead, or the event is added without departure reminders. Siri and notification replies never show the location prompt or get the location: the event is added without departure reminders and the reply says to open the app. There is no Always permission and no background location.
 
 Background modes: only "fetch", which lets background app refresh sync Google Calendar changes and keep reminders and Live Activities up to date. Reminders are local notifications created on the iPhone.
 
@@ -604,8 +609,8 @@ App 預覽影片（App Preview）可以不做。要做的話，用同樣的流�
 | iOS 18 以上；繁體中文和英文 | `project.yml`（`deploymentTarget iOS 18.0`）；`Shared/Localization/Localizable.xcstrings` |
 
 刻意**沒有**寫進商店文字的：主畫面小工具（沒有）、貼上連結就讀網頁內容（Gemini 只看到網址文字）、
-iPad 或 Mac、特定的 Gemini 模型版本、價格。語音輸入（已在程式裡，`App/Voice/VoiceTranscriber.swift`）、照片和 PDF 附件、AI 訂閱（建置中；迴紋針會改成拍照、照片和 PDF）
-目前也還沒寫進描述：功能做好、對照過程式碼之後再加，並在這張表補上依據。
+iPad 或 Mac、特定的 Gemini 模型版本、價格。語音輸入（已在程式裡，`App/Voice/VoiceTranscriber.swift`）、照片和 PDF 附件、AI 訂閱（建置中；迴紋針會改成拍照、照片和 PDF）、出發提醒「該出發了」（建置中）
+目前也還沒寫進描述：功能做好、對照過程式碼之後再加，並在這張表補上依據。出發提醒寫進描述時，交通時間只能和 Apple 地圖一起出現（Apple Developer Program License Agreement Attachment 6：顯示地圖資料時要顯示對應的 Apple 地圖），截圖也一樣。
 
 ---
 
