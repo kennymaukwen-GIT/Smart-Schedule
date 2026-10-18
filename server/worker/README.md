@@ -353,6 +353,7 @@ Client 的 header 只轉送 `content-type` 與 `accept`，再加上 `x-goog-api-
 `X-Dev-Token`、`Cookie`、client 帶來的 `x-goog-api-key`、`User-Agent`、`Accept-Language`、hop-by-hop headers、**所有 `cf-*` headers**
 （`cf-connecting-ip`、`cf-ipcountry`、`cf-ray` …）與 `x-forwarded-for`，不把使用者 IP、位置或裝置資訊傳給 Google。
 回傳 upstream 的 status、body（串流，SSE 可用）與 content-type。上游連不到時 `502 upstream_unavailable`。
+例外：`POST /v1beta/models/<model>:generateContent` 成功的 JSON 回覆會先完整讀進來，記下 `usageMetadata` 的數字（見下面「每次請求的實際成本」），再原封不動回傳（bytes、status、content-type 都不變）。
 Bearer 與 dev 依合約是完整的 `/v1beta/*` passthrough（body 上限 2 MB；App 送的是文字 prompt）；Session 只限上面的 scope（512 KB）。
 
 ### `POST /devices/push-to-start`
@@ -450,6 +451,46 @@ Workers KV 是 eventually consistent：寫入在其他 Cloudflare 據點可能�
 需要嚴格一致（counter 嚴格遞增、challenge 嚴格單次、精確 rate limit、確保只送一次）時，應改用 **Durable Objects**
 （例如每個 keyId / deviceID 一個 object），它提供單一執行緒、strongly consistent 的儲存。
 
+### 每次請求的實際成本（`gemini_usage`）
+
+App 每送出一句話，只會呼叫一次 `generateContent`（函式結果放在下一輪的歷史裡，沒有第二次往返）；Siri、通知回覆、「AI 建議」各自也是一次。
+所以「一個指令從送出到完成」的成本，幾乎全部是這一次 Gemini 呼叫：Cloudflare 每則約 US$0.00001，Google Calendar API 在每天 100 萬次以內不收費。
+
+Worker 在每個成功的 `generateContent` 回覆後寫一行 log，只有 Google 回傳的數字，**不含任何請求或回覆的文字、使用者或裝置識別碼**：
+
+```json
+{"level":"info","event":"gemini_usage","model":"gemini-3.8-flash","finish":"STOP","prompt":9620,"cached":6000,"output":185,"thoughts":640,"image":1120,"usd":0.006259}
+```
+
+| 欄位 | 意思 | 計價 |
+|---|---|---|
+| `prompt` | 全部輸入 token：系統規則、9 個函式定義、對話歷史、新訊息、圖片和 PDF 頁面 | 輸入價 |
+| `cached` | `prompt` 裡 Google 隱式快取命中的部分 | 快取價（輸入價的 1/10） |
+| `output` | 回覆（文字和函式呼叫） | 輸出價 |
+| `thoughts` | 思考 token | **輸出價**（貴 5 倍） |
+| `image` / `document` | `prompt` 裡圖片和 PDF 佔的 token（有附件才出現） | 已含在 `prompt` |
+| `finish` | `STOP` 正常；`MAX_TOKENS`、`MALFORMED_FUNCTION_CALL` 代表照樣收費但 App 拿不到可用結果 | |
+| `usd` | (`prompt` − `cached`) × 輸入價 + `cached` × 快取價 + (`output` + `thoughts`) × 輸出價，美元，四捨五入到 0.000001 | |
+
+價格在 `wrangler.toml` 的 `GEMINI_INPUT_USD_PER_M`、`GEMINI_CACHED_USD_PER_M`、`GEMINI_OUTPUT_USD_PER_M`（每百萬 token 的美元）。
+2026 年底前是 0.75 / 0.075 / 3.75；**2027-01-01 起 Google 公告的價格是 1.50 / 0.15 / 7.50**，到時改這三個值再部署。
+`usd` 是 Google 的牌價，不含英國 VAT 和匯率；AI Studio 帳單扣的是英鎊、可能含 20% VAT，所以帳單會比 `usd` 換算的英鎊多一些。
+
+被 Google 拒絕的呼叫（400、401/403、429、5xx）不收費，log 只記 `gemini_refused` 和 status。串流（`streamGenerateContent`）和其他路徑不記。
+
+**即時看（最準）**：在 Mac 的終端機
+
+```sh
+cd ~/Desktop/Smart-Schedule/server/worker
+npx wrangler tail --env="" --format pretty
+```
+
+然後在 iPhone 上用 App 說一句話，終端機會在一兩秒內出現那一則的 `gemini_usage`。按 control+C 結束。只想看成本的行：
+`npx wrangler tail --env="" --format json | grep gemini_usage`。Cloudflare 後台 › Workers & Pages › smart-schedule-worker › Logs
+也看得到（Workers Logs 保存幾天，只有這些數字）。
+
+對帳：AI Studio › Usage 看每天的 token 總數，Billing › Transactions 看實際扣款；把同一天 `gemini_usage` 的 `usd` 加總來比對。
+
 ### 讀寫量與方案
 
 - Assertion 驗證的 request：**2 次寫入**（`key:` counter + `rl:` 計數）、3 次讀取（`key:` 兩次、`rl:`）；沒有 binding 時再加 1 次讀取（body 預算）。
@@ -544,7 +585,8 @@ src/
   auth.ts             驗證（assertion / session scope / dev token）與 counter 寫回
   ratelimit.ts        rate limit（Rate Limiting binding + KV）、IPv6 /64 bucket、Bearer body 預算
   session.ts          /session 與 session token 查詢
-  gemini.ts           Gemini proxy
+  gemini.ts           Gemini proxy（generateContent 回覆另記 gemini_usage）
+  usage.ts            usageMetadata 的數字與每則成本（gemini_usage）
   registration.ts     /devices/push-to-start
   cron.ts             每分鐘的 push-to-start 排程
   apns.ts             APNs request 與 payload

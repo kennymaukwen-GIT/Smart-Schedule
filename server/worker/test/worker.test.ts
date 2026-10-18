@@ -551,6 +551,93 @@ describe("Gemini proxy", () => {
     assert.equal(await r.text(), '{"error":{"code":429}}');
   });
 
+  /** Runs `fn` with console.log/warn captured; returns the parsed JSON lines. */
+  async function capturingLogs(fn: () => Promise<void>): Promise<Array<Record<string, unknown>>> {
+    const lines: string[] = [];
+    const original = { log: console.log, warn: console.warn };
+    console.log = (line: string) => lines.push(line);
+    console.warn = (line: string) => lines.push(line);
+    try {
+      await fn();
+    } finally {
+      console.log = original.log;
+      console.warn = original.warn;
+    }
+    return lines.map((l) => JSON.parse(l) as Record<string, unknown>);
+  }
+
+  const ANSWER = JSON.stringify({
+    candidates: [{ content: { parts: [{ functionCall: { name: "create_events", args: { title: "秘密的會議" } } }] }, finishReason: "STOP" }],
+    usageMetadata: {
+      promptTokenCount: 9620,
+      cachedContentTokenCount: 6000,
+      candidatesTokenCount: 185,
+      thoughtsTokenCount: 640,
+      totalTokenCount: 10445,
+      promptTokensDetails: [{ modality: "TEXT", tokenCount: 8500 }, { modality: "IMAGE", tokenCount: 1120 }],
+    },
+    modelVersion: "gemini-3.8-flash",
+  });
+
+  it("logs what each generateContent answer cost (counts only) and returns it byte for byte", async () => {
+    const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true" } });
+    h.setResponder(() => new Response(ANSWER, { status: 200, headers: { "content-type": "application/json; charset=UTF-8" } }));
+    let text = "";
+    let status = 0;
+    const logs = await capturingLogs(async () => {
+      const r = await h.request("/v1beta/models/gemini-3.8-flash:generateContent", { method: "POST", headers: { "x-dev-token": "dev-secret-token" }, body: '{"contents":[{"parts":[{"text":"明天下午兩點開會"}]}]}' });
+      status = r.status;
+      assert.equal(r.headers.get("content-type"), "application/json; charset=UTF-8");
+      text = await r.text();
+    });
+    assert.equal(status, 200);
+    assert.equal(text, ANSWER);
+    const usage = logs.filter((l) => l.event === "gemini_usage");
+    assert.equal(usage.length, 1);
+    // (9620 − 6000) × 0.75 + 6000 × 0.075 + (185 + 640) × 3.75 = 2715 + 450 + 3093.75 per million = $0.006259
+    assert.deepEqual(usage[0], {
+      level: "info", event: "gemini_usage", model: "gemini-3.8-flash", finish: "STOP",
+      prompt: 9620, cached: 6000, output: 185, thoughts: 640, image: 1120, usd: 0.006259,
+    });
+    const line = JSON.stringify(logs);
+    assert.ok(!line.includes("秘密") && !line.includes("明天") && !line.includes("create_events"), "no request or answer text is logged");
+  });
+
+  it("prices the usage line from wrangler.toml vars (2027 prices)", async () => {
+    const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true", GEMINI_INPUT_USD_PER_M: "1.50", GEMINI_CACHED_USD_PER_M: "0.15", GEMINI_OUTPUT_USD_PER_M: "7.50" } });
+    h.setResponder(() => new Response(ANSWER, { status: 200, headers: { "content-type": "application/json" } }));
+    const logs = await capturingLogs(async () => {
+      await (await h.request("/v1beta/models/gemini-3.8-flash:generateContent", { method: "POST", headers: { "x-dev-token": "dev-secret-token" }, body: "{}" })).text();
+    });
+    assert.equal(logs.find((l) => l.event === "gemini_usage")?.usd, 0.012518);
+  });
+
+  it("logs only the status of refused generateContent calls, and nothing for streams or other paths", async () => {
+    const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true" } });
+    const dev = { "x-dev-token": "dev-secret-token" };
+    h.setResponder(() => new Response('{"error":{"code":429,"message":"quota"}}', { status: 429, headers: { "content-type": "application/json" } }));
+    const refused = await capturingLogs(async () => {
+      const r = await h.request("/v1beta/models/gemini-3.8-flash:generateContent", { method: "POST", headers: dev, body: "{}" });
+      assert.equal(await r.text(), '{"error":{"code":429,"message":"quota"}}');
+    });
+    assert.deepEqual(refused, [{ level: "warn", event: "gemini_refused", model: "gemini-3.8-flash", status: 429 }]);
+
+    h.setResponder(() => new Response(ANSWER, { status: 200, headers: { "content-type": "application/json" } }));
+    const others = await capturingLogs(async () => {
+      await (await h.request("/v1beta/models/gemini-3.8-flash:countTokens", { method: "POST", headers: dev, body: "{}" })).text();
+      await (await h.request("/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse", { method: "POST", headers: dev, body: "{}" })).text();
+      await (await h.request("/v1beta/models", { headers: dev })).text();
+    });
+    assert.deepEqual(others, []);
+
+    h.setResponder(() => new Response('{"candidates":[]}', { status: 200, headers: { "content-type": "application/json" } }));
+    const missing = await capturingLogs(async () => {
+      const r = await h.request("/v1beta/models/gemini-3.8-flash:generateContent", { method: "POST", headers: dev, body: "{}" });
+      assert.equal(await r.text(), '{"candidates":[]}');
+    });
+    assert.deepEqual(missing, [{ level: "warn", event: "gemini_usage_missing", model: "gemini-3.8-flash" }]);
+  });
+
   it("forwards GET without a body and drops a lone key parameter", async () => {
     const h = makeHarness({ env: { ALLOW_DEV_TOKEN: "true" } });
     await h.request("/v1beta/models?key=abc", { headers: { "x-dev-token": "dev-secret-token" } });

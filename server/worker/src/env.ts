@@ -41,6 +41,10 @@ export interface Env {
   SESSION_MODELS?: string;
   SESSION_DAILY_LIMIT?: string;
   ATTEST_DAILY_PER_IP?: string;
+  /** Gemini prices in USD per million tokens, for the `gemini_usage` log line (src/usage.ts). */
+  GEMINI_INPUT_USD_PER_M?: string;
+  GEMINI_CACHED_USD_PER_M?: string;
+  GEMINI_OUTPUT_USD_PER_M?: string;
 }
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;

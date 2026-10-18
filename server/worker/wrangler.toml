@@ -76,6 +76,12 @@ SESSION_DAILY_LIMIT = "200"
 # Successful attestations (new identities) per client IP per UTC day; IPv6 counted per /64. High because mobile
 # carriers put many users behind one IPv4 address.
 ATTEST_DAILY_PER_IP = "200"
+# Gemini prices in USD per million tokens, used only for the `gemini_usage` log line (what each answer cost; see
+# README "每次請求的實際成本"). Gemini 3.8 Flash until 31 Dec 2026: 0.75 / 0.075 / 3.75. From 1 Jan 2027 Google lists
+# 1.50 / 0.15 / 7.50: change these three and deploy. Thinking tokens are billed as output.
+GEMINI_INPUT_USD_PER_M = "0.75"
+GEMINI_CACHED_USD_PER_M = "0.075"
+GEMINI_OUTPUT_USD_PER_M = "3.75"
 
 # Secrets — never in this file. They are kept across deploys (a deploy replaces the vars above, not secrets):
 #   npx wrangler secret put GEMINI_API_KEY
@@ -138,3 +144,6 @@ SESSION_TTL_SECONDS = "604800"
 SESSION_MODELS = "gemini-3.8-flash"
 SESSION_DAILY_LIMIT = "200"
 ATTEST_DAILY_PER_IP = "200"
+GEMINI_INPUT_USD_PER_M = "0.75"
+GEMINI_CACHED_USD_PER_M = "0.075"
+GEMINI_OUTPUT_USD_PER_M = "3.75"

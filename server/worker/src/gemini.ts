@@ -1,11 +1,13 @@
 // ANY /v1beta/* → https://generativelanguage.googleapis.com/v1beta/* with the server's API key.
 //
 // The body is forwarded byte for byte (the same bytes the assertion's clientDataHash covered); nothing in it is
-// parsed or rewritten. Path and query are kept, except any `key` query parameter. The upstream status, body
-// (streamed, so SSE works) and content-type come back unchanged.
+// parsed or rewritten. Path and query are kept, except any `key` query parameter. The upstream status, body and
+// content-type come back unchanged: streamed, so SSE works, except a generateContent JSON answer, which is read in
+// full first so its usageMetadata can be logged (`gemini_usage`: token counts and the cost, never any text).
 
 import type { Deps, Env } from "./env.ts";
-import { HttpError, log } from "./http.ts";
+import { HttpError, log, parseJson } from "./http.ts";
+import { costUSD, finishReasonOf, geminiPrices, modelOf, usageOf } from "./usage.ts";
 
 export const GEMINI_ORIGIN = "https://generativelanguage.googleapis.com";
 
@@ -63,5 +65,50 @@ export async function proxyGemini(request: Request, body: Uint8Array, env: Env, 
   const responseHeaders = new Headers({ "cache-control": "no-store" });
   const contentType = upstream.headers.get("content-type");
   if (contentType) responseHeaders.set("content-type", contentType);
-  return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+
+  const pathModel = method === "POST" ? generateContentModel(url.pathname) : undefined;
+  if (pathModel === undefined) {
+    return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+  }
+  if (!upstream.ok) {
+    // Google does not bill refused requests (400, 401/403, 429, 5xx); the status says which it was.
+    log("warn", "gemini_refused", { model: pathModel, status: upstream.status });
+    return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+  }
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await upstream.arrayBuffer());
+  } catch (e) {
+    log("error", "gemini_unreachable", { error: String(e) });
+    throw new HttpError(502, "upstream_unavailable");
+  }
+  logUsage(parseJson(bytes), pathModel, env);
+  return new Response(bytes, { status: upstream.status, headers: responseHeaders });
+}
+
+/** The model of `POST /v1beta/models/<model>:generateContent`; undefined for every other path (streams included). */
+export function generateContentModel(pathname: string): string | undefined {
+  const match = /^\/v1beta\/models\/([^/:]+):generateContent$/.exec(pathname);
+  return match?.[1];
+}
+
+/** One line per billed answer: what it cost and why, from the counts Google returns. Never the request or answer. */
+function logUsage(response: unknown, pathModel: string, env: Env): void {
+  const usage = usageOf(response);
+  if (!usage) {
+    log("warn", "gemini_usage_missing", { model: pathModel });
+    return;
+  }
+  log("info", "gemini_usage", {
+    model: modelOf(response, pathModel),
+    finish: finishReasonOf(response) ?? null,
+    prompt: usage.prompt,
+    cached: usage.cached,
+    output: usage.output,
+    thoughts: usage.thoughts,
+    ...(usage.image ? { image: usage.image } : {}),
+    ...(usage.document ? { document: usage.document } : {}),
+    ...(usage.toolPrompt ? { toolPrompt: usage.toolPrompt } : {}),
+    usd: costUSD(usage, geminiPrices(env)),
+  });
 }
