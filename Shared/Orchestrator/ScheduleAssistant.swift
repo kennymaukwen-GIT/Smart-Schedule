@@ -623,8 +623,11 @@ actor ScheduleAssistant {
         case .replyToUser:
             let args = try call.decode(ReplyToUserArgs.self)
             reply.append(aliases.restoringAccountEmails(args.message))
-            reply.needsClarification = args.needsClarification ?? false
-            reply.suggestions = (args.suggestedReplies ?? []).prefix(3).map { aliases.restoringAccountEmails($0) }
+            // The prompt allows one reply_to_user per turn, but Gemini may still send two (a question, then a decline
+            // of an off-topic part): a later call never drops the question or its one-tap answers.
+            reply.needsClarification = reply.needsClarification || (args.needsClarification ?? false)
+            let suggestions = (args.suggestedReplies ?? []).prefix(3).map { aliases.restoringAccountEmails($0) }
+            if !suggestions.isEmpty { reply.suggestions = suggestions }
             return ["ok": true]
 
         case .updatePreferences:

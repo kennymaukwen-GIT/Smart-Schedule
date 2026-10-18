@@ -86,7 +86,8 @@ final class NoteSuggestionsModel {
     }
 
     /// "AI suggestions": ideas for `event` (as edited so far) added after the chips already shown. Offline, this
-    /// device answers from the rule engine, in demo mode too (its AI needs the network as well). Demo mode asks Gemini
+    /// device answers from the rule engine, in demo mode too (its AI needs the network as well); so it does when
+    /// Gemini's content filter blocks the request, which "Try again" could never get past. Demo mode asks Gemini
     /// about a sample event once AI data sharing is allowed, and its rules answer otherwise; an answer without an AI
     /// item says the rules answered. Without AI consent `fetch` throws `GeminiError.consentRequired` (demo mode: only
     /// before "Use the AI assistant?" was answered): the sheet asks, and Allow asks Gemini again.
@@ -125,6 +126,10 @@ final class NoteSuggestionsModel {
                 consentPrompt = ConsentPrompt()
             } catch is URLError {
                 // Gemini cannot be reached: Smart Schedule's own suggestions instead.
+                fallback()
+            } catch GeminiError.blocked(let reason) where GeminiError.isContentBlock(reason: reason) {
+                // Gemini's filter blocked the request (the event's title, place or notes): asking again would be
+                // blocked the same way, so Smart Schedule's own suggestions instead of "Try again".
                 fallback()
             } catch {
                 phase = .failed

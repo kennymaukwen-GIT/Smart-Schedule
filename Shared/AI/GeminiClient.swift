@@ -29,13 +29,46 @@ enum GeminiError: LocalizedError {
     /// AI data sharing is not allowed (`AIConsentStore`); thrown before anything is built or sent.
     case consentRequired
 
+    /// What the user reads in the assistant's reply (chat, Quick Capture, Siri, the notification extension): never
+    /// Gemini's raw reason, status or English message, which stay in the case's payload.
     var errorDescription: String? {
         switch self {
-        case let .http(status, message): "Gemini HTTP \(status): \(message)"
-        case let .blocked(reason): String(localized: "Gemini blocked the request (\(reason)).")
-        case let .malformed(detail): String(localized: "Unexpected Gemini response: \(detail)")
+        case let .http(status, _):
+            Self.isBusy(status: status)
+                ? String(localized: "The assistant is busy right now. Please try again in a moment.")
+                : Self.requestFailedMessage
+        case let .blocked(reason):
+            Self.isContentBlock(reason: reason)
+                ? String(localized: "I can't help with that. I can help with your events, times and plans.")
+                : Self.requestFailedMessage
+        case .malformed: Self.requestFailedMessage
         case .consentRequired: String(localized: "Allow AI data sharing in Settings › AI & privacy to use the assistant.")
         }
+    }
+
+    /// A request that went wrong for a reason the user can't act on (a block that is not about the content, Google's
+    /// 4xx, a response that can't be read): try again, or say it another way.
+    private static var requestFailedMessage: String {
+        String(localized: "Something went wrong with that request. Please try again, or say it another way.")
+    }
+
+    /// Whether an `http(status:message:)` status means Gemini is overloaded or out of quota for now (429, 5xx), which
+    /// passes: "busy, try again in a moment". `send` has already retried these twice.
+    static func isBusy(status: Int) -> Bool {
+        status == 429 || status >= 500
+    }
+
+    /// The `promptFeedback.blockReason` and `finishReason` values that mean the content itself was filtered (the
+    /// request's `safetySettings`, Google's own policy and blocklists, personal data, recitation).
+    static let contentBlockReasons: Set<String> = [
+        "SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY", "RECITATION"
+    ]
+
+    /// Whether a `blocked(reason:)` reason means the content was filtered, so the reply steers back to events, times
+    /// and plans. Every other reason (MAX_TOKENS, MALFORMED_FUNCTION_CALL, OTHER, "no candidates", one Gemini adds
+    /// later) is a request that went wrong: try again, or say it another way.
+    static func isContentBlock(reason: String) -> Bool {
+        contentBlockReasons.contains(reason)
     }
 }
 
@@ -137,7 +170,8 @@ final class GeminiClient: Sendable {
             "systemInstruction": ["parts": [["text": system]]],
             "contents": try history.map { try JSONSerialization.jsonObject(with: $0.json) },
             "tools": [["functionDeclarations": try JSONSerialization.jsonObject(with: declarationsJSON)]],
-            "toolConfig": ["functionCallingConfig": functionCallingConfig]
+            "toolConfig": ["functionCallingConfig": functionCallingConfig],
+            "safetySettings": Self.safetySettings
         ]
         // Gemini 3 guidance: keep temperature at its default (1.0); lowering it can cause looping.
         if let level = config.thinkingLevel {
@@ -158,6 +192,17 @@ final class GeminiClient: Sendable {
         let data = try await send(request, body: try JSONSerialization.data(withJSONObject: body))
         return try Self.parse(data)
     }
+
+    /// Gemini's content filter, sent with every request: Gemini 2.5 and 3 models filter nothing unless a threshold
+    /// is set. A blocked answer throws `GeminiError.blocked`, shown as "I can't help with that…".
+    static let safetySettings: [[String: String]] = [
+        ["category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"],
+        ["category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"],
+        ["category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"],
+        // Only high: the prompt carries up to 40 of the user's own event titles and notes, and ordinary ones (a
+        // shooting range, a chemistry exam, picking up a prescription) must not make every request fail.
+        ["category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"]
+    ]
 
     // MARK: - Transport with bounded retry on 429 / 5xx
 
@@ -191,8 +236,11 @@ final class GeminiClient: Sendable {
         }
         guard let candidate = (root["candidates"] as? [[String: Any]])?.first,
               var content = candidate["content"] as? [String: Any] else {
-            let reason = (root["promptFeedback"] as? [String: Any])?["blockReason"] as? String
-            throw GeminiError.blocked(reason: reason ?? "no candidates")
+            // A filtered prompt has no candidates and a blockReason; a filtered answer, a candidate with a
+            // finishReason (SAFETY…) and no content.
+            let blockReason = (root["promptFeedback"] as? [String: Any])?["blockReason"] as? String
+            let finishReason = (root["candidates"] as? [[String: Any]])?.first?["finishReason"] as? String
+            throw GeminiError.blocked(reason: blockReason ?? finishReason ?? "no candidates")
         }
         content["role"] = "model"
 

@@ -9,6 +9,7 @@ final class ClarifiedRequestTests: XCTestCase {
     override func setUp() {
         super.setUp()
         ClarifyingGeminiStub.reset()
+        DoubleReplyGeminiStub.reset()
     }
 
     override func tearDown() {
@@ -33,12 +34,25 @@ final class ClarifiedRequestTests: XCTestCase {
         XCTAssertEqual(ClarifyingGeminiStub.requestCount, 3)
     }
 
+    /// Gemini sends reply_to_user twice in one turn (the question, then a decline of the off-topic part): the reply
+    /// keeps the question's needs_clarification and one-tap answers, and shows both texts.
+    func testASecondReplyToUserKeepsTheQuestionAndItsAnswers() async throws {
+        let assistant = await makeAssistant(stub: DoubleReplyGeminiStub.self)
+        let reply = try await assistant.handle("明天下午開線上會議，順便告訴我今天的新聞", now: now)
+        XCTAssertTrue(reply.needsClarification)
+        XCTAssertEqual(reply.suggestions, ["13:00", "14:00", "15:00"])
+        XCTAssertTrue(reply.text.contains("明天下午的「線上會議」要排在幾點？"), reply.text)
+        XCTAssertTrue(reply.text.contains("我只能幫你處理行程和時間相關的事，新聞的部分幫不上忙。"), reply.text)
+        XCTAssertNil(reply.pendingEvents)
+        XCTAssertEqual(DoubleReplyGeminiStub.requestCount, 1)
+    }
+
     // MARK: Helpers
 
     /// "Ask me first", so the events wait as a batch and nothing needs Google.
-    private func makeAssistant() async -> ScheduleAssistant {
+    private func makeAssistant(stub: AnyClass = ClarifyingGeminiStub.self) async -> ScheduleAssistant {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [ClarifyingGeminiStub.self]
+        configuration.protocolClasses = [stub]
         let gemini = GeminiClient(config: GeminiConfig(baseURL: "https://gemini.example.invalid/v1beta", modelID: "test-model",
                                                        apiKey: "test-key", thinkingLevel: nil),
                                   session: URLSession(configuration: configuration),
@@ -93,6 +107,38 @@ private final class ClarifyingGeminiStub: URLProtocol {
                                        httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+/// One turn with two reply_to_user calls: the question with its one-tap answers, then a decline without any.
+private final class DoubleReplyGeminiStub: URLProtocol {
+    private static let body = #"""
+        {"candidates": [{"content": {"role": "model", "parts": [
+          {"functionCall": {"name": "reply_to_user", "args": {
+            "message": "明天下午的「線上會議」要排在幾點？", "needs_clarification": true,
+            "suggested_replies": ["13:00", "14:00", "15:00"]}}},
+          {"functionCall": {"name": "reply_to_user", "args": {
+            "message": "我只能幫你處理行程和時間相關的事，新聞的部分幫不上忙。"}}}]}, "finishReason": "STOP"}]}
+        """#
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var count = 0
+
+    static var requestCount: Int { lock.withLock { count } }
+    static func reset() { lock.withLock { count = 0 } }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.lock.withLock { Self.count += 1 }
+        let response = HTTPURLResponse(url: request.url ?? URL(string: "https://gemini.example.invalid")!, statusCode: 200,
+                                       httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(Self.body.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
 

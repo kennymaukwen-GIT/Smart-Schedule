@@ -1391,6 +1391,26 @@
         }
       }
     },
+    "Copy" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷貝"
+          }
+        }
+      }
+    },
+    "Copy Report" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷貝回報內容"
+          }
+        }
+      }
+    },
     "Could not understand the date “%@”." : {
       "localizations" : {
         "zh-Hant" : {
@@ -1440,6 +1460,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法取得 AI 建議。"
+          }
+        }
+      }
+    },
+    "Couldn't open Mail" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法開啟郵件"
           }
         }
       }
@@ -2349,16 +2379,6 @@
         }
       }
     },
-    "Gemini blocked the request (%@)." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gemini 拒絕了這個要求（%@）。"
-          }
-        }
-      }
-    },
     "General" : {
       "localizations" : {
         "zh-Hant" : {
@@ -2521,6 +2541,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "長按回覆：告訴我要新增或修改什麼。"
+          }
+        }
+      }
+    },
+    "I can't help with that. I can help with your events, times and plans." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個我沒辦法幫忙。我可以幫你處理行程、時間和計畫。"
           }
         }
       }
@@ -3399,6 +3429,16 @@
         }
       }
     },
+    "Open Email" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟郵件"
+          }
+        }
+      }
+    },
     "Open Quick Capture" : {
       "localizations" : {
         "zh-Hant" : {
@@ -3497,6 +3537,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "貼上連結"
+          }
+        }
+      }
+    },
+    "Paste the assistant's reply here, or describe it:" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請把助理的回覆貼在這裡，或描述回覆的內容："
           }
         }
       }
@@ -3825,6 +3875,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "回覆語言"
+          }
+        }
+      }
+    },
+    "Report an AI reply" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回報 AI 的回覆"
+          }
+        }
+      }
+    },
+    "Report copied" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已拷貝回報內容"
+          }
+        }
+      }
+    },
+    "Report this reply" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回報這則回覆"
           }
         }
       }
@@ -4220,6 +4300,16 @@
         }
       }
     },
+    "Something went wrong with that request. Please try again, or say it another way." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個要求出了點問題，請再試一次，或換個說法。"
+          }
+        }
+      }
+    },
     "Speech language" : {
       "comment" : "Settings › Assistant › Voice input picker",
       "localizations" : {
@@ -4574,6 +4664,16 @@
         }
       }
     },
+    "The Smart Schedules assistant replied:" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedules 助理的回覆："
+          }
+        }
+      }
+    },
     "The Smart Schedules server couldn't verify this copy of the app, so the assistant is unavailable." : {
       "localizations" : {
         "zh-Hant" : {
@@ -4594,22 +4694,22 @@
         }
       }
     },
-    "The Smart Schedules server returned an error (%lld). Try again later." : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Smart Schedules 的伺服器回應錯誤（%lld）。請稍後再試。"
-          }
-        }
-      }
-    },
     "The Smart Schedules server sent something unexpected. Try again later." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Smart Schedules 的伺服器傳回了無法辨識的內容。請稍後再試。"
+          }
+        }
+      }
+    },
+    "The assistant is busy right now. Please try again in a moment." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "助理現在比較忙，請稍後再試。"
           }
         }
       }
@@ -4686,6 +4786,16 @@
         }
       }
     },
+    "The report has been copied. Paste it into an email to %@." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回報內容已經拷貝。請貼到寄給 %@ 的郵件裡。"
+          }
+        }
+      }
+    },
     "There is no draft plan waiting for review." : {
       "localizations" : {
         "zh-Hant" : {
@@ -4745,6 +4855,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這是重複行程。"
+          }
+        }
+      }
+    },
+    "This opens an email to %@ with the reply. The report is also copied, so you can paste it into any email app." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "會開啟一封寄到 %@ 的郵件，附上這則回覆。回報內容也會拷貝起來，你可以貼到任何郵件 App。"
+          }
+        }
+      }
+    },
+    "This opens an email to %@. The report is also copied, so you can paste it into any email app." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "會開啟一封寄到 %@ 的郵件。回報內容也會拷貝起來，你可以貼到任何郵件 App。"
           }
         }
       }
@@ -5098,16 +5228,6 @@
         }
       }
     },
-    "Unexpected Gemini response: %@" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gemini 的回應格式不符：%@"
-          }
-        }
-      }
-    },
     "Upcoming event" : {
       "localizations" : {
         "zh-Hant" : {
@@ -5335,6 +5455,16 @@
         }
       }
     },
+    "What was wrong with it? (optional)" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "哪裡有問題？（可以不填）"
+          }
+        }
+      }
+    },
     "What would you like to change?" : {
       "localizations" : {
         "zh-Hant" : {
@@ -5391,6 +5521,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "昨天"
+          }
+        }
+      }
+    },
+    "You can also touch and hold a reply in the chat." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "也可以在對話裡按住回覆。"
           }
         }
       }

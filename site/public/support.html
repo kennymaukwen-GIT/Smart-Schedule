@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>支援 Support · Smart Schedules</title>
-<meta name="description" content="Smart Schedules 支援與常見問題：聯絡方式、刪除資料、移除 Google 帳號、停止 AI 分享、動態島、匯出資料。Smart Schedules support and FAQ: contact, deleting data, removing a Google account, stopping AI sharing, the Dynamic Island, exporting data.">
+<meta name="description" content="Smart Schedules 支援與常見問題：聯絡方式、刪除資料、移除 Google 帳號、停止 AI 分享、回報 AI 的回覆、動態島、匯出資料。Smart Schedules support and FAQ: contact, deleting data, removing a Google account, stopping AI sharing, reporting an AI reply, the Dynamic Island, exporting data.">
 <link rel="canonical" href="https://www.smart-schedules.com/support">
 <link rel="icon" type="image/png" href="/logo.png">
 <style>
@@ -148,6 +148,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><a href="#zh-live">動態島什麼時候會出現？</a></li>
   <li><a href="#zh-purchases">有 App 內購買或訂閱嗎？</a></li>
   <li><a href="#zh-needs">AI 助理需要什麼才能運作？</a></li>
+  <li><a href="#zh-ai-report">AI 的回覆有問題或不恰當怎麼辦？</a></li>
   <li><a href="#zh-export">怎麼匯出我的資料？</a></li>
   <li><a href="#zh-provenance">為什麼 Google 日曆的行程說明出現「由 Smart Schedules 智慧助理自動排程」？</a></li>
 </ul>
@@ -194,6 +195,18 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
 </ul>
 <p>助理會傳送什麼，請看隱私權政策的 <a href="/privacy#zh-ai">AI 助理</a>一節。</p>
 
+<h3 id="zh-ai-report">AI 的回覆有問題或不恰當怎麼辦？</h3>
+<p>AI 助理只處理行程和時間相關的要求，例如新增或修改行程、提醒、日期和時區；其他的事，它會禮貌地說沒辦法幫忙。AI 還是可能出錯，或說出不恰當的話。遇到這種情況：</p>
+<ol>
+  <li>在對話或快速輸入裡按住那則回覆，或助理做的卡片（例如計畫、加入的行程），選「回報這則回覆」。</li>
+  <li>選「開啟郵件」：App 會打開一封寄到 <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a> 的新郵件，裡面已經有那則回覆、卡片上的內容、建議的回覆，以及 App 和 iOS 的版本（不含你輸入的內容）。回報內容也會一起拷貝起來，你可以貼到任何郵件 App。也可以選「拷貝回報內容」，自己貼到寄給 support@smart-schedules.com 的郵件裡。</li>
+  <li>想說明哪裡有問題可以寫在信裡，然後寄出。</li>
+</ol>
+<p>回覆裡可能提到你的行程（例如行程的名稱、時間和地點）。寄出前，你可以修改或刪掉這些內容。</p>
+<p>Siri 或通知裡的回覆，以及行程頁「AI 建議」給的建議：到 設定 › AI 與隱私 › 回報 AI 的回覆，在信裡描述那則回覆或建議，或直接貼上。</p>
+<p>如果接下來 14 天內某個行程的名稱或備註觸發了安全過濾，助理可能每次都回「這個我沒辦法幫忙」：請檢查那個行程或改個名稱，或告訴我們。</p>
+<p>每一則回報我們都會讀，並用 email 回覆你（通常在 3 個工作天內）。你也可以隨時到 設定 › AI 與隱私 › 停止分享 關掉 AI 助理（見<a href="#zh-withdraw">怎麼停止 AI 資料分享</a>）。</p>
+
 <h3 id="zh-export">怎麼匯出我的資料？</h3>
 <p>到 設定 › 資料 › 匯出我的資料。App 會產生一個 JSON 檔案，包含設定、助理記得的事、帳號和行事曆、快取的行程和聊天記錄，用分享選單存到你想要的地方。檔案不含登入權杖。</p>
 
@@ -230,6 +243,7 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li><a href="#en-live">When does an event appear in the Dynamic Island?</a></li>
   <li><a href="#en-purchases">Are there in-app purchases or subscriptions?</a></li>
   <li><a href="#en-needs">What does the AI assistant need to work?</a></li>
+  <li><a href="#en-ai-report">What if an AI reply is wrong or inappropriate?</a></li>
   <li><a href="#en-export">How do I export my data?</a></li>
   <li><a href="#en-provenance">Why do my Google Calendar events say "由 Smart Schedules 智慧助理自動排程"?</a></li>
 </ul>
@@ -275,6 +289,18 @@ mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25
   <li>To speak instead of typing: tap the microphone button in the chat or Quick Capture and allow Speech Recognition and the microphone when iOS asks. Your speech is turned into text on your iPhone, and the audio is not recorded or sent anywhere; nothing is sent until you tap Send. If there is no microphone button, this iPhone can't recognise that language on the device yet; the keyboard's dictation key and Siri still work.</li>
 </ul>
 <p>For what the assistant sends, see <a href="/privacy#en-ai">The AI assistant</a> in the Privacy Policy.</p>
+
+<h3 id="en-ai-report">What if an AI reply is wrong or inappropriate?</h3>
+<p>The AI assistant only handles requests about your schedule and time, such as adding or changing events, reminders, dates and time zones; for anything else, it politely says it can't help. AI can still get things wrong or say something inappropriate. If that happens:</p>
+<ol>
+  <li>In the chat or Quick Capture, touch and hold the reply, or a card the assistant made (such as a plan or the events it added), and choose Report this reply.</li>
+  <li>Choose Open Email: the app opens a new email to <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a> with the reply, what its cards show, its suggested replies and the app and iOS versions already in it (not what you typed). The report is also copied, so you can paste it into any email app. Or choose Copy Report and paste it into an email to support@smart-schedules.com yourself.</li>
+  <li>Add what was wrong if you like, then send it.</li>
+</ol>
+<p>The reply may mention your events (such as their names, times and places). You can edit or delete that before you send the email.</p>
+<p>For a reply from Siri or in a notification, or AI suggestions on an event page, go to Settings › AI &amp; privacy › Report an AI reply and describe the reply or suggestions in the email, or paste them.</p>
+<p>If the name or notes of an event in the next 14 days trip the safety filter, the assistant may answer "I can't help with that" to every request: check that event or rename it, or tell us.</p>
+<p>We read every report and reply by email (usually within 3 business days). You can also turn the AI off at any time in Settings › AI &amp; privacy › Stop sharing (see <a href="#en-withdraw">How do I stop AI data sharing</a>).</p>
 
 <h3 id="en-export">How do I export my data?</h3>
 <p>Go to Settings › Data › Export my data. The app creates a JSON file with your settings, what the assistant remembers, accounts and calendars, cached events and chat history, and you choose where to save or send it from the share sheet. The file never contains sign-in tokens.</p>

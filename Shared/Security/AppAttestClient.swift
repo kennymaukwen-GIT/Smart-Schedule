@@ -43,7 +43,10 @@ enum AttestationError: LocalizedError {
         case .unsupported: String(localized: "This device can't prove it is running Smart Schedules, so the assistant is unavailable.")
         case .sessionMissing: String(localized: "Open Smart Schedules once so the assistant can answer here.")
         case .notConfigured: "GEMINI_BASE_URL must point at the Smart Schedules server (server/worker)."
-        case let .server(status): String(localized: "The Smart Schedules server returned an error (\(status)). Try again later.")
+        // Like `GeminiError.http`: never the status, which stays in the payload. 429 and 5xx pass.
+        case let .server(status): GeminiError.isBusy(status: status)
+            ? String(localized: "The assistant is busy right now. Please try again in a moment.")
+            : String(localized: "Something went wrong with that request. Please try again, or say it another way.")
         case .attestationRejected: String(localized: "The Smart Schedules server couldn't verify this copy of the app, so the assistant is unavailable.")
         case .rateLimited: String(localized: "Too many requests. Wait a minute and try again.")
         case .dailyLimit: NetworkSession.isAppExtension

@@ -303,11 +303,11 @@
   },
   {
     "name": "reply_to_user",
-    "description": "Talk to the user without changing the calendar: ask for missing information (e.g. no time given and none can be inferred), answer a question, or decline. Use only when no other function fits.",
+    "description": "Talk to the user without changing the calendar: ask for missing information (e.g. no time given and none can be inferred), answer a question, or decline. Use only when no other function fits, or next to another call to decline an off-topic part; at most once per turn.",
     "parameters": {
       "type": "object",
       "properties": {
-        "message": { "type": "string", "description": "At most 2 short sentences in the user's language. Ask one question at a time. 24-hour times; no slashes or abbreviations such as 'Tue/Thu'." },
+        "message": { "type": "string", "description": "At most 2 short sentences in the reply language the system instruction sets. Ask one question at a time. 24-hour times; no slashes or abbreviations such as 'Tue/Thu'." },
         "needs_clarification": { "type": "boolean" },
         "suggested_replies": {
           "type": "array",

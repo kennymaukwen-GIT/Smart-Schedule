@@ -11,6 +11,9 @@ import Foundation
 ///   Attest that this device or build can't do, or that the server refuses (or a server this build doesn't know), is
 ///   not tried again until `resetConversation`. Each reason is said once ("…so demo mode answered with its offline
 ///   rules."), until the AI answers again.
+/// - Content Gemini's filter blocked (`GeminiError.isContentBlock(reason:)`) is not a failure: the reply is "I can't
+///   help with that…" alone, and the offline rules never see it (they would turn it into an event or ask about it).
+///   Other blocks (an answer cut short, MAX_TOKENS) fall back like any failure.
 /// - A question carries over: when the offline rules asked back ("what time?"), the answer goes to them as well; when
 ///   the AI asked back and the offline rules answer next (the AI failed, or consent was withdrawn), they get the
 ///   request and the answer together.
@@ -96,6 +99,14 @@ actor DemoModeAssistant: ScheduleAssisting {
                 aiQuestion = reply.needsClarification ? (aiQuestion ?? utterance) : nil
                 if reply.changed { reply.append(DemoAssistant.demoNote) }
                 return reply
+            } catch GeminiError.blocked(let blockReason) where GeminiError.isContentBlock(reason: blockReason) {
+                // Gemini's filter blocked what was asked (or its answer): "I can't help with that…", never the
+                // offline rules, which would echo the text back as an event title or a "what time?" question. The AI
+                // did answer, so no reason note, and nothing is written. Only the request kept for the offline rules
+                // (`aiQuestion`) is dropped, so they never get it later; the AI's own conversation is left as it is.
+                lastNote = nil
+                aiQuestion = nil
+                return Reply(text: GeminiError.blocked(reason: blockReason).localizedDescription)
             } catch {
                 if error is CancellationError || Task.isCancelled { throw error }
                 reason = fallback(after: error)

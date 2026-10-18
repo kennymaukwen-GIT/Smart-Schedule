@@ -36,6 +36,12 @@ struct AddPlanIntent: AppIntent {
             }
         } catch GeminiError.consentRequired {
             return .result(dialog: "\(Self.consentNeeded)") // revoked meanwhile
+        } catch let error where error is GeminiError || error is AttestationError || error is URLError {
+            // Busy, filtered content, a limit, no connection: Siri says the same friendly text the chat shows
+            // (`GeminiError`, `AttestationError`), never the system's generic "couldn't be completed". Only the
+            // assistant's own errors: a cancelled request or a dismissed follow-up question passes through as before.
+            if Task.isCancelled { throw error }
+            return .result(dialog: "\(error.localizedDescription)")
         }
         await LiveActivityManager.shared.refreshIfRunning()
         let next = String(localized: "Open Smart Schedules to review it and tap Add.")

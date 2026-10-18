@@ -244,6 +244,67 @@ final class DemoModeAssistantTests: XCTestCase {
         XCTAssertEqual(requestCount, 4)
     }
 
+    // MARK: Filtered content
+
+    /// A prompt Gemini's filter blocked (promptFeedback.blockReason SAFETY), and an answer it blocked (a candidate with
+    /// finishReason SAFETY and no content): "I can't help with that…" alone. Not the offline rules, which would add
+    /// the text as an event ("買蛋給 Jocelyn") or ask what time; no reason note, nothing written, and the next message
+    /// goes to the AI.
+    func testFilteredContentGetsTheFriendlyMessageAndNothingIsWritten() async throws {
+        let rig = await makeRig()
+        let before = await rig.store.snapshot().events
+        DemoModeGeminiStub.recorder.answer([
+            .gemini(#"{"promptFeedback": {"blockReason": "SAFETY"}}"#),
+            .gemini(#"{"candidates": [{"finishReason": "SAFETY", "index": 0}]}"#)
+        ])
+        let friendly = GeminiError.blocked(reason: "SAFETY").localizedDescription
+        XCTAssertEqual(friendly, "I can't help with that. I can help with your events, times and plans.")
+
+        for utterance in ["1個小時後買蛋給 Jocelyn", "明天開會"] {
+            let reply = try await ask(rig, utterance)
+            XCTAssertEqual(reply.text, friendly, utterance)
+            XCTAssertFalse(reply.text.contains(unavailableNote), reply.text)
+            XCTAssertFalse(reply.text.contains(consentNote), reply.text)
+            XCTAssertFalse(reply.text.contains(DemoAssistant.demoNote), reply.text)
+            XCTAssertFalse(reply.text.contains(utterance), "the text is not echoed back")
+            XCTAssertTrue(reply.addedEvents.isEmpty, utterance)
+            XCTAssertTrue(reply.created.isEmpty, utterance)
+            XCTAssertFalse(reply.changed, utterance)
+            XCTAssertFalse(reply.needsClarification, utterance)
+            XCTAssertNil(reply.pendingEvents, utterance)
+            XCTAssertNil(reply.planDraft, utterance)
+        }
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertTrue(writes.entries.isEmpty, "\(writes.entries)")
+        let after = await rig.store.snapshot().events
+        XCTAssertEqual(after, before)
+        await assertNothingReachedGoogle(rig)
+
+        // No question was left waiting with the offline rules: the next message asks the AI (the stub's plain "OK").
+        let next = try await ask(rig, "14:00")
+        XCTAssertEqual(requestCount, 3)
+        XCTAssertEqual(next.text, "OK")
+    }
+
+    /// An answer cut short (finishReason MAX_TOKENS, no call and no text) is a failure like any other: the offline
+    /// rules answer, with the reason said.
+    func testAnAnswerCutShortStillFallsBackToTheOfflineRules() async throws {
+        let rig = await makeRig()
+        DemoModeGeminiStub.recorder.answer([
+            .gemini(#"{"candidates": [{"content": {"role": "model", "parts": []}, "finishReason": "MAX_TOKENS"}]}"#)
+        ])
+        let reply = try await ask(rig, "1個小時後買蛋給 Jocelyn")
+        XCTAssertEqual(requestCount, 1)
+        let event = try XCTUnwrap(reply.addedEvents.first)
+        XCTAssertTrue(event.id.hasPrefix("demo-chat-"), "the offline rules' event: \(event.id)")
+        XCTAssertEqual(event.title, "買蛋給 Jocelyn")
+        XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
+        XCTAssertTrue(reply.text.hasSuffix(unavailableNote), reply.text)
+        XCTAssertFalse(reply.text.contains(GeminiError.blocked(reason: "SAFETY").localizedDescription), reply.text)
+        XCTAssertEqual(writes.entries, ["offline"])
+        await assertNothingReachedGoogle(rig)
+    }
+
     // MARK: Only sample data
 
     func testAFocusThatIsNotASampleEventIsNeverUsed() async throws {

@@ -1,13 +1,17 @@
 import SwiftUI
 
 /// Settings › AI & privacy: whether the assistant may send requests to Google's Gemini API (and what it sends),
-/// and "What the assistant remembers": every lasting preference changed by voice, in Settings or learned from
-/// habits, each deletable (back to its default).
+/// "What the assistant remembers": every lasting preference changed by voice, in Settings or learned from
+/// habits, each deletable (back to its default), and "Report an AI reply" (App Review Guidelines 1.2 and 4.7.1): the
+/// chat's report dialog without a quote, so it is titled "Report an AI reply" too, does not mention a reply, and the
+/// email asks the user to paste or describe the reply.
 struct PrivacySettingsView: View {
     @Environment(SettingsModel.self) private var model
     @State private var confirmsStop = false
     /// Allow shows the same disclosure as the first use of the assistant, and grants only from its Allow.
     @State private var asksConsent = false
+    /// "" while the report dialog is up (`ReplyReportDialog`).
+    @State private var reportQuote: String? = nil
 
     var body: some View {
         Form {
@@ -55,6 +59,16 @@ struct PrivacySettingsView: View {
                 Text("What the assistant remembers")
             } footer: {
                 Text("Deleting an item puts that setting back to its default.")
+            }
+
+            // Like Settings › About's Contact support, hidden when the Info.plist has no address.
+            if AppConstants.info("SSSupportEmail") != nil {
+                Section {
+                    Button("Report an AI reply") { reportQuote = "" }
+                        .replyReportDialog(quote: $reportQuote)
+                } footer: {
+                    Text("You can also touch and hold a reply in the chat.")
+                }
             }
         }
         .navigationTitle("AI & privacy")

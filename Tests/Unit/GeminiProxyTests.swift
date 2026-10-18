@@ -31,11 +31,100 @@ final class GeminiProxyTests: XCTestCase {
         XCTAssertFalse(request.url.contains("key="))
         let signed = await attestation.bodies
         XCTAssertEqual(signed, [request.body], "the assertion signs exactly the body that is sent")
-        // The body is Gemini's own: generationConfig as before, nothing added or removed.
+        // The body is Gemini's own: generationConfig as before, and the content filter (safetySettings).
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: request.body) as? [String: Any])
-        XCTAssertEqual(Set(json.keys), ["systemInstruction", "contents", "tools", "toolConfig", "generationConfig"])
+        XCTAssertEqual(Set(json.keys),
+                       ["systemInstruction", "contents", "tools", "toolConfig", "generationConfig", "safetySettings"])
         XCTAssertEqual((json["generationConfig"] as? [String: Any]).flatMap { $0["thinkingConfig"] as? [String: String] },
                        ["thinkingLevel": "low"])
+    }
+
+    // MARK: Content filter
+
+    private let contentBlockedMessage = "I can't help with that. I can help with your events, times and plans."
+    private let requestFailedMessage = "Something went wrong with that request. Please try again, or say it another way."
+
+    /// Gemini 2.5 and 3 filter nothing unless a threshold is set: every request carries these four, dangerous content
+    /// only when high (ordinary event titles in the prompt must not make requests fail).
+    func testEveryRequestCarriesTheSafetySettings() async throws {
+        ProxyStub.respond([(200, ProxyStub.okResponse)])
+        _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("Chemistry exam Friday 9am")])
+        let request = try XCTUnwrap(ProxyStub.requests.first)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: request.body) as? [String: Any])
+        let settings = try XCTUnwrap(json["safetySettings"] as? [[String: String]])
+        XCTAssertEqual(settings, [
+            ["category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"],
+            ["category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"],
+            ["category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"],
+            ["category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"]
+        ])
+        XCTAssertEqual(settings, GeminiClient.safetySettings)
+    }
+
+    /// Sends one request whose answer is `response` and returns the `GeminiError.blocked` it throws.
+    private func blockedError(for response: String, file: StaticString = #filePath,
+                              line: UInt = #line) async -> GeminiError? {
+        ProxyStub.reset()
+        ProxyStub.respond([(200, response)])
+        do {
+            _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
+            XCTFail("expected GeminiError.blocked", file: file, line: line)
+        } catch let error as GeminiError {
+            guard case .blocked = error else {
+                XCTFail("unexpected \(error)", file: file, line: line)
+                return nil
+            }
+            XCTAssertEqual(ProxyStub.requests.count, 1, "not retried", file: file, line: line)
+            return error
+        } catch {
+            XCTFail("unexpected \(error)", file: file, line: line)
+        }
+        return nil
+    }
+
+    /// A filtered prompt (promptFeedback.blockReason) or answer (a candidate without content): the reply says what
+    /// the assistant can help with, never Gemini's reason.
+    func testFilteredContentSaysWhatTheAssistantCanHelpWith() async throws {
+        let filtered: [(response: String, reason: String)] = [
+            (#"{"promptFeedback": {"blockReason": "SAFETY"}}"#, "SAFETY"),
+            (#"{"candidates": [{"finishReason": "SAFETY", "index": 0}]}"#, "SAFETY"),
+            (#"{"promptFeedback": {"blockReason": "PROHIBITED_CONTENT"}}"#, "PROHIBITED_CONTENT")
+        ]
+        for (response, expected) in filtered {
+            let error = await blockedError(for: response)
+            guard case let .blocked(reason)? = error else { continue }
+            XCTAssertEqual(reason, expected, response)
+            XCTAssertEqual(error?.errorDescription, contentBlockedMessage, response)
+            XCTAssertEqual(error?.localizedDescription, contentBlockedMessage, "what the chat shows")
+            XCTAssertFalse(error?.localizedDescription.contains(reason) ?? true, "no raw reason in the reply")
+        }
+    }
+
+    /// An answer cut short (MAX_TOKENS) with no call and no text is not about what was asked: try again.
+    func testAnAnswerCutShortAsksToTryAgain() async throws {
+        let cutShort = #"{"candidates": [{"content": {"role": "model", "parts": []}, "finishReason": "MAX_TOKENS"}]}"#
+        let error = await blockedError(for: cutShort)
+        guard case let .blocked(reason)? = error else { return XCTFail("got \(String(describing: error))") }
+        XCTAssertEqual(reason, "MAX_TOKENS")
+        XCTAssertEqual(error?.errorDescription, requestFailedMessage)
+        XCTAssertEqual(error?.localizedDescription, requestFailedMessage)
+
+        let empty = await blockedError(for: #"{"candidates": []}"#)
+        guard case let .blocked(emptyReason)? = empty else { return XCTFail("got \(String(describing: empty))") }
+        XCTAssertEqual(emptyReason, "no candidates")
+        XCTAssertEqual(empty?.errorDescription, requestFailedMessage)
+    }
+
+    func testWhichBlockReasonsMeanTheContentWasFiltered() {
+        for reason in ["SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY", "RECITATION"] {
+            XCTAssertTrue(GeminiError.isContentBlock(reason: reason), reason)
+            XCTAssertEqual(GeminiError.blocked(reason: reason).errorDescription, contentBlockedMessage, reason)
+        }
+        for reason in ["MAX_TOKENS", "MALFORMED_FUNCTION_CALL", "OTHER", "no candidates", "FINISH_REASON_UNSPECIFIED",
+                       "BLOCK_REASON_UNSPECIFIED", "STOP", "SOMETHING_NEW", ""] {
+            XCTAssertFalse(GeminiError.isContentBlock(reason: reason), reason)
+            XCTAssertEqual(GeminiError.blocked(reason: reason).errorDescription, requestFailedMessage, reason)
+        }
     }
 
     func testAStaleCounterGetsOneFreshAssertion() async throws {
@@ -63,7 +152,8 @@ final class GeminiProxyTests: XCTestCase {
             _ = try await client(attestation).generate(system: "system", history: [.user("hi")])
             XCTFail("expected an error")
         } catch AttestationError.server(let status) {
-            XCTAssertEqual(status, 401, "the server's own error, shown as \"Try again later\"")
+            XCTAssertEqual(status, 401, "the server's own error")
+            XCTAssertEqual(AttestationError.server(status: status).errorDescription, requestFailedMessage, "not the status")
         } catch {
             XCTFail("unexpected \(error)")
         }
@@ -100,8 +190,8 @@ final class GeminiProxyTests: XCTestCase {
 
     /// invalid_attestation (POST /attest refused the key: a build attesting in App Attest's development environment, as
     /// Debug builds did before project.yml set production, against a Worker that checks production, or an APPLE_TEAM_ID
-    /// that is not the build's team): it says the app could not be verified, not "returned an error (401), try again
-    /// later". A 401 code this build does not know still is the general error.
+    /// that is not the build's team): it says the app could not be verified, not "something went wrong, try again". A
+    /// 401 code this build does not know still is the general error.
     func testARejectedAttestationSaysTheAppCouldNotBeVerified() throws {
         let rejected = AttestedRequest.failure(status: 401, data: Data(#"{"error":"invalid_attestation"}"#.utf8),
                                                response: nil)
@@ -169,15 +259,65 @@ final class GeminiProxyTests: XCTestCase {
         }
     }
 
-    /// Google's own errors still pass through as before.
+    /// Google's own errors still pass through as before: the payload keeps Google's status and message, the reply
+    /// shows neither.
     func testGooglesErrorsKeepTheirMessage() async {
         ProxyStub.respond([(400, #"{"error":{"code":400,"message":"Invalid JSON payload"}}"#)])
         do {
             _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
             XCTFail("expected an error")
-        } catch GeminiError.http(let status, let message) {
+        } catch let error as GeminiError {
+            guard case let .http(status, message) = error else { return XCTFail("unexpected \(error)") }
             XCTAssertEqual(status, 400)
             XCTAssertEqual(message, "Invalid JSON payload")
+            XCTAssertEqual(error.localizedDescription, requestFailedMessage, "what the chat shows")
+            XCTAssertFalse(error.localizedDescription.contains("Invalid JSON payload"))
+            XCTAssertFalse(error.localizedDescription.contains("400"))
+        } catch {
+            XCTFail("unexpected \(error)")
+        }
+        XCTAssertEqual(ProxyStub.requests.count, 1, "a 4xx is not retried")
+    }
+
+    private let busyMessage = "The assistant is busy right now. Please try again in a moment."
+
+    /// Google overloaded or out of quota (429, 5xx, after `send`'s two retries) passes: "busy, try again in a moment".
+    /// Any other status is a request that went wrong. Neither shows Google's status or English message.
+    func testGooglesErrorsAreShownAsBusyOrAsARequestThatWentWrong() {
+        let google = "Resource has been exhausted (e.g. check quota)."
+        for status in [429, 500, 502, 503, 504, 599] {
+            let error = GeminiError.http(status: status, message: google)
+            XCTAssertTrue(GeminiError.isBusy(status: status), "\(status)")
+            XCTAssertEqual(error.errorDescription, busyMessage, "\(status)")
+            XCTAssertEqual(error.localizedDescription, busyMessage, "\(status)")
+            XCTAssertFalse(error.localizedDescription.contains(google), "\(status)")
+            XCTAssertFalse(error.localizedDescription.contains("\(status)"), "\(status)")
+            // Smart Schedules' own server says the same, without its status.
+            XCTAssertEqual(AttestationError.server(status: status).errorDescription, busyMessage, "\(status)")
+        }
+        for status in [0, 400, 401, 403, 404, 413, 428, 499] {
+            let error = GeminiError.http(status: status, message: google)
+            XCTAssertFalse(GeminiError.isBusy(status: status), "\(status)")
+            XCTAssertEqual(error.errorDescription, requestFailedMessage, "\(status)")
+            XCTAssertFalse(error.localizedDescription.contains(google), "\(status)")
+            XCTAssertEqual(AttestationError.server(status: status).errorDescription, requestFailedMessage, "\(status)")
+        }
+    }
+
+    /// A response that can't be read: the reply asks to try again; the detail stays in the payload.
+    func testAnUnreadableResponseAsksToTryAgain() async {
+        XCTAssertEqual(GeminiError.malformed("root is not an object").errorDescription, requestFailedMessage)
+        XCTAssertEqual(GeminiError.malformed("bad base URL").localizedDescription, requestFailedMessage)
+
+        ProxyStub.respond([(200, "[]")])
+        do {
+            _ = try await client(FakeAttestation()).generate(system: "system", history: [.user("hi")])
+            XCTFail("expected an error")
+        } catch let error as GeminiError {
+            guard case let .malformed(detail) = error else { return XCTFail("unexpected \(error)") }
+            XCTAssertEqual(detail, "root is not an object")
+            XCTAssertEqual(error.localizedDescription, requestFailedMessage, "what the chat shows")
+            XCTAssertFalse(error.localizedDescription.contains("Gemini"))
         } catch {
             XCTFail("unexpected \(error)")
         }
@@ -204,7 +344,7 @@ final class GeminiProxyTests: XCTestCase {
     }
 
     /// 401 attestation_required: no credential the server accepts (a simulator build without the dev token, or an
-    /// extension without a session) is not "the server returned an error, try again later".
+    /// extension without a session) is not the server's general error ("something went wrong, try again").
     func testNoAcceptedCredentialIsNotATransientError() async {
         ProxyStub.respond([(401, #"{"error":"attestation_required"}"#)])
         do {
