@@ -1072,7 +1072,7 @@ enum SharedChangeNotifier {
 final class SharedChangeObservation { /* removes the Darwin observer in deinit */ }
 ```
 
-Posting duties: `PreferencesStore` posts `.preferences` after every write; `AccountStore` posts `.accounts` after every write; `AIConsentStore` posts `.consent`; `SyncStatusStore` posts `.syncStatus`; `DeepLinkRequests.open` posts `.deepLink` when it leaves the Control Center button's Quick Capture link in the App Group (the intent ran in the widget extension, as on iOS 26), and the app's `AppDelegate` observes it and opens the link while the app is not in the background (`docs/ARCHITECTURE.md` §3.1). Observers: `PreferencesStore` itself (invalidates its synchronous cache), `ScheduleViewModel` (UI: reload accounts/events, rebuild `clock`, reschedule reminders, refresh the Live Activity), `ChatViewModel` (consent banner). The app also reloads on `scenePhase == .active` as today.
+Posting duties: `PreferencesStore` posts `.preferences` after every write; `AccountStore` posts `.accounts` after every write; `AIConsentStore` posts `.consent`; `SyncStatusStore` posts `.syncStatus`; `DeepLinkRequests.open` posts `.deepLink` when it leaves the Control Center button's Quick Capture link in the App Group (should the intent run in the widget extension; it normally runs in the app as an `OpenIntent`), and the app's `AppDelegate` observes it and opens the link while the app is not in the background (`docs/ARCHITECTURE.md` §3.1). Observers: `PreferencesStore` itself (invalidates its synchronous cache), `ScheduleViewModel` (UI: reload accounts/events, rebuild `clock`, reschedule reminders, refresh the Live Activity), `ChatViewModel` (consent banner). The app also reloads on `scenePhase == .active` as today.
 
 ### 4.4 Synchronous reads
 

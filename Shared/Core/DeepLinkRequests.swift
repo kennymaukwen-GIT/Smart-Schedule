@@ -2,13 +2,14 @@ import Foundation
 
 /// Hands a deep link from an App Intent to the app's router (`AppRouter.handle`).
 ///
-/// iOS 18: an intent with `openAppWhenRun` (the Control Center button's `OpenQuickCaptureIntent`) runs in the app's
-/// process, where the app installs `handler` at launch, and the link is handled at once. iOS 26 runs a control's
-/// intent in the widget extension, in the background, while the app comes forward on its own (Apple, "Configuring
-/// the runtime behavior of your app intents"). There `handler` is nil: the link waits in the App Group, recent for
-/// `maxAge`, and `SharedChange.deepLink` is posted. The app comes forward before or after that write, so it looks
-/// at cold start (the app's `.task`), on becoming active, once more `lateWriteDelay` later, and on hearing
-/// `.deepLink` while not in the background (`routePending`). Taking the link removes it, so whichever finds it first opens Quick Capture, once.
+/// The Control Center button's `OpenQuickCaptureIntent` is an `OpenIntent`: the system brings the app to the front
+/// and runs it in the app's process, where the app installs `handler` at launch, and the link is handled at once.
+/// Should the intent run in the widget extension instead (Apple: "For WidgetKit controls in a Widget extension, the
+/// system runs the control's app intent from the extension in the background"), `handler` is nil there: the link
+/// waits in the App Group, recent for `maxAge`, and `SharedChange.deepLink` is posted. The app comes forward before
+/// or after that write, so it looks at cold start (the app's `.task`), on becoming active, once more
+/// `lateWriteDelay` later, and on hearing `.deepLink` while not in the background (`routePending`). Taking the link
+/// removes it, so whichever finds it first opens Quick Capture, once.
 @MainActor
 enum DeepLinkRequests {
     private static var handler: (@MainActor (URL) -> Void)?

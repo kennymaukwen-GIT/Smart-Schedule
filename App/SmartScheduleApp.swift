@@ -10,8 +10,8 @@ struct SmartScheduleApp: App {
     @State private var chat: ChatViewModel
 
     init() {
-        // The Control Center button's intent, when it runs in this process (iOS 18), opens Quick Capture through the
-        // router at once. Run in the widget extension (iOS 26), it leaves the link in the App Group: see `.active`
+        // The Control Center button's intent (an `OpenIntent`, run in this process) opens Quick Capture through the
+        // router at once. Should it run in the widget extension, it leaves the link in the App Group: see `.active`
         // below and `deepLinkObservation`.
         DeepLinkRequests.install { AppRouter.shared.handle($0) }
         let schedule = ScheduleViewModel()
@@ -180,8 +180,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                 await AppAttestClient.shared.refreshSessionIfNeeded()
             }
         }
-        // The Control Center button's link, left in the App Group by the widget extension (iOS 26) after the app came
-        // forward: Quick Capture opens as soon as it is written. Not while in the background: it waits for `.active`.
+        // The Control Center button's link, left in the App Group when its intent ran in the widget extension: Quick
+        // Capture opens as soon as it is written. Not while in the background: it waits for `.active`.
         deepLinkObservation = SharedChangeNotifier.observe(.deepLink) {
             Task { @MainActor in
                 guard UIApplication.shared.applicationState != .background else { return }

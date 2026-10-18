@@ -15,7 +15,7 @@
 - The countdown uses `Text(timerInterval:)`, so the activity needs no updates from a server. `NSSupportsLiveActivitiesFrequentUpdates` is declared, but the app receives no updates from a server at all.
 - Tapping the Live Activity opens the app's quick-input screen (`smartschedule://compose`). In the expanded Dynamic Island, the Edit button opens the same screen with the keyboard up.
 
-**Control Center control.** The "Smart Schedules" control opens the app directly on the quick-input screen with the keyboard up (`openAppWhenRun`; on iOS 26 `supportedModes`). It does not start a Live Activity.
+**Control Center control.** The "Smart Schedules" control opens the app directly on the quick-input screen with the keyboard up (an `OpenIntent`, which the system runs in the app in the foreground). It does not start a Live Activity.
 
 **Time Sensitive notifications.** Reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning summary and suggestions are Normal. People can change the urgency per kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off. The one other Time Sensitive notification is the "time to leave" departure reminder (see Location below), at the departure time the app worked out for an event the person asked about; its "get ready" notification 10 minutes earlier is Normal. Departure reminders are not counted in the daily reminder limit, do not replace the event's own reminders, and arrive silently during quiet hours.
 

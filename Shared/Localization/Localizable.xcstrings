@@ -4053,6 +4053,16 @@
         }
       }
     },
+    "Screen" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "畫面"
+          }
+        }
+      }
+    },
     "Search events" : {
       "comment" : "Events list search field placeholder",
       "localizations" : {
@@ -4265,6 +4275,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只用 Smart Schedules"
+          }
+        }
+      }
+    },
+    "Smart Schedules screen" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Schedules 畫面"
           }
         }
       }
