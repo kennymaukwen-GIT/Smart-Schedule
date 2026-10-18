@@ -69,29 +69,32 @@ final class AIConsentStoreTests: XCTestCase {
 
     func testDisclosureSaysWhatIsSentAndToWhom() throws {
         XCTAssertEqual(AIConsentDisclosure.title, "Use the AI assistant?")
-        XCTAssertEqual(AIConsent.disclosureVersion, 6, "everyone is asked again for the new disclosure")
+        XCTAssertEqual(AIConsent.disclosureVersion, 7, "everyone is asked again for the new disclosure")
         let items = AIConsentDisclosure.items
-        XCTAssertEqual(items.count, 6)
+        // Version 1.0 has no photo or PDF attachments: the five items quoted in the privacy policy's section 4.
+        XCTAssertEqual(items.count, 5)
         // What the user types or says, with whatever names and addresses they mention themselves.
         XCTAssertTrue(items[0].contains("type or say"), items[0])
         XCTAssertTrue(items[0].contains("spoken requests as text"), items[0])
         XCTAssertTrue(items[0].contains("email addresses you mention"), items[0])
-        // A photo or PDF the user attaches, only with that request: quoted word for word in the privacy policy's
-        // section 4 (site/public/privacy.html), so it must not drift.
-        XCTAssertEqual(items[1], "A photo or PDF you attach (only when you attach one and send)")
         // UPCOMING and FOCUS: the 14-day / 40-event window with Google event IDs, and no places.
-        XCTAssertTrue(items[2].contains("Google event IDs"), items[2])
-        XCTAssertTrue(items[2].contains("up to 40 events"), items[2])
-        XCTAssertTrue(items[2].contains("14 days"), items[2])
-        XCTAssertTrue(items[2].contains("reminder you reply to"), items[2])
-        XCTAssertFalse(items[2].contains("location"), items[2])
+        XCTAssertTrue(items[1].contains("Google event IDs"), items[1])
+        XCTAssertTrue(items[1].contains("up to 40 events"), items[1])
+        XCTAssertTrue(items[1].contains("14 days"), items[1])
+        XCTAssertTrue(items[1].contains("reminder you reply to"), items[1])
+        XCTAssertFalse(items[1].contains("location"), items[1])
         // Only "AI suggestions" sends a place, for one event.
-        XCTAssertTrue(items[3].contains("AI suggestions"), items[3])
-        XCTAssertTrue(items[3].contains("location"), items[3])
+        XCTAssertTrue(items[2].contains("AI suggestions"), items[2])
+        XCTAssertTrue(items[2].contains("location"), items[2])
         // Calendars are "Account 1", "Account 2" (CalendarAliases): no account email.
-        XCTAssertTrue(items[4].contains("calendar names and assistant settings"), items[4])
-        XCTAssertTrue(items[4].contains("not your Google account email addresses"), items[4])
-        XCTAssertTrue(items[5].contains("time zone and language"), items[5])
+        XCTAssertTrue(items[3].contains("calendar names and assistant settings"), items[3])
+        XCTAssertTrue(items[3].contains("not your Google account email addresses"), items[3])
+        XCTAssertTrue(items[4].contains("time zone and language"), items[4])
+        // Nothing about attachments in 1.0 (they come with 1.1 and consent version 8).
+        for item in items {
+            let lower = item.lowercased()
+            XCTAssertFalse(lower.contains("photo") || lower.contains("pdf") || lower.contains("attach"), item)
+        }
         XCTAssertTrue(AIConsentDisclosure.lead.contains("Gemini API"))
         XCTAssertTrue(AIConsentDisclosure.recipient.contains("Google"))
 

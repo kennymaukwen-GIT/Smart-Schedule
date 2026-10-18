@@ -194,13 +194,12 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
 
 - **唯一的關卡在 `GeminiClient.generate`**：一開始就檢查 `AIConsentStore.current.isGranted`，沒有同意就丟出 `GeminiError.consentRequired`，連 request 都不會組。聊天、快速輸入、Siri、通知裡的回覆、notification extension 全都經過這裡，所以一個關卡就涵蓋全部入口。單元測試用注入的 `consentCheck` 和一個會計數的 `URLSession` 證明沒有任何 request 送出。
 - 同意存在 App Group 的 `UserDefaults`（key `SSAIConsent`，JSON），三個 process 都能同步讀到；寫入時發 `SharedChange.consent`。
-- 說明文字只有一份：`AIConsentDisclosure`（標題、會送出的 6 類資料、收件者「Google，透過 Gemini API」、iOS 18 的伺服器說明（只有開啟 push-to-start 時才有，1.0 沒有）、語音說明（Siri、鍵盤聽寫和 App 的麥克風按鈕）、註腳）。同意畫面和「設定 › AI 與隱私 › 會送出什麼」都用它。說明內容有重大改變時把 `AIConsent.disclosureVersion` 加 1，所有人會被重新詢問。目前是第 6 版（第 6 版加入第 2 類：使用者附加的照片或 PDF；第 5 版起 1.0 不用 iOS 18 的 push-to-start，所以拿掉了 iOS 18 的伺服器說明；1.0 還沒上架，拿掉又加回 App 的語音輸入（改成只在 iPhone 上辨識）都只改寫語音說明，版本不變；第 4 版起帳號 email 不送給 Gemini），第 1、3–6 類**完全對應** prompt 實際送出的內容（10.6 節），第 2 類是訂閱者附加的照片或 PDF（附件建置中，只隨那一次請求送出）：
+- 說明文字只有一份：`AIConsentDisclosure`（標題、會送出的 5 類資料、收件者「Google，透過 Gemini API」、iOS 18 的伺服器說明（只有開啟 push-to-start 時才有，1.0 沒有）、語音說明（Siri、鍵盤聽寫和 App 的麥克風按鈕）、註腳）。同意畫面和「設定 › AI 與隱私 › 會送出什麼」都用它。說明內容有重大改變時把 `AIConsent.disclosureVersion` 加 1，所有人會被重新詢問。1.0 是第 7 版（第 6 版曾加入「使用者附加的照片或 PDF」那一類，只出現在 TestFlight；照片和 PDF 附件延到 1.1，不在 1.0，所以第 7 版拿掉那一類，1.1 加回時是第 8 版。第 5 版起 1.0 不用 iOS 18 的 push-to-start，所以拿掉了 iOS 18 的伺服器說明；1.0 還沒上架，拿掉又加回 App 的語音輸入（改成只在 iPhone 上辨識）都只改寫語音說明，版本不變；第 4 版起帳號 email 不送給 Gemini），5 類資料**完全對應** prompt 實際送出的內容（10.6 節）：
   1. 對助理輸入或說出的內容（語音先轉成文字），包括其中提到的姓名或 email；
-  2. 使用者附加的照片或 PDF（只有附加並送出時）；
-  3. 從今天起 14 天內最多 40 個行程的標題、時間、備註（每個最多 300 字）和 Google 行程 ID，以及回覆提醒的那個行程（UPCOMING 和 FOCUS 都**沒有地點**）；
-  4. 「✨ AI 建議」只送那一個行程，包括地點（12.2 節）；
-  5. 行事曆名稱和助理設定，但**不包括 Google 帳號的 email**；
-  6. 時區和語言。
+  2. 從今天起 14 天內最多 40 個行程的標題、時間、備註（每個最多 300 字）和 Google 行程 ID，以及回覆提醒的那個行程（UPCOMING 和 FOCUS 都**沒有地點**）；
+  3. 「✨ AI 建議」只送那一個行程，包括地點（12.2 節）；
+  4. 行事曆名稱和助理設定，但**不包括 Google 帳號的 email**；
+  5. 時區和語言。
 
   另外的段落：語音說明「你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字；Smart Schedules 的麥克風按鈕則在你的 iPhone 上轉成文字。Smart Schedules 只傳送文字，不傳送語音。」（App 的麥克風按鈕一律 `requiresOnDeviceRecognition = true`，見 `App/Voice/VoiceTranscriber.swift`）；註腳「點『允許』之前，不會傳送任何資料給 AI……示範模式傳送的是範例行事曆和行程，不是你的 Google 日曆。」（當時只改了註腳，揭露版本仍是 5）。iOS 18 的伺服器說明（接下來 48 小時內行程的標題、開始與結束時間、行程 ID 和行事曆顏色存在 Smart Schedules 的伺服器並透過 Apple 的推播服務送出）只在 `AppConstants.pushToStartEnabled` 為 true 時出現（`AIConsentDisclosure.serverNote`），1.0 在每個 iOS 版本都是 nil：伺服器不存任何行程。
 - **絕對不要寫「不會被用來訓練」**：這只在 Gemini 付費方案成立。上線檢查清單：在 Gemini API 專案啟用 Cloud Billing（付費方案）。免費方案下 Google 可能用 prompt 改善產品。
@@ -214,7 +213,7 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
 - `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.8-flash`（2026-10-17 從 `gemini-3.5-flash` 換過來；1.0 還沒上架，Worker 的 `SESSION_MODELS` 只留 3.8）。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。換 ID 前先把它加進 Worker 的 `SESSION_MODELS`（`server/worker/wrangler.toml`）並部署，舊 ID 留到舊版 App 不再使用；remote config 能選的每個模型也都要在裡面，否則通知擴充的回覆會被拒。
 - `thinkingLevel: "low"`：只對 Gemini 3.x 有效。2.x 用的是 `thinkingBudget`，參數不相容。
 - **不設定 temperature**：Gemini 3 的官方建議是保持預設值 1.0，調低可能造成迴圈或品質下降。
-- 「send a link」（Artboard 5 的迴紋針）：Gemini API 的 changelog（2026-03）寫明，內建工具（如 `url_context`）可以和自訂 function 在同一次呼叫裡並用。建議把這件事放在 proxy 端做，讓模型直接讀活動頁面。舊模型則先跑一次 `url_context` 抽出文字，再呼叫 function。
+- 「send a link」（Artboard 5 的迴紋針）：1.0 把迴紋針藏起來（`App/Views/ChatPanel.swift` 的 `showsAttachment: false`；它原本只把剪貼簿的連結貼進輸入框，送出的還是文字），1.1 計畫把它改成照片和 PDF 附件（`inlineData`，不用 Files API，見 `docs/SETTINGS.md` §16），不在 1.0。讓模型讀連結（還沒做）：Gemini API 的 changelog（2026-03）寫明，內建工具（如 `url_context`）可以和自訂 function 在同一次呼叫裡並用。建議把這件事放在 proxy 端做，讓模型直接讀活動頁面。舊模型則先跑一次 `url_context` 抽出文字，再呼叫 function。
 
 ## 10. 用一句話改設定：`update_preferences`，以及「先問我」
 

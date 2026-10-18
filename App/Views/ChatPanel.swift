@@ -83,7 +83,8 @@ struct ChatPanel: View {
             ComposerBar(
                 text: $chat.draft,
                 placeholder: "Type your schedule, event, aim, or plan, or send a link with a date and time",
-                showsAttachment: true,
+                // Version 1.0 has no attachments; 1.1 brings the paperclip back for photos and PDFs.
+                showsAttachment: false,
                 isBusy: chat.isBusy,
                 focus: $inputFocused,
                 // Quick Capture, the drawer or a sheet over the chat: its mic stops.

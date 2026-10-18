@@ -25,7 +25,10 @@ struct AIConsent: Codable, Hashable, Sendable {
     /// 6: names photo and PDF attachments ("A photo or PDF you attach (only when you attach one and send)", the second
     /// item, quoted word for word in the privacy policy's section 4). Everyone who allowed version 5 on TestFlight is
     /// asked again, as the policy's section 18 promises when what is sent changes.
-    static let disclosureVersion = 6
+    /// 7: version 1.0 has no photo or PDF attachments (they move to 1.1), so the attachment item is gone and the five
+    /// items quoted in the privacy policy's section 4 are back; everyone who allowed version 6 on TestFlight is asked
+    /// again. 1.1 brings the item back with version 8.
+    static let disclosureVersion = 7
 
     var status: Status = .notAsked
     var version = 0                 // disclosure version the decision applies to
@@ -97,11 +100,10 @@ enum AIConsentDisclosure {
     }
 
     /// Exactly what `AssistantPrompt` and `NoteSuggestionPrompt` send (docs/GEMINI_FUNCTION_CALLING.md §10.6): no
-    /// account email address, since calendars are named through `CalendarAliases`. The second item is the photo or PDF
-    /// a subscriber attaches, sent only with that request (docs/SETTINGS.md §8.2).
+    /// account email address, since calendars are named through `CalendarAliases`. The five items are quoted word for
+    /// word in the privacy policy's section 4 (docs/SETTINGS.md §8.2).
     static var items: [String] {
         [String(localized: "What you type or say to the assistant (spoken requests as text), including any names or email addresses you mention"),
-         String(localized: "A photo or PDF you attach (only when you attach one and send)"),
          String(localized: "Titles, times, notes and Google event IDs of up to 40 events in the 14 days from today, and of the event whose reminder you reply to"),
          String(localized: "For AI suggestions on an event: that event only, including its location"),
          String(localized: "Your calendar names and assistant settings, but not your Google account email addresses"),

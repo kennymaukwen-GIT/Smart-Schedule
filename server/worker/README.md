@@ -459,16 +459,16 @@ App 每送出一句話，只會呼叫一次 `generateContent`（函式結果放�
 Worker 在每個成功的 `generateContent` 回覆後寫一行 log，只有 Google 回傳的數字，**不含任何請求或回覆的文字、使用者或裝置識別碼**：
 
 ```json
-{"level":"info","event":"gemini_usage","model":"gemini-3.8-flash","finish":"STOP","prompt":9620,"cached":6000,"output":185,"thoughts":640,"image":1120,"usd":0.006259}
+{"level":"info","event":"gemini_usage","model":"gemini-3.8-flash","finish":"STOP","prompt":9620,"cached":6000,"output":185,"thoughts":640,"usd":0.006259}
 ```
 
 | 欄位 | 意思 | 計價 |
 |---|---|---|
-| `prompt` | 全部輸入 token：系統規則、9 個函式定義、對話歷史、新訊息、圖片和 PDF 頁面 | 輸入價 |
+| `prompt` | 全部輸入 token：系統規則、9 個函式定義、對話歷史、新訊息（請求帶圖片或 PDF 時也包括它們） | 輸入價 |
 | `cached` | `prompt` 裡 Google 隱式快取命中的部分 | 快取價（輸入價的 1/10） |
 | `output` | 回覆（文字和函式呼叫） | 輸出價 |
 | `thoughts` | 思考 token | **輸出價**（貴 5 倍） |
-| `image` / `document` | `prompt` 裡圖片和 PDF 佔的 token（有附件才出現） | 已含在 `prompt` |
+| `image` / `document` | `prompt` 裡圖片和 PDF 佔的 token，只有請求帶圖片或 PDF 時才出現。1.0 的 App 沒有附件，所以不會出現；照片和 PDF 附件計畫在 1.1 | 已含在 `prompt` |
 | `finish` | `STOP` 正常；`MAX_TOKENS`、`MALFORMED_FUNCTION_CALL` 代表照樣收費但 App 拿不到可用結果 | |
 | `usd` | (`prompt` − `cached`) × 輸入價 + `cached` × 快取價 + (`output` + `thoughts`) × 輸出價，美元，四捨五入到 0.000001 | |
 
