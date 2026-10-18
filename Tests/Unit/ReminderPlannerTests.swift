@@ -143,7 +143,7 @@ final class ReminderPlannerTests: XCTestCase {
         XCTAssertNil(quiet.content.sound)
         XCTAssertEqual(quiet.content.categoryIdentifier, NotificationIDs.Category.eventReminder)
         XCTAssertEqual(quiet.content.subtitle, "In 30 min")
-        XCTAssertEqual(quiet.content.body, "07:00")
+        XCTAssertEqual(quiet.content.body, "07:00\nHold to edit or snooze")
         XCTAssertEqual(quiet.content.userInfo[NotificationIDs.UserInfo.eventID] as? String, "m")
         XCTAssertEqual(quiet.content.userInfo[NotificationIDs.UserInfo.kind] as? String, "event")
         XCTAssertEqual(quiet.content.userInfo[NotificationIDs.UserInfo.offset] as? Int, 30)
@@ -158,9 +158,23 @@ final class ReminderPlannerTests: XCTestCase {
         let holiday = try XCTUnwrap(candidates([allDay("h", "Holiday", on: TestClock.local(2026, 10, 16))]).first)
         let allDayRequest = ReminderScheduler.request(for: holiday, clock: clock)
         XCTAssertEqual(allDayRequest.content.subtitle, "Tomorrow")
-        XCTAssertEqual(allDayRequest.content.body, "All day")
+        XCTAssertEqual(allDayRequest.content.body, "All day\nHold to edit or snooze")
         XCTAssertEqual(allDayRequest.content.userInfo[NotificationIDs.UserInfo.allDay] as? Bool, true)
         XCTAssertEqual(allDayRequest.content.userInfo[NotificationIDs.UserInfo.fromDefaults] as? Bool, true)
+    }
+
+    /// The reminder says what holding it down offers; the expanded card's header leaves that line out.
+    func testRemindersEndWithTheHoldHintThatTheCardLeavesOut() throws {
+        var meeting = event("w", "Workshop", start: TestClock.local(2026, 10, 15, 14, 48), reminders: [15])
+        meeting.location = "Room 2"
+        let request = ReminderScheduler.request(for: try XCTUnwrap(candidates([meeting]).first), clock: clock)
+        XCTAssertEqual(request.content.body, "14:48 · Room 2\nHold to edit or snooze")
+        XCTAssertEqual(ReminderScheduler.bodyWithoutHoldHint(request.content.body), "14:48 · Room 2")
+
+        XCTAssertEqual(ReminderScheduler.bodyWithoutHoldHint("14:48\n長按以編輯或延後行程"), "14:48", "written in Chinese")
+        XCTAssertEqual(ReminderScheduler.bodyWithoutHoldHint("1 event, at 12:00\n12:00 Day 15"), "1 event, at 12:00\n12:00 Day 15",
+                       "a briefing has no hint: nothing is removed")
+        XCTAssertEqual(ReminderScheduler.bodyWithoutHoldHint(""), "")
     }
 
     // MARK: Source modes

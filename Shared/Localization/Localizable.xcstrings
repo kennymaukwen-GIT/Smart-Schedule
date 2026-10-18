@@ -2484,6 +2484,16 @@
         }
       }
     },
+    "Hold to edit or snooze" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長按以編輯或延後行程"
+          }
+        }
+      }
+    },
     "Hold-to-reply: tell me what to add or change." : {
       "localizations" : {
         "zh-Hant" : {

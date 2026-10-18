@@ -4,7 +4,7 @@
     "alert": {
       "title": "Online meeting with Joe",
       "subtitle": "In 30 min",
-      "body": "15:30 · Google Meet"
+      "body": "15:30 · Google Meet\nHold to edit or snooze"
     },
     "category": "SS_EVENT_REMINDER",
     "interruption-level": "time-sensitive",

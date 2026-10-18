@@ -13,6 +13,8 @@
 **Google Calendar App 發出的通知，Smart Schedules 不能擴充，也讀不到。** iOS 的 Notification Content Extension 只會套用在「本 App 送出、而且 `categoryIdentifier` 列在 extension Info.plist 裡」的通知。所以 Artboard 1 中「MESSAGE SENT FROM GOOGLE CALENDAR」這一步要改寫成：
 > Google Calendar 的事件資料同步到 Smart Schedules，再由 Smart Schedules 自己發出提醒。這則提醒可以長按展開。
 
+提醒的文字（`ReminderScheduler.request`）：標題是行程名稱，副標是多久後開始（「30 分鐘後」「明天」），內文第一行是時間和地點（「14:48 · 會議室」，全天行程是「全天」），第二行是「長按以編輯或延後行程」（`ReminderScheduler.holdHint`，英文 "Hold to edit or snooze"），告訴使用者長按可以輸入要改的內容或延後 10 分鐘。長按展開後的卡片標題列不重複這一行（`ReminderScheduler.bodyWithoutHoldHint`）。每日摘要和計畫提醒沒有這一行。
+
 其他 iOS 不允許、所以設定頁只能用文字說明的事：
 
 | 做不到 | 原因 | App 的做法 |
@@ -194,7 +196,7 @@ NSExtensionAttributes:
 ```json
 {
   "aps": {
-    "alert": { "title": "Online meeting with Joe", "subtitle": "In 30 min", "body": "15:30 · Google Meet" },
+    "alert": { "title": "Online meeting with Joe", "subtitle": "In 30 min", "body": "15:30 · Google Meet\nHold to edit or snooze" },
     "category": "SS_EVENT_REMINDER",
     "thread-id": "ss0k3p…",
     "interruption-level": "time-sensitive",

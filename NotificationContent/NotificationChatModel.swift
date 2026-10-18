@@ -125,7 +125,9 @@ final class NotificationChatModel {
 
     func load(_ content: UNNotificationContent) {
         headerTitle = content.title
-        headerBody = [content.subtitle, content.body].filter { !$0.isEmpty }.joined(separator: " · ")
+        // The card is what holding down opened, so its header leaves out the "Hold to edit or snooze" line.
+        headerBody = [content.subtitle, ReminderScheduler.bodyWithoutHoldHint(content.body)]
+            .filter { !$0.isEmpty }.joined(separator: " · ")
         focusEventID = content.userInfo[NotificationIDs.UserInfo.eventID] as? String
 
         if content.categoryIdentifier == NotificationIDs.Category.eventReminder, let focusEventID {

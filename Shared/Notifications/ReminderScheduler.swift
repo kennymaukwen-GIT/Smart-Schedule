@@ -70,13 +70,15 @@ actor ReminderScheduler {
         let content = UNMutableNotificationContent()
         content.title = event.title
         let place = event.location ?? (event.meetURL != nil ? "Google Meet" : nil)
+        let when: String
         if reminder.isAllDay {
             content.subtitle = allDayLeadText(reminder.minutes)
-            content.body = [String(localized: "All day"), place].compactMap { $0 }.joined(separator: " · ")
+            when = [String(localized: "All day"), place].compactMap { $0 }.joined(separator: " · ")
         } else {
             content.subtitle = leadText(reminder.minutes)
-            content.body = [ReplyFormatter.clockTime(event.start, clock: clock), place].compactMap { $0 }.joined(separator: " · ")
+            when = [ReplyFormatter.clockTime(event.start, clock: clock), place].compactMap { $0 }.joined(separator: " · ")
         }
+        content.body = when + "\n" + holdHint
         content.categoryIdentifier = NotificationIDs.Category.eventReminder
         content.threadIdentifier = event.id
         content.userInfo = [
@@ -91,6 +93,20 @@ actor ReminderScheduler {
         content.relevanceScore = ReminderPlanner.relevanceScore(reminder.level)
         content.sound = reminder.level == .passive ? nil : .default
         return UNNotificationRequest(identifier: reminder.identifier, content: content, trigger: trigger(at: reminder.fire))
+    }
+
+    /// A reminder's last line: what holding it down offers (typing a change in the expanded card, Snooze 10 min).
+    static var holdHint: String { String(localized: "Hold to edit or snooze") }
+
+    /// A reminder's body without its hold hint, for the expanded card's header (the hint is the last line; it is
+    /// also left out when it was written in English or in Chinese before the language changed).
+    static func bodyWithoutHoldHint(_ body: String) -> String {
+        var lines = body.components(separatedBy: "\n")
+        let hints: Set<String> = [holdHint, "Hold to edit or snooze", "長按以編輯或延後行程"]
+        if let last = lines.last, hints.contains(last) {
+            lines.removeLast()
+        }
+        return lines.joined(separator: "\n")
     }
 
     static func briefingRequest(_ briefing: PlannedBriefing) -> UNNotificationRequest {
