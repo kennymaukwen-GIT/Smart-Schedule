@@ -44,7 +44,7 @@
 | 類別（Category） | 主要：**Productivity（生產力）**；次要：**Business（商務）** | 行事曆和待辦都在 Productivity。次要也可以選 Utilities（工具程式）。不要選 Health & Fitness：長期計畫雖然能排健身課，但 App 本身是行事曆工具。 |
 | 內容版權（Content Rights） | 「Yes, it contains, shows, or accesses third-party content」並勾選有權使用 | App 讀取並顯示使用者自己的 Google 日曆（經使用者授權、依 Google API 條款），也顯示 Gemini 產生的文字。 |
 | 年齡分級（Age Rating） | **18+**（問卷算出來比較低，用「Override to Higher Age Rating」調高） | 第 6 節 |
-| 授權合約（License Agreement） | Apple 標準 EULA | App 內「使用條款」連到 Apple 的標準 EULA（`SSTermsURL`） |
+| 授權合約（License Agreement） | Apple 標準 EULA | App 內「使用條款」（`SSTermsURL`）和網站頁尾連到使用條款頁 https://www.smart-schedules.com/terms ，它的第 2 節連到 Apple 的標準 EULA，並說明 App 的使用授權以 EULA 為準 |
 | 隱私權政策網址（Privacy Policy URL） | `https://www.smart-schedules.com/privacy` | 和 App 內 設定 › 關於 › 隱私權政策（`SSPrivacyURL`）相同 |
 | 使用者隱私選項網址（User Privacy Choices URL，選填） | `https://www.smart-schedules.com/support#en-delete`（中文頁面用 `#zh-delete`） | 說明怎麼刪除資料、移除帳號、撤回 AI 同意 |
 

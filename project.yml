@@ -94,10 +94,10 @@ targets:
         SSGeminiModelID: $(GEMINI_MODEL_ID)
         # Debug only: lets the simulator (no App Attest) call the server. Empty in Release.
         SSDevToken: $(SS_DEV_TOKEN)
-        # Shown in Settings › About and the account sheet. SSTermsURL is Apple's standard EULA; SSPrivacyURL is the policy
-        # in site/public/privacy.html, live once site/ is deployed to the Cloudflare Pages project served at
-        # www.smart-schedules.com (one CNAME "www" at Squarespace DNS; site/README.md).
-        SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+        # Shown in Settings › About and the account sheet. SSTermsURL is the terms page (site/public/terms.html, which
+        # links Apple's standard EULA in its section 2); SSPrivacyURL is the policy in site/public/privacy.html. Both are
+        # served at www.smart-schedules.com (site/README.md).
+        SSTermsURL: https://www.smart-schedules.com/terms
         SSPrivacyURL: https://www.smart-schedules.com/privacy
         SSSupportEmail: support@smart-schedules.com
     entitlements:

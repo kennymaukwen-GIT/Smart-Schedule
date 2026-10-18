@@ -1603,7 +1603,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 
 ## 13. project.yml changes (integrator)
 
-1. `targets.SmartSchedule.info.properties`: add `SSTermsURL: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/` (Apple's standard EULA as the placeholder), `SSPrivacyURL: https://www.smart-schedules.com/privacy` (site/public/privacy.html, served by the Cloudflare Pages project at www.smart-schedules.com), `SSSupportEmail: support@smart-schedules.com`.
+1. `targets.SmartSchedule.info.properties`: add `SSTermsURL: https://www.smart-schedules.com/terms` (the terms page, site/public/terms.html, whose section 2 links Apple's standard EULA; until 2026-10-18 this was the EULA itself), `SSPrivacyURL: https://www.smart-schedules.com/privacy` (site/public/privacy.html, served by the Cloudflare Pages project at www.smart-schedules.com), `SSSupportEmail: support@smart-schedules.com`.
 2. `targets.SmartSchedule.scheme`: add `storeKitConfiguration: Config/SmartSchedule.storekit` (XcodeGen target scheme option; if the installed XcodeGen rejects it, define a full `schemes.SmartSchedule` with `run.storeKitConfiguration`). `Config/` is not a source folder, so the file is not copied into the bundle. Unused while `AppConstants.subscriptionsEnabled` is false (1.0).
 3. No new source folders: every new Shared file sits in an existing folder, so the widget and notification-extension source lists stay as they are (`Shared/Models`, `Shared/Storage` and `Shared/Core` are already in all three targets and the tests; `App/Intents`, `App/Auth`, `App/Store`, `App/Privacy` are under `App/`).
 4. No new entitlements (Focus filters, StoreKit 2 and Time Sensitive need nothing beyond what exists).

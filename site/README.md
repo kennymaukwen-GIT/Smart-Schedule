@@ -17,6 +17,7 @@ site/
     index.html         https://www.smart-schedules.com/          首頁（Google OAuth 的 Home page）
     privacy.html       https://www.smart-schedules.com/privacy   隱私權政策（App Store Connect、Google OAuth、SSPrivacyURL）
     support.html       https://www.smart-schedules.com/support   支援頁（App Store Connect 的 Support URL）
+    terms.html         https://www.smart-schedules.com/terms     使用條款（Google OAuth 的 Terms of Service、SSTermsURL；第 2 節連到 Apple 的標準 EULA）
     404.html           找不到頁面時回 404
     _headers           安全性標頭（不會被當成頁面提供）
     robots.txt
@@ -319,11 +320,11 @@ Google OAuth 的品牌驗證要求首頁和隱私權政策所在的網域已經�
    - Logo：120×120，用 `public/logo.png`。
    - Application home page：`https://www.smart-schedules.com/`
    - Application privacy policy link：`https://www.smart-schedules.com/privacy`
-   - Terms of service：留空。這裡的連結必須在授權網域上，所以不能填 Apple 的標準 EULA。
+   - Terms of service：`https://www.smart-schedules.com/terms`（這個專案的表單不讓它空白；連結必須在授權網域上，所以不能直接填 Apple 的標準 EULA，條款頁第 2 節會連到它）。
    - Authorized domains：`smart-schedules.com`（不加 `www`；授權網域涵蓋它的子網域，首頁和政策放在 www 沒問題）
    - User support email：下拉選單只會列出登入的帳號和你管理的 Google 群組。要顯示 support@smart-schedules.com，它必須是專案 Owner／Editor 的 Google 帳號或群組。support@ 是 Workspace 帳號，你也用它登入 Google Cloud，所以用它登入、而且它是專案 Owner 或 Editor 時就可以直接選（請在畫面上確認）。
 2. **Audience**：發佈（In production）。還在 Testing 時，refresh token 7 天就過期。
-3. **Data Access**：加入兩個 calendar scope，各寫一段用途說明。
+3. **Data Access**：加入兩個 calendar scope。控制台（2026-10-18）只把 `calendar.events` 列為敏感，用途說明貼 [`docs/google-oauth-verification.md`](../docs/google-oauth-verification.md) 第 4.5 節（1,000 字元以內）。
 4. **Verification Center**：送審，附上不公開的 YouTube 示範影片：OAuth 同意畫面（語言設成英文）、新增行程（`calendar.events`）、抽屜列出行事曆（`calendar.calendarlist.readonly`）。
 5. 首頁已經符合 Google 的要求：公開、不需登入、在已驗證的網域上（Search Console 的網域資源 `smart-schedules.com` 涵蓋 www）、說明 App 做什麼和為什麼用 Google 日曆資料、有明顯的隱私權政策連結和 support@smart-schedules.com，也放了 Limited Use 聲明。隱私權政策第 11 節有 Google 規定的 Limited Use 原文，以及「不用 Google 使用者資料訓練 AI/ML 模型」的承諾。
 6. 首頁和政策網址要直接回 200（[§3.4](#34-等-active-和憑證然後檢查網站) 的檢查），不要填根網域、`http://` 或 `/privacy.html` 這些會轉址的網址。

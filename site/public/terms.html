@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>使用條款 Terms of Use · Smart Schedules</title>
+<meta name="description" content="Smart Schedules 使用條款：免費、年滿 18 歲、AI 助理可能出錯、通知和出發提醒的限制、不可以做的事、我們的責任和你的權利。Smart Schedules Terms of Use: free, 18 or older, the AI assistant can be wrong, limits of notifications and departure reminders, what you must not do, our responsibility and your rights.">
+<link rel="canonical" href="https://www.smart-schedules.com/terms">
+<link rel="icon" type="image/png" href="/logo.png">
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --surface: #f2f2f5;
+  --text: #1d1d1f;
+  --muted: #55555b;
+  --line: #d6d6db;
+  --link: #0057b8;
+  --todo-bg: #fff0a3;
+  --todo-text: #3b3000;
+  --icon-ring: rgba(0, 0, 0, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --text: #f5f5f7;
+    --muted: #a8a8ae;
+    --line: #38383c;
+    --link: #6cb6ff;
+    --todo-bg: #4d4100;
+    --todo-text: #ffeb8a;
+    --icon-ring: rgba(255, 255, 255, 0.18);
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  overflow-wrap: break-word;
+}
+[lang="en"] { line-height: 1.6; }
+.wrap { max-width: 46rem; margin: 0 auto; padding: 0 1rem; }
+a { color: var(--link); text-underline-offset: 0.18em; }
+a:hover { text-decoration-thickness: 2px; }
+a:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+.skip { position: absolute; left: -100vw; top: 0; }
+.skip:focus { left: 1rem; top: 0.5rem; z-index: 10; background: var(--bg); padding: 0.5rem 0.75rem; border-radius: 8px; }
+.site-header { border-bottom: 1px solid var(--line); }
+.site-header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.brand { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--text); text-decoration: none; font-weight: 600; font-size: 1.05rem; }
+.brand img { width: 32px; height: 32px; border-radius: 22%; box-shadow: 0 0 0 1px var(--icon-ring); }
+.site-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.95rem; }
+.site-nav a { text-decoration: none; }
+.site-nav a:hover { text-decoration: underline; }
+.site-nav a[aria-current="page"] { color: var(--text); font-weight: 600; }
+.lang-switch { margin: 1.25rem 0 0; padding: 0.6rem 0.9rem; background: var(--surface); border-radius: 12px; font-size: 0.95rem; }
+.lang-switch a { font-weight: 600; }
+main { padding-bottom: 2rem; }
+article { padding-top: 0.5rem; }
+article + article { margin-top: 3rem; border-top: 4px solid var(--line); }
+h1, h2, h3 { line-height: 1.3; }
+h1 { font-size: clamp(1.75rem, 6vw, 2.25rem); margin: 1.5rem 0 0.5rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; margin: 2.5rem 0 0.75rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+h3 { font-size: 1.1rem; margin: 1.75rem 0 0.5rem; }
+p, ul, ol, table, dl { margin: 0 0 1rem; }
+ul, ol { padding-left: 1.4rem; }
+li { margin: 0.3rem 0; }
+li > ul { margin: 0.3rem 0 0; }
+.meta { color: var(--muted); font-size: 0.95rem; margin-top: 0; }
+.lead { font-size: 1.15rem; }
+.box { background: var(--surface); border-radius: 14px; padding: 1rem 1.15rem; margin: 1.25rem 0; }
+.box > :last-child { margin-bottom: 0; }
+.box h2, .box h3 { border-top: 0; margin-top: 0; padding-top: 0; }
+.toc { font-size: 0.97rem; }
+.toc ol { margin-bottom: 0; }
+.quote { border-left: 4px solid var(--link); padding: 0.25rem 0 0.25rem 1rem; margin: 1rem 0; }
+.quote > :last-child { margin-bottom: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+caption { text-align: left; font-weight: 600; padding-bottom: 0.4rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.55rem 0.75rem 0.55rem 0; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; }
+thead th { border-bottom-width: 2px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; background: var(--surface); padding: 0.1em 0.35em; border-radius: 5px; }
+mark.todo { background: var(--todo-bg); color: var(--todo-text); padding: 0 0.25em; border-radius: 4px; }
+.hero { display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; }
+.hero img { width: 72px; height: 72px; border-radius: 22%; box-shadow: 0 0 0 1px var(--icon-ring); flex: none; }
+.hero h1 { margin: 0; }
+.links { display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 0; list-style: none; }
+.links a { display: inline-block; padding: 0.55rem 1rem; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; font-weight: 600; }
+.links a:hover { border-color: var(--link); }
+.top { font-size: 0.9rem; }
+.site-footer { border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; padding: 1.25rem 0 2rem; }
+.site-footer ul { list-style: none; padding: 0; margin: 0 0 0.5rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
+.site-footer p { margin: 0.25rem 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到內容 <span lang="en">Skip to content</span></a>
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.png" alt="" width="32" height="32">Smart Schedules</a>
+    <nav class="site-nav" aria-label="網站 Site">
+      <ul>
+        <li><a href="/">首頁 <span lang="en">Home</span></a></li>
+        <li><a href="/privacy">隱私權政策 <span lang="en">Privacy</span></a></li>
+        <li><a href="/support">支援 <span lang="en">Support</span></a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+<p class="lang-switch">語言 <span lang="en">Language</span>：<a href="#zh" hreflang="zh-Hant" lang="zh-Hant">繁體中文</a> · <a href="#en" hreflang="en" lang="en">English</a></p>
+
+<!-- ===================================================================== 繁體中文 -->
+<article id="zh" lang="zh-Hant" aria-labelledby="zh-title">
+<h1 id="zh-title">使用條款</h1>
+<p class="meta">最後更新：2026 年 10 月 18 日 · <a href="#en" hreflang="en" lang="en">English version</a></p>
+<p class="lead">本條款是使用 Smart Schedules 的規則。請和<a href="/privacy">隱私權政策</a>一起閱讀。</p>
+
+<section class="box" aria-labelledby="zh-summary">
+<h2 id="zh-summary">重點摘要</h2>
+<ul>
+  <li>Smart Schedules 免費。1.0 版沒有 App 內購買、訂閱或廣告。</li>
+  <li>你必須年滿 18 歲。</li>
+  <li>你使用 App 的授權，由 Apple 的標準授權合約（EULA）規範。本條款補充使用服務的規則，不取代 EULA。</li>
+  <li>AI 助理可能出錯，請檢查它新增或修改的內容。不要把 Smart Schedules 用在緊急情況；任何錯過或弄錯時間可能造成嚴重傷害的事，不要只靠它。</li>
+  <li>提醒、即時動態和出發時間可能延遲、沒有出現或不正確。請預留更多時間，開車時絕對不要操作 App。</li>
+  <li>你的行程仍然屬於你。我們只依隱私權政策的說明，用它們提供功能。</li>
+  <li>你隨時可以停止使用。本條款的任何內容，都不影響你依居住國家或地區的消費者保護相關法律享有的權利。</li>
+</ul>
+</section>
+
+<nav class="toc" aria-label="目錄">
+<ol>
+  <li><a href="#zh-about">關於本條款</a></li>
+  <li><a href="#zh-eula">Apple 的授權合約</a></li>
+  <li><a href="#zh-who">誰可以使用</a></li>
+  <li><a href="#zh-price">費用</a></li>
+  <li><a href="#zh-google">你的 Google 帳號與 Google 日曆</a></li>
+  <li><a href="#zh-privacy">隱私與 Google 使用者資料</a></li>
+  <li><a href="#zh-ai">AI 助理</a></li>
+  <li><a href="#zh-apple">語音輸入、Siri、通知與即時動態</a></li>
+  <li><a href="#zh-departure">出發提醒</a></li>
+  <li><a href="#zh-demo">示範模式</a></li>
+  <li><a href="#zh-limits">使用上限與服務狀態</a></li>
+  <li><a href="#zh-use">不可以做的事</a></li>
+  <li><a href="#zh-content">你的內容</a></li>
+  <li><a href="#zh-ip">我們的 App 與商標</a></li>
+  <li><a href="#zh-liability">我們的責任</a></li>
+  <li><a href="#zh-ending">停止與終止</a></li>
+  <li><a href="#zh-changes">條款變更</a></li>
+  <li><a href="#zh-rights">你的權利與其他法律事項</a></li>
+  <li><a href="#zh-contact">聯絡方式</a></li>
+</ol>
+</nav>
+
+<h2 id="zh-about">1. 關於本條款</h2>
+<p>本條款適用於 Smart Schedules iPhone App（包括它的即時動態、控制中心按鈕、通知擴充功能、Siri 與捷徑動作）、App 的 AI 助理使用的伺服器，以及本網站 www.smart-schedules.com。本條款中的「服務」指以上全部。</p>
+<p>服務由在英國的個人開發者 SHENG HAN HSIEH（以下稱「我們」）提供。聯絡方式：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>。</p>
+<p>使用服務，就表示你同意本條款。如果你不同意，請不要使用。你隨時可以在本頁（www.smart-schedules.com/terms），或 App 的 設定 › 關於 › 使用條款 閱讀本條款。</p>
+
+<h2 id="zh-eula">2. Apple 的授權合約</h2>
+<p>你從 Apple 的 App Store 取得 Smart Schedules。App 的授權合約是 Apple 的標準<a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/">授權應用程式終端使用者授權合約</a>（Licensed Application End User License Agreement，以下稱「EULA」）。你使用 App 的授權，由 EULA 規範。</p>
+<p>本條款補充使用服務的規則，不取代 EULA。如果本條款和 EULA 在你使用 App 的授權上有衝突，以 EULA 為準。在其他事項上，例如我們對你的責任（第 15 節），如果本條款給你的保障比 EULA 多，以本條款為準。</p>
+<p>本條款是你和我們之間的約定，Apple 不是本條款的當事人。</p>
+
+<h2 id="zh-who">3. 誰可以使用</h2>
+<ul>
+  <li>你必須年滿 18 歲。Smart Schedules 在 App Store 的分級是 18+，因為 Google Gemini API 的條款要求使用者年滿 18 歲（見隱私權政策的<a href="/privacy#zh-children">最低年齡</a>）。</li>
+  <li>Smart Schedules 是 iPhone App，需要 iOS 18 以上。它只在我們透過 App Store 提供的國家或地區供應。</li>
+</ul>
+
+<h2 id="zh-price">4. 費用</h2>
+<p>Smart Schedules 免費。1.0 版沒有 App 內購買、訂閱或廣告。如果之後的版本提供付費項目，我們會先更新本條款，你也會在購買前看到價格。你的電信業者或網路服務供應商可能會對 App 使用的數據收費。</p>
+
+<h2 id="zh-google">5. 你的 Google 帳號與 Google 日曆</h2>
+<ul>
+  <li>要使用你真實的行事曆，你要透過 Google 的登入頁，連接你自己的 Google 帳號（可以連接好幾個）。我們看不到你的 Google 密碼。</li>
+  <li>App 會向 Google 要求下列權限：<code>openid</code> 和 <code>email</code>（知道你連接的是哪個帳號）、<code>calendar.events</code>（顯示、新增、修改和刪除你的行程），以及 <code>calendar.calendarlist.readonly</code>（列出你的行事曆）。你的登入權杖存在 iPhone 的鑰匙圈（Keychain），只會送到 Google。</li>
+  <li>只連接你有權搭配這類 App 使用的 Google 帳號（例如連接工作帳號前，請先確認公司允許）。</li>
+  <li>你或助理做的變更會存進你的 Google 日曆。能看到那個行事曆或行程的人（包括邀請對象）都看得到。如果你的請求裡有別人的 email，助理可能把對方加為邀請對象，Google 可能寄邀請信給對方。</li>
+  <li>你隨時可以移除帳號，這會向 Google 要求撤銷 App 的授權。你也可以清除所有資料（設定 › 資料 › 清除這台裝置上的所有資料）。兩者都不會刪除 Google 日曆裡的任何東西。</li>
+  <li>你的 Google 帳號、Google 日曆和其他 Google 服務，適用 Google 自己的<a href="https://policies.google.com/terms">服務條款</a>和<a href="https://policies.google.com/privacy">隱私權政策</a>。</li>
+</ul>
+
+<h2 id="zh-privacy">6. 隱私與 Google 使用者資料</h2>
+<p><a href="/privacy">隱私權政策</a>說明服務使用哪些資料、送到哪裡、保存多久。本條款不重複這些內容。</p>
+<p class="quote">Smart Schedules 使用從 Google API 取得的資訊，以及將這些資訊傳輸到任何其他 App，都將遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API 服務使用者資料政策</a>（Google API Services User Data Policy），包括其中的「有限使用」（Limited Use）規定。</p>
+<p>這代表什麼，請看隱私權政策第 11 節〈<a href="/privacy#zh-limited-use">Google 使用者資料與「有限使用」</a>〉。</p>
+
+<h2 id="zh-ai">7. AI 助理</h2>
+<ul>
+  <li>助理是選用的。它透過我們在 Cloudflare 上執行的伺服器，使用 Google 的 Gemini API。你在說明傳送內容的對話框中按「允許」之前，不會傳送任何內容給 AI（你也可以從 設定 › AI 與隱私 打開這個對話框）。你隨時可以在 設定 › AI 與隱私 › 停止分享 關閉它。</li>
+  <li>助理可以新增、移動、修改和刪除行程，照你的要求修改 App 的設定（例如提醒時間），也可以為長期目標擬定計畫。</li>
+  <li>「加入行程」（設定 › 助理）設為「先問我」時，新的行程會先停在卡片上，等你點「加入」。「先問我」只適用於新行程：助理可能直接修改或刪除單一行程，但一次刪除多個行程（包括整個重複行程）時，一律會先等你確認。長期計畫一律等你確認。</li>
+  <li><strong>AI 的輸出可能有錯。</strong>助理可能誤解你的意思，或選錯日期、時間、行事曆、行程或對象。請檢查它新增或修改的內容，特別是日期、時間和邀請對象。</li>
+  <li>不要把 Smart Schedules 用在緊急情況。任何錯過或弄錯時間可能造成嚴重傷害的事，例如什麼時候該吃藥，不要只靠 Smart Schedules，請另外設定提醒。</li>
+  <li>使用助理時，你必須遵守 Google 的<a href="https://policies.google.com/terms/generative-ai/use-policy">生成式 AI 使用限制政策</a>（Generative AI Prohibited Use Policy）。</li>
+  <li>助理擬定的計畫（例如運動或讀書計畫）只是建議，不是專業意見。</li>
+</ul>
+
+<h2 id="zh-apple">8. 語音輸入、Siri、通知與即時動態</h2>
+<ul>
+  <li>麥克風按鈕使用你 iPhone 上的 Apple 語音辨識，聲音不會被保存。語音辨識可能聽錯，所以按送出前請檢查文字。</li>
+  <li>Siri 與捷徑、通知與提醒，以及動態島和鎖定畫面上的即時動態，取決於 iOS 和你的設定。專注模式、低耗電模式、通知設定和 iOS 本身的限制，可能讓它們延遲或沒有出現；在 Smart Schedules 裡，安靜時段會讓提醒不發出聲音，設定每日提醒上限時，超過的提醒不會送出。在 iOS 26 以上，每次打開 App 時，它會安排接下來兩天的即時動態。在 iOS 18 上，只有在行程開始前你設定的提前時間內或行程進行中打開 Smart Schedules，行程才會出現在動態島（見<a href="/support#zh-live">支援</a>）。</li>
+  <li>重要的事不要只靠它們。</li>
+  <li>Siri、聽寫和其他 Apple 服務由 Apple 依它自己的條款提供。</li>
+</ul>
+
+<h2 id="zh-departure">9. 出發提醒</h2>
+<ul>
+  <li>你告訴助理你要在什麼時間到哪裡，或問某個行程什麼時候該出發時，App 可以算出你該什麼時候出發，並設定兩個提醒：一個提醒你準備出門，一個在該出發時提醒你。</li>
+  <li>交通時間是 Apple 的地圖服務估算的，由你的 iPhone 直接向它查詢，不經過我們的伺服器或 Gemini（傳送哪些內容，見隱私權政策<a href="/privacy#zh-apple">第 8 節</a>）。實際的交通、大眾運輸和路況可能不同。建議的時間已經提早 10 分鐘作為緩衝，但重要的事請預留更多時間。</li>
+  <li>提醒上的「出發」按鈕會打開 Google 地圖，只帶入目的地原本的文字（你輸入的，或行程的地點）。Google 地圖可能找到不同的地點或路線，所以請確認目的地。Google 地圖適用 Google 的條款。</li>
+  <li>有時 App 算不出時間，例如沒有位置權限、從 Siri 或通知回覆、地點太遠，或找不到路線。這時你要求的行程仍會加入，但不會設定出發提醒，回覆會說明。沒有位置權限時，助理可能改問你從哪裡出發。</li>
+  <li><strong>開車時絕對不要操作 App。</strong>請在出發前設定好，並遵守交通法規。</li>
+</ul>
+
+<h2 id="zh-demo">10. 示範模式</h2>
+<p>「不登入先試用」會進入示範模式。示範模式使用虛構的範例行事曆，從不使用你的 Google 帳號；示範模式中的變更只留在你的 iPhone 上。如果你允許 AI 資料分享，可以在範例行事曆上試用真正的 AI 助理；否則示範模式在你的 iPhone 上用離線規則回答。</p>
+
+<h2 id="zh-limits">11. 使用上限與服務狀態</h2>
+<ul>
+  <li>為了防止濫用、控制 AI 的成本，我們的伺服器會限制請求的次數。目前每個安裝的 App 每分鐘最多可以向我們的伺服器送出 30 個請求。在提醒通知裡回覆另有每日上限：每個安裝每天 200 個 AI 請求（依 UTC 日期計算）。我們可能調整這些上限。</li>
+  <li>達到上限時，App 會告訴你。在通知裡回覆的每日次數用完時，打開 Smart Schedules 就能繼續，或明天再試。我們也會限制同一個網路每天可以設定助理的安裝數量；達到這個上限時，App 會請你明天再試。每日上限在 UTC 0 點重新計算。</li>
+  <li>服務大部分需要網路連線，以及 Google、Apple 和 Cloudflare 提供的服務。服務有時可能變慢、無法使用或發生錯誤，我們也可能修改、新增或移除功能。因為服務是免費的，我們無法保證它永遠可以使用或不會出錯。</li>
+</ul>
+
+<h2 id="zh-use">12. 不可以做的事</h2>
+<p>使用服務時，不可以：</p>
+<ul>
+  <li>違反法律，或用服務騷擾、威脅或傷害任何人；</li>
+  <li>以你無權使用的方式，把別人的個人資料放進服務，例如用不合法方式取得的資料，或為了騷擾或發送垃圾訊息而把別人加為邀請對象。在你自己的行程裡提到別人（例如「和 Joe 吃午餐」）或邀請對方，沒有問題；</li>
+  <li>試圖規避使用上限、App Attest 或任何其他安全措施；</li>
+  <li>複製、反編譯或還原工程 App 或我們的伺服器，法律允許的情況除外；</li>
+  <li>攻擊我們的伺服器、讓它負荷過重或干擾它，或不透過 App 存取它；</li>
+  <li>使用機器人、腳本或其他自動化或大量的存取方式（App 本身提供的 Siri 與捷徑動作，用在你自己的行事曆上，不在此限）；</li>
+  <li>用服務或它的回答建立資料集，來訓練 AI 模型或用於競爭的服務；</li>
+  <li>以 Google 生成式 AI 使用限制政策不允許的方式使用 AI。</li>
+</ul>
+<p>如果你濫用服務，我們可能限制、暫停或封鎖你的使用。如果你認為我們弄錯了，請寫信給我們。</p>
+
+<h2 id="zh-content">13. 你的內容</h2>
+<ul>
+  <li>你的行程、請求，以及你放進服務的任何其他內容，仍然屬於你。</li>
+  <li>你只授權我們依隱私權政策的說明，在提供你使用的功能所需的範圍內處理它們。</li>
+  <li>你要為你放進服務的內容負責。</li>
+</ul>
+
+<h2 id="zh-ip">14. 我們的 App 與商標</h2>
+<ul>
+  <li>App、本網站，以及 Smart Schedules 的名稱和標誌屬於我們。除了依本條款和 EULA 使用服務，本條款不給你對它們的任何權利。</li>
+  <li>「Google」「Gemini」「Google 日曆」（Google Calendar）「Google 地圖」（Google Maps）「Apple」「iPhone」「Siri」和「App Store」是各自所有者的商標。Smart Schedules 不隸屬於 Google 或 Apple，也沒有獲得它們的認可。</li>
+</ul>
+
+<h2 id="zh-liability">15. 我們的責任</h2>
+<p>我們會以合理的注意和技能提供服務。如果我們沒有做到，而你因此受到可以預見的損失，我們會負責，但受本節其他內容限制。</p>
+<p>如果因為我們沒有以合理的注意和技能提供服務，App 損壞了你的裝置或其他數位內容，我們會修復損壞，或給你合理的賠償。</p>
+<p>本條款的任何內容，都不排除或限制我們對下列事項的責任：因我們的過失造成的死亡或人身傷害、詐欺或詐欺性的不實陳述，以及其他法律不允許排除或限制的責任。</p>
+<p>因為服務是免費的，在法律允許的範圍內，我們不對下列情況負責：</p>
+<ul>
+  <li>你開始使用服務時無法預見的損失。如果損失顯然會發生，或你和我們都知道它可能發生，就是可以預見的；</li>
+  <li>商業上的損失，例如利潤、收入、合約或商業機會的損失；</li>
+  <li>因 AI 輸出錯誤、同步延遲，或通知、提醒、即時動態或出發時間延遲、沒有出現或不正確，而錯過或遲到的約會。AI 和 iOS 通知無法做到完全可靠，所以第 7 到 9 節請你檢查助理做的變更，不要只靠提醒；</li>
+  <li>我們無法合理控制的事情造成的問題，例如 Google、Apple 或 Cloudflare 的服務中斷，或你的網路連線。</li>
+</ul>
+
+<h2 id="zh-ending">16. 停止與終止</h2>
+<ul>
+  <li>你隨時可以停止使用服務：停止 AI 資料分享、移除你的 Google 帳號、清除所有資料（設定 › 資料 › 清除這台裝置上的所有資料），或刪除 App。刪除 App 之前，請在有網路時先清除資料（見<a href="/support#zh-delete">支援</a>）。</li>
+  <li>我們可能停止提供服務或其中一部分。在合理可行的情況下，我們會先在本網站或 App 裡，給你合理的事先通知。</li>
+  <li>我們也可能因濫用而限制、暫停或封鎖使用（第 12 節）。</li>
+  <li>服務結束時，你的行程仍然留在你的 Google 日曆裡。</li>
+</ul>
+
+<h2 id="zh-changes">17. 條款變更</h2>
+<ul>
+  <li>我們可能更新本條款，例如在服務或法律改變時。更新時，本頁上方的日期會跟著改。</li>
+  <li>重大變更會在生效前一段合理的時間告訴你：公布在本網站上，並寫在 App Store 上 App 的更新說明裡（可行時也會在 App 裡告訴你），除非因法律或安全原因需要更早生效。</li>
+  <li>如果你不同意變更，可以停止使用服務（第 16 節）。變更生效後你繼續使用服務，就適用更新後的條款。</li>
+</ul>
+
+<h2 id="zh-rights">18. 你的權利與其他法律事項</h2>
+<ul>
+  <li>本條款的任何內容，都不影響你依居住國家或地區的消費者保護相關法律享有的權利。</li>
+  <li>本條款有繁體中文和英文版本。如果兩個版本不一致，你可以採用對你較有利的版本。</li>
+  <li>如果法院認定本條款的某部分無法執行，其餘部分仍然有效。</li>
+  <li>如果 Smart Schedules 轉讓給其他提供者，我們可能把本條款轉讓給對方。這不會減少你的權利，我們也會在本網站或 App 裡告訴你。Google 使用者資料只有在事先取得你明確的同意後才會移轉（見隱私權政策<a href="/privacy#zh-limited-use">第 11 節</a>）。</li>
+</ul>
+
+<h2 id="zh-contact">19. 聯絡方式</h2>
+<p>SHENG HAN HSIEH<br>
+Email：<a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a><br>
+網站：<a href="/">www.smart-schedules.com</a></p>
+<p>App 的使用問題，請看<a href="/support">支援</a>。</p>
+<p class="top"><a href="#main">回到頁首</a></p>
+</article>
+
+<!-- ===================================================================== English -->
+<article id="en" lang="en" aria-labelledby="en-title">
+<h1 id="en-title">Terms of Use</h1>
+<p class="meta">Last updated: October 18, 2026 ·<a href="#zh" hreflang="zh-Hant" lang="zh-Hant">繁體中文版</a></p>
+<p class="lead">These terms are the rules for using Smart Schedules. Please read them with the <a href="/privacy">Privacy Policy</a>.</p>
+
+<section class="box" aria-labelledby="en-summary">
+<h2 id="en-summary">In short</h2>
+<ul>
+  <li>Smart Schedules is free. Version 1.0 has no in-app purchases, subscriptions or ads.</li>
+  <li>You must be 18 or older.</li>
+  <li>Apple's standard licence agreement (the EULA) governs your licence to use the app. These terms add rules for using the service; they don't replace the EULA.</li>
+  <li>The AI assistant can be wrong, so check what it adds or changes. Don't use Smart Schedules for emergencies, and don't rely on it alone for anything where a missed or wrong time could cause serious harm.</li>
+  <li>Reminders, Live Activities and departure times can be late, missing or wrong. Leave extra time, and never interact with the app while driving.</li>
+  <li>Your events remain yours. We use them only to provide the features, as the Privacy Policy describes.</li>
+  <li>You can stop at any time. Nothing in these terms affects rights you have under the consumer laws of the country where you live.</li>
+</ul>
+</section>
+
+<nav class="toc" aria-label="Contents">
+<ol>
+  <li><a href="#en-about">About these terms</a></li>
+  <li><a href="#en-eula">Apple's licence agreement</a></li>
+  <li><a href="#en-who">Who can use Smart Schedules</a></li>
+  <li><a href="#en-price">Price</a></li>
+  <li><a href="#en-google">Your Google account and Google Calendar</a></li>
+  <li><a href="#en-privacy">Privacy and Google user data</a></li>
+  <li><a href="#en-ai">The AI assistant</a></li>
+  <li><a href="#en-apple">Speech input, Siri, notifications and Live Activities</a></li>
+  <li><a href="#en-departure">Departure reminders</a></li>
+  <li><a href="#en-demo">Demo mode</a></li>
+  <li><a href="#en-limits">Limits and availability</a></li>
+  <li><a href="#en-use">What you must not do</a></li>
+  <li><a href="#en-content">Your content</a></li>
+  <li><a href="#en-ip">Our app and trademarks</a></li>
+  <li><a href="#en-liability">Our responsibility to you</a></li>
+  <li><a href="#en-ending">Stopping and ending</a></li>
+  <li><a href="#en-changes">Changes to these terms</a></li>
+  <li><a href="#en-rights">Your rights and other legal points</a></li>
+  <li><a href="#en-contact">Contact</a></li>
+</ol>
+</nav>
+
+<h2 id="en-about">1. About these terms</h2>
+<p>These terms apply to the Smart Schedules iPhone app (including its Live Activities, Control Center control, notification extension, and Siri and Shortcuts actions), the server the app uses for the AI assistant, and this website, www.smart-schedules.com. In these terms, "the service" means all of these.</p>
+<p>The service is provided by SHENG HAN HSIEH, an individual developer based in the United Kingdom ("we", "us"). Contact: <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a>.</p>
+<p>By using the service, you agree to these terms. If you don't agree, please don't use it. You can read these terms at any time on this page (www.smart-schedules.com/terms) or in the app in Settings › About › Terms of Use.</p>
+
+<h2 id="en-eula">2. Apple's licence agreement</h2>
+<p>You get Smart Schedules from Apple's App Store. The licence agreement for the app is Apple's standard <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/">Licensed Application End User License Agreement</a> (the "EULA"). The EULA governs your licence to use the app.</p>
+<p>These terms add rules for using the service. They don't replace the EULA. If these terms and the EULA conflict about your licence to use the app, the EULA applies. On anything else, such as our responsibility to you (section 15), where these terms give you more protection than the EULA, these terms apply.</p>
+<p>These terms are between you and us. Apple is not a party to them.</p>
+
+<h2 id="en-who">3. Who can use Smart Schedules</h2>
+<ul>
+  <li>You must be 18 or older. Smart Schedules is rated 18+ on the App Store, because Google's Gemini API terms require users to be 18 or older (see <a href="/privacy#en-children">Minimum age</a> in the Privacy Policy).</li>
+  <li>Smart Schedules is an iPhone app and needs iOS 18 or later. It is available only in the countries or regions where we offer it on the App Store.</li>
+</ul>
+
+<h2 id="en-price">4. Price</h2>
+<p>Smart Schedules is free. Version 1.0 has no in-app purchases, subscriptions or ads. If a later version offers something you can pay for, we will update these terms first, and you will see the price before you buy. Your mobile carrier or internet provider may charge you for the data the app uses.</p>
+
+<h2 id="en-google">5. Your Google account and Google Calendar</h2>
+<ul>
+  <li>To use your real calendars, you connect your own Google account (you can connect several) through Google's sign-in page. We never see your Google password.</li>
+  <li>The app asks Google for these permissions: <code>openid</code> and <code>email</code> (to know which account you connected), <code>calendar.events</code> (to show, add, change and delete your events) and <code>calendar.calendarlist.readonly</code> (to list your calendars). Your sign-in tokens are kept in your iPhone's Keychain and sent only to Google.</li>
+  <li>Only connect Google accounts you have the right to use with an app like this (for example, before you connect a work account, check that your employer allows it).</li>
+  <li>Changes you or the assistant make are saved in your Google Calendar. People who can see that calendar or event, including guests, can see them. If a request includes someone's email address, the assistant may add them as a guest, and Google may email them an invitation.</li>
+  <li>You can remove an account at any time; this asks Google to revoke the app's access. You can also erase all data (Settings › Data › Erase all data on this device). Neither deletes anything in Google Calendar.</li>
+  <li>Google's own <a href="https://policies.google.com/terms">Terms of Service</a> and <a href="https://policies.google.com/privacy">Privacy Policy</a> apply to your Google account, Google Calendar and other Google services.</li>
+</ul>
+
+<h2 id="en-privacy">6. Privacy and Google user data</h2>
+<p>The <a href="/privacy">Privacy Policy</a> explains what data the service uses, where it goes and how long it is kept. These terms don't repeat it.</p>
+<p class="quote">Smart Schedules' use and transfer to any other app of information received from Google APIs will adhere to <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+<p>For what this means, see section 11 of the Privacy Policy, "<a href="/privacy#en-limited-use">Google user data and Limited Use</a>".</p>
+
+<h2 id="en-ai">7. The AI assistant</h2>
+<ul>
+  <li>The assistant is optional. It uses Google's Gemini API through our server, which runs on Cloudflare. Nothing is sent to the AI until you tap Allow in the dialog that explains what is sent (you can also open this dialog from Settings › AI &amp; privacy). You can turn it off at any time in Settings › AI &amp; privacy › Stop sharing.</li>
+  <li>The assistant can add, move, change and delete events, change the app's settings when you ask (for example, reminder times), and draft plans for long-term goals.</li>
+  <li>When "Adding events" (Settings › Assistant) is set to "Ask me first", new events wait on a card until you tap Add. "Ask me first" covers only new events: the assistant can change or delete a single event straight away, but deleting several events at once (including a whole repeating event) always waits for your tap. Long-term plans always wait for your review.</li>
+  <li><strong>AI output can be wrong.</strong> The assistant can misunderstand you, or pick the wrong date, time, calendar, event or person. Check what it adds or changes, especially dates, times and guests.</li>
+  <li>Don't use Smart Schedules for emergencies. For anything where a missed or wrong time could cause serious harm, such as when to take medicine, don't rely on Smart Schedules alone: keep another reminder too.</li>
+  <li>When you use the assistant, you must follow Google's <a href="https://policies.google.com/terms/generative-ai/use-policy">Generative AI Prohibited Use Policy</a>.</li>
+  <li>Plans the assistant drafts (for example, for exercise or study) are suggestions, not professional advice.</li>
+</ul>
+
+<h2 id="en-apple">8. Speech input, Siri, notifications and Live Activities</h2>
+<ul>
+  <li>The microphone button uses Apple's speech recognition on your iPhone, and the audio is not kept. Speech recognition can mishear you, so check the text before you tap Send.</li>
+  <li>Siri and Shortcuts, notifications and reminders, and Live Activities in the Dynamic Island and on the Lock Screen depend on iOS and on your settings. Focus, Low Power Mode, notification settings and iOS's own limits can make them late or stop them from appearing; in Smart Schedules, quiet hours make reminders silent, and with a daily reminder limit some reminders are not sent. On iOS 26 and later, the app schedules Live Activities for the next two days each time you open it. On iOS 18, an event appears in the Dynamic Island only if you open Smart Schedules within the lead time you chose before it starts, or while it is under way (see <a href="/support#en-live">Support</a>).</li>
+  <li>Don't rely on them alone for anything important.</li>
+  <li>Siri, dictation and other Apple services are provided by Apple under Apple's own terms.</li>
+</ul>
+
+<h2 id="en-departure">9. Departure reminders</h2>
+<ul>
+  <li>When you tell the assistant where you need to be and when, or ask when to leave for an event, the app can work out when you should leave and set two reminders: one to get ready, and one when it is time to leave.</li>
+  <li>The travel time is an estimate from Apple's map service. Your iPhone asks it directly; our server and Gemini are not involved (for what is sent, see <a href="/privacy#en-apple">section 8</a> of the Privacy Policy). Real traffic, public transport and road conditions can differ. The suggested time already includes a 10-minute margin, but for anything important, leave extra time.</li>
+  <li>The reminder's button for setting off opens Google Maps with only the destination as it was written (what you typed, or the event's location). Google Maps may find a different place or route, so check the destination. Google's terms apply to Google Maps.</li>
+  <li>Sometimes the app can't work out a time, for example without location permission, from Siri or a notification reply, when the place is too far away, or when no route is found. Then any event you asked for is still added, but no departure reminders are set, and the reply says so. Without location permission, the assistant may ask where you are leaving from instead.</li>
+  <li><strong>Never interact with the app while driving.</strong> Set things up before you leave, and follow traffic laws.</li>
+</ul>
+
+<h2 id="en-demo">10. Demo mode</h2>
+<p>"Try without signing in" opens demo mode. Demo mode uses fictional sample calendars and never uses your Google account; changes in demo mode stay on your iPhone. If you allow AI data sharing, you can try the real AI assistant on the sample calendars; otherwise demo mode answers with offline rules on your iPhone.</p>
+
+<h2 id="en-limits">11. Limits and availability</h2>
+<ul>
+  <li>To prevent abuse and keep the cost of the AI under control, our server limits requests. Currently each installation of the app can send up to 30 requests a minute to our server. Replies typed in a reminder notification also have a daily limit: 200 AI requests per installation per day (by UTC date). We may change these limits.</li>
+  <li>When a limit is used up, the app tells you. If the daily limit for notification replies is used up, open Smart Schedules to continue, or try again tomorrow. We also limit how many installations can set up the assistant from one network each day; if that limit is reached, the app asks you to try again tomorrow. Daily limits start again at 00:00 UTC.</li>
+  <li>Most of the service needs an internet connection and services run by Google, Apple and Cloudflare. It may sometimes be slow, unavailable or have errors, and we may change, add or remove features. Because the service is free, we can't promise that it will always be available or free of errors.</li>
+</ul>
+
+<h2 id="en-use">12. What you must not do</h2>
+<p>When you use the service, you must not:</p>
+<ul>
+  <li>break the law, or use the service to harass, threaten or harm anyone;</li>
+  <li>put other people's personal data into the service in a way you have no right to, for example details you obtained unlawfully, or adding people as guests to spam or harass them. Mentioning people in your own plans, such as "lunch with Joe", or inviting them as guests is fine;</li>
+  <li>try to get around the limits, App Attest or any other security measure;</li>
+  <li>copy, decompile or reverse engineer the app or our server, except where the law allows it;</li>
+  <li>attack, overload or interfere with our server, or reach it other than through the app;</li>
+  <li>use bots, scripts or other automated or bulk access, except the app's own Siri and Shortcuts actions used for your own calendar;</li>
+  <li>use the service or its answers to build a dataset for training AI models or for a competing service;</li>
+  <li>use the AI in a way Google's Generative AI Prohibited Use Policy doesn't allow.</li>
+</ul>
+<p>If you misuse the service, we may limit, suspend or block your access to it. If you think we got it wrong, email us.</p>
+
+<h2 id="en-content">13. Your content</h2>
+<ul>
+  <li>Your events, requests and anything else you put into the service remain yours.</li>
+  <li>You give us only the permission needed to process them to provide the features you use, as the Privacy Policy describes.</li>
+  <li>You are responsible for what you put into the service.</li>
+</ul>
+
+<h2 id="en-ip">14. Our app and trademarks</h2>
+<ul>
+  <li>The app, this website, and the Smart Schedules name and logo belong to us. These terms don't give you any rights in them, except to use the service as these terms and the EULA allow.</li>
+  <li>"Google", "Gemini", "Google Calendar", "Google Maps", "Apple", "iPhone", "Siri" and "App Store" are trademarks of their owners. Smart Schedules is not affiliated with or endorsed by Google or Apple.</li>
+</ul>
+
+<h2 id="en-liability">15. Our responsibility to you</h2>
+<p>We will provide the service with reasonable care and skill. If we don't, and you suffer a loss that was foreseeable, we are responsible for it, subject to the rest of this section.</p>
+<p>If the app damages your device or other digital content because we didn't use reasonable care and skill, we will repair the damage or pay you fair compensation.</p>
+<p>Nothing in these terms excludes or limits our liability for death or personal injury caused by our negligence, for fraud or fraudulent misrepresentation, or for anything else the law does not allow us to exclude or limit.</p>
+<p>Because the service is free, and to the extent the law allows, we are not responsible for:</p>
+<ul>
+  <li>losses that were not foreseeable when you started using the service. A loss is foreseeable if it was obvious it would happen, or if both you and we knew it might happen;</li>
+  <li>business losses, such as lost profit, income, contracts or business opportunities;</li>
+  <li>missed or late appointments caused by wrong AI output, sync delays, or notifications, reminders, Live Activities or departure times that were late, missing or wrong. The AI and iOS notifications can't be made fully reliable, which is why sections 7 to 9 ask you to check the assistant's changes and not to rely on reminders alone;</li>
+  <li>problems caused by things outside our reasonable control, such as outages of Google, Apple or Cloudflare services, or your internet connection.</li>
+</ul>
+
+<h2 id="en-ending">16. Stopping and ending</h2>
+<ul>
+  <li>You can stop using the service at any time: stop AI data sharing, remove your Google accounts, erase all data (Settings › Data › Erase all data on this device), or delete the app. Before you delete the app, erase your data while you're online (see <a href="/support#en-delete">Support</a>).</li>
+  <li>We may stop providing the service, or part of it. Where reasonably possible, we will give you reasonable notice on this website or in the app first.</li>
+  <li>We may also limit, suspend or block access for misuse (section 12).</li>
+  <li>If the service ends, your events stay in your Google Calendar.</li>
+</ul>
+
+<h2 id="en-changes">17. Changes to these terms</h2>
+<ul>
+  <li>We may update these terms, for example when the service or the law changes. When we do, the date at the top of this page changes.</li>
+  <li>For material changes, we will tell you a reasonable time before they apply, on this website and in the app's update notes on the App Store (or in the app where possible), unless a change is needed sooner for legal or security reasons.</li>
+  <li>If you don't agree with a change, you can stop using the service (section 16). If you keep using the service after a change applies, the updated terms apply.</li>
+</ul>
+
+<h2 id="en-rights">18. Your rights and other legal points</h2>
+<ul>
+  <li>Nothing in these terms affects rights you have under the consumer laws of the country where you live.</li>
+  <li>These terms are in Traditional Chinese and English. If the two versions differ, you can rely on the one that is more favourable to you.</li>
+  <li>If a court decides that part of these terms can't be enforced, the rest still applies.</li>
+  <li>If Smart Schedules is transferred to another provider, we may transfer these terms to them. This won't reduce your rights, and we will tell you on this website or in the app. Google user data moves to a new provider only with your explicit prior consent (see <a href="/privacy#en-limited-use">section 11</a> of the Privacy Policy).</li>
+</ul>
+
+<h2 id="en-contact">19. Contact</h2>
+<p>SHENG HAN HSIEH<br>
+Email: <a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a><br>
+Website: <a href="/">www.smart-schedules.com</a></p>
+<p>For help with the app, see <a href="/support">Support</a>.</p>
+<p class="top"><a href="#main">Back to top</a></p>
+</article>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <ul>
+      <li><a href="/">首頁 <span lang="en">Home</span></a></li>
+      <li><a href="/privacy">隱私權政策 <span lang="en">Privacy Policy</span></a></li>
+      <li><a href="/support">支援 <span lang="en">Support</span></a></li>
+      <li><a href="/terms" aria-current="page">使用條款 <span lang="en">Terms of Use</span></a></li>
+    </ul>
+    <p><a href="mailto:support@smart-schedules.com">support@smart-schedules.com</a></p>
+    <p>© 2026 SHENG HAN HSIEH</p>
+  </div>
+</footer>
+</body>
+</html>
