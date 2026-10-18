@@ -41,11 +41,12 @@ final class SampleCalendarRouterTests: XCTestCase {
         return Rig(router: router, store: store, outbox: outbox, google: google)
     }
 
-    /// "1個小時後買蛋給 Jocelyn" said at 22:50, as Gemini answers it (`create_events.relative_time.json`), mapped.
+    /// "1個小時後買蛋給 Jocelyn" said at 22:50, as Gemini answers it (`create_events.relative_time.json`), mapped the
+    /// way `ScheduleAssistant` maps a new event: created at `now`, so the 23:50 task gets 10 minutes before and at start.
     private func relativeTimeEvent(seed: String = "s|0") throws -> MappedEvent {
         let name = "create_events.relative_time.json"
         let draft = try XCTUnwrap(Fixtures.args(CreateEventsArgs.self, from: name).events.first)
-        return try mapper.event(from: draft, seed: seed, utterance: Fixtures.utterance(name))
+        return try mapper.event(from: draft, seed: seed, utterance: Fixtures.utterance(name), createdAt: now)
     }
 
     private func repeating(_ title: String, start: String, minutes: Int, kind: String = "event",
@@ -103,7 +104,7 @@ final class SampleCalendarRouterTests: XCTestCase {
         XCTAssertEqual(event.title, "買蛋給 Jocelyn")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
         XCTAssertEqual(event.end, TestClock.local(2026, 10, 14, 0, 20))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(event.reminderMinutes, [10, 0], "created at 22:50 for later the same day")
         XCTAssertFalse(event.isWaitingToSync)
 
         // Demo mode shows it, like every sample event.
@@ -206,7 +207,7 @@ final class SampleCalendarRouterTests: XCTestCase {
         XCTAssertEqual(copy.location, "Tesco")
         XCTAssertEqual(copy.start, TestClock.local(2026, 10, 14, 9, 0))
         XCTAssertEqual(copy.end, TestClock.local(2026, 10, 14, 9, 30))
-        XCTAssertEqual(copy.reminderMinutes, [0], "unchanged")
+        XCTAssertEqual(copy.reminderMinutes, [10, 0], "unchanged")
         await assertNothingReachedGoogle(rig)
     }
 

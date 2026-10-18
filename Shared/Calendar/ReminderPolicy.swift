@@ -19,6 +19,11 @@ struct ReminderPolicy: Sendable {
     /// False in "Smart Schedules only" mode: new and edited events get no Google pop-ups (empty overrides), so
     /// only Smart Schedule's interactive reminders alert.
     var writesGooglePopups = true
+    /// A timed one-off event, deadline or task created for later the same day gets these instead of its kind's
+    /// defaults: 10 minutes before and at the start (owner decision, 18 Oct 2026). The day-before and hour-before
+    /// defaults would mostly be past already. Not a setting: `ReminderPolicy(preferences:)` keeps it.
+    /// See `sameDayMinutes(for:start:createdAt:calendar:)`.
+    var sameDayDefaults = [10, 0]
 
     static let googleMaxOverrides = 5
     static let googleMaxMinutes = 40_320
@@ -46,6 +51,20 @@ struct ReminderPolicy: Sendable {
         )
     }
 
+    /// The reminders of a timed one-off item created at `now` that starts later the same day: `sameDayDefaults`
+    /// (10 minutes before and at the start), clamped like every list. nil when the kind's defaults apply instead:
+    /// a routine (plan sessions), a start that is not after `now`, a start on another day of `calendar` (the app's
+    /// `WallClock` calendar, so its time zone decides), or a kind whose defaults are "none" (an empty list, which
+    /// stays none). Reminders already past when it is created are not scheduled (`ReminderPlanner` skips them).
+    /// The caller checks the rest: only when the user asked for no specific reminders, and not for all-day or
+    /// repeating items.
+    func sameDayMinutes(for kind: ScheduleEvent.Kind, start: Date, createdAt now: Date, calendar: Calendar) -> [Int]? {
+        guard kind != .routine, start > now, calendar.isDate(start, inSameDayAs: now),
+              !defaults(for: kind).isEmpty else { return nil }
+        let minutes = Self.clean(sameDayDefaults)
+        return minutes.isEmpty ? nil : minutes
+    }
+
     /// `useDefault: false` with no overrides: Google shows nothing for this event.
     static let noPopups = GCalReminders(useDefault: false, overrides: [])
 
@@ -58,7 +77,7 @@ struct ReminderPolicy: Sendable {
 // In an extension so the synthesized `init()` and memberwise initializer stay available.
 extension ReminderPolicy {
     /// Defaults from Settings › Notifications. The event list already carries its 0-minute ping when the user
-    /// keeps "at start", so `includeStartPing` is off.
+    /// keeps "at start", so `includeStartPing` is off. `sameDayDefaults` stays [10, 0] (not a setting).
     init(preferences: AppPreferences) {
         self.init()
         eventDefaults = preferences.eventReminders

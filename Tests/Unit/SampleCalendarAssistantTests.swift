@@ -100,7 +100,7 @@ final class SampleCalendarAssistantTests: XCTestCase {
         XCTAssertEqual(event.title, "買蛋給 Jocelyn")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
         XCTAssertEqual(event.end, TestClock.local(2026, 10, 14, 0, 20))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(event.reminderMinutes, [10, 0], "created at 22:50 for later the same day")
         XCTAssertFalse(event.isWaitingToSync)
         XCTAssertFalse(reply.waitingToSync)
         XCTAssertTrue(reply.text.hasPrefix("Added: 買蛋給 Jocelyn"), reply.text)
@@ -141,14 +141,16 @@ final class SampleCalendarAssistantTests: XCTestCase {
         let batch = try XCTUnwrap(proposed.pendingEvents)
         XCTAssertEqual(batch.target, DemoData.personalCalendar)
         XCTAssertTrue(proposed.addedEvents.isEmpty)
+        XCTAssertEqual(batch.previewEvents.first?.reminderMinutes, [10, 0])
 
-        let reply = try await rig.assistant.commitPendingEvents(batch)
+        // Add a minute later, the same evening: created for later that day.
+        let reply = try await rig.assistant.commitPendingEvents(batch, now: now.addingTimeInterval(60))
         XCTAssertEqual(reply.committedEventBatchID, batch.id)
         XCTAssertEqual(reply.addedEvents.count, 1)
         let event = try XCTUnwrap(reply.addedEvents.first)
         XCTAssertTrue(event.id.hasPrefix("demo-"), event.id)
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(event.reminderMinutes, [10, 0])
         XCTAssertTrue(reply.text.hasPrefix("Added: 買蛋給 Jocelyn"), reply.text)
         XCTAssertNotEqual(reply.text, ReplyFormatter.pendingEventsAdded(1))
         XCTAssertFalse(reply.text.contains("Google Calendar"), reply.text)
@@ -191,7 +193,7 @@ final class SampleCalendarAssistantTests: XCTestCase {
         XCTAssertEqual(cached.map(\.title), ["買蛋和牛奶給 Jocelyn"])
         XCTAssertEqual(cached.first?.location, "Tesco")
         XCTAssertEqual(cached.first?.start, TestClock.local(2026, 10, 13, 23, 50), "unchanged")
-        XCTAssertEqual(cached.first?.reminderMinutes, [0], "unchanged")
+        XCTAssertEqual(cached.first?.reminderMinutes, [10, 0], "unchanged")
 
         SampleAssistantGeminiStub.recorder.answer([SampleAssistantGeminiStub.call(
             "delete_events", #"{"event_ids": ["\#(id)"]}"#)])

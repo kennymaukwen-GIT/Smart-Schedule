@@ -120,7 +120,7 @@ final class DemoModeAssistantTests: XCTestCase {
         XCTAssertTrue(event.id.hasPrefix("demo-"), event.id)
         XCTAssertFalse(event.id.hasPrefix("demo-chat-"), "the AI's event, not the offline rules'")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(event.reminderMinutes, [10, 0], "created at 22:50 for later the same day")
         XCTAssertTrue(reply.text.hasSuffix(DemoAssistant.demoNote), reply.text)
         XCTAssertFalse(reply.text.contains(unavailableNote), reply.text)
         XCTAssertFalse(reply.text.contains(consentNote), reply.text)
@@ -140,7 +140,7 @@ final class DemoModeAssistantTests: XCTestCase {
         XCTAssertTrue(event.id.hasPrefix("demo-chat-"), event.id)
         XCTAssertEqual(event.title, "買蛋給 Jocelyn")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(event.reminderMinutes, [10, 0], "the same reminders as the AI's event")
         XCTAssertTrue(reply.text.contains(DemoAssistant.demoNote), reply.text)
         XCTAssertTrue(reply.text.hasSuffix(consentNote), reply.text)
         XCTAssertEqual(writes.entries, ["offline"])
@@ -344,20 +344,22 @@ final class DemoModeAssistantTests: XCTestCase {
         await assertNothingReachedGoogle(rig)
     }
 
-    /// "Ask me first" proposed by the offline rules: Add goes through the AI's writer, which keeps the reminder.
+    /// "Ask me first" proposed by the offline rules: Add goes through the AI's writer, which gives the same-day
+    /// reminders as the offline rules' card showed.
     func testPendingEventsAreAddedByTheAIsWriterWithoutTheAI() async throws {
         let rig = await makeRig(consent: Self.declined, askFirst: true)
         let proposed = try await ask(rig, "1個小時後買蛋給 Jocelyn")
         let batch = try XCTUnwrap(proposed.pendingEvents)
         XCTAssertTrue(proposed.addedEvents.isEmpty)
+        XCTAssertEqual(batch.previewEvents.first?.reminderMinutes, [10, 0])
 
-        let reply = try await rig.assistant.commitPendingEvents(batch)
+        let reply = try await rig.assistant.commitPendingEvents(batch, now: now.addingTimeInterval(60))
         XCTAssertEqual(reply.committedEventBatchID, batch.id)
         let event = try XCTUnwrap(reply.addedEvents.first)
         XCTAssertTrue(event.id.hasPrefix("demo-"), event.id)
         XCTAssertEqual(event.title, "買蛋給 Jocelyn")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(event.reminderMinutes, [10, 0])
         XCTAssertEqual(event.calendarRef, DemoData.personalCalendar)
         XCTAssertTrue(reply.text.hasPrefix("Added: 買蛋給 Jocelyn"), reply.text)
         XCTAssertFalse(reply.text.contains(ReplyFormatter.pendingEventsAdded(1)), reply.text)

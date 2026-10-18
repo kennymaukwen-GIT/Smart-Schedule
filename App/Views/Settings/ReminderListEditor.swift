@@ -43,7 +43,12 @@ struct ReminderListEditor: View {
                 }
                 .disabled(minutes.count >= Self.maxReminders)
             } footer: {
-                Text("Used when you don't ask for specific reminders. Google allows up to 5 per event.")
+                if kind == .routine {
+                    Text("Used when you don't ask for specific reminders. Google allows up to 5 per event.")
+                } else {
+                    // ReminderPolicy.sameDayMinutes: items created for later the same day get [10, 0] instead.
+                    Text("Used when you don't ask for specific reminders. A one-off event, deadline or task added for later the same day gets 10 min before and at start instead. Google allows up to 5 per event.")
+                }
             }
         }
         .navigationTitle(kind.settingsTitle)

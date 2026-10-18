@@ -84,11 +84,12 @@ enum AssistantPrompt {
         "in 30 minutes". A time counted from now ("in an hour", "in half an hour", "an hour from now", "1個小時後", \
         "一小時後", "半小時後", "兩小時後", "10 分鐘後") is one: start = now_local plus that much, on the next day past \
         midnight (at now_local 22:50, "1個小時後" → 23:50 and "兩小時後" → 00:50 the next day). Leave the phrase out of \
-        the title ("1個小時後買蛋給 Jocelyn" → "買蛋給 Jocelyn") and set reminder_minutes to [0], a reminder at the \
-        start, unless the user asked for other reminders (the one exception to rule 8). A clock time followed by \
-        "後" ("三點後", "after 3pm") is not counted from now, and moving an existing event ("push it an hour", \
-        "延後 1 小時") stays modify_event from its current start. When the request gives only a day ("明天開會", \
-        "dentist on Friday") or only a part of the day \
+        the title ("1個小時後買蛋給 Jocelyn" → "買蛋給 Jocelyn") and leave reminder_minutes out (the app gives an item \
+        created for later the same day a reminder 10 minutes before and one at the start, and skips any already \
+        past) unless the user named specific reminder times ('提醒我' or 'remind me' alone names none). A clock \
+        time followed by "後" ("三點後", "after 3pm") is not counted from now, and moving an existing event ("push it \
+        an hour", "延後 1 小時") stays modify_event from its current start. When the request gives only a day \
+        ("明天開會", "dentist on Friday") or only a part of the day \
         ("明天下午", "tomorrow evening", "lunch on Friday", "今晚"), do NOT pick a time and create nothing: call \
         reply_to_user with needs_clarification=true and ask what time, naming the event and the day (for a repeating \
         event the repeat: "every Monday evening"). Give 3 suggested_replies as 24-hour times inside the part of the \

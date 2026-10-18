@@ -5180,6 +5180,16 @@
         }
       }
     },
+    "Used when you don't ask for specific reminders. A one-off event, deadline or task added for later the same day gets 10 min before and at start instead. Google allows up to 5 per event." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有指定提醒時使用。當天新增、當天稍後才開始的單次行程、截止日和待辦，改在 10 分鐘前和開始時提醒。Google 每個行程最多允許 5 個提醒。"
+          }
+        }
+      }
+    },
     "Used when you don't ask for specific reminders. Google allows up to 5 per event." : {
       "localizations" : {
         "zh-Hant" : {

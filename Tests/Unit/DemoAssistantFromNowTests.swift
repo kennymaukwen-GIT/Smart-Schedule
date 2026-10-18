@@ -1,8 +1,9 @@
 import XCTest
 
 /// Demo mode's offline rules for a time counted from now, as Gemini's prompt rule 7 has it: "1個小時後買蛋給 Jocelyn"
-/// said at 22:50 is "買蛋給 Jocelyn" at 23:50 with a reminder at the start. Also: demo deletes only ever offer sample
-/// events, never the hidden copies of the user's real ones still in the cache.
+/// said at 22:50 is "買蛋給 Jocelyn" at 23:50, reminded 10 minutes before and at the start because it is created for
+/// later the same day (`ReminderPolicy.sameDayMinutes`); past midnight it keeps the kind's defaults. Also: demo
+/// deletes only ever offer sample events, never the hidden copies of the user's real ones still in the cache.
 final class DemoAssistantFromNowTests: XCTestCase {
     typealias Reply = ScheduleAssistant.Reply
 
@@ -45,7 +46,7 @@ final class DemoAssistantFromNowTests: XCTestCase {
         XCTAssertEqual(event.title, "買蛋給 Jocelyn", "the time phrase is not in the title")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
         XCTAssertEqual(event.end, event.start.addingTimeInterval(TimeInterval(AppPreferences().defaultEventMinutes) * 60))
-        XCTAssertEqual(event.reminderMinutes, [0], "a reminder at the start")
+        XCTAssertEqual(event.reminderMinutes, [10, 0], "created for later today: 10 minutes before and at the start")
         XCTAssertTrue(event.id.hasPrefix("demo-chat-"), event.id)
         XCTAssertEqual(event.calendarRef, DemoData.personalCalendar)
         XCTAssertTrue(reply.text.contains(DemoAssistant.demoNote), reply.text)
@@ -62,7 +63,7 @@ final class DemoAssistantFromNowTests: XCTestCase {
         let event = try XCTUnwrap(reply.addedEvents.first)
         XCTAssertEqual(event.title, "打給媽媽")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 14, 0, 50))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertNil(event.reminderMinutes, "tomorrow, not later today: the kind's defaults")
     }
 
     /// 提醒我 and 以後 here are about this one event: no preference changes, no default length of 2 hours.
@@ -75,7 +76,7 @@ final class DemoAssistantFromNowTests: XCTestCase {
         let event = try XCTUnwrap(water.addedEvents.first)
         XCTAssertEqual(event.title, "喝水")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 20))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(event.reminderMinutes, [10, 0])
 
         let meeting = try await ask(assistant, "兩個小時以後開會")
         XCTAssertNil(meeting.preferenceReceipt, meeting.text)
@@ -89,15 +90,41 @@ final class DemoAssistantFromNowTests: XCTestCase {
         let eggs = try await ask(make().assistant, "in an hour buy eggs")
         XCTAssertEqual(eggs.addedEvents.map(\.title), ["Buy eggs"])
         XCTAssertEqual(eggs.addedEvents.first?.start, TestClock.local(2026, 10, 13, 23, 50))
-        XCTAssertEqual(eggs.addedEvents.first?.reminderMinutes, [0])
+        XCTAssertEqual(eggs.addedEvents.first?.reminderMinutes, [10, 0])
 
         let mom = try await ask(make().assistant, "call mom 2 hours from now")
         XCTAssertEqual(mom.addedEvents.map(\.title), ["Call mom"])
         XCTAssertEqual(mom.addedEvents.first?.start, TestClock.local(2026, 10, 14, 0, 50))
+        XCTAssertNil(mom.addedEvents.first?.reminderMinutes, "past midnight: the kind's defaults")
 
         let leave = try await ask(make().assistant, "in an hour and a half leave")
         XCTAssertEqual(leave.addedEvents.map(\.title), ["Leave"])
         XCTAssertEqual(leave.addedEvents.first?.start, TestClock.local(2026, 10, 14, 0, 20))
+    }
+
+    // MARK: Same-day reminders
+
+    /// Not only a time counted from now: any capture created for later today is reminded 10 minutes before and at the
+    /// start. One for a later day, or of a kind whose defaults are "none", keeps the kind's defaults (nil).
+    func testCapturesForLaterTodayGetTheSameDayReminders() async throws {
+        let later = try await ask(make().assistant, "Call Joe 11pm")
+        XCTAssertEqual(later.addedEvents.first?.start, TestClock.local(2026, 10, 13, 23, 0))
+        XCTAssertEqual(later.addedEvents.first?.reminderMinutes, [10, 0])
+
+        let tomorrow = try await ask(make().assistant, "Call Joe tomorrow 11pm")
+        XCTAssertEqual(tomorrow.addedEvents.first?.start, TestClock.local(2026, 10, 14, 23, 0))
+        XCTAssertNil(tomorrow.addedEvents.first?.reminderMinutes)
+
+        // 9am has passed at 22:50: tomorrow at 09:00.
+        let rolled = try await ask(make().assistant, "Call Joe 9am")
+        XCTAssertEqual(rolled.addedEvents.first?.start, TestClock.local(2026, 10, 14, 9, 0))
+        XCTAssertNil(rolled.addedEvents.first?.reminderMinutes)
+
+        let (assistant, preferences, _) = make()
+        await preferences.update { $0.eventReminders = [] }
+        let none = try await ask(assistant, "Call Joe 11pm")
+        XCTAssertEqual(none.addedEvents.first?.start, TestClock.local(2026, 10, 13, 23, 0))
+        XCTAssertNil(none.addedEvents.first?.reminderMinutes, "no event reminders in Settings: still none")
     }
 
     // MARK: Parsing
@@ -153,7 +180,7 @@ final class DemoAssistantFromNowTests: XCTestCase {
 
     // MARK: "Ask me first"
 
-    func testAskFirstKeepsTheReminderAtTheStart() async throws {
+    func testAskFirstGivesTheSameDayRemindersAtAdd() async throws {
         let (assistant, preferences, store) = make()
         await preferences.update { $0.autonomy = .askFirst }
 
@@ -165,8 +192,9 @@ final class DemoAssistantFromNowTests: XCTestCase {
         let draft = try XCTUnwrap((args["events"] as? [[String: Any]])?.first)
         XCTAssertEqual(draft["title"] as? String, "買蛋給 Jocelyn")
         XCTAssertEqual(draft["start"] as? String, "2026-10-13T23:50")
-        XCTAssertEqual(draft["reminder_minutes"] as? [Int], [0])
+        XCTAssertNil(draft["reminder_minutes"], "the args keep only reminders asked for, as Gemini's do")
         XCTAssertEqual(batch.previewEvents.first?.start, TestClock.local(2026, 10, 13, 23, 50))
+        XCTAssertEqual(batch.previewEvents.first?.reminderMinutes, [10, 0], "the card shows what Add now gives")
         let nothing = await store.snapshot().events
         XCTAssertTrue(nothing.isEmpty, "nothing is written before Add")
 
@@ -175,7 +203,7 @@ final class DemoAssistantFromNowTests: XCTestCase {
         let event = try XCTUnwrap(added.addedEvents.first)
         XCTAssertEqual(event.title, "買蛋給 Jocelyn")
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
-        XCTAssertEqual(event.reminderMinutes, [0])
+        XCTAssertEqual(event.reminderMinutes, [10, 0], "added at 22:50 for later the same day")
         XCTAssertTrue(DemoData.isDemoID(event.id), event.id)
     }
 

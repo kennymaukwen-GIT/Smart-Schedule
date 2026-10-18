@@ -308,8 +308,14 @@ actor ScheduleAssistant {
     /// or read-only) and clears the slot. The batch's seed gives the same Google ids every time, so a second Add is
     /// an idempotent 409, not a duplicate.
     func commitPendingEvents(_ batch: PendingEventBatch) async throws -> Reply {
+        try await commitPendingEvents(batch, now: Date())
+    }
+
+    /// Same, with the moment of Add given (unit tests): the events are created then, which decides the same-day
+    /// reminders (`ReminderPolicy.sameDayMinutes`).
+    func commitPendingEvents(_ batch: PendingEventBatch, now: Date) async throws -> Reply {
         let ctx = context()
-        let (events, target) = try await writeBatch(batch, ctx: ctx, now: Date())
+        let (events, target) = try await writeBatch(batch, ctx: ctx, now: now)
         remember([.user("[app] The user tapped Add; the pending events are now in the calendar.")])
         if lastProposal == .events { lastProposal = nil }
         await rescheduleReminders(store)
@@ -347,7 +353,8 @@ actor ScheduleAssistant {
     private func writeBatch(_ batch: PendingEventBatch, ctx: Context, now: Date) async throws -> (events: [ScheduleEvent], target: CalendarInfo) {
         let args = try Self.decodeCreateArgs(batch.argsJSON)
         let mapped = try args.events.prefix(20).enumerated().map { index, draft in
-            try ctx.mapper.event(from: draft, seed: "\(batch.seed)|\(index)", utterance: batch.utterance)
+            // Created now, at Add: an item for later today gets the same-day reminders.
+            try ctx.mapper.event(from: draft, seed: "\(batch.seed)|\(index)", utterance: batch.utterance, createdAt: now)
         }
         let target: CalendarInfo
         if let ref = batch.target, let calendar = await ctx.router.accounts.calendar(ref), calendar.isWritable {
@@ -423,7 +430,7 @@ actor ScheduleAssistant {
             let restored = Self.restoringAccountEmails(in: call, aliases: aliases)
             let args = try restored.decode(CreateEventsArgs.self)
             let mapped = try args.events.prefix(20).enumerated().map { index, draft in
-                try ctx.mapper.event(from: draft, seed: "\(seed)|\(index)", utterance: request)
+                try ctx.mapper.event(from: draft, seed: "\(seed)|\(index)", utterance: request, createdAt: now)
             }
             // suggested_notes stay on this iPhone: chips on the card and the event page, never in Google.
             let suggested = Self.suggestedNotes(args, mapped: mapped)

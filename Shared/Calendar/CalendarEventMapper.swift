@@ -62,7 +62,21 @@ struct CalendarEventMapper: Sendable {
 
     // MARK: - create_events
 
+    /// The Google body of `draft`, its reminders as asked or else the kind's defaults (no same-day rule).
     func event(from draft: EventDraft, seed: String, utterance: String) throws -> MappedEvent {
+        try event(from: draft, seed: seed, utterance: utterance, sameDayFrom: nil)
+    }
+
+    /// Same, for an item created at `now`: a timed one-off event, deadline or task without reminders of its own that
+    /// starts later that day gets `ReminderPolicy.sameDayMinutes` (10 minutes before and at the start). They are
+    /// written as an explicit list, to Google's pop-ups and to `ssReminders` ("10,0"), so this iPhone and Google
+    /// agree. Items on later days, all-day and repeating ones, and routines keep the kind's defaults.
+    func event(from draft: EventDraft, seed: String, utterance: String, createdAt now: Date) throws -> MappedEvent {
+        try event(from: draft, seed: seed, utterance: utterance, sameDayFrom: now)
+    }
+
+    /// `sameDayFrom`: when the item is created, for the same-day rule; nil = no same-day rule.
+    private func event(from draft: EventDraft, seed: String, utterance: String, sameDayFrom now: Date?) throws -> MappedEvent {
         let kind = ScheduleEvent.Kind(rawValue: draft.kind ?? "") ?? .event
         var body = GCalEvent()
         body.id = GoogleEventID.make(seed: seed)
@@ -100,9 +114,15 @@ struct CalendarEventMapper: Sendable {
             }
             body.start = timed(start)
             body.end = timed(end)
-            body.reminders = policy.googleReminders(for: kind, requested: draft.reminderMinutes)
+            // Asked-for reminders win; nil and [] both mean "the defaults", as in `ReminderPolicy.minutes`.
+            var requested = draft.reminderMinutes
+            if requested?.isEmpty != false, draft.recurrence == nil, let now,
+               let sameDay = policy.sameDayMinutes(for: kind, start: start, createdAt: now, calendar: clock.calendar) {
+                requested = sameDay
+            }
+            body.reminders = policy.googleReminders(for: kind, requested: requested)
             body.extendedProperties = properties(kind: kind, planID: nil,
-                                                 reminders: localReminders(requested: draft.reminderMinutes) {
+                                                 reminders: localReminders(requested: requested) {
                                                      policy.minutes(for: kind, requested: $0)
                                                  })
         }

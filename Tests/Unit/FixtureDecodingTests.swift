@@ -84,7 +84,8 @@ final class FixtureDecodingTests: XCTestCase {
     }
 
     func testTimeCountedFromNow() throws {
-        // "1個小時後買蛋給 Jocelyn" at 22:50: one task at 23:50, the phrase out of the title, a reminder at the start.
+        // "1個小時後買蛋給 Jocelyn" at 22:50: one task at 23:50, the phrase out of the title, no reminder_minutes (created
+        // for later the same day, it is reminded 10 minutes before and at the start).
         let name = "create_events.relative_time.json"
         let root = try Fixtures.root(name)
         let minutes = try XCTUnwrap(root["relative_minutes"] as? Int, name)
@@ -95,20 +96,22 @@ final class FixtureDecodingTests: XCTestCase {
         let draft = try XCTUnwrap(args.events.first)
         XCTAssertEqual(draft.title, "買蛋給 Jocelyn")
         XCTAssertNil(draft.end)
-        XCTAssertEqual(draft.reminderMinutes, [0])
+        XCTAssertNil(draft.reminderMinutes, "left out: the app works out the reminders")
 
         let mapper = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy())
-        let mapped = try mapper.event(from: draft, seed: "s|0", utterance: Fixtures.utterance(name))
+        let mapped = try mapper.event(from: draft, seed: "s|0", utterance: Fixtures.utterance(name), createdAt: now)
         let event = try XCTUnwrap(mapper.scheduleEvent(from: mapped.body))
         XCTAssertEqual(event.title, "買蛋給 Jocelyn")
         XCTAssertEqual(event.kind, .task)
         XCTAssertEqual(event.start, TestClock.local(2026, 10, 13, 23, 50))
         XCTAssertEqual(event.start, now.addingTimeInterval(TimeInterval(minutes * 60)))
         XCTAssertEqual(event.end, TestClock.local(2026, 10, 14, 0, 20), "the task default of 30 minutes, past midnight")
-        // At the start, not the task default (60 minutes before).
-        XCTAssertEqual(CalendarEventMapper.reminderMinutes(of: mapped.body), [0])
-        XCTAssertEqual(event.reminderMinutes, [0])
-        XCTAssertEqual(mapped.body.reminders?.overrides?.map(\.minutes), [0])
+        // Created at 22:50 for later the same day: 10 minutes before and at the start, not the task default (60
+        // minutes before), the same list in Google and on this iPhone.
+        XCTAssertEqual(CalendarEventMapper.reminderMinutes(of: mapped.body), [10, 0])
+        XCTAssertEqual(mapped.body.extendedProperties?.private?[SSProperty.localReminders], "10,0")
+        XCTAssertEqual(event.reminderMinutes, [10, 0])
+        XCTAssertEqual(mapped.body.reminders?.overrides?.map(\.minutes), [10, 0])
     }
 
     func testLongTermPlan() throws {

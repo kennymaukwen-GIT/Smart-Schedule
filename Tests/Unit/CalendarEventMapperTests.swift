@@ -495,6 +495,104 @@ final class CalendarEventMapperTests: XCTestCase {
         XCTAssertEqual(try minutes(#", "reminders": {"useDefault": false, "overrides": [{"method": "popup", "minutes": 5}]}"#, "x,1"), [5])
     }
 
+    // MARK: Same-day reminders (event(from:seed:utterance:createdAt:))
+
+    /// Tuesday 2026-10-13 10:15 BST: when the items below are created.
+    private var createdAt: Date { TestClock.local(2026, 10, 13, 10, 15) }
+
+    private func created(_ json: String, by mapper: CalendarEventMapper? = nil) throws -> GCalEvent {
+        try (mapper ?? self.mapper).event(from: draft(json), seed: "same-day", utterance: "u", createdAt: createdAt).body
+    }
+
+    func testAnItemForLaterTodayIsRemindedTenMinutesBeforeAndAtTheStart() throws {
+        let body = try created(#"{"title": "Sync", "start": "2026-10-13T15:00"}"#)
+        XCTAssertEqual(body.reminders?.useDefault, false)
+        XCTAssertEqual(body.reminders?.overrides?.map(\.minutes), [10, 0])
+        XCTAssertEqual(Set(body.reminders?.overrides?.map(\.method) ?? []), ["popup"])
+        // An explicit list, so this iPhone reminds at the same times as Google.
+        XCTAssertEqual(body.extendedProperties?.private?["ssReminders"], "10,0")
+        XCTAssertEqual(mapper.scheduleEvent(from: body)?.reminderMinutes, [10, 0])
+
+        for kind in ["task", "deadline"] {
+            let item = try created(#"{"title": "Pay Ann", "start": "2026-10-13T23:45", "kind": "\#(kind)"}"#)
+            XCTAssertEqual(item.reminders?.overrides?.map(\.minutes), [10, 0], kind)
+            XCTAssertEqual(item.extendedProperties?.private?["ssReminders"], "10,0", kind)
+        }
+        // Starting in 5 minutes: both are written; ReminderPlanner never schedules the one already past.
+        let soon = try created(#"{"title": "Call Joe", "start": "2026-10-13T10:20"}"#)
+        XCTAssertEqual(soon.extendedProperties?.private?["ssReminders"], "10,0")
+    }
+
+    func testAnItemOnALaterDayOrAlreadyStartedKeepsTheKindsDefaults() throws {
+        for start in ["2026-10-14T09:00", "2026-10-13T09:00", "2026-10-13T10:15"] {
+            let json = #"{"title": "Sync", "start": "\#(start)"}"#
+            let body = try created(json)
+            XCTAssertEqual(body.extendedProperties?.private?["ssReminders"], "default", start)
+            XCTAssertEqual(body.reminders?.overrides?.map(\.minutes), [1440, 60, 30, 0], start)
+            // Exactly what the overload without createdAt writes.
+            XCTAssertEqual(body, try mapper.event(from: draft(json), seed: "same-day", utterance: "u").body, start)
+        }
+    }
+
+    func testRepeatingAllDayAndRoutineItemsKeepTheirDefaults() throws {
+        let weekly = try created(#"""
+        {"title": "Standup", "start": "2026-10-13T15:00", "recurrence": {"frequency": "WEEKLY", "by_weekday": ["TU"]}}
+        """#)
+        XCTAssertNotNil(weekly.recurrence)
+        XCTAssertEqual(weekly.extendedProperties?.private?["ssReminders"], "default")
+        XCTAssertEqual(weekly.reminders?.overrides?.map(\.minutes), [1440, 60, 30, 0])
+
+        let allDay = try created(#"{"title": "Day off", "start": "2026-10-13", "all_day": true}"#)
+        XCTAssertEqual(allDay.extendedProperties?.private?["ssReminders"], "default")
+        XCTAssertEqual(allDay.reminders?.overrides?.map(\.minutes), CalendarEventMapper.allDayReminder)
+
+        let routine = try created(#"{"title": "Gym", "start": "2026-10-13T18:00", "kind": "routine"}"#)
+        XCTAssertEqual(routine.extendedProperties?.private?["ssReminders"], "default")
+        XCTAssertEqual(routine.reminders?.overrides?.map(\.minutes), [30])
+    }
+
+    func testRemindersTheUserAskedForWin() throws {
+        let body = try created(#"{"title": "Sync", "start": "2026-10-13T15:00", "reminder_minutes": [30]}"#)
+        XCTAssertEqual(body.reminders?.overrides?.map(\.minutes), [30])
+        XCTAssertEqual(body.extendedProperties?.private?["ssReminders"], "30")
+        // [] is no request (the defaults), as everywhere else: the same-day list applies.
+        let empty = try created(#"{"title": "Sync", "start": "2026-10-13T15:00", "reminder_minutes": []}"#)
+        XCTAssertEqual(empty.extendedProperties?.private?["ssReminders"], "10,0")
+    }
+
+    /// The overload without createdAt (plans, edits, existing callers and tests) never applies the same-day rule; with
+    /// it, only the reminders differ.
+    func testWithoutCreatedAtNothingChanges() throws {
+        let json = #"{"title": "Sync", "start": "2026-10-13T15:00", "location": "Room 4"}"#
+        let plain = try mapper.event(from: draft(json), seed: "same-day", utterance: "u").body
+        XCTAssertEqual(plain.extendedProperties?.private?["ssReminders"], "default")
+        XCTAssertEqual(plain.reminders?.overrides?.map(\.minutes), [1440, 60, 30, 0])
+
+        var sameDay = try created(json)
+        XCTAssertNotEqual(sameDay, plain)
+        sameDay.reminders = plain.reminders
+        sameDay.extendedProperties = plain.extendedProperties
+        XCTAssertEqual(sameDay, plain)
+    }
+
+    func testSameDayRemindersFollowTheSourceAndTheDefaultsInSettings() throws {
+        var preferences = AppPreferences()
+        preferences.reminderSource = .smartSchedule
+        let local = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy(preferences: preferences))
+        let quiet = try created(#"{"title": "Sync", "start": "2026-10-13T15:00"}"#, by: local)
+        XCTAssertEqual(quiet.reminders?.overrides?.count, 0, "no Google pop-ups in Smart Schedules only")
+        XCTAssertEqual(quiet.extendedProperties?.private?["ssReminders"], "10,0")
+
+        // No event reminders in Settings: an event created for later today still gets none.
+        var none = AppPreferences()
+        none.eventReminders = []
+        let off = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy(preferences: none))
+        let event = try created(#"{"title": "Sync", "start": "2026-10-13T15:00"}"#, by: off)
+        XCTAssertEqual(event.extendedProperties?.private?["ssReminders"], "default")
+        XCTAssertEqual(event.reminders?.overrides?.count, 0)
+        XCTAssertNil(off.scheduleEvent(from: event)?.reminderMinutes)
+    }
+
     func testDefaultLengthOfEventsAndRoutinesComesFromPreferences() throws {
         let short = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy(), defaultEventMinutes: 30)
         let meeting = try short.event(from: draft(#"{"title": "Sync", "start": "2026-10-14T09:00"}"#), seed: "m", utterance: "u").body

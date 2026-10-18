@@ -67,6 +67,18 @@ final class ReminderPlannerTests: XCTestCase {
         XCTAssertEqual(reminders.first?.fromDefaults, false)
     }
 
+    /// An item created for later today carries [10, 0] (`ReminderPolicy.sameDayMinutes`): a reminder already past when it
+    /// is created is simply not scheduled, and an explicit list never feeds dismiss learning.
+    func testSameDayRemindersAlreadyPastAreSkipped() {
+        let soon = event("soon", start: TestClock.local(2026, 10, 14, 10, 5), reminders: [10, 0])
+        let later = event("later", start: TestClock.local(2026, 10, 14, 15), reminders: [10, 0])
+        let reminders = candidates([soon, later])
+        XCTAssertEqual(reminders.map(\.identifier), ["ss.reminder.soon.0", "ss.reminder.later.10", "ss.reminder.later.0"])
+        XCTAssertEqual(reminders.map(\.fire), [TestClock.local(2026, 10, 14, 10, 5), TestClock.local(2026, 10, 14, 14, 50),
+                                               TestClock.local(2026, 10, 14, 15)])
+        XCTAssertFalse(reminders.contains(where: \.fromDefaults))
+    }
+
     func testPastCompletedAndDraftEventsGetNothing() {
         var done = event("done", start: TestClock.local(2026, 10, 15, 9), kind: .task)
         done.isCompleted = true

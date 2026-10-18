@@ -1,0 +1,14 @@
+{
+  "utterance": "半小時後提醒我喝水",
+  "now_local": "2026-10-13T15:10",
+  "time_zone": "Europe/London",
+  "relative_minutes": 30,
+  "expected_call": {
+    "name": "create_events",
+    "args": {
+      "events": [
+        { "title": "喝水", "start": "2026-10-13T15:40", "duration_minutes": 15, "kind": "task" }
+      ]
+    }
+  }
+}

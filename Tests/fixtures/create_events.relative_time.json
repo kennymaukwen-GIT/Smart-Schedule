@@ -8,7 +8,7 @@
     "name": "create_events",
     "args": {
       "events": [
-        { "title": "買蛋給 Jocelyn", "start": "2026-10-13T23:50", "duration_minutes": 30, "kind": "task", "reminder_minutes": [0] }
+        { "title": "買蛋給 Jocelyn", "start": "2026-10-13T23:50", "duration_minutes": 30, "kind": "task" }
       ]
     }
   }

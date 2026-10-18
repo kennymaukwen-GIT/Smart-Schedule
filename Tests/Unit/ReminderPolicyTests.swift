@@ -107,6 +107,85 @@ final class ReminderPolicyTests: XCTestCase {
         XCTAssertEqual(local.allDayMinutes(requested: nil), [900])
     }
 
+    // MARK: Same-day reminders
+
+    /// The app's calendar (Europe/London), and Tuesday 2026-10-13 10:15 BST as the moment of creation.
+    private var london: Calendar { TestClock.clock.calendar }
+    private var morning: Date { TestClock.local(2026, 10, 13, 10, 15) }
+
+    func testSameDayDefaultsAreTenMinutesBeforeAndTheStart() {
+        XCTAssertEqual(policy.sameDayDefaults, [10, 0])
+        var preferences = AppPreferences()
+        preferences.eventReminders = [60]
+        XCTAssertEqual(ReminderPolicy(preferences: preferences).sameDayDefaults, [10, 0], "not a setting")
+        XCTAssertEqual(ReminderPolicy(preferences: AppPreferences()).sameDayDefaults, [10, 0])
+    }
+
+    func testLaterTodayGetsTenMinutesBeforeAndTheStart() {
+        let later = TestClock.local(2026, 10, 13, 15, 0)
+        for kind in [ScheduleEvent.Kind.event, .deadline, .task] {
+            XCTAssertEqual(policy.sameDayMinutes(for: kind, start: later, createdAt: morning, calendar: london), [10, 0],
+                           kind.rawValue)
+        }
+        // In 5 minutes: both; the one already past is never scheduled (ReminderPlanner skips fire times <= now).
+        XCTAssertEqual(policy.sameDayMinutes(for: .event, start: morning.addingTimeInterval(300), createdAt: morning,
+                                             calendar: london), [10, 0])
+        let fromPreferences = ReminderPolicy(preferences: AppPreferences())
+        XCTAssertEqual(fromPreferences.sameDayMinutes(for: .task, start: later, createdAt: morning, calendar: london), [10, 0])
+    }
+
+    func testTomorrowAndLaterKeepTheKindsDefaults() {
+        XCTAssertNil(policy.sameDayMinutes(for: .event, start: TestClock.local(2026, 10, 14, 9, 0), createdAt: morning,
+                                           calendar: london))
+        XCTAssertNil(policy.sameDayMinutes(for: .task, start: TestClock.local(2026, 10, 20, 15, 0), createdAt: morning,
+                                           calendar: london))
+    }
+
+    func testAnItemThatHasStartedKeepsTheKindsDefaults() {
+        XCTAssertNil(policy.sameDayMinutes(for: .event, start: TestClock.local(2026, 10, 13, 9, 0), createdAt: morning,
+                                           calendar: london))
+        XCTAssertNil(policy.sameDayMinutes(for: .event, start: morning, createdAt: morning, calendar: london), "starts now")
+    }
+
+    func testRoutinesKeepTheirDefaults() {
+        XCTAssertNil(policy.sameDayMinutes(for: .routine, start: TestClock.local(2026, 10, 13, 18, 0), createdAt: morning,
+                                           calendar: london))
+    }
+
+    /// "None" in Settings stays none: no reminders are added for that kind.
+    func testAKindWithoutDefaultsGetsNone() {
+        var preferences = AppPreferences()
+        preferences.taskReminders = []
+        preferences.eventReminders = []
+        let quiet = ReminderPolicy(preferences: preferences)
+        let later = TestClock.local(2026, 10, 13, 15, 0)
+        XCTAssertNil(quiet.sameDayMinutes(for: .task, start: later, createdAt: morning, calendar: london))
+        XCTAssertNil(quiet.sameDayMinutes(for: .event, start: later, createdAt: morning, calendar: london))
+        XCTAssertEqual(quiet.sameDayMinutes(for: .deadline, start: later, createdAt: morning, calendar: london), [10, 0])
+    }
+
+    /// The day is the one of the calendar passed in (the app's time zone), not UTC's or the iPhone's.
+    func testTheDayEndsAtMidnightInTheAppsTimeZone() {
+        let late = TestClock.local(2026, 10, 13, 23, 30)
+        XCTAssertEqual(policy.sameDayMinutes(for: .event, start: TestClock.local(2026, 10, 13, 23, 50), createdAt: late,
+                                             calendar: london), [10, 0])
+        XCTAssertNil(policy.sameDayMinutes(for: .event, start: TestClock.local(2026, 10, 14, 0, 10), createdAt: late,
+                                           calendar: london))
+        // The same instants are 07:30 and 08:10 on 14 October in Tokyo: one day there.
+        let tokyo = WallClock(timeZone: TimeZone(identifier: "Asia/Tokyo")!).calendar
+        XCTAssertEqual(policy.sameDayMinutes(for: .event, start: TestClock.local(2026, 10, 14, 0, 10), createdAt: late,
+                                             calendar: tokyo), [10, 0])
+    }
+
+    func testSameDayDefaultsAreCleanedLikeEveryList() {
+        var custom = ReminderPolicy()
+        custom.sameDayDefaults = [0, 15, 15, -5]
+        let later = TestClock.local(2026, 10, 13, 15, 0)
+        XCTAssertEqual(custom.sameDayMinutes(for: .event, start: later, createdAt: morning, calendar: london), [15, 0])
+        custom.sameDayDefaults = []
+        XCTAssertNil(custom.sameDayMinutes(for: .event, start: later, createdAt: morning, calendar: london))
+    }
+
     func testBothAndGoogleOnlyKeepWritingPopups() {
         for source in [ReminderSource.both, .google] {
             var preferences = AppPreferences()

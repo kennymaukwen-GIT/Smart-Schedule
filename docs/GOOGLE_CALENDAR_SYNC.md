@@ -94,6 +94,8 @@ Google 的限制：`overrides` **最多 5 個**，每個 `minutes` 介於 **0 �
 
 上表是出廠預設；實際值來自「設定 › 通知 › 預設提醒」（`ReminderPolicy(preferences:)`，每次寫入時從偏好設定建立 `CalendarEventMapper.current()`）。`ReminderPolicy.minutes()` 會把數值限制在合法範圍、去除重複、由大到小排序，最多取 5 個。全天事件和 milestone 走 `googleAllDayReminders(requested:)`。
 
+**當天建立、當天稍後才開始**（2026-10-18 起）：有時間、不重複的 event、deadline、task，使用者沒指定提醒，而且開始時間在建立那一刻同一天的稍後（App 時區），overrides 是 `[10, 0]`，`ssReminders` 寫 `"10,0"`（`ReminderPolicy.sameDayMinutes`，經 `CalendarEventMapper.event(from:seed:utterance:createdAt:)`）。routine、milestone、全天、重複的事件和隔天以後的照上表；該類型的預設是空的就還是空的。細節見 [NOTIFICATIONS.md](NOTIFICATIONS.md) 第 3 節。
+
 **由誰發送提醒（設定 › 通知）：**
 
 | 模式 | 寫給 Google 的 popup | Smart Schedules 自己的提醒 |

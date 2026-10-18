@@ -141,7 +141,7 @@ actor DemoAssistant: ScheduleAssisting {
     }
 
     func commitPendingEvents(_ batch: PendingEventBatch) async throws -> Reply {
-        let reply = try await writeBatch(batch)
+        let reply = try await writeBatch(batch, now: Date())
         await rescheduleReminders(store)
         await store.setLastAssistantLine(reply.text)
         return reply
@@ -579,7 +579,8 @@ actor DemoAssistant: ScheduleAssisting {
     // MARK: - (d) "Lunch with Andrew tomorrow 1pm" · (e) no clock time (only a day, or "下午") → ask
 
     /// `fromNow` (from `DemoParser.fromNow`): "1個小時後買蛋給 Jocelyn" said at 22:50:37 is "買蛋給 Jocelyn" at 23:50,
-    /// with a reminder at the start and no "what time?" question, as Gemini's prompt rule 7 has it.
+    /// with no "what time?" question, as Gemini's prompt rule 7 has it. Like every capture it gets the same-day
+    /// reminders when it starts later today (10 minutes before and at the start), else the kind's defaults.
     private func capture(_ text: String, pending: TimeQuestion?, language: DemoLanguage,
                          parser: DemoParser, fromNow: (minutes: Int, leftover: String)? = nil) async -> Reply {
         let calendar = clock.calendar
@@ -589,7 +590,7 @@ actor DemoAssistant: ScheduleAssisting {
             var title = DemoParser.title(from: fromNow.leftover)
             if title.isEmpty { title = language == .chinese ? "新行程" : "New event" }
             return await addCaptured(title: title, start: minute.addingTimeInterval(TimeInterval(fromNow.minutes) * 60),
-                                     utterance: text, reminderMinutes: [0], now: now)
+                                     utterance: text, reminderMinutes: nil, now: now)
         }
         var leftover = text
         let time: DemoParser.TimeOfDay?
@@ -664,7 +665,8 @@ actor DemoAssistant: ScheduleAssisting {
     }
 
     /// The end of every capture: with "Ask me first" the event waits on a card, otherwise it is added now.
-    /// `reminderMinutes` nil = the kind's defaults.
+    /// `reminderMinutes` nil = none asked for: the same-day reminders when it starts later today
+    /// (`reminders(_:kind:start:now:)`), else the kind's defaults.
     private func addCaptured(title: String, start: Date, utterance: String, reminderMinutes: [Int]?,
                              now: Date) async -> Reply {
         let kind = CalendarEventMapper.inferKind(title)
@@ -680,7 +682,7 @@ actor DemoAssistant: ScheduleAssisting {
 
         let event = makeEvent(id: DemoData.idPrefix + "chat-" + UUID().uuidString.prefix(8).lowercased(),
                               title: title, start: start, minutes: minutes, kind: kind, utterance: utterance,
-                              reminderMinutes: reminderMinutes)
+                              reminderMinutes: reminders(reminderMinutes, kind: kind, start: start, now: now))
         await store.upsert([event])
         lastEventID = event.id
 
@@ -706,7 +708,7 @@ actor DemoAssistant: ScheduleAssisting {
     }
 
     /// A captured event in the calendar new events go to (Settings or "以後用學校帳號"). `reminderMinutes` nil = the
-    /// kind's defaults; [0] = at the start (a time counted from now).
+    /// kind's defaults; otherwise these minutes (asked for, or the same-day [10, 0] from `reminders(_:kind:start:now:)`).
     private func makeEvent(id: String, title: String, start: Date, minutes: Int, kind: ScheduleEvent.Kind,
                            utterance: String, reminderMinutes: [Int]? = nil) -> ScheduleEvent {
         let target = Self.demoTarget(for: settings)
@@ -731,6 +733,14 @@ actor DemoAssistant: ScheduleAssisting {
         )
     }
 
+    /// The reminders of a captured event created at `now`: the ones asked for, else 10 minutes before and at the start
+    /// when it starts later that day (`ReminderPolicy.sameDayMinutes`, as `CalendarEventMapper` gives Gemini's events),
+    /// else nil (the kind's defaults). The demo's events are timed and one-off.
+    private func reminders(_ requested: [Int]?, kind: ScheduleEvent.Kind, start: Date, now: Date) -> [Int]? {
+        if let requested, !requested.isEmpty { return requested }
+        return mapper.policy.sameDayMinutes(for: kind, start: start, createdAt: now, calendar: clock.calendar)
+    }
+
     /// The sample calendar new events go to: the one chosen in Settings or by voice, else the personal calendar.
     static func demoTarget(for settings: AppPreferences) -> CalendarRef {
         if let chosen = settings.defaultCalendar, demoWritableCalendars.contains(where: { $0.id == chosen }) { return chosen }
@@ -750,7 +760,9 @@ actor DemoAssistant: ScheduleAssisting {
 
     // MARK: - "Ask me first": pending events
 
-    /// Same as capture, but nothing is written: the event waits on a card with Add and Edit.
+    /// Same as capture, but nothing is written: the event waits on a card with Add and Edit. The args keep only the
+    /// reminders asked for, as Gemini's do; the preview shows the reminders an Add right now would give, and Add works
+    /// them out again at its own moment.
     private func proposeBatch(title: String, start: Date, minutes: Int, kind: ScheduleEvent.Kind, utterance: String,
                               reminderMinutes: [Int]?, now: Date, dayInterval: DateInterval,
                               sameDay: [ScheduleEvent]) async -> Reply {
@@ -761,7 +773,8 @@ actor DemoAssistant: ScheduleAssisting {
         let argsJSON = (try? encoder.encode(CreateEventsArgs(events: [draft]))) ?? Data("{\"events\":[]}".utf8)
         let id = PendingEventBatch.newID()
         var preview = makeEvent(id: PendingEventBatch.previewID(batchID: id, index: 0), title: title, start: start,
-                                minutes: minutes, kind: kind, utterance: utterance, reminderMinutes: reminderMinutes)
+                                minutes: minutes, kind: kind, utterance: utterance,
+                                reminderMinutes: reminders(reminderMinutes, kind: kind, start: start, now: now))
         // Previews belong to no calendar, like plan previews: always drawn, never hidden.
         preview.accountID = nil
         preview.calendarID = nil
@@ -780,7 +793,8 @@ actor DemoAssistant: ScheduleAssisting {
     }
 
     /// "Add": the batch's args, written locally with ids derived from the batch (a second Add changes nothing).
-    private func writeBatch(_ batch: PendingEventBatch) async throws -> Reply {
+    /// `now` is when Add was tapped or said: the events are created then (the same-day reminders).
+    private func writeBatch(_ batch: PendingEventBatch, now: Date) async throws -> Reply {
         let args = try ScheduleAssistant.decodeCreateArgs(batch.argsJSON)
         let suffix = batch.id.hasPrefix(PendingEventBatch.idPrefix)
             ? String(batch.id.dropFirst(PendingEventBatch.idPrefix.count)) : batch.id
@@ -790,7 +804,8 @@ actor DemoAssistant: ScheduleAssisting {
             let kind = ScheduleEvent.Kind(rawValue: draft.kind ?? "") ?? .event
             events.append(makeEvent(id: DemoData.idPrefix + "chat-\(suffix)-\(index)", title: draft.title, start: start,
                                     minutes: draft.durationMinutes ?? Self.defaultMinutes(for: kind, settings: settings),
-                                    kind: kind, utterance: batch.utterance, reminderMinutes: draft.reminderMinutes))
+                                    kind: kind, utterance: batch.utterance,
+                                    reminderMinutes: reminders(draft.reminderMinutes, kind: kind, start: start, now: now)))
         }
         await store.upsert(events)
         if let last = events.last { lastEventID = last.id }
@@ -826,7 +841,7 @@ actor DemoAssistant: ScheduleAssisting {
         // "加入明天 3 點開會" is a new event, not an approval.
         var leftover = text
         let namesWhen = parser.containsTime(text) || parser.extractDay(from: &leftover) != nil
-        if !namesWhen, Self.isApproval(lower) { return try await writeBatch(batch) }
+        if !namesWhen, Self.isApproval(lower) { return try await writeBatch(batch, now: parser.now) }
         let bare = lower.replacingOccurrences(of: "’", with: "'")
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters))
         let abandonment: Set<String> = ["no", "nope", "discard", "cancel", "never mind", "nevermind", "don't add",

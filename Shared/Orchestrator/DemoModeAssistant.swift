@@ -155,7 +155,12 @@ actor DemoModeAssistant: ScheduleAssisting {
     /// Always the AI's writer, whichever side proposed the batch: on the sample calendars it needs no network, and it
     /// keeps everything the batch holds (place, notes, repeat, reminders).
     func commitPendingEvents(_ batch: PendingEventBatch) async throws -> Reply {
-        var reply = try await ai.commitPendingEvents(batch)
+        try await commitPendingEvents(batch, now: Date())
+    }
+
+    /// Same, with the moment of Add given (unit tests): it decides the same-day reminders.
+    func commitPendingEvents(_ batch: PendingEventBatch, now: Date) async throws -> Reply {
+        var reply = try await ai.commitPendingEvents(batch, now: now)
         reply.append(DemoAssistant.demoNote)
         return reply
     }

@@ -34,7 +34,8 @@
    project.yml, saying "on this iPhone"; zh-Hant in every InfoPlist.strings) and for neither extension.
 10. A time counted from now (prompt rule 7: "1個小時後", "in an hour"): a fixture with "relative_minutes" says such a
     time and creates one event that starts at now_local plus that many minutes (the next day past midnight), with no
-    time phrase in its title, reminder_minutes [0] (a reminder at the start) and no end.
+    time phrase in its title, no reminder_minutes (the app gives an item created for later the same day a reminder
+    10 minutes before and one at the start, ReminderPolicy.sameDayMinutes) and no end.
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -410,7 +411,8 @@ def says_time_from_now(text: str) -> bool:
 
 def relative_time_checks(root: dict, fixture: str) -> None:
     """Prompt rule 7: a time counted from now ("1個小時後", "in an hour") starts at now_local plus that much, on the next
-    day past midnight; the title keeps no time phrase; the event reminds at its start (reminder_minutes [0])."""
+    day past midnight; the title keeps no time phrase; reminder_minutes is left out (the app gives an item created for
+    later the same day 10 minutes before and at the start, the kind's defaults on a later day)."""
     delta = root.get("relative_minutes")
     if delta is None:
         return
@@ -427,8 +429,9 @@ def relative_time_checks(root: dict, fixture: str) -> None:
     # No \b around the time: in "買蛋23:50" there is no word boundary between the characters and the digits.
     if says_time_from_now(event["title"]) or re.search(r"\d{1,2}:\d{2}", event["title"]):
         errors.append(f"{fixture}: the title keeps the time phrase")
-    if event.get("reminder_minutes") != [0]:
-        errors.append(f"{fixture}: a time counted from now reminds at the start (reminder_minutes [0])")
+    if "reminder_minutes" in event:
+        errors.append(f"{fixture}: a time counted from now leaves reminder_minutes out (the app gives an item created "
+                      "for later the same day 10 minutes before and at the start)")
     if "end" in event:
         errors.append(f"{fixture}: no end unless the user gave one; the default length applies")
 

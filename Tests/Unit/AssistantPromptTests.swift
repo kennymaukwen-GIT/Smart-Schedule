@@ -421,8 +421,14 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertTrue(rule7.contains("1個小時後"), rule7)
         XCTAssertTrue(rule7.contains(#"at now_local 22:50, "1個小時後" → 23:50 and "兩小時後" → 00:50 the next day"#), rule7)
         XCTAssertTrue(rule7.contains(#"("1個小時後買蛋給 Jocelyn" → "買蛋給 Jocelyn")"#), rule7)
-        XCTAssertTrue(rule7.contains("set reminder_minutes to [0], a reminder at the start"), rule7)
-        XCTAssertTrue(rule7.contains("(the one exception to rule 8)"), rule7)
+        // No reminder_minutes of its own: the app reminds an item created for later today 10 minutes before and at start.
+        XCTAssertTrue(rule7.contains(#"("1個小時後買蛋給 Jocelyn" → "買蛋給 Jocelyn") and leave reminder_minutes out (the app "#
+                                     + "gives an item created for later the same day a reminder 10 minutes before and one "
+                                     + "at the start, and skips any already past) unless the user named specific "
+                                     + "reminder times ('提醒我' or 'remind me' alone names none)."),
+                      rule7)
+        XCTAssertFalse(rule7.contains("[0]"), rule7)
+        XCTAssertFalse(rule7.contains("exception to rule 8"), rule7)
         XCTAssertTrue(rule7.contains(#"A clock time followed by "後" ("三點後", "after 3pm") is not counted from now"#), rule7)
         XCTAssertTrue(rule7.contains(#"("push it an hour", "延後 1 小時") stays modify_event from its current start"#), rule7)
         // The rest of rule 7 is unchanged: a day alone, or a part of the day, still asks what time.
@@ -450,7 +456,9 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertTrue(title.contains("No time counted from now ('1個小時後', 'in an hour')."), title)
         let reminders = try fieldDescription("reminder_minutes")
         XCTAssertTrue(reminders.contains("only when the user asks for them"), reminders)
-        XCTAssertTrue(reminders.contains("Exception: a start counted from now → [0] (rule 7)."), reminders)
+        XCTAssertTrue(reminders.contains("Omit it for a start counted from now too (rule 7): an item created for later "
+                                         + "today gets 10 min before and at start."), reminders)
+        XCTAssertFalse(reminders.contains("[0]"), reminders)
     }
 
     func testLanguageLineFollowsReplyLanguage() {
