@@ -26,7 +26,7 @@ Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.eve
 | App logo | [`site/public/logo.png`](../site/public/logo.png)（120×120 PNG，約 3 KB，由 App 圖示縮小，和首頁同一張） |
 | Application home page | `https://www.smart-schedules.com` |
 | Application privacy policy link | `https://www.smart-schedules.com/privacy` |
-| Application terms of service link | **留空**（1.0 用 Apple 的標準 EULA，在 apple.com 上，不能當授權網域） |
+| Application terms of service link | `https://www.smart-schedules.com/terms`（使用條款頁，`site/public/terms.html`；這個專案的 Branding 表單不讓這一欄空白（2026-10-18）。條款說明 App 的使用授權依 Apple 的標準 EULA，另外加上服務規則。不要填支援頁 `/support`：它不是條款） |
 | Authorized domains | `smart-schedules.com`（不加 `www`；授權網域涵蓋它的子網域，首頁和政策放在 www 沒問題） |
 | Developer contact information | `support@smart-schedules.com`（真實信箱，審查信寄到這裡） |
 | Audience › User type | **External**（不要選 Internal，見文件開頭的提醒） |
@@ -42,7 +42,7 @@ Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.eve
 | Scope（App 送出的字串） | Data access 裡的名稱 | 分類 | 用在哪裡 |
 |---|---|---|---|
 | `openid` | `openid` | 非敏感（登入用） | ID token 的 `sub`：每個帳號的 Keychain 項目和資料都以它為 key（[`Shared/Auth/IDToken.swift`](../Shared/Auth/IDToken.swift)） |
-| `email` | `https://www.googleapis.com/auth/userinfo.email` | 非敏感（登入用） | ID token 的 email：抽屜和帳號頁顯示帳號、比對使用者輸入的 email 和實際登入的帳號。不以帳號資訊傳給伺服器或 Gemini（見 4.5） |
+| `email` | `https://www.googleapis.com/auth/userinfo.email` | 非敏感（登入用） | ID token 的 email：抽屜和帳號頁顯示帳號、比對使用者輸入的 email 和實際登入的帳號。不以帳號資訊傳給伺服器或 Gemini（見 4.6） |
 | `https://www.googleapis.com/auth/calendar.events` | 同左 | **敏感** | `events.list` / `get` / `insert` / `patch` / `delete`（[`Shared/Calendar/GoogleCalendarClient.swift`](../Shared/Calendar/GoogleCalendarClient.swift)）：顯示、提醒、即時動態；使用者或助理新增、修改、刪除行程 |
 | `https://www.googleapis.com/auth/calendar.calendarlist.readonly` | 同左 | **敏感** | 只有 `calendarList.list`（`minAccessRole=reader`）：抽屜裡列出每個行事曆的名稱、顏色、權限，選擇顯示哪些、新行程寫到哪裡 |
 
@@ -53,7 +53,7 @@ Smart Schedules 要求兩個 Google Calendar 的**敏感 scope**（`calendar.eve
 
 ## 2. 送審前檢查
 
-- [ ] **網站已上線**：`https://www.smart-schedules.com` 和 `https://www.smart-schedules.com/privacy` 直接回 200（不要用 `/privacy.html`、`http://` 或沒有 `www` 的根網域：前兩個會轉址，根網域不提供網站，最多轉到 www）。`grep -rn 'class="todo"' site/public` 什麼都不印（開發者名稱等佔位字已替換，見 [`site/README.md`](../site/README.md) 第 1 節）。網站沒有會擋機器人的驗證頁（DNS 不在 Cloudflare，所以沒有 Cloudflare 區域層級的 Bot Fight Mode、Under Attack 這些設定；用 `curl -sI https://www.smart-schedules.com/privacy` 看到 `200` 就好）。
+- [ ] **網站已上線**：`https://www.smart-schedules.com`、`https://www.smart-schedules.com/privacy` 和 `https://www.smart-schedules.com/terms` 直接回 200（不要用 `/privacy.html`、`http://` 或沒有 `www` 的根網域：前兩個會轉址，根網域不提供網站，最多轉到 www）。`grep -rn 'class="todo"' site/public` 什麼都不印（開發者名稱等佔位字已替換，見 [`site/README.md`](../site/README.md) 第 1 節）。網站沒有會擋機器人的驗證頁（DNS 不在 Cloudflare，所以沒有 Cloudflare 區域層級的 Bot Fight Mode、Under Attack 這些設定；用 `curl -sI https://www.smart-schedules.com/privacy` 看到 `200` 就好）。
 - [ ] **首頁**：說明 App 做什麼、為什麼要用 Google 日曆，連到隱私權政策，有 Limited Use 聲明（`index.html` 的「AI and privacy」）。不是登入頁。
 - [ ] **隱私權政策**：第 3 節逐一列出四個 scope 和用途，第 4 節說明 AI 送出什麼（和 App 的同意說明第 7 版的五項逐字相同），第 5 節說明即時動態只在 iPhone 上產生，第 7 節寫 1.0 沒有任何 App 內購買，第 8 節語音輸入只在 iPhone 上辨識和出發提醒（位置只送到 Apple 的地圖服務，行程只存提早分鐘數、交通方式和開始前幾分鐘出發），第 11 節 Limited Use（傳輸清單包括出發提醒用的 Apple 地圖服務和 Google 地圖），第 13 節保存期限，第 15 節刪除方式。
 - [ ] **App**：TestFlight 上的版本已包含同意說明第 7 版（`AIConsent.disclosureVersion` = 7：只列五項，第 6 版的附件那一項拿掉了；同意的內容變了，所以在 TestFlight 上允許過第 5 或第 6 版的人也要重新同意，符合政策第 18 節；`CalendarAliases` 取代帳號 email，`AppConstants.pushToStartEnabled = false`），CI 的 `AccountEmailPrivacyTests` 和 `AIConsentStoreTests` 通過。影片要用這個版本錄。**錄影前**確認同意畫面是**五項**、沒有「A photo or PDF you attach …」那一項，語音那一句是目前程式的文字（「… The microphone button in Smart Schedules does it on your iPhone. Smart Schedules sends only the text, never audio.」），這樣影片裡的同意畫面才和政策第 4 節的引用一致；主畫面的對話輸入列也沒有迴紋針（1.0 把它藏起來了）。
@@ -87,7 +87,7 @@ Google Cloud 控制台 › **Google Auth Platform**（從 APIs & Services › OA
 
 - **User support email**：下拉選單只列出目前登入的帳號和你管理的 Google 群組。support@smart-schedules.com 是 Workspace「Smart Schedule」的真實帳號，用它登入 Cloud 控制台時就在選單裡，直接選它。用別的帳號（例如個人 Gmail）登入時它不會出現，改用 support@ 登入再選；整個專案和 Search Console 都由這個帳號擁有最簡單。不需要另外註冊 Google 帳號或用轉寄地址。不要選個人信箱。
 - **App logo**：上傳 `site/public/logo.png`。規定：正方形、不超過 1 MB、JPG／PNG／BMP，建議 120×120 px，不能用 Google 的產品圖示或商標，送審後要和同意畫面上的一致。上傳 logo（或顯示 App 名稱）就需要品牌驗證。
-- **Terms of service**：留空。填了就必須在已驗證的網域上。
+- **Terms of service**：`https://www.smart-schedules.com/terms`（必須在已驗證的網域上，而且真的是使用條款；先確認網址回 200 再填）。
 - **Authorized domains**：先加 `smart-schedules.com`（不加 `www`），再填首頁 `https://www.smart-schedules.com` 和政策網址 `https://www.smart-schedules.com/privacy`。
 
 儲存後：
@@ -105,8 +105,8 @@ Verification Center 的「Prepare for verification」在品牌**驗證並發佈*
 ### 3.4 Data access：宣告 scope、用途說明、影片
 
 1. **Data access › Add or remove scopes**：勾 `openid`、`.../auth/userinfo.email`、`.../auth/calendar.events`、`.../auth/calendar.calendarlist.readonly`。清單裡找不到 Calendar 的 scope，代表 Calendar API 還沒啟用（APIs & Services › Library），或直接貼進「Manually add scopes」。不要加第 1 節列為「沒有要求」的 scope。
-2. 確認 `calendar.events` 和 `calendar.calendarlist.readonly` 出現在 **Your sensitive scopes**，`openid`、`userinfo.email` 在非敏感區。
-3. 每個敏感 scope 的「How will the scopes be used?」貼第 4.2、4.3 節的英文；只有一個欄位或欄位有字數限制時，貼 4.4 節的合併版。影片欄位貼 YouTube 連結。
+2. 確認分類：2026-10-18 的控制台把 `calendar.calendarlist.readonly` 放在 **Your non-sensitive scopes**（和 `openid`、`userinfo.email` 一起），**Your sensitive scopes** 只有 `calendar.events`。以控制台顯示的為準。
+3. 「How will the scopes be used?」只有一個欄位，上限 1,000 字元：貼第 4.5 節（只講 `calendar.events`，970 字元）。`calendar.calendarlist.readonly` 又被列為敏感時，改貼 4.4 節的合併版（998 字元）。4.2、4.3 節的長版留著回覆審查員的提問。影片欄位貼 YouTube 連結。
 4. Save。
 
 ### 3.5 Audience：發佈到 In production
@@ -178,7 +178,13 @@ calendar.calendarlist.readonly: calendarList.list only, to list the user's calen
 Sync is direct between iPhone and Google. Only with in-app consent: limited event details (no account emails) pass through our server (not stored) to the paid Gemini API. Departure reminders send an event's place and start time to Apple's MapKit, its place to Google Maps on tap. Reminders and Live Activities are made on the iPhone; our server stores no calendar data. No ads, no sale, no AI training.
 ```
 
-### 4.5 `openid`、`email`（非敏感，表單通常不問；審查員問到時用）
+### 4.5 只有 `calendar.events` 是敏感 scope 時（Data access 的欄位，970 字元）
+
+```text
+Smart Schedules is a Google Calendar client and AI scheduling assistant for iPhone. It uses calendar.events to read events for its month, week and day views, reminders and Live Activities, and to create, change and delete events when the user does so on the event page or asks the in-app assistant (for example "lunch with Joe tomorrow at 12:30"). Narrower scopes do not fit: the readonly scopes cannot write, calendar.events.owned excludes calendars shared with the user, and calendar.app.created covers only calendars the app creates. All calls go directly from the iPhone to the Google Calendar API; our server never receives OAuth tokens and stores no calendar data. Only after the user allows AI in the app do limited event details (titles, times, notes, event IDs; never account emails) pass through our server, unstored, to the paid Gemini API. Departure reminders send one event's place to Apple's MapKit from the iPhone. No ads, no sale of data, no AI training.
+```
+
+### 4.6 `openid`、`email`（非敏感，表單通常不問；審查員問到時用）
 
 ```text
 openid and email identify which Google account the user connected. The app reads the account ID (sub) and email address from the ID token, stores that account's sign-in on the iPhone under its ID, shows the address in the sidebar and account list so users with several Google accounts can tell them apart, and checks that the account signed in on Google's page is the one the user typed. The app does not send the address as account information to our server or the AI service: calendars are named 'Account 1', 'Account 2', and the address is replaced by a placeholder in the user's requests and in event text sent to the AI. Apart from Google itself, the app sends the address nowhere.
