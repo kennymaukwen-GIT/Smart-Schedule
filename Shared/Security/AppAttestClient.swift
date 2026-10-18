@@ -1,6 +1,7 @@
 import CryptoKit
 import DeviceCheck
 import Foundation
+import os
 
 /// What a request to Smart Schedule's server (server/worker) carries to prove it comes from this app. A protocol so
 /// tests can inject one.
@@ -33,6 +34,8 @@ enum AttestationError: LocalizedError {
     case serverNotReady
     /// The server no longer accepts this version's request from the notification extension (its model).
     case updateRequired
+    /// App Attest itself failed on this iPhone (`DCError`'s code), even after starting over with a new key.
+    case deviceCheck(code: Int)
     case malformed
 
     var errorDescription: String? {
@@ -48,6 +51,7 @@ enum AttestationError: LocalizedError {
             : String(localized: "Today's limit is used up. Try again tomorrow.")
         case .serverNotReady: String(localized: "The Smart Schedules server isn't ready yet. Try again later.")
         case .updateRequired: String(localized: "Update Smart Schedules to use the assistant here.")
+        case let .deviceCheck(code): String(localized: "This iPhone couldn't verify Smart Schedules just now (App Attest error \(code)). Try again in a moment; if it keeps happening, restart the iPhone.")
         case .malformed: String(localized: "The Smart Schedules server sent something unexpected. Try again later.")
         }
     }
@@ -116,6 +120,9 @@ actor AppAttestClient: AttestationProviding {
     private let now: @Sendable () -> Date
     private var keyID: String?
     private var attesting: Task<String, Error>?
+    /// Keys attested since this launch. Only a key from an earlier launch (the Keychain) is replaced when iOS refuses
+    /// it, so a new key that fails too is reported instead of attesting another one on every request.
+    private var attestedThisLaunch: Set<String> = []
 
     init(origin: URL? = ServerEndpoint.origin,
          session: URLSession = NetworkSession.shared,
@@ -135,6 +142,16 @@ actor AppAttestClient: AttestationProviding {
 
     func headers(for body: Data) async throws -> [String: String] {
         if isExtension { return try extensionHeaders() }
+        do {
+            return try await assertionHeaders(for: body)
+        } catch let error as DCError {
+            // Shown as "The operation couldn't be completed (com.apple.devicecheck.error error 2)" otherwise.
+            Logger.attest.error("App Attest failed: DCError \(error.code.rawValue, privacy: .public)")
+            throw Self.userFacing(error)
+        }
+    }
+
+    private func assertionHeaders(for body: Data) async throws -> [String: String] {
         let service = DCAppAttestService.shared
         guard service.isSupported else {
             #if DEBUG
@@ -149,13 +166,28 @@ actor AppAttestClient: AttestationProviding {
         let assertion: Data
         do {
             assertion = try await service.generateAssertion(keyID, clientDataHash: clientDataHash)
-        } catch let error as DCError where error.code == .invalidKey {
-            // The Secure Enclave dropped the key (a restore to another device): attest a new one.
+        } catch let error as DCError
+                    where Self.startsOver(after: error, keyFromEarlierLaunch: !attestedThisLaunch.contains(keyID)) {
+            // The Keychain keeps the key ID when the app is deleted; App Attest keys do not survive a reinstall, a
+            // restore from a backup or a move to another iPhone (Apple: "start the process from the beginning").
+            Logger.attest.notice("Stored App Attest key refused (DCError \(error.code.rawValue, privacy: .public)): attesting a new one")
             reset()
-            return try await headers(for: body)
+            return try await assertionHeaders(for: body)
         }
         guard let token = Self.bearerToken(keyID: keyID, assertion: assertion) else { throw AttestationError.malformed }
         return ["Authorization": "Bearer \(token)"]
+    }
+
+    /// Whether iOS refusing `generateAssertion` means the stored key is gone. After a reinstall iOS answers
+    /// `invalidKey` or `invalidInput` (2026-10-18, on an iPhone after deleting and reinstalling the app); either way
+    /// only a key from an earlier launch is replaced, once.
+    static func startsOver(after error: DCError, keyFromEarlierLaunch: Bool) -> Bool {
+        keyFromEarlierLaunch && [.invalidKey, .invalidInput].contains(error.code)
+    }
+
+    /// What the user reads when App Attest fails on the device.
+    static func userFacing(_ error: DCError) -> AttestationError {
+        error.code == .featureUnsupported ? .unsupported : .deviceCheck(code: error.code.rawValue)
     }
 
     func reset() {
@@ -270,6 +302,8 @@ actor AppAttestClient: AttestationProviding {
             return try await attestNewKey(challengeRetried: true)
         }
         try Self.requireOK(data, response)
+        // Here, before any caller waiting on this attestation resumes.
+        attestedThisLaunch.insert(keyID)
         return keyID
     }
 
@@ -340,6 +374,11 @@ enum AttestedRequest {
         default: return .server(status: status)
         }
     }
+}
+
+extension Logger {
+    /// Console.app › the iPhone › search "attest".
+    static let attest = Logger(subsystem: "com.smartschedules.app", category: "attest")
 }
 
 /// Smart Schedule's own endpoints (everything but Gemini, which `GeminiClient` sends through `AttestedRequest`).

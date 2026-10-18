@@ -4718,6 +4718,16 @@
         }
       }
     },
+    "This iPhone couldn't verify Smart Schedules just now (App Attest error %lld). Try again in a moment; if it keeps happening, restart the iPhone." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這支 iPhone 剛剛無法驗證 Smart Schedules（App Attest 錯誤 %lld）。請稍後再試；如果一直發生，請將 iPhone 重新開機。"
+          }
+        }
+      }
+    },
     "This is a repeating event." : {
       "comment" : "Delete confirmation message for a repeating event",
       "localizations" : {
