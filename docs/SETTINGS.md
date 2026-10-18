@@ -1352,7 +1352,7 @@ When `dailyReminderCap = N`: group candidate reminders by the local day of their
 
 ### 7.8 Dynamic Island lead time
 
-`LiveActivityManager.summonIfDue(now:)` (called by the app when it becomes active): if an activity is running → `refreshIfRunning()`; else if `liveActivityLeadMinutes` is set and the next visible timed event is in progress or starts within it → `summon()`. The Control Center button keeps calling `summon()` unconditionally. Superseded by `ActivityScheduler` (see `docs/NOTIFICATIONS.md`): iOS 26 schedules each activity with `Activity.request(…, start:)`; iOS 18 registers the events with the Smart Schedules server (`server/worker/`), which sends an APNs push-to-start at each trigger, only with AI consent. Version 1.0 has push-to-start off (`AppConstants.pushToStartEnabled = false`): nothing is registered or uploaded, and on iOS 18 an activity starts only when the app runs within the lead time or while the event is under way (§16). `ContentState` gains `firstWeekday: Int?` (set by the builder from `clock.calendar.firstWeekday`) so the island's week strip letters follow "Week starts on"; `days` are 7 days from that weekday.
+`LiveActivityManager.summonIfDue(now:)` (called by the app when it becomes active): if an activity is running → `refreshIfRunning()`; else if `liveActivityLeadMinutes` is set and the next visible timed event is in progress or starts within it → `summon()`. The Control Center button keeps calling `summon()` unconditionally. Superseded by `ActivityScheduler` (see `docs/NOTIFICATIONS.md`): iOS 26 schedules each activity with `Activity.request(…, start:)`; iOS 18 registers the events with the Smart Schedules server (`server/worker/`), which sends an APNs push-to-start at each trigger, only with AI consent. Version 1.0 has push-to-start off (`AppConstants.pushToStartEnabled = false`): nothing is registered or uploaded, and on iOS 18 an activity starts only when the app runs within the lead time or while the event is under way (§16). `ContentState` gains `firstWeekday: Int?` (set by the builder from `clock.calendar.firstWeekday`); `days` are 7 days from that weekday. Since 2026-10-18 no view shows `days` (the island's week strip became "Up next"); they are still built so older payloads decode. `ContentState.timeZoneIdentifier` is the Settings › Time zone the island's times are shown in.
 
 ### 7.9 Focus filter (ACCOUNTS implements, PREFS reacts)
 
@@ -1487,7 +1487,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 | `Shared/Notifications/ReminderEngagement.swift` | `enum ReminderEngagement { static func record(_ response: UNNotificationResponse, store: PreferencesStore = .shared) async }` | UI (AppDelegate, NotificationViewController) | §7.7 |
 | `Shared/Notifications/NotificationIDs.swift` | constants of §7.10 | UI, STORE_PRIVACY | |
 | `Shared/LiveActivity/LiveActivityManager.swift` | `func summonIfDue(now: Date = Date()) async` (new); `summon()`, `refreshIfRunning()`, `dismiss()` unchanged | UI (on active), ACCOUNTS (after account changes), STORE_PRIVACY (erase) | §7.8 |
-| `Shared/LiveActivity/ScheduleActivityAttributes.swift` | `ContentState.firstWeekday: Int?` | UI (widget week strip) | §7.8 |
+| `Shared/LiveActivity/ScheduleActivityAttributes.swift` | `ContentState.firstWeekday: Int?` | PREFS (week digest `days`, not shown since 2026-10-18; `timeZoneIdentifier` for the times shown) | §7.8 |
 
 ### 11.2 ACCOUNTS provides
 
@@ -1545,7 +1545,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 |---|---|---|---|
 | `App/ViewModels/ScheduleViewModel.swift` | `var accounts: [GoogleAccount]`, `var isSignedIn: Bool` (= any connected account), `func reloadAccounts() async`, `func resetAfterErase() async`; bootstrap order: `AccountManager.migrateLegacyAccountIfNeeded()` → accounts → cache → `refresh()` | UI only | `clock` becomes `var` and is rebuilt on `.preferences` |
 | `App/ViewModels/ChatViewModel.swift` | `func resetConversation()`, `func resetAfterErase()`, consent flow §8.3, history load/save via `ChatHistoryStore` | UI only | |
-| `Shared/DesignSystem/Theme.swift` | `static func weekdayLetters(firstWeekday: Int) -> [String]` (keep the static array) | UI (widget, grids) | |
+| `Shared/DesignSystem/Theme.swift` | `static func weekdayLetters(firstWeekday: Int) -> [String]` (keep the static array) | UI (grids) | |
 | `App/SmartScheduleApp.swift` | wiring list below | – | |
 
 **UI wiring duties** (calls into other roles): at launch `SubscriptionStore.shared.start()`, only when `AppConstants.subscriptionsEnabled` (off in the code today; on for the 1.0 AI subscription, §16); `ScheduleViewModel.bootstrap()` runs the migration first; on `.active`: `AccountManager.shared.refreshCalendarLists()`, `LiveActivityManager.shared.summonIfDue()`, append learned suggestion cards; observe `.preferences` (rebuild clock, `ReminderScheduler.reschedule()`, `LiveActivityManager.refreshIfRunning()`), `.accounts` (reload accounts and visible events, reschedule), `.consent` (banner); `AppDelegate` and `NotificationViewController` call `ReminderEngagement.record(response)` for every response; `AppDelegate` handles `GeminiError.consentRequired` and pending batches (§2.8); `ScheduleViewModel.events` comes from `visibleEvents()`; `displayEvents` and `events(on:)` include `pendingEvents.previewEvents` like plan previews; every date shown follows `clock.timeZone` (set `Date.FormatStyle.timeZone`, or `.environment(\.timeZone, clock.timeZone)` at the root).
@@ -1576,7 +1576,7 @@ Provider → signature → who calls it. "async" methods of actors are called wi
 | 22 | `ScheduleAssistant.init` replaces `calendar: GoogleCalendarClient` with `router: CalendarRouter`, adds `preferences:`, `clock` optional | STORE_PRIVACY | `ScheduleAssistant()` / `.shared` call sites compile unchanged (NotificationChatModel, AppDelegate, AddPlanIntent) |
 | 15 | `DemoAssistant.init` `clock`/`policy` become optional, adds `preferences:` | STORE_PRIVACY | existing call sites compile (optional promotion) |
 | 16 | `ScheduleEvent` gains optional fields | ACCOUNTS | none (memberwise defaults) |
-| 17 | `ScheduleActivityAttributes.ContentState.firstWeekday` | PREFS | widget week strip (UI) |
+| 17 | `ScheduleActivityAttributes.ContentState.firstWeekday` | PREFS | Live Activity week digest (`days`; not shown since 2026-10-18) |
 | 18 | `ChatViewModel.Message.id` becomes an init parameter (`var id: UUID = UUID()`) plus new card fields | UI | UI only |
 | 19 | `AuthError.reconnectNeeded(email:)` added | ACCOUNTS | `ScheduleViewModel` stops setting `isSignedIn = false` on one account's `refreshFailed` (UI) |
 | 20 | `Theme.weekdayLetters(firstWeekday:)` | UI | UI only |

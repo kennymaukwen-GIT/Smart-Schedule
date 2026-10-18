@@ -15,7 +15,7 @@
 |---|---|---|
 | Artboard 1 | 鎖定畫面提醒 → 長按展開 → 原地對話（MY TEXT／THE RESPOND／輸入列） | `NotificationContent/NotificationViewController.swift`、`NotificationChatView.swift`、`Shared/Notifications/*` |
 | Artboard 2 | 動態島 compact 狀態「⏰ Online meeting in 21 MIN」 | `Widgets/ScheduleLiveActivity.swift`（`compactLeading`／`compactTrailing`） |
-| Artboard 3 | 控制中心時鐘按鈕 → 打開快速輸入；動態島只在行程前出現，展開後顯示一週微型日曆和「編輯」按鈕（點了打開快速輸入） | `Widgets/SmartScheduleControl.swift`、`Shared/Intents/OpenQuickCaptureIntent.swift`、`Widgets/ScheduleLiveActivity.swift`（`ExpandedIslandView`） |
+| Artboard 3 | 控制中心時鐘按鈕 → 打開快速輸入；動態島只在行程前出現，展開後左上角是「編輯」按鈕（點了打開快速輸入），標題下是時間和地點，底部是「接下來」的行程（同一天最多 3 筆，其餘「+N」；當天沒有就顯示明天第一筆）；行程結束後鎖定畫面的卡片顯示「已結束」 | `Widgets/SmartScheduleControl.swift`、`Shared/Intents/OpenQuickCaptureIntent.swift`、`Widgets/ScheduleLiveActivity.swift`（`IslandEditPill`、`UpNextList`） |
 | Artboard 4（04 Quick Capture） | 點了動態島之後出現的 Quick Capture：DAY／WEEK／MONTH 切換（記住上次的選擇）、24 小時制時間軸、可左右翻頁的週卡、可上下捲動的連續月曆、對話面板、建議膠囊 | `App/Views/QuickCaptureView.swift`、`CaptureModePicker.swift`、`WeekAgendaCard.swift`、`MonthScrollCard.swift`、`CaptureCalendarParts.swift`、`Shared/Core/CalendarPaging.swift`（日期運算）、`RootView.swift`（從島的位置放大出現的動畫） |
 | Artboard 5 | 主畫面：標頭（漢堡選單 ·「2027 October」· 頭像）、月份選擇、月曆格（multi-day bar、task、+N）、AI 對話區、行程頁（點行程打開，可直接修改，含備註） | `App/Views/MainView.swift`、`Navigation/AppHeader.swift`、`MonthGridView.swift`、`ChatPanel.swift`、`EventDetailSheet.swift`、`Events/EventPage.swift` |
 | Artboard 5（側邊選單） | 漢堡選單打開的抽屜：General、「行程」區（進行中和接下來的行程、全部行程）、每個 Google 帳號一區、列出該帳號的行事曆；點色塊顯示或隱藏，點列進入行事曆設定 | `App/Views/Navigation/CalendarDrawer.swift`、`CalendarDetailsView.swift`、`App/Views/Events/*` |
