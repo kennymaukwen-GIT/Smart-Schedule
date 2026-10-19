@@ -39,6 +39,8 @@ enum DataEraser {
         removeExportCopies()
         // Which events' note suggestions were hidden with "×" (event ids, App Group).
         NoteSuggestionDismissals.reset()
+        // When each scheduled Live Activity was to start (event ids, App Group); the activities ended above.
+        ScheduledActivityStarts.store([:])
         AppConstants.setDemoMode(false)
         if let bundleID = Bundle.main.bundleIdentifier {
             UserDefaults.standard.removePersistentDomain(forName: bundleID)

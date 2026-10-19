@@ -5,7 +5,9 @@
 - `Shared/Notifications/ReminderScheduler.swift`：把計畫交給 `UNUserNotificationCenter`
 - `Shared/Notifications/BriefingBuilder.swift`：早晨摘要與晚間預覽的文字
 - `Shared/Notifications/ReminderEngagement.swift`：從「略過」學習
+- `Shared/Notifications/NotificationPermission.swift`：何時問通知權限（有行事曆、iOS 還沒問過）
 - `Shared/Models/AppPreferences.swift`、`Shared/Storage/PreferencesStore.swift`：設定 › 通知 的所有值
+- `Shared/Storage/ScheduledActivityStarts.swift`：iOS 26 排程中的即時動態什麼時候開始（App Group），它開始時的提醒取代同一刻的 App 提醒（第 8 節）
 - `NotificationContent/`：長按展開後的對話 UI
 
 ## 1. 先講清楚做不到的事
@@ -128,7 +130,7 @@ iOS 每個 App 最多保留 64 個待發本地通知，超過的會被默默丟�
 - **一個行程一個 Live Activity**，只代表「即將開始或進行中」的行程：開始前「提前量」出現，行程結束後從鎖定畫面消失前再留 10 分鐘。沒有行程時動態島不出現；控制中心按鈕改為打開快速輸入（`OpenQuickCaptureIntent`）。
 - `ActivityScheduler.reconcile()`（`Shared/LiveActivity/ActivityScheduler.swift`）在 App 回到前景（`LiveActivityManager.summonIfDue`）、每次寫入或同步後、以及 BGAppRefresh（`refreshIfRunning`）時執行：
   - 規劃（`ActivityPlanner`，純函式、有單元測試）：未來 48 小時內開始、有時間、未完成、不是草稿的行程，最近的優先，最多 `ActivityPlanner.maxPending`（8，待真機測試回填）。觸發時間 = 開始 − 提前量；結束時間 = min(行程結束, 觸發 + 8 小時)，超過 8 小時的行程直接截斷。
-  - **iOS 26 起**：`Activity.request(…, style: .standard, alertConfiguration:, start: 觸發時間)` 排程啟動（狀態 `.pending`），App 關著也會準時出現。系統規定排程啟動一定要附提醒（標題 = 行程名稱，內文「%lld 分鐘後開始」）。
+  - **iOS 26 起**：`Activity.request(…, style: .standard, alertConfiguration:, start: 觸發時間)` 排程啟動（狀態 `.pending`），App 關著也會準時出現。系統規定排程啟動一定要附提醒（標題 = 行程名稱，內文「%lld 分鐘後開始」）。排程啟動時的提醒（亮螢幕、通知音、展開動態島）就是那一刻的提醒：同一個行程、提前量和動態島相同（預設 30 分鐘前）、相差不到 1 分鐘的 App 提醒不再另外送（`ReminderPlanner.withoutLiveActivityDuplicates`，依 `ScheduledActivityStarts`：每次 `ActivityScheduler` 執行後從 ActivityKit 讀回、還在排程中的 activity）。照常送的：iOS 18、動態島關閉、App 在背景沒排成功、行程改了時間但排程中的 activity 還沒換掉、安靜時段或「安靜」的提醒（本來就無聲，留在通知中心）。iPhone 上這個提醒顯示的是展開的即時動態（標題、時間地點、倒數），「%lld 分鐘後開始」只在 Apple Watch 上出現。沒送的那則不算進每日提醒上限，早晨摘要的「未發送提醒：」也不會列出它。紀錄有變時 App 會再重排一次提醒（`ActivityScheduler.scheduledStartsChanged`，由 `AppDelegate` 設定；每個呼叫點都先重排提醒、再跑即時動態，所以要靠這一次；即時動態的這一輪會等它重排完，背景重新整理、Siri 或通知回覆不會在重排到一半時結束）；清除所有資料時紀錄一併清掉。
   - **iOS 18（1.0）**：App 不能排程，也不能在背景啟動；`AppConstants.pushToStartEnabled = false`（`ActivityPlanner.pushToStartStep` 是 `.off`）：不要求 push-to-start token、不寫 `push-to-start.json`、不上傳，伺服器不存任何行程。即時動態只在提前時間內或行程進行中 App 執行時立即啟動，之後關掉 App 也留著。App 一直開著時，`ActivityScheduler` 在下一個觸發時間再跑一次（`dueWake`，只在 App 的程序（process）還在執行時有效；在背景時啟動會失敗，回到前景的那一次會補上）。
     - 之後的版本開啟 push-to-start 時：`PushToStartRegistrar.sync(token:upcomingEvents:)` 把 48 小時內的行程（ID、標題、開始時間、提前量、觸發時間，加上用預設 `JSONEncoder` 編好的 attributes 與 content-state）整份寫進 App Group 的 `push-to-start.json`，由伺服器（`server/worker/`）在觸發時間送 push-to-start。登記經 App Attest 上傳到 `POST /devices/push-to-start`，**只在有 AI 資料分享同意、而且 iOS 已給 push-to-start token 時**才帶行程；沒有同意（或撤回、清除所有資料、換到 iOS 26）時送空的登記，讓伺服器刪掉之前的標題。剛過觸發時間不到 3 分鐘、還沒出現的行程會留在登記裡，伺服器重試失敗的推播時還找得到。
   - 兩者共用：已在提前量內的行程，App 在前景時立刻啟動；行程改了（標題、時間、提前量）→ 排程中的 activity 先排好新的、成功後才 `end(nil, .immediate)` 舊的（背景裡排不了新的，就先留著舊的，下次前景再換），已顯示中的直接更新內容（只在畫面上看得到的內容變了才更新：標題、標題下的時間和地點、時區、倒數，以及進度條的起點（觸發時間，`ContentState.progressStart`；出現後就不變，改提前量或行程往後移 3 分鐘以內都不會讓進度條倒退（變回空的）或停住，行程提前到起點之前才換成新的觸發時間，`ActivityPlanner.keptProgressStart`）；排程中的 activity 不能更新，標題、時間、地點、時區或提前量變了就換一個新的，`ActivityPlanner.scheduledActivityMatches`。2026-10-18 起畫面不再顯示「接下來」，之後的行程新增、改名或刪除不會更新或替換即時動態）（移到更晚超過 3 分鐘則結束後重排；3 分鐘的寬限是給開啟 push-to-start 時伺服器和 iPhone 兩邊時鐘的誤差，伺服器在觸發時間或之後才送）；行程刪除、完成、或動態島關閉 → 立即結束；行程結束 → `end(最後內容, .after(結束 + 10 分鐘))`。使用者滑掉的 activity 不會被同一個觸發時間再叫出來；排程中但在出現前就消失的（例如重開機）會重排。
@@ -186,8 +188,10 @@ NSExtensionAttributes:
 
 | 路徑 | 可靠度 | 說明 |
 |---|---|---|
-| `UNTextInputNotificationAction`（系統輸入框） | **保證可用** | 在鎖定畫面上也能用；回覆會送到 extension 的 `didReceive(_:completionHandler:)`；麥克風就是鍵盤上的聽寫鍵（通知擴充沒有 App 自己的麥克風按鈕，也不宣告麥克風權限） |
+| `UNTextInputNotificationAction`（系統輸入框） | **保證可用** | 鎖定時點輸入會先要求 Face ID／密碼（`.authenticationRequired`）；回覆會送到 extension 的 `didReceive(_:completionHandler:)`；麥克風就是鍵盤上的聽寫鍵（通知擴充沒有 App 自己的麥克風按鈕，也不宣告麥克風權限） |
 | 卡片內的 inline `TextField` | 要在實機上驗證 | 需要 user interaction enabled；extension 裡能不能取得鍵盤焦點，各 iOS 版本表現不一。拿到焦點就是最接近設計稿的體驗 |
+
+卡片自己的輸入框、建議、「加入」、紅色「確認刪除」和「顯示」不能靠 action 的選項要求解鎖，所以 `NotificationChatModel` 先問 `DeviceLock.isLocked()`（`Shared/Notifications/DeviceLock.swift`：一個只在解鎖時讀得到的 1 位元組 Keychain 項目，其他錯誤都算解鎖；鎖定後約 10 秒內仍算解鎖）；鎖定時只回「請先解鎖 iPhone，再試一次。」，打的字留在輸入框。「延後 10 分鐘」只排一則本機通知，鎖定時不用解鎖。
 
 另外，如果使用者在**收合狀態**的 banner 上直接回覆（沒有展開 extension），回覆會送到 `AppDelegate.userNotificationCenter(_:didReceive:)`，App 在背景被喚醒，跑同一條管線，再發一則 `SS_COMPOSE` 通知回報結果。這則回報通知本身也能長按繼續對話。
 
@@ -225,7 +229,10 @@ NSExtensionAttributes:
 
 ## 14. 實機測試清單
 
-- [ ] 鎖定畫面長按 → 展開 → 用系統輸入框輸入 → 卡片保持展開，並顯示回覆。
+- [ ] 鎖定時回覆（A、B 都要先把 設定 › 通知 › Smart Schedules › 顯示預覽 改成「永遠」，Face ID 的預設「解鎖時」在鎖定時根本打不開卡片；再鎖定，把 iPhone 蓋著讓 Face ID 過不了）：
+  - A. 長按提醒 → 點「輸入要新增或修改的計畫」→ 先要求 Face ID 或密碼；解鎖後輸入「push this 30 minutes later」，卡片保持展開並顯示回覆。如果跳回主畫面或回覆不見，就改用 Plan B：回覆動作改回 `options: []`，只靠卡片的 `DeviceLock` 檢查（不要在 `AppDelegate` 用 `isProtectedDataAvailable` 拒絕，否則 iPhone 鎖定時從 Apple Watch 回覆也會被拒）。
+  - B. 卡片開著時在卡片的輸入框打字或點建議 → 出現「請先解鎖 iPhone，再試一次。」、打的字還在，Google 日曆沒有任何變動；用 Face ID 解鎖後按傳送就正常。
+  - C. 「延後 10 分鐘」不用解鎖、沒有提示，10 分鐘後收到延後的那則。
 - [ ] 解鎖狀態在其他 App 裡收到 banner → 下拉 → 同上。
 - [ ] 在收合的 banner 直接回覆 → App 在背景處理 → 收到結果通知。
 - [ ] Inline TextField 能不能取得焦點（決定是否把它當主要輸入方式）。
@@ -237,4 +244,11 @@ NSExtensionAttributes:
 - [ ] 早晨摘要的內容在新增行程後會更新（重排）。
 - [ ] 滑掉同一個預設提醒 5 次 → 回到 App 出現建議卡片；按「保留」後不會再問。
 - [ ] 動態島：行程 30 分鐘內開始時打開 App 會自動出現；設定為「關閉」則不會。
+- [ ] iOS 26 即時動態與提醒不重複（預設提醒、動態島提前 30 分鐘）。測試用的行程要有預設提醒：在 Google 日曆網頁版建立、用預設通知；不要用 App 裡新增的「今天稍後」項目，它只有 10 分鐘前和開始時的提醒，本來就沒有 30 分鐘前。
+  - A. 建立 40 分鐘以後的行程，打開 Smart Schedules（同步並排好即時動態）後鎖定。30 分鐘前只響一次，動態島或鎖定畫面出現即時動態，通知中心沒有「30 分鐘後」；開始時「現在開始」照常。
+  - B. 同上，但建立行程時 App 一直關著 → 30 分鐘前的通知照常來。
+  - C. 設定 › 動態島「關閉」，再在 Google 網頁版建立一個行程 → 30 分鐘前的通知回來。
+  - D. 即時動態排好後，從提醒的長按卡片（或 App 關著時在 Google 網頁版）把行程延後 30 分鐘 → 原本 30 分鐘前的那一刻，「1 小時後」的通知照常來。
+  - E. 專注模式（工作）開著：即時動態開始時的提醒會不會穿透專注模式。
+  - F. iOS 18：沒有變（30 分鐘前的通知照常，沒有即時動態的提醒）。
 - [ ] 專注模式過濾條件：開啟時只顯示並提醒選定的行事曆，結束後恢復。

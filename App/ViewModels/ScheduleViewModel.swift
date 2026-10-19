@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 @MainActor
 @Observable
@@ -113,6 +114,21 @@ final class ScheduleViewModel {
         await reloadAccounts()
         await reloadFromCache()
         await refresh(.foreground)
+        let hasCalendar = isSignedIn || isDemo
+        Task { await requestNotificationPermissionIfNeeded(hasCalendar: hasCalendar) }
+    }
+
+    /// The notification prompt, in context: when "Try without signing in" starts the sample calendar (asked before
+    /// it is seeded, so its reminders are scheduled after the answer), after connecting a Google account, and at launch
+    /// for someone who has either but was never asked. Returns once answered (at once when iOS already has an answer).
+    /// iOS refused reminders added before the answer (UNError.notificationsNotAllowed): "Allow" schedules them again.
+    func requestNotificationPermissionIfNeeded(hasCalendar: Bool) async {
+        guard !Self.isPreview else { return }
+        let center = UNUserNotificationCenter.current()
+        let status = await center.notificationSettings().authorizationStatus
+        guard NotificationPermission.shouldAsk(status: status, hasCalendar: hasCalendar) else { return }
+        let granted = (try? await center.requestAuthorization(options: NotificationPermission.options)) ?? false
+        if granted { await ReminderScheduler.shared.reschedule() }
     }
 
     /// Calendar events plus the ghost previews of the pending plan and of "Ask me first" events, for the WEEK and
@@ -216,6 +232,9 @@ final class ScheduleViewModel {
         show(notice)
         // The first connection shows the island at once when an event is about to start (within the lead time).
         if !wasSignedIn && !isDemo { await LiveActivityManager.shared.summonIfDue() }
+        // Not awaited: the add page closes at once, with the alert over it.
+        let hasCalendar = isSignedIn
+        Task { await requestNotificationPermissionIfNeeded(hasCalendar: hasCalendar) }
     }
 
     func reconnect(accountID: String) async {
@@ -480,6 +499,8 @@ final class ScheduleViewModel {
     /// "Try without signing in": sample data and accounts, Live Activity, no Google account. The chat's assistant
     /// (`DemoModeAssistant`) is Gemini on the sample calendars once AI data sharing is allowed, offline rules otherwise.
     func startDemo() async {
+        // First: the sample reminders (Joe's within a minute) are scheduled after the answer, not refused before it.
+        await requestNotificationPermissionIfNeeded(hasCalendar: true)
         AppConstants.setDemoMode(true)
         // A draft or batch belongs to the assistant that made it.
         await SharedStore.shared.setPendingPlan(nil)

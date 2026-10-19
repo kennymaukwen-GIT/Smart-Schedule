@@ -83,7 +83,7 @@ flowchart LR
 |---|---|---|
 | `SmartSchedule`（App） | SwiftUI 主畫面、Quick Capture、Google 登入（PKCE）、語音輸入（只在 iPhone 上辨識）、BGTask、App Intents | `ASWebAuthenticationSession` 和 `UIApplication` 在 extension 裡不能用；麥克風只給 App，兩個 extension 都沒有 |
 | `SmartScheduleWidgets` | Live Activity（動態島＋鎖定畫面）、Control Center 控制項 | Widget extension 有記憶體上限，所以只編譯 Models、Storage、LiveActivity、Intents、DesignSystem，不放 AI 和網路程式碼 |
-| `SmartScheduleNotificationContent` | 「長按展開」的對話 UI 和完整的 AI → Calendar 管線 | 必須能在鎖定畫面上獨立完成寫入（Gemini 要用 App 在 7 天內替它換好的 session，見 3.3） |
+| `SmartScheduleNotificationContent` | 「長按展開」的對話 UI 和完整的 AI → Calendar 管線 | 必須能在鎖定畫面上獨立完成寫入（iPhone 鎖定時會先要求 Face ID／密碼；Gemini 要用 App 在 7 天內替它換好的 session，見 3.3） |
 
 **跨 process 共享：**
 - **App Group**（`group.com.smartschedule.shared`）：放 `SharedStore`，一個 JSON 檔，每次存取都包在 `NSFileCoordinator` 裡。檔案大約 50 到 150 KB；profiling 證明有瓶頸才換成 SQLite。
@@ -132,7 +132,7 @@ flowchart LR
 - **Artboard 5 的導覽**：漢堡選單 = 看什麼（`CalendarDrawer`，從左邊滑出，內含自己的 `NavigationStack`，行事曆設定在抽屜裡推入）；頭像 = 我是誰（`AccountSheet`：Google 帳號；Smart Schedules Pro 區塊在 1.0 關閉）；General = App 怎麼運作（`SettingsView`）。`AppRouter` 管抽屜開關和這兩個 sheet，也接受 `smartschedule://settings`、`smartschedule://accounts`。月份 chips 和月曆格維持無限捲動；時區或每週起始日改變時，用 `.id(schedule.clockID)` 讓它們以 `displayedMonth` 重新排版。
 - **View model**：`ScheduleViewModel`（可見行程、帳號、待確認的計畫和「先問我」行程、`clock`）、`ChatViewModel`（對話、卡片狀態、AI 同意流程、對話紀錄的讀寫）、`SettingsModel`（設定頁的偏好、紀錄、建議、同意狀態；每次修改都經過 `PreferencesStore.update(source: .settings)`，自動記進「助理記得的事」）。
 - **語音輸入**（2026-10-18 加回，免費）：主畫面對話和快速輸入的輸入列（`ComposerBar`）有麥克風按鈕，由 `App/Voice/VoiceTranscriber.swift` 用 `SFSpeechRecognizer` 辨識中文（台灣）或美式英文（設定 › 助理 › 語音辨識語言，「自動」跟著 App 的語言；規則在 `Shared/Voice/VoiceInput.swift`）。每個 `SFSpeechAudioBufferRecognitionRequest` 都設 `requiresOnDeviceRecognition = true`，只在 iPhone 上辨識、不用 Apple 的伺服器；這支 iPhone 不支援該語言的裝置端辨識時不顯示按鈕（鍵盤的聽寫照常可用）；辨識器的 delegate（`availabilityDidChange`）在畫面開著時更新按鈕，例如裝置端模型下載完。音訊只在記憶體裡交給辨識器，不寫檔、不上傳；辨識到的字填進輸入框，按「傳送」才送出。再按一次、按傳送、離開畫面、被蓋住（主畫面對話上面開了快速輸入、抽屜、sheet 或行程頁）、App 退到背景、靜默 3 秒（還沒聽到字時 8 秒）或滿 60 秒就停；輸入框被清空（傳送、點建議、另一個輸入列送出、清除對話紀錄）時也停，還在路上的字丟掉，不會再填回去。麥克風和語音辨識權限只在第一次按麥克風時詢問；被拒絕後按麥克風會說明要開哪個開關，並可打開「設定」。`scripts/validate_schema.py` 第 9 項檢查這些規則和 usage description 只在 App target。
-- **啟動順序**：先讀回對話紀錄 → `ScheduleViewModel.bootstrap()`（舊版單一帳號搬到多帳號 → 帳號 → 快取 → 同步）→ 對齊 App Group 裡的草稿和「先問我」批次 → 加入學到的建議卡片 → `summonIfDue`。回到前景時另外重新整理行事曆清單（超過 6 小時的）。
+- **啟動順序**：先讀回對話紀錄 → `ScheduleViewModel.bootstrap()`（舊版單一帳號搬到多帳號 → 帳號 → 快取 → 同步）→ 對齊 App Group 裡的草稿和「先問我」批次 → 加入學到的建議卡片 → `summonIfDue`。回到前景時另外重新整理行事曆清單（超過 6 小時的）。通知權限不在第一次啟動時問：示範模式開始（種範例資料之前）或第一次連上 Google 帳號後才問（`ScheduleViewModel.requestNotificationPermissionIfNeeded`）；已經登入或在示範模式、卻從沒被問過的人（例如問到一半 App 被關掉），啟動時補問一次。
 
 ### 3.5 零 UI 輸入：App Intents
 - `AddPlanIntent`：用 `@Parameter` 搭配 `requestValueDialog`，由 Siri 或 Shortcuts 開口問「What should I schedule?」，全程不開 App。
@@ -227,6 +227,7 @@ sequenceDiagram
 - [ ] Testing 模式下 7 天 refresh token 到期後，重新登入的流程。
 - [ ] 專注模式過濾條件：開啟和關閉專注模式時 `CalendarFocusFilter.perform()` 都有被呼叫。
 - [ ] 時效性提醒能穿過專注模式；「安靜」等級和安靜時段內的提醒只進通知中心、沒有聲音。
+- [ ] 通知權限（刪除重裝後測）：第一次打開不跳；點「Try without signing in」（或 ☰ › General › 示範模式）先跳通知權限，按 Allow 後範例行事曆和即時動態才出現，一分鐘內收到「Online meeting with Joe」的提醒；沒進過示範模式時，連好 Google 帳號、回到 App 才跳；按 Don't Allow 後不再問，即時動態照常。
 - [ ] 乾淨安裝時，第一次送出訊息、Siri、長按通知回覆都先要求 AI 資料分享同意，同意前沒有任何 request 送到 Gemini。
 - [ ] 語音輸入（只在 iPhone 上辨識）：快速輸入和主畫面對話有麥克風按鈕，長按通知沒有；第一次按才跳麥克風和語音辨識的權限提示（文字寫「在這支 iPhone 上轉成文字」），之前整個 App 都不會跳；中文（台灣）和 English (US) 各說一句，字邊說邊填進輸入框，按「傳送」才送出；開飛航模式仍能辨識（證明沒有用 Apple 的伺服器）；靜默約 3 秒、滿 60 秒、App 退到背景、關掉快速輸入都會停；拒絕權限後再按，跳出說明和「打開設定」；在沒有下載裝置端語音模型的語言（設定 › 助理 › 語音辨識語言）下按鈕不出現，設定頁顯示「這個語言不支援裝置端辨識」；`smartschedule://compose?mode=voice` 在已授權時直接開始收音，未授權時只叫出鍵盤、不跳權限提示；快速輸入還開著時再觸發一次（App 先退到背景再回來），會再開始收音。鍵盤上的聽寫鍵照常可用。
 - [ ] 語音輸入，乾淨安裝：還沒問過任何權限時，主畫面對話和快速輸入就看得到麥克風按鈕（預期 `isAvailable` 和 `supportsOnDeviceRecognition` 在授權前就是 true，還沒在實機上確認）。如果看不到，第一次按就跳權限提示這條路走不通：改成語音辨識權限還沒決定（`.notDetermined`）且有這個語言的辨識器時也顯示按鈕，`start()` 授權後重新檢查，裝置端不支援就不收音（仍然只在 iPhone 上辨識）。另外：畫面開著時下載語言的裝置端模型（或下載完），按鈕不必退到背景再回來就出現或消失。

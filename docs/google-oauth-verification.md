@@ -151,7 +151,7 @@ Smart Schedules is a Google Calendar client for iPhone. It uses calendar.events 
 1. Read events (events.list, events.get) in the user's calendars to show them in month, week and day views and in the event list, and to schedule reminders, departure reminders and Live Activities on the iPhone.
 2. Create events (events.insert) when the user adds them, for example by typing "lunch with Joe tomorrow at 12:30" to the in-app assistant (or saying it to Siri), or by tapping Add on events or a plan the assistant proposed.
 3. Change events (events.patch) when the user edits the title, time, location, reminders or notes on the event page, or asks the assistant to move an event or when to leave for it (the app then saves in the event's private extended properties only how many minutes early the user wants to arrive, the travel mode and how many minutes before the start to leave).
-4. Delete events (events.delete) when the user taps Delete event or confirms a deletion the assistant proposed.
+4. Delete events (events.delete) when the user taps Delete event, asks the assistant to delete an event, or confirms a bulk deletion the assistant proposed (several events, a whole series or a plan).
 All calls are made by the app on the user's iPhone directly to the Google Calendar API, in response to the user's actions or to keep the on-device copy in sync.
 
 Why a narrower scope is not enough: calendar.events.readonly and calendar.events.owned.readonly cannot create, change or delete events. calendar.events.owned covers only calendars the user owns, but users also see calendars other people share with them and edit the shared calendars they have "Make changes to events" access to (family or team calendars). calendar.app.created covers only calendars the app itself creates, while users manage events in their existing calendars. calendar.events.freebusy returns no event details. We do not request the full calendar scope: the app never changes calendar settings or sharing, and never creates or deletes calendars.
@@ -326,7 +326,7 @@ Other features: reminders and Live Activities are created on the iPhone from the
   ```
 
 **鏡頭 8｜讀取行程：`calendar.events`（2:20–2:40）**
-- 畫面：回到 App，月曆出現測試帳號的行程；切到週、日檢視。旁邊（或接著）是 Mac 上的 Google Calendar 網頁，同樣的行程。
+- 畫面：（刪除重裝後第一次連線才會出現；用 Erase all data 重來時 iOS 記得之前的答案，不會再問）回到 App 時 iOS 先問「"Smart Schedules" Would Like to Send You Notifications」→ 點 Allow（App 的通知權限，與 Google 無關）。回到 App，月曆出現測試帳號的行程；切到週、日檢視。旁邊（或接著）是 Mac 上的 Google Calendar 網頁，同樣的行程。
 - 旁白：
   ```text
   Back in the app, Smart Schedules reads the events with the calendar.events scope and shows them in month, week and day views. They are the same events as in Google Calendar on the web.

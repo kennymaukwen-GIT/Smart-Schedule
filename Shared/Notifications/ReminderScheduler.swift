@@ -6,7 +6,8 @@ import UserNotifications
 ///
 /// iOS keeps at most 64 pending local notifications per app and silently drops the rest, so this is a rolling
 /// window (`ReminderPlanner`): re-run after every write, sync, app launch, background refresh and preference change.
-/// "Google Calendar only" schedules no reminders; briefings and nudges stay.
+/// "Google Calendar only" schedules no reminders; briefings and nudges stay. On iOS 26 the reminder an event's
+/// scheduled Live Activity start alert replaces is left out (`ReminderPlanner.withoutLiveActivityDuplicates`).
 actor ReminderScheduler {
     static let shared = ReminderScheduler()
 
@@ -25,7 +26,8 @@ actor ReminderScheduler {
         let briefingEvents = await store.visibleEvents(in: briefingRange, audience: .display)
 
         let plan = ReminderPlanner.plan(reminderEvents: reminderEvents, briefingEvents: briefingEvents, nudges: nudges,
-                                        preferences: preferences, now: now, clock: clock)
+                                        preferences: preferences, now: now, clock: clock,
+                                        liveActivityStarts: ScheduledActivityStarts.load())
 
         let pending = await center.pendingNotificationRequests()
         center.removePendingNotificationRequests(withIdentifiers: pending.map(\.identifier).filter(Self.isRescheduled))

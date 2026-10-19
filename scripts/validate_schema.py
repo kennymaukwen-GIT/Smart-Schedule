@@ -41,6 +41,10 @@
     (AppRefresh.registerHandler), for the one identifier in BGTaskSchedulerPermittedIdentifiers, never with SwiftUI's
     .backgroundTask: Apple DTS confirms SwiftUI can register it after launch has finished (developer forums 775182), most
     likely why the app crashed when the Control Center button launched it (owner's iPhone, 2026-10-19).
+12. AddPlanIntent (Siri, Shortcuts, the Action Button) can add, move and delete events, so it declares
+    authenticationPolicy = .requiresAuthentication: a locked iPhone asks for Face ID or the passcode first (the default,
+    .alwaysAllowed, runs it from the Lock Screen). App/ is not compiled into the unit tests, so this is checked here;
+    NotificationActionsTests checks the notification reply action's .authenticationRequired.
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -772,6 +776,25 @@ def background_task_checks() -> None:
         print(f"✓ Background refresh {listed[0]} registered once, first in didFinishLaunching (no SwiftUI .backgroundTask)")
 
 
+ADD_PLAN_INTENT = "App/Intents/AddPlanIntent.swift"
+AUTHENTICATION_POLICY = re.compile(r"\bstatic\s+(?:let|var)\s+authenticationPolicy\s*:\s*IntentAuthenticationPolicy\s*"
+                                   r"=\s*\.(requiresAuthentication|requiresLocalDeviceAuthentication)\b")
+
+
+def lock_screen_checks() -> None:
+    """Check 12: AddPlanIntent writes to Google Calendar from Siri, Shortcuts and the Action Button, so a locked iPhone
+    must ask for Face ID or the passcode first. `.requiresLocalDeviceAuthentication` (stricter: an unlocked Apple Watch
+    does not count) passes too. Comments are ignored."""
+    code = re.sub(r"//.*", "", (ROOT / ADD_PLAN_INTENT).read_text(encoding="utf-8"))
+    match = AUTHENTICATION_POLICY.search(code)
+    if not match:
+        errors.append(f"{ADD_PLAN_INTENT}: AddPlanIntent needs `static let authenticationPolicy: "
+                      "IntentAuthenticationPolicy = .requiresAuthentication` (it can add, move and delete events; the "
+                      "default .alwaysAllowed runs it on a locked iPhone)")
+    else:
+        print(f"✓ AddPlanIntent asks a locked iPhone to unlock first (authenticationPolicy = .{match.group(1)})")
+
+
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
     by_name = {}
@@ -834,6 +857,7 @@ def main() -> int:
           f"= true in {VOICE_DIR}; usage descriptions for the app target only (en + zh-Hant)")
     notification_extension_checks()
     background_task_checks()
+    lock_screen_checks()
 
     if errors:
         print("\n".join(f"✗ {e}" for e in errors), file=sys.stderr)

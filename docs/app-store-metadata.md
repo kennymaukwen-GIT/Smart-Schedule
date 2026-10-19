@@ -101,7 +101,7 @@ Smart Schedules 是搭配 Google 日曆的 iPhone AI 行程助理。輸入一句
 • 用日常語言新增、移動、改名或刪除行程。
 • 沒說時間的話，助理會先問你，不會自己亂猜。
 • 長期目標會拆成分階段的計畫：固定的練習時段、檢查點和每日提醒。先在日曆上預覽，按「加入」才寫進 Google 日曆；想改哪裡直接說，助理會給你新的版本。
-• 想每個行程都先過目？打開「先問我」，單一行程也會等你按「加入」。
+• 想新增的行程都先過目？打開「先問我」，單一行程也會等你按「加入」。
 • 一句話就能改設定，例如「以後 8 點前不要提醒我」、「健身提前 2 小時提醒」。改完可以在對話裡馬上復原，之後也能在「助理記得的事」刪除。
 
 ■ 隨時一鍵叫出
@@ -207,7 +207,7 @@ PLAN IN A SENTENCE
 • Add, move, rename or delete events in everyday language.
 • If you don't say a time, the assistant asks instead of guessing.
 • Long-term goals become a phased plan with regular sessions, checkpoints and a daily nudge. Preview it on your calendar first; nothing is added until you tap Add. Say what to change and the assistant makes a new version.
-• Want to approve everything? Turn on "Ask me first" and single events wait for your Add too.
+• Want to approve new events first? Turn on "Ask me first" and single events wait for your Add too.
 • Change settings just by asking: "from now on, don't remind me before 8", "remind me 2 hours before gym". Undo a change right in the chat, or delete it later in "What the assistant remembers".
 
 ONE TAP AWAY
@@ -268,9 +268,9 @@ calendar,agenda,reminder,to-do,task,routine,habit,goal,meeting,diary,assistant,o
 | 名稱（主要／備用 1／備用 2） | 15／23／22 字元 | 15／27／29 字元 | 30 字元 |
 | 副標題 | 13 字元 | 29 字元 | 30 字元 |
 | 宣傳文字 | 63 字元 | 151 字元 | 170 字元 |
-| 描述 | 1,713 字元 | 3,869 字元 | 4,000 字元 |
+| 描述 | 1,714 字元 | 3,875 字元 | 4,000 字元 |
 | 關鍵字 | 99 位元組 | 100 位元組 | 100 位元組 |
-| 審核備註（第 8.2 節） | — | 3,985 位元組（2026-10-18：AI CONTENT（1.2、4.7.1）那一段改成長按回覆或卡片、設定 › AI 與隱私 › 回報 AI 的回覆、Open Email／Copy Report，為了放得下，IN-APP PURCHASES 和 LIVE ACTIVITY 各縮短一句，意思沒變；之前拿掉訂閱和附件那一段，加上 IN-APP PURCHASES、AI 上限和位置；只剩 15 位元組，填入備用驗證碼後要重算，驗證碼不要帶空格；要再加內容就先刪掉別的） | 4,000 位元組 |
+| 審核備註（第 8.2 節） | — | 3,989 位元組（2026-10-19：NOTIFICATION REPLIES 改成鎖定的 iPhone 先要求 Face ID 或密碼、「Snooze 10 min」不用解鎖，「the event is updated before the notification closes (deleting needs a red Confirm)」縮成「The event is updated in place.」（拿掉不對的「刪除都要按確認」：單一行程直接刪除，批次刪除才要按紅色確認；寫進來要多 33 位元組放不下，寫在第 8.3 節的 Deleting 和 `docs/review-notes.md`）；LIVE ACTIVITY 寫明 App 下次執行才結束（until the app next runs after it ends）；IN-APP PURCHASES 拿掉「every feature is free」（「sells nothing」已經說了）；2026-10-18：AI CONTENT（1.2、4.7.1）那一段改成長按回覆或卡片、設定 › AI 與隱私 › 回報 AI 的回覆、Open Email／Copy Report，為了放得下，IN-APP PURCHASES 和 LIVE ACTIVITY 各縮短一句，意思沒變；之前拿掉訂閱和附件那一段，加上 IN-APP PURCHASES、AI 上限和位置；只剩 11 位元組，填入備用驗證碼後要重算，驗證碼不要帶空格；要再加內容就先刪掉別的） | 4,000 位元組 |
 
 精確數字用第 12 節的腳本算；改了文字就重跑一次。
 
@@ -477,19 +477,19 @@ VOICE INPUT (FREE)
 The mic button in the chat and Quick Capture turns speech into text on the iPhone only (requiresOnDeviceRecognition = true; hidden if the language has no on-device support). Microphone and Speech Recognition are asked on the first tap. No audio is stored or sent; nothing is sent until Send.
 
 LIVE ACTIVITY / DYNAMIC ISLAND
-One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island) until it ends, made on the iPhone only (no AI permission needed). iOS 26 schedules the next two days' activities when the app opens, so they appear with the app closed; on iOS 18 one appears when the app is opened during the lead time or the event. Tapping it opens Quick Capture.
+One Live Activity per timed event, from 30/15/10/5 minutes before it starts (Settings › Notifications › Dynamic Island) until the app next runs after it ends, made on the iPhone only (no AI permission needed). iOS 26 schedules the next two days' activities when the app opens, so they appear with the app closed; on iOS 18 one appears when the app is opened during the lead time or the event. Tapping it opens Quick Capture.
 
 CONTROL CENTER
 The "Smart Schedules" control opens Quick Capture with the keyboard up.
 
 NOTIFICATION REPLIES
-Long-press a reminder and type, e.g. "push this 30 minutes later"; the event is updated before the notification closes (deleting needs a red Confirm). "Snooze 10 min" is also offered.
+Long-press a reminder and type, e.g. "push this 30 minutes later"; a locked iPhone asks for Face ID or the passcode first. The event is updated in place. "Snooze 10 min" needs no unlock.
 
 DATA DELETION (5.1.1(v))
 Remove account (avatar › ⋯ next to the account, or ☰ › ⋯) revokes Google access and deletes its tokens and cached events. ☰ › General › Data › "Erase all data on this device" revokes every Google account, withdraws AI permission and deletes all local data. Events in Google Calendar are not deleted.
 
 IN-APP PURCHASES
-None: 1.0 sells nothing; every feature is free. StoreKit code in the binary is switched off at build time and never runs in 1.0; only a later version submitted for review can turn it on.
+None: 1.0 sells nothing. StoreKit code in the binary is switched off at build time and never runs in 1.0; only a later version submitted for review can turn it on.
 
 OTHER
 AI limits (abuse protection, not sold): 30 requests a minute per installation; notification replies up to 200 requests a day.
@@ -502,11 +502,13 @@ Rated 18+: Google's Gemini API terms require users to be 18 or older.
 需要時貼到 App Review 的回覆（App Review 訊息或 Resolution Center）。
 
 ```text
-Time Sensitive notifications: reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning briefing and suggestions are Normal. People can change the urgency for each kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off. The one other Time Sensitive notification is the "time to leave" departure reminder, at the departure time the app worked out for an event the person asked about (the "get ready" one 10 minutes earlier is Normal); departure reminders exist only when the person asked when to leave or said where they need to be and when, are not counted in the daily reminder limit, and do not replace the event's own reminders. During quiet hours all of these arrive silently.
+Time Sensitive notifications: reminders are Time Sensitive only when they fire 30 minutes or less before an event starts (the default "Automatic" urgency). Earlier reminders, the morning briefing and the evening preview are Normal, and a long-term plan's daily nudge arrives silently. People can change the urgency for each kind of event in Settings › Notifications › Urgency, including turning Time Sensitive off. The one other Time Sensitive notification is the "time to leave" departure reminder, at the departure time the app worked out for an event the person asked about (the "get ready" one 10 minutes earlier is Normal); departure reminders exist only when the person asked when to leave or said where they need to be and when, are not counted in the daily reminder limit, and do not replace the event's own reminders. During quiet hours all of these arrive silently.
 
 Location (5.1.5): used only for departure reminders. When someone tells the assistant where they need to be and when, or asks how long a trip takes or when to leave (just adding an event with a place and a time does not count), the app (in the foreground only, with When In Use permission, asked the first time) gets the current location and sends it, with the destination and the arrival time, to Apple's MapKit for a place search and a travel-time estimate; the reply shows a small Apple map. The app schedules two local notifications, and its "leave" action opens Google Maps with the destination text only. The location is not stored and never reaches our server or Google's Gemini API; for departure reminders the app adds to the Google Calendar event, in private extended properties, only the minutes early, the travel mode and the minutes before the start to leave. If permission is denied, the person can type a starting point instead, or the event is added without departure reminders. Siri and notification replies never show the location prompt or get the location: the event is added without departure reminders and the reply says to open the app. There is no Always permission and no background location.
 
 Background modes: only "fetch", which lets background app refresh sync Google Calendar changes and keep reminders and Live Activities up to date. Reminders are local notifications created on the iPhone.
+
+Live Activity end: the app ends each event's Live Activity in its first update after the event ends (when the app comes to the front, after a change to the events, or in a background refresh): it leaves the Dynamic Island at once and stays on the Lock Screen, marked "Ended", until 10 minutes after the event's end, or leaves at once if that time has passed. Nothing ends it on time while the app does not run: iOS then ends it 8 hours after it appeared and can keep it on the Lock Screen for up to 4 more hours unless the person removes it.
 
 NSSupportsLiveActivitiesFrequentUpdates: declared, but Live Activities get no updates from a server at all; the countdown uses Text(timerInterval:).
 
@@ -520,7 +522,9 @@ Speech: the mic button in the chat and Quick Capture uses SFSpeechRecognizer wit
 
 AI content (1.2, 4.7.1): the system prompt of every assistant (chat) request, in the chat, Quick Capture, Siri and notification replies, limits the assistant to calendar and time requests (events, reminders, dates, times, time zones, plans that become calendar events, and how to use the app). Anything else, including medical, legal or financial advice and anything harmful or explicit, gets one polite sentence saying it can only help with the person's schedule and times, plus an example; scheduling itself is fine whatever the subject ("remind me to take my medicine at 9"). AI suggestions for one event have their own prompt: they only suggest things to bring, prepare or check, never medical, legal or financial advice. Every request, AI suggestions included, also sets Gemini's safety settings: harassment, hate speech and sexually explicit content are blocked from medium probability up, dangerous content at high only, so ordinary event titles such as a chemistry exam or a shooting range don't make requests fail. A blocked request or answer shows "I can't help with that. I can help with your events, times and plans." instead of an error code (AI suggestions show the app's own suggestions instead). Other Gemini failures and our server's general errors show "Something went wrong with that request. Please try again, or say it another way.", or "The assistant is busy right now. Please try again in a moment." when either is overloaded (the server's limits keep their own messages), never Gemini's raw reason or Google's own message; Siri speaks the same text. To report a reply, touch and hold it, or a card the assistant made (a plan, the events it added), in the chat or Quick Capture and choose Report this reply (VoiceOver offers Copy and Report this reply as actions); for a reply from Siri or a notification, or AI suggestions on an event page, Settings › AI & privacy › Report an AI reply opens the same dialog, titled "Report an AI reply" and without a quote, and the email asks the person to paste or describe the reply. The dialog offers Open Email, which copies the report and opens a new email to support@smart-schedules.com, and Copy Report, which only copies it; the report is always copied, so it can be pasted into any email app. The email quotes the reply, what its cards show (which can name the person's events, with their times and places; they can edit or delete that before sending) and its suggested replies, with the app and iOS versions, never the person's request. The developer reads every report and answers by email, usually within 3 business days; the support page (https://www.smart-schedules.com/support) and the app's Settings › About › Contact support show the same address.
 
-Siri: "Add a plan in Smart Schedules" runs without opening the app. It checks AI permission first and answers "Turn on AI data sharing in the Smart Schedules settings first." when it is missing. Long-term plans made through Siri wait in the app until the person taps Add. In demo mode Siri uses the real assistant on the sample data when AI permission was given in the app, and the offline demo rules otherwise.
+Deleting: one event is deleted at once; several events, every occurrence of a repeating event or a long-term plan wait for a red Confirm in the chat, Quick Capture and the long-pressed notification.
+
+Siri: "Add a plan in Smart Schedules" runs without opening the app; on a locked iPhone Siri asks for Face ID or the passcode first. It checks AI permission first and answers "Turn on AI data sharing in the Smart Schedules settings first." when it is missing. Long-term plans made through Siri wait in the app until the person taps Add. In demo mode Siri uses the real assistant on the sample data when AI permission was given in the app, and the offline demo rules otherwise.
 
 Provenance: events the assistant creates carry a line at the top of their Google Calendar description saying they were scheduled by the Smart Schedules assistant, with what the person asked.
 

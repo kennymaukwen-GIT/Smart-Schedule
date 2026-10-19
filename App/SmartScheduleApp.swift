@@ -157,10 +157,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // Before launch finishes, every time: also when iOS launches the app for an App Intent (AppRefresh).
         AppRefresh.registerHandler()
+        // Neither needs permission; it is asked in context (ScheduleViewModel.requestNotificationPermissionIfNeeded).
         UNUserNotificationCenter.current().delegate = self
         NotificationIDs.registerCategories()
         // Every sync that changes the cache reschedules reminders and refreshes the Live Activity.
         AppRefresh.installSyncHooks()
+        // iOS 26: a scheduled Live Activity alerts when it starts, so the reminder due then is left out; reminders
+        // follow changes. Every caller reschedules them before the Live Activity pass, so this one runs after it, and the
+        // pass waits for it (no half-rescheduled reminders when the app is suspended in the background).
+        ActivityScheduler.shared.scheduledStartsChanged = { await ReminderScheduler.shared.reschedule() }
         // iOS 18 push-to-start, off in version 1.0 (AppConstants.pushToStartEnabled): the registration would go to
         // Smart Schedule's server (App Attest), which starts each event's Live Activity on time. Off, no uploader is
         // installed, so nothing about events or push tokens can leave the iPhone.
@@ -191,9 +196,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         // nothing (AppConstants.subscriptionsEnabled), so StoreKit is not touched at all.
         if AppConstants.subscriptionsEnabled {
             Task { @MainActor in SubscriptionStore.shared.start() }
-        }
-        Task {
-            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge, .timeSensitive])
         }
         return true
     }

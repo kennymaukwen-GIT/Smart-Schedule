@@ -175,6 +175,7 @@ final class NotificationChatModel {
     }
 
     func send(_ text: String) {
+        guard !refusedWhileLocked() else { draft = text; return }
         suggestions = []
         turns.append(Turn(role: .user, text: text))
         isWorking = true
@@ -200,6 +201,7 @@ final class NotificationChatModel {
 
     func confirmDeletion() {
         guard let pending = pendingDeletion else { return }
+        guard !refusedWhileLocked() else { return } // the red button stays
         pendingDeletion = nil
         Task {
             let text = (try? await assistant.confirm(pending).text)
@@ -215,6 +217,7 @@ final class NotificationChatModel {
         guard !isWorking,
               let turn = turns.first(where: { $0.id == turnID }), turn.hasOpenPlan,
               let plan = turn.planDraft else { return }
+        guard !refusedWhileLocked() else { return }
         setPlanStatus(.adding, turnID: turnID)
         isWorking = true
         Task {
@@ -248,6 +251,7 @@ final class NotificationChatModel {
         guard !isWorking,
               let turn = turns.first(where: { $0.id == turnID }), turn.hasOpenPendingEvents,
               let batch = turn.pendingEvents else { return }
+        guard !refusedWhileLocked() else { return }
         setPendingEventsStatus(.adding, turnID: turnID)
         isWorking = true
         Task {
@@ -277,6 +281,7 @@ final class NotificationChatModel {
 
     /// "Show": the calendar becomes visible on this iPhone (the app and its reminders follow through `.accounts`).
     func showHiddenCalendar(_ turnID: Turn.ID) {
+        guard !refusedWhileLocked() else { return }
         guard let index = turns.firstIndex(where: { $0.id == turnID }),
               let hidden = turns[index].hiddenCalendar else { return }
         turns[index].hiddenCalendar = nil
@@ -323,6 +328,16 @@ final class NotificationChatModel {
     }
 
     // MARK: Private
+
+    /// The system text field asks for Face ID or the passcode itself (`.authenticationRequired`, `NotificationIDs`);
+    /// the card's own field, chips and buttons cannot, so they check here. Repeated taps don't repeat the line.
+    private func refusedWhileLocked() -> Bool {
+        guard DeviceLock.isLocked() else { return false }
+        let text = String(localized: "Unlock your iPhone first, then try again.")
+        if turns.last?.text != text { turns.append(Turn(role: .assistant, text: text)) }
+        onPreferredHeightChange?(hasPlan ? Self.planHeight : Self.expandedHeight)
+        return true
+    }
 
     private func apply(_ reply: ScheduleAssistant.Reply, hiddenCalendar: HiddenCalendar?) {
         pendingDeletion = reply.pendingDeletion

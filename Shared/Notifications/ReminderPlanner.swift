@@ -57,18 +57,27 @@ enum ReminderPlanner {
     /// - Parameters:
     ///   - reminderEvents: visible events of calendars whose notifications are on (`EventAudience.reminders`).
     ///   - briefingEvents: visible events (`EventAudience.display`).
+    ///   - liveActivityStarts: iOS 26: event ID → when its scheduled Live Activity starts
+    ///     (`ScheduledActivityStarts`); the reminder its start alert replaces is left out
+    ///     (`withoutLiveActivityDuplicates`), before the daily cap.
     static func plan(reminderEvents: [ScheduleEvent],
                      briefingEvents: [ScheduleEvent],
                      nudges: [PlanNudge],
                      preferences: AppPreferences,
                      now: Date,
-                     clock: WallClock) -> ReminderPlan {
+                     clock: WallClock,
+                     liveActivityStarts: [String: Date] = [:]) -> ReminderPlan {
         var free = pendingLimit - spareSlots
         let activeNudges = Array(nudges.filter { $0.endsOn > now }.prefix(max(0, free)))
         free -= activeNudges.count
 
+        // Left out before the cap, so the cap counts only reminders that alert and the morning briefing does not list
+        // the left-out one as held back.
         let all = preferences.localRemindersEnabled
-            ? candidates(events: reminderEvents, preferences: preferences, now: now, clock: clock)
+            ? withoutLiveActivityDuplicates(
+                candidates(events: reminderEvents, preferences: preferences, now: now, clock: clock),
+                liveActivityStarts: liveActivityStarts,
+                leadMinutes: preferences.liveActivityLeadMinutes)
             : []
         let (kept, capped) = applyCap(all, cap: preferences.dailyReminderCap, clock: clock)
 
@@ -151,6 +160,30 @@ enum ReminderPlanner {
     static func minuteOfDay(_ date: Date, clock: WallClock) -> Int {
         let parts = clock.calendar.dateComponents([.hour, .minute], from: date)
         return (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+    }
+
+    // MARK: Live Activity starts
+
+    /// How close to its event's scheduled Live Activity start a reminder counts as "at the same moment".
+    static let liveActivityAlertWindow: TimeInterval = 60
+
+    /// iOS 26 alerts when a scheduled Live Activity starts (`ActivityScheduler.startAlert`: notification sound, screen
+    /// on, the expanded island), so the reminder of the same event `leadMinutes` before its start (Settings › Dynamic
+    /// Island; by default the 30-minute one), due within a minute of that start, is left out: one alert, not two.
+    /// Kept: all-day and passive reminders (quiet hours, "Quiet": no sound, they stay in Notification Center), other
+    /// offsets, and the reminder of an event that no longer starts when its scheduled activity says (moved while the
+    /// app could not replace it: the old activity's start is then not this reminder's time). `liveActivityStarts`:
+    /// event ID → scheduled start (`ScheduledActivityStarts`); empty on iOS 18, with the island off, or before the
+    /// app could schedule one.
+    static func withoutLiveActivityDuplicates(_ reminders: [PlannedReminder],
+                                              liveActivityStarts: [String: Date],
+                                              leadMinutes: Int?) -> [PlannedReminder] {
+        guard let leadMinutes, !liveActivityStarts.isEmpty else { return reminders }
+        return reminders.filter { reminder in
+            guard !reminder.isAllDay, reminder.level != .passive, reminder.minutes == leadMinutes,
+                  let start = liveActivityStarts[reminder.event.id] else { return true }
+            return abs(reminder.fire.timeIntervalSince(start)) >= liveActivityAlertWindow
+        }
     }
 
     // MARK: Daily cap

@@ -7,6 +7,9 @@ struct AddPlanIntent: AppIntent {
     static let title: LocalizedStringResource = "Add to Smart Schedules"
     static let description = IntentDescription("Describe an event or a goal; Smart Schedules writes it to Google Calendar. Long-term plans wait in the app until you review them and tap Add.")
     static let openAppWhenRun = false
+    /// It can add, move and delete events, so a locked iPhone asks for Face ID or the passcode first (an unlocked Apple
+    /// Watch counts, as Apple documents). The default, `.alwaysAllowed`, runs it from the Lock Screen.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     @Parameter(title: "Plan", requestValueDialog: "What should I schedule?")
     var text: String

@@ -121,6 +121,13 @@ enum ActivityPlanner {
             && scheduled.hasSameDetailLine(as: planned)
     }
 
+    /// When a scheduled (iOS 26 pending) activity starts: its content is built as of its trigger, so the bar's start
+    /// (`progressStart`) is the trigger, and so is the build time (`countdownFrom`) in one scheduled by an earlier
+    /// build without it. Recorded for the reminders (`ScheduledActivityStarts`).
+    static func scheduledStart(of state: ScheduleActivityAttributes.ContentState) -> Date {
+        state.progressStart ?? state.countdownFrom
+    }
+
     /// The content of `item`'s activity as of `asOf` (`LiveActivityStateBuilder.build(for:…)`), with the start of
     /// its countdown bar (`ContentState.progressStart`): `progressStart` when given (a running activity's own,
     /// `keptProgressStart(for:shown:now:)`), otherwise the trigger, when the activity appears.
@@ -150,7 +157,9 @@ enum ActivityPlanner {
 /// (`LiveActivityManager.summonIfDue`) and after every change and background refresh (`refreshIfRunning`).
 ///
 /// • iOS 26 and later: each planned event gets an activity scheduled to start at its trigger time
-///   (`Activity.request(…, start:)`, state `.pending`), which iOS starts even with the app closed.
+///   (`Activity.request(…, start:)`, state `.pending`), which iOS starts even with the app closed. Its start alert
+///   stands in for the reminder due then: every pass records the scheduled starts (`ScheduledActivityStarts`) and,
+///   when they changed, the app reschedules the reminders (`scheduledStartsChanged`).
 /// • iOS 18: only APNs push-to-start can start an activity in the background. With `AppConstants.pushToStartEnabled`
 ///   the planned events, with their attributes and content already encoded, go to `PushToStartRegistrar` for a server
 ///   to send. Version 1.0 has it off (`ActivityPlanner.pushToStartStep`): no token is asked for and nothing leaves the
@@ -186,6 +195,10 @@ final class ActivityScheduler {
     /// "Erase all data" is under way: passes plan nothing, whatever started them (a consent change, a sync, the
     /// app returning to the front), so nothing is scheduled again from the cache that is about to go.
     private var isSuspended = false
+    /// Set by the app (AppDelegate): reschedules the reminders when the scheduled starts change
+    /// (`ScheduledActivityStarts`). The pass waits for it, so a background caller (a refresh, Siri, a notification
+    /// reply) never returns with the reminders half rescheduled. Nil in the widget extension.
+    var scheduledStartsChanged: (() async -> Void)?
 
     /// Called by "Erase all data" before it ends the activities; `resume()` once the data is gone.
     func suspend() { isSuspended = true }
@@ -274,6 +287,9 @@ final class ActivityScheduler {
             }
         }
         Self.storeStartedTriggers(started.filter { planned[$0.key] != nil })
+        // iOS 26: each scheduled activity alerts when it starts; the reminder due then is left out, so reminders follow
+        // any change here. Not while "Erase all data" runs (it removes every reminder itself).
+        if ScheduledActivityStarts.store(Self.scheduledStarts()), !isSuspended { await scheduledStartsChanged?() }
 
         switch ActivityPlanner.pushToStartStep(enabled: AppConstants.pushToStartEnabled,
                                                schedulesOnDevice: ActivityPlanner.schedulesOnDevice) {
@@ -396,6 +412,18 @@ final class ActivityScheduler {
 
     private static func storeStartedTriggers(_ started: [String: Double]) {
         UserDefaults(suiteName: AppConstants.appGroupID)?.set(started, forKey: startedKey)
+    }
+
+    /// iOS 26: event ID → when its scheduled (`.pending`) activity starts, read back from ActivityKit, so the record
+    /// holds what iOS will start, not what this pass meant to (a request from the background fails). [:] on iOS 18.
+    private static func scheduledStarts() -> [String: Date] {
+        guard #available(iOS 26.0, *) else { return [:] }
+        var starts: [String: Date] = [:]
+        for activity in ScheduleActivity.activities where activity.activityState == .pending {
+            guard let id = activity.attributes.eventID else { continue }
+            starts[id] = ActivityPlanner.scheduledStart(of: activity.content.state)
+        }
+        return starts
     }
 
     /// iOS 26 requires an alert when a scheduled activity starts: the event and how soon it begins.

@@ -41,12 +41,20 @@ enum NotificationIDs {
 
     /// Call at every launch (app) — categories are per-app, not per-process.
     static func registerCategories() {
-        // The system text field is the guaranteed input path inside an expanded notification:
-        // it works on the Lock Screen and the result is delivered to the content extension in place.
+        UNUserNotificationCenter.current().setNotificationCategories(categories())
+    }
+
+    /// The reminder and compose categories `registerCategories()` registers. Built separately so the unit tests can
+    /// read the actions' options without `UNUserNotificationCenter` (not usable in the hostless test bundle).
+    static func categories() -> Set<UNNotificationCategory> {
+        // The system text field is the guaranteed input path inside an expanded notification; the result is delivered
+        // to the content extension in place. On a locked iPhone, tapping "Type in any plan…" asks for Face ID or the
+        // passcode first (`.authenticationRequired`): a reply can add, move or delete events. Snooze only schedules a
+        // local copy, so it works while locked.
         let reply = UNTextInputNotificationAction(
             identifier: Action.reply,
             title: String(localized: "Type in any plan to add or change"),
-            options: [],
+            options: [.authenticationRequired],
             icon: UNNotificationActionIcon(systemImageName: "text.bubble"),
             textInputButtonTitle: String(localized: "Send"),
             textInputPlaceholder: String(localized: "e.g. push this to 16:00 · add gym tomorrow 07:00")
@@ -72,6 +80,6 @@ enum NotificationIDs {
             intentIdentifiers: [],
             options: []
         )
-        UNUserNotificationCenter.current().setNotificationCategories([reminder, compose])
+        return [reminder, compose]
     }
 }

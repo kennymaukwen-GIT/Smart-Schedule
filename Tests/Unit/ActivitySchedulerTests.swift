@@ -299,6 +299,16 @@ final class ActivitySchedulerTests: XCTestCase {
         XCTAssertFalse(matches(planned([meeting, lunch], zone: taipei)), "times shown in another zone")
     }
 
+    /// What the reminders are told (`ScheduledActivityStarts`): a scheduled activity starts at its trigger, also one
+    /// scheduled by an earlier build without the bar's start.
+    func testScheduledStartIsTheTrigger() {
+        let item = ActivityPlanner.Item(event: event("m", TestClock.local(2026, 10, 15, 14)), leadMinutes: 30)
+        var state = ActivityPlanner.state(for: item, events: [item.event], lastLine: nil, asOf: item.triggerAt, clock: clock)
+        XCTAssertEqual(ActivityPlanner.scheduledStart(of: state), TestClock.local(2026, 10, 15, 13, 30))
+        state.progressStart = nil
+        XCTAssertEqual(ActivityPlanner.scheduledStart(of: state), TestClock.local(2026, 10, 15, 13, 30), "from `countdownFrom`")
+    }
+
     // MARK: Push-to-start (iOS 18)
 
     /// Off (version 1.0, `AppConstants.pushToStartEnabled`): a pass asks iOS for no push-to-start token and registers,

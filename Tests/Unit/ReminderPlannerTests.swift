@@ -28,9 +28,10 @@ final class ReminderPlannerTests: XCTestCase {
     private func plan(_ events: [ScheduleEvent],
                       briefing: [ScheduleEvent]? = nil,
                       nudges: [PlanNudge] = [],
-                      preferences: AppPreferences = AppPreferences()) -> ReminderPlan {
+                      preferences: AppPreferences = AppPreferences(),
+                      liveActivityStarts: [String: Date] = [:]) -> ReminderPlan {
         ReminderPlanner.plan(reminderEvents: events, briefingEvents: briefing ?? events, nudges: nudges,
-                             preferences: preferences, now: now, clock: clock)
+                             preferences: preferences, now: now, clock: clock, liveActivityStarts: liveActivityStarts)
     }
 
     private func candidates(_ events: [ScheduleEvent], _ preferences: AppPreferences = AppPreferences()) -> [PlannedReminder] {
@@ -263,6 +264,127 @@ final class ReminderPlannerTests: XCTestCase {
         XCTAssertEqual(result.reminders.map(\.identifier), ["ss.reminder.a.0"])
         XCTAssertTrue(result.briefings.isEmpty)
         XCTAssertEqual(result.capped["2026-10-15"]?.count, 1)
+    }
+
+    // MARK: Live Activity starts (iOS 26)
+
+    /// The meeting's island is scheduled to start at 13:30, the default 30 minutes before, and alerts then (sound,
+    /// screen on, the expanded island): the 30-minute reminder is left out; the others stay.
+    func testReminderDueAsTheLiveActivityStartsIsLeftOut() {
+        let meeting = event("m", start: TestClock.local(2026, 10, 15, 14))
+        let result = plan([meeting], liveActivityStarts: ["m": TestClock.local(2026, 10, 15, 13, 30)])
+        XCTAssertEqual(result.reminders.map(\.identifier), ["ss.reminder.m.1440", "ss.reminder.m.60", "ss.reminder.m.0"])
+    }
+
+    /// iOS 18, or before the app could schedule one: nothing is left out.
+    func testWithoutAScheduledStartEveryReminderStays() {
+        let meeting = event("m", start: TestClock.local(2026, 10, 15, 14))
+        XCTAssertEqual(plan([meeting]).reminders.map(\.minutes), [1440, 60, 30, 0])
+        let all = candidates([meeting])
+        XCTAssertEqual(ReminderPlanner.withoutLiveActivityDuplicates(all, liveActivityStarts: [:], leadMinutes: 30), all)
+    }
+
+    func testOtherLeadTimesAndOtherEventsKeepTheirReminders() {
+        let meeting = event("m", start: TestClock.local(2026, 10, 15, 14))
+        let islandAt1330 = TestClock.local(2026, 10, 15, 13, 30)
+        XCTAssertEqual(plan([meeting], liveActivityStarts: ["m": TestClock.local(2026, 10, 15, 13, 45)]).reminders.count, 4,
+                       "an island scheduled with the 15-minute lead alerts at 13:45, not with the 30-minute reminder")
+        XCTAssertEqual(plan([meeting], liveActivityStarts: ["other": islandAt1330]).reminders.count, 4, "another event's island")
+        let explicit = event("m", start: TestClock.local(2026, 10, 15, 14), reminders: [31, 30, 29])
+        XCTAssertEqual(plan([explicit], liveActivityStarts: ["m": islandAt1330]).reminders.map(\.minutes), [31, 29])
+
+        // "At the same moment": less than a minute apart, either way.
+        let window = ReminderPlanner.liveActivityAlertWindow
+        XCTAssertEqual(window, 60)
+        XCTAssertEqual(plan([meeting], liveActivityStarts: ["m": islandAt1330.addingTimeInterval(window - 1)]).reminders.count, 3)
+        XCTAssertEqual(plan([meeting], liveActivityStarts: ["m": islandAt1330.addingTimeInterval(1 - window)]).reminders.count, 3)
+        XCTAssertEqual(plan([meeting], liveActivityStarts: ["m": islandAt1330.addingTimeInterval(window)]).reminders.count, 4)
+    }
+
+    /// Its offset equals the lead, so only the all-day rule keeps it (all-day events get no island).
+    func testAllDayRemindersStay() throws {
+        let day = TestClock.local(2026, 10, 16)
+        let holiday = allDay("h", "Holiday", on: day, reminders: [30])
+        let fire = try XCTUnwrap(ReminderPlanner.allDayFireDate(eventStart: day, minutes: 30, clock: clock))
+        XCTAssertEqual(plan([holiday], liveActivityStarts: ["h": fire]).reminders.count, 1)
+    }
+
+    /// Left out before the daily cap: the cap counts only reminders that alert, and the morning briefing does not
+    /// list the left-out one as held back.
+    func testLeftOutReminderDoesNotCountTowardsTheCap() {
+        var preferences = AppPreferences()
+        preferences.dailyReminderCap = 2
+        let meeting = event("m", start: TestClock.local(2026, 10, 15, 14))
+        XCTAssertEqual(plan([meeting], preferences: preferences).capped["2026-10-15"]?.map(\.identifier),
+                       ["ss.reminder.m.30"], "without an island the cap holds the 30-minute one back")
+        let result = plan([meeting], preferences: preferences,
+                          liveActivityStarts: ["m": TestClock.local(2026, 10, 15, 13, 30)])
+        XCTAssertEqual(result.reminders.map(\.identifier), ["ss.reminder.m.1440", "ss.reminder.m.60", "ss.reminder.m.0"])
+        XCTAssertNil(result.capped["2026-10-15"])
+    }
+
+    /// Moved to 14:30 while the app could not replace its scheduled island (from the reminder's long-press card, or
+    /// on Google with the app closed): the old island still alerts at 13:30, showing 14:00. The new 60-minute
+    /// reminder fires then too and is kept: it is not the island's reminder.
+    func testMovedEventKeepsItsReminders() {
+        let moved = event("m", start: TestClock.local(2026, 10, 15, 14, 30))
+        let result = plan([moved], liveActivityStarts: ["m": TestClock.local(2026, 10, 15, 13, 30)])
+        XCTAssertEqual(result.reminders.map(\.minutes), [1440, 60, 30, 0])
+        XCTAssertEqual(result.reminders.first { $0.minutes == 60 }?.fire, TestClock.local(2026, 10, 15, 13, 30))
+    }
+
+    /// Settings › Dynamic Island Off: no island alerts, so nothing is left out (whatever the record still says).
+    func testIslandOffKeepsAll() {
+        var preferences = AppPreferences()
+        preferences.liveActivityLeadMinutes = nil
+        let meeting = event("m", start: TestClock.local(2026, 10, 15, 14))
+        XCTAssertEqual(plan([meeting], preferences: preferences,
+                            liveActivityStarts: ["m": TestClock.local(2026, 10, 15, 13, 30)]).reminders.count, 4)
+    }
+
+    /// In quiet hours, or with "Quiet" urgency, the reminder arrives without sound and does not light the screen: not
+    /// a second alert, so it stays in Notification Center (hold to edit or snooze).
+    func testQuietReminderStays() throws {
+        let meeting = event("m", start: TestClock.local(2026, 10, 15, 14))
+        let starts = ["m": TestClock.local(2026, 10, 15, 13, 30)]
+        var quietHours = AppPreferences()
+        quietHours.quietHours = QuietHours(isEnabled: true, startMinute: 13 * 60, endMinute: 14 * 60)
+        let inQuietHours = plan([meeting], preferences: quietHours, liveActivityStarts: starts).reminders
+        XCTAssertEqual(inQuietHours.count, 4)
+        let thirty = try XCTUnwrap(inQuietHours.first { $0.minutes == 30 })
+        XCTAssertEqual(thirty.level, .passive)
+
+        var quiet = AppPreferences()
+        quiet.eventUrgency = .quiet
+        XCTAssertEqual(plan([meeting], preferences: quiet, liveActivityStarts: starts).reminders.count, 4)
+    }
+
+    /// Lead 15: the island starts at 13:45, with no default reminder; an explicit 15-minute one is left out.
+    func testOtherLeadTime() {
+        var preferences = AppPreferences()
+        preferences.liveActivityLeadMinutes = 15
+        let starts = ["m": TestClock.local(2026, 10, 15, 13, 45)]
+        let meeting = event("m", start: TestClock.local(2026, 10, 15, 14))
+        XCTAssertEqual(plan([meeting], preferences: preferences, liveActivityStarts: starts).reminders.map(\.minutes),
+                       [1440, 60, 30, 0])
+        let fifteen = event("m", start: TestClock.local(2026, 10, 15, 14), reminders: [15])
+        XCTAssertTrue(plan([fifteen], preferences: preferences, liveActivityStarts: starts).reminders.isEmpty)
+    }
+
+    func testScheduledActivityStartsRoundTrip() throws {
+        let suite = "test.scheduledStarts.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let start = TestClock.local(2026, 10, 15, 13, 30)
+        XCTAssertFalse(ScheduledActivityStarts.store([:], defaults: defaults), "nothing saved yet: nothing changed")
+        XCTAssertTrue(ScheduledActivityStarts.store(["m": start], defaults: defaults))
+        XCTAssertFalse(ScheduledActivityStarts.store(["m": start], defaults: defaults), "the same again: no reschedule")
+        XCTAssertEqual(ScheduledActivityStarts.load(defaults: defaults), ["m": start])
+        XCTAssertTrue(ScheduledActivityStarts.store([:], defaults: defaults), "erased")
+        XCTAssertEqual(ScheduledActivityStarts.load(defaults: defaults), [:])
+
+        XCTAssertFalse(ScheduledActivityStarts.store(["m": start], defaults: nil), "no App Group: nothing saved, no reschedule")
+        XCTAssertEqual(ScheduledActivityStarts.load(defaults: nil), [:])
     }
 
     // MARK: Briefings

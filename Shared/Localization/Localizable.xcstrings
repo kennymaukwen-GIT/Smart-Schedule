@@ -5248,6 +5248,16 @@
         }
       }
     },
+    "Unlock your iPhone first, then try again." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先解鎖 iPhone，再試一次。"
+          }
+        }
+      }
+    },
     "Upcoming event" : {
       "localizations" : {
         "zh-Hant" : {
