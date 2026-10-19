@@ -163,6 +163,70 @@ final class DeparturePlannerTests: XCTestCase {
         XCTAssertEqual(plan.travelMinutes, 90)
     }
 
+    // MARK: Google Maps link
+
+    private func queryItems(_ url: URL) -> [String: String] {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        return Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
+    }
+
+    func testTaipei101IsPercentEncodedAsUTF8() {
+        let url = DeparturePlanner.googleMapsURL(destination: "台北101", mode: .transit)
+        XCTAssertEqual(url.absoluteString,
+                       "https://www.google.com/maps/dir/?api=1&destination=%E5%8F%B0%E5%8C%97101&travelmode=transit")
+    }
+
+    func testAnApostropheAndSpacesAreEncoded() {
+        let url = DeparturePlanner.googleMapsURL(destination: "St Mary's School", mode: .driving)
+        XCTAssertEqual(url.absoluteString,
+                       "https://www.google.com/maps/dir/?api=1&destination=St%20Mary%27s%20School&travelmode=driving")
+    }
+
+    func testAmpersandAndHashCannotSplitTheLink() {
+        let url = DeparturePlanner.googleMapsURL(destination: "Smith & Sons, 12 High St #3", mode: .walking)
+        XCTAssertEqual(url.absoluteString,
+                       "https://www.google.com/maps/dir/?api=1&destination=Smith%20%26%20Sons%2C%2012%20High%20St%20%233&travelmode=walking")
+        XCTAssertNil(url.fragment)
+        XCTAssertEqual(queryItems(url), ["api": "1", "destination": "Smith & Sons, 12 High St #3", "travelmode": "walking"])
+    }
+
+    func testOtherReservedCharactersAreEncoded() {
+        let url = DeparturePlanner.googleMapsURL(destination: "C++ Café, Level 2/3? a=b; x:y @z", mode: .transit)
+        XCTAssertEqual(url.absoluteString,
+                       "https://www.google.com/maps/dir/?api=1&destination=C%2B%2B%20Caf%C3%A9%2C%20Level%202%2F3%3F%20a%3Db%3B%20x%3Ay%20%40z&travelmode=transit")
+    }
+
+    func testEveryPlaceComesBackExactly() {
+        for place in ["台北101", "St Mary's School", "Smith & Sons, 12 High St #3", "C++ Café, Level 2/3? a=b; x:y @z",
+                      "露營地 😀", "100% Gym"] {
+            let url = DeparturePlanner.googleMapsURL(destination: place, mode: .transit)
+            XCTAssertEqual(queryItems(url)["destination"], place, place)
+        }
+    }
+
+    func testEachModeIsGooglesTravelMode() {
+        XCTAssertEqual(DeparturePlanner.googleMapsURL(destination: "台北101", mode: .transit).absoluteString.hasSuffix("&travelmode=transit"), true)
+        XCTAssertEqual(DeparturePlanner.googleMapsURL(destination: "台北101", mode: .driving).absoluteString.hasSuffix("&travelmode=driving"), true)
+        XCTAssertEqual(DeparturePlanner.googleMapsURL(destination: "台北101", mode: .walking).absoluteString.hasSuffix("&travelmode=walking"), true)
+    }
+
+    func testOnlyTheDestinationIsSent() {
+        let url = DeparturePlanner.googleMapsURL(destination: "台北101", mode: .transit)
+        XCTAssertEqual(Set(queryItems(url).keys), ["api", "destination", "travelmode"], "no origin, no coordinates")
+        XCTAssertTrue(url.absoluteString.hasPrefix("https://www.google.com/maps/dir/?api=1&destination="))
+    }
+
+    func testOnlySurroundingSpaceIsTrimmed() {
+        let url = DeparturePlanner.googleMapsURL(destination: "  台北 101 \n", mode: .transit)
+        XCTAssertEqual(queryItems(url)["destination"], "台北 101")
+    }
+
+    func testAVeryLongPlaceStillMakesALink() {
+        let place = String(repeating: "台北市信義區市府路", count: 100)
+        let url = DeparturePlanner.googleMapsURL(destination: place, mode: .driving)
+        XCTAssertEqual(queryItems(url)["destination"], place)
+    }
+
     func testTravelModeRawValuesMatchGoogleMaps() {
         XCTAssertEqual(TravelMode.allCases.map(\.rawValue), ["transit", "driving", "walking"])
     }

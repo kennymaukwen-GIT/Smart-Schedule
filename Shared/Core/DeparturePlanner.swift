@@ -63,6 +63,24 @@ enum DeparturePlanner {
         plan.departAt.addingTimeInterval(-seconds(clamp(leadMinutes, to: readyLeadRange)))
     }
 
+    // MARK: Google Maps
+
+    /// What a query value keeps as it is (RFC 3986 "unreserved"). Everything else is percent-encoded as UTF-8, so a space,
+    /// & # + = ? / , ' or a Chinese place name can't split or end the destination.
+    private static let unreserved = CharacterSet(charactersIn:
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
+    /// Directions in Google Maps (the app when installed, otherwise the website) to `destination`: the text as the user
+    /// typed it or as the event's location has it, only trimmed. Never coordinates, Apple's place data or a starting
+    /// point (docs/SETTINGS.md §7.11), so there is no `origin` and Google Maps starts from where the user is.
+    /// Google's format: https://www.google.com/maps/dir/?api=1&destination=…&travelmode=…
+    static func googleMapsURL(destination: String, mode: TravelMode) -> URL {
+        let text = destination.trimmingCharacters(in: .whitespacesAndNewlines)
+        let encoded = text.addingPercentEncoding(withAllowedCharacters: unreserved) ?? ""
+        // Only unreserved ASCII and %XX escapes go in, so the string is always a valid URL.
+        return URL(string: "https://www.google.com/maps/dir/?api=1&destination=\(encoded)&travelmode=\(mode.rawValue)")!
+    }
+
     private static func clamp(_ value: Int, to range: ClosedRange<Int>) -> Int {
         min(max(value, range.lowerBound), range.upperBound)
     }
