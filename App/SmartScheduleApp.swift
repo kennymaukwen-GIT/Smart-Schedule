@@ -1,3 +1,5 @@
+// AppIntents with SwiftUI loads the overlay that declares View.onAppIntentExecution (QuickCaptureSceneRouting).
+import AppIntents
 import os
 import SwiftUI
 import UserNotifications

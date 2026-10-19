@@ -22,8 +22,9 @@ enum DeepLinkRequests {
     static let lateWriteDelay: Duration = .milliseconds(500)
 
     /// iOS 26: after the scene opened Quick Capture for a Control Center tap, the same tap's `perform()` (or its App Group
-    /// hand-off) arrives within this many seconds and is skipped once (`isSceneEcho`).
-    nonisolated static let sceneEchoWindow: TimeInterval = 10
+    /// hand-off) arriving within this many seconds is skipped once (`isSceneEcho`). As long as the hand-off lives
+    /// (`maxAge`): `perform()` can come well after the scene, for example after unlocking from the Lock Screen control.
+    nonisolated static let sceneEchoWindow: TimeInterval = 60
 
     /// Whether `url`, arriving from the Control Center intent's `perform()` or its App Group hand-off, repeats the Quick
     /// Capture the scene already opened at `sceneOpenedAt` for the same tap. Only plain `DeepLink.compose` counts: the

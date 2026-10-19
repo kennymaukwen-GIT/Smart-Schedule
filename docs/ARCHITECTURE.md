@@ -116,8 +116,8 @@ flowchart LR
   1. `OpenQuickCaptureIntent` 加上 iOS 26 才有的 `TargetContentProvidingIntent`（預設的 `contentIdentifier`，也就是型別名稱）。
   2. `RootView` 掛 `QuickCaptureSceneRouting`（`onAppIntentExecution(OpenQuickCaptureIntent.self)`）：「Your closure runs before the app comes to the foreground and before the system calls the app intent's perform() method」，在這裡呼叫 `AppRouter.openQuickCaptureFromScene()`，所以 App 出現時第一個畫面就是快速輸入。`handlesExternalEvents(preferring: [], allowing: ["*"])` 讓唯一的 scene 接所有連結和 intent，iOS 不會另開 scene。
   3. App 的 Info.plist 加 `UIApplicationSceneManifest › UIApplicationSupportsMultipleScenes = YES`：「The App Intents framework requires support for multiple scenes to dispatch app intents to your scene at launch time」。App 還是只有一個 scene。
-  4. 之後系統照樣呼叫 `perform()`：`AppRouter.handleIntentLink` 用 `DeepLinkRequests.isSceneEcho` 認出是同一次按下（10 秒內、`DeepLink.compose`），略過一次，所以使用者剛關掉的快速輸入不會又跳出來。App Group 備援（`routePending`）也走同一個檢查。動態島的連結（`onOpenURL`）不受影響。
-  5. 快速輸入可能在 App 還在背景準備時就出現，鍵盤可能叫不起來，所以 `QuickCaptureView` 在 App 第一次變成 `.active` 時再叫一次鍵盤。
+  4. 之後系統照樣呼叫 `perform()`：`AppRouter.handleIntentLink` 用 `DeepLinkRequests.isSceneEcho` 認出是同一次按下（60 秒內，和 App Group 備援的有效時間一樣；`DeepLink.compose`），略過一次，所以使用者剛關掉的快速輸入不會又跳出來。App Group 備援（`routePending`）也走同一個檢查。動態島的連結（`onOpenURL`）不受影響。
+  5. 快速輸入可能在 App 還在背景準備時就出現，那時叫不起鍵盤，所以 `QuickCaptureView` 這時先不叫，等 App 第一次變成 `.active` 才叫。
   6. iOS 18 沒有這些 API，照舊由 `perform()` 打開（主畫面會先出現一下）。三個部分少一個就會默默回到舊行為，`scripts/validate_schema.py` 第 13 項檢查三者都在。
 - **時間紀錄**：Console.app › iPhone › subsystem `com.smartschedules.app`、category `Launch`，依序記 `App init`、`didFinishLaunching`、`Scene active`、`First task`、`Open Quick Capture (from scene｜perform｜url｜pending …)`、`… skipped`、`Quick Capture on screen`。不用 debugger 就能看出是哪一條路打開、各花多久。終端機收集方式見第 7 節。
 

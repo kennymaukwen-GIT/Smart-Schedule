@@ -112,9 +112,10 @@ struct QuickCaptureView: View {
         .onAppear {
             Logger.launch.notice("Quick Capture on screen")
             // With voice, the composer brings the keyboard up itself if the mic can't start.
+            // Not while the app is still being prepared in the background: the keyboard can't come up then, and a
+            // focus that didn't take would make the write on `.active` a no-op.
             if voiceRequest == nil {
-                inputFocused = true
-                focusesWhenActive = scenePhase != .active
+                if scenePhase == .active { inputFocused = true } else { focusesWhenActive = true }
             }
             if showsPlanCard { isConversationExpanded = true }
         }

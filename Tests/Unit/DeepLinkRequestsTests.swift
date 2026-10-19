@@ -38,7 +38,7 @@ final class DeepLinkRequestsTests: XCTestCase {
     func testALaterTapIsNotAnEcho() {
         let opened = Date(timeIntervalSince1970: 1_800_000_000)
         let window = DeepLinkRequests.sceneEchoWindow
-        XCTAssertEqual(window, 10)
+        XCTAssertEqual(window, DeepLinkRequests.maxAge, "as long as the App Group hand-off lives")
         XCTAssertTrue(DeepLinkRequests.isSceneEcho(DeepLink.compose, sceneOpenedAt: opened, now: opened.addingTimeInterval(window - 0.1)))
         XCTAssertFalse(DeepLinkRequests.isSceneEcho(DeepLink.compose, sceneOpenedAt: opened, now: opened.addingTimeInterval(window)))
     }
