@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// DAY mode of Quick Capture: the hour grid of one day (DayTimelineView), swiped sideways a day at a time with no
-/// end either way. Each page scrolls its own grid to the hour that matters when it appears.
+/// DAY mode of Quick Capture: the hour grid of one day, swiped sideways a day at a time with no end either way.
 /// `focusDay` is the source of truth both ways: a swipe that comes to rest makes its day the focus day (so the
 /// header's date disc and month follow), and a new focus day (a tap in WEEK or MONTH, the assistant, the Today
 /// pill) pages here.
@@ -20,9 +19,6 @@ struct CaptureDayPager: View {
     /// The day at page 0; pages are day offsets from it.
     @State private var anchor: Date
     @State private var page: Int?
-    /// The time for the pages' red line, moved on at the start of every minute by the one loop below (outside the
-    /// lazy pages, which run no timers of their own).
-    @State private var tick: Date?
 
     init(focusDay: Date,
          now: Date = Date(),
@@ -43,14 +39,12 @@ struct CaptureDayPager: View {
     }
 
     var body: some View {
-        let current = tick.map { max($0, now) } ?? now
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 0) {
                     ForEach(CalendarPaging.dayPages, id: \.self) { offset in
                         let day = CalendarPaging.day(offset, after: anchor, calendar: calendar)
-                        DayTimelineView(day: day, events: eventsOnDay(day), now: current, hourHeight: 46,
-                                        onSelect: onSelectEvent)
+                        DayTimelineView(day: day, events: eventsOnDay(day), hourHeight: 46, onSelect: onSelectEvent)
                             .containerRelativeFrame(.horizontal)
                     }
                 }
@@ -71,9 +65,6 @@ struct CaptureDayPager: View {
                 proxy.scrollTo(target)
             }
         }
-        // The same dark card as WEEK and MONTH.
-        .background(CaptureCardBackground())
-        .clipShape(RoundedRectangle(cornerRadius: CaptureCardBackground.radius, style: .continuous))
         .overlay(alignment: .bottomTrailing) {
             CalendarStatusAccessory(showsToday: !calendar.isDate(focusDay, inSameDayAs: now),
                                     isLoading: isLoading,
@@ -83,21 +74,6 @@ struct CaptureDayPager: View {
         .onChange(of: calendar.startOfDay(for: focusDay), initial: true) { _, day in
             show(day)
             onRangeChange(CalendarPaging.dayInterval(containing: day, calendar: calendar))
-        }
-        .task { await tickEveryMinute() }
-    }
-
-    /// Moves `tick` on at the start of every minute until DAY goes away.
-    private func tickEveryMinute() async {
-        while true {
-            // A little past the tick, so the time read is inside the new minute.
-            let wait = MinuteTick.next(after: Date()).timeIntervalSinceNow + 0.05
-            do {
-                try await Task.sleep(for: .seconds(max(0.05, wait)))
-            } catch {
-                return
-            }
-            tick = Date()
         }
     }
 
