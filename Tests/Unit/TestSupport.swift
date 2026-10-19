@@ -61,7 +61,7 @@ enum Fixtures {
     /// The other calls of the same turn (`also_calls`, for example the create_events next to a plan_departure), each
     /// re-serialized like `call`. Empty when the fixture has none.
     static func alsoCalls(_ name: String) throws -> [(name: String, args: Data)] {
-        let calls = root(name)["also_calls"] as? [[String: Any]] ?? []
+        let calls = try root(name)["also_calls"] as? [[String: Any]] ?? []
         return try calls.map { call in
             let function = try XCTUnwrap(call["name"] as? String, name)
             let args = try XCTUnwrap(call["args"] as? [String: Any], name)
