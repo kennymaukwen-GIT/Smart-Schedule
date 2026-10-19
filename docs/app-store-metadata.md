@@ -392,7 +392,9 @@ Apple 的定義（[App privacy details](https://developer.apple.com/app-store/ap
 
 ## 6. 年齡分級問卷：18+
 
-**理由：** Gemini API 的條款要求使用者年滿 18 歲，也不允許把 API 用在「directed towards or likely to be accessed by individuals under the age of 18」的服務裡（[Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms)；這個沙盒連不到 Google 的網站，文字來自搜尋摘錄，請再確認一次）。
+**理由：** Gemini API 的條款要求使用者年滿 18 歲，也不允許把 API 用在「directed towards or likely to be accessed by individuals under the age of 18」的服務裡（[Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms)，「Age Requirements」，Effective March 23, 2026；2026-10-19 從完整的第三方備份逐字核對過，官網在這個沙盒打不開，老闆用瀏覽器再看一次）。付費方案不改變這條；Vertex AI（現在叫 Gemini Enterprise Agent Platform）和 Firebase AI Logic 也一樣：Google Cloud Service Specific Terms §20(d)「Age Restrictions」（2026-10-12 版，2026-10-19 直接核對），§20(f) 寫明 Google 只要懷疑違規就能立刻停用。所以只要用 Google 的 AI，App 就只能給 18 歲以上。
+
+**2026-10-19 老闆決定：** 1.0 維持 18+、照計畫上架；開放 13–17 歲要改用 Google 以外的 AI（例如 Anthropic 的使用政策允許有保護措施的未成年產品），連同英國 Children's Code 等義務，最快 1.1 再評估。「我已滿 18 歲」確認和 Apple 的 Declared Age Range 年齡檢查**這次不做**（老闆：忽略）。已知風險：美國德州 SB 2420 從 2026-06-04 起適用德州的新 Apple 帳號，Apple 的說明是法律有要求的地方，18+ 的 App 也要用 Declared Age Range（[Age assurance](https://developer.apple.com/support/age-assurance/)）；App 目前沒有任何年齡檢查，所以年齡分級問卷的「Age Assurance / 年齡確認」照實選「否」。之後加上年齡檢查時，這一題要改成「是」。
 Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級高，就必須用「Override to Higher Age Rating」調到符合的分級
 （[Set an app age rating](https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating)）。
 
@@ -402,7 +404,7 @@ Apple 說明：如果你的條款或 EULA 的最低年齡比算出來的分級�
 | 步驟 | 問題 | 回答 | 原因 |
 |---|---|---|---|
 | In-App Controls | Parental Controls | 不勾 | 沒有家長控制功能 |
-| | Age Assurance | 不勾 | 沒有年齡驗證機制 |
+| | Age Assurance | **否**（不勾） | App 沒有任何年齡檢查（2026-10-19 決定這次不做，見上面） |
 | Capabilities | Unrestricted Web Access | **No** | App 裡沒有瀏覽器；連結（Meet、Google 日曆，以及出發提醒的 Google 地圖）交給 Safari 或其他 App 打開；Google 登入用系統的登入視窗（ASWebAuthenticationSession） |
 | | User-Generated Content | **No** | 內容不會分享給其他使用者 |
 | | Messaging and Chat | **No** | 對話對象是助理，不是其他人 |
