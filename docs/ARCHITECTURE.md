@@ -101,13 +101,13 @@ flowchart LR
 - 控制項只能顯示 SF Symbol 或自訂 symbol（`.symbolset`）。要和 App icon 的時鐘一模一樣，得把它匯出成 custom symbol。
 - 同一個控制項可以放進控制中心、鎖定畫面左下和右下的按鈕位，以及 Action Button。
 - 控制項的 intent 不啟動 Live Activity。
-- **為什麼是 `OpenIntent`**：第一版用普通 `AppIntent` 加 `openAppWhenRun = true`（iOS 26 再加 `supportedModes = .foreground(.immediate)`）。實機 iOS 26 上按下後 App 打開了，卻停在主畫面。Apple 文件寫明：`openAppWhenRun` 在 iOS 26 SDK 棄用，「Setting this property to `true` generates an error if the app intent runs in an app extension」；而「For WidgetKit controls in a Widget extension, the system runs the control's app intent from the extension in the background」。錄影看到 App 打開但沒有快速輸入，符合 intent 在 widget extension 出錯、`perform()` 沒有執行、連結從沒寫出去。`OpenIntent` 由系統自動設成在前景執行（「The system automatically brings your app to the foreground to run this app intent」），不再宣告 `openAppWhenRun` 和 `supportedModes`。
+- **為什麼是 `OpenIntent`**：第一版用普通 `AppIntent` 加 `openAppWhenRun = true`（iOS 26 再加 `supportedModes = .foreground(.immediate)`）。實機 iOS 26 上，用 Xcode 的 Run 裝的時候正常；改用 `xcodebuild` 加 `xcrun devicectl device install app` 安裝（沒有 debugger，和 App Store 安裝一樣）之後，按下去控制中心停約 3.5 秒、App 閃一下黑畫面又回到主畫面，再按一次 App 打開了卻停在主畫面。Apple 文件寫明：`openAppWhenRun` 在 iOS 26 SDK 棄用，「Setting this property to `true` generates an error if the app intent runs in an app extension」；而「For WidgetKit controls in a Widget extension, the system runs the control's app intent from the extension in the background」。Apple 也說系統「might run it from your app if the app is already running」，而 debugger 讓 App 不會被暫停。最可能的原因：Xcode 跑的時候 App 一直活著，intent 在 App 裡執行；沒有 debugger 時 App 沒在跑，intent 改在 widget extension 執行、出錯，`perform()` 沒有執行，連結從沒寫出去（還沒用 Console 的 `QuickCapture` 那一行在實機證實）。`OpenIntent` 由系統自動設成在前景執行（「The system automatically brings your app to the foreground to run this app intent」），不再宣告 `openAppWhenRun` 和 `supportedModes`。
 - **App process（正常路徑）**：App 啟動時 `DeepLinkRequests.install` 裝好的 handler 直接呼叫 `AppRouter.handle(DeepLink.compose)`。handler 在 `SmartScheduleApp.init` 裝好；萬一 intent 比它早執行，`open` 會走下面的備援，冷啟動的 `.task` 一樣取得到。
 - **widget extension（備援）**：沒有 handler，所以：
   1. `DeepLinkRequests.open` 把連結和時間寫進 App Group（`deepLink.pendingURL`／`pendingDate`，60 秒內有效），`synchronize()` 後發 Darwin notification `SharedChange.deepLink`。
   2. App 在三個時機呼叫 `DeepLinkRequests.routePending`：`AppDelegate` 收到 `.deepLink` 而且不在背景時；scene 變成 `.active` 時，當下沒有的話 `lateWriteDelay`（0.5 秒）後再看一次；冷啟動 `RootView` 的 `.task` 一開始。寫入比 App 到前景早或晚都接得到。
   3. `takePending` 讀到就刪掉，所以三個時機只有第一個打開快速輸入，不會打開兩次。
-- Siri／捷徑的「Open Quick Capture in Smart Schedules」是同一個 intent（`SmartScheduleShortcuts`），`target` 預設 `.quickCapture`，不會多問一個問題。
+- `target` 在 `init()` 裡設成 `.quickCapture`，`@Parameter` 也有同樣的預設值：控制項存下的 action 一定帶著它（還要使用者回答參數的 intent 從控制項不會執行）。Siri／捷徑的「Open Quick Capture in Smart Schedules」是同一個 intent（`SmartScheduleShortcuts`），不會多問一個問題（這句話目前只有英文，Siri 要設成英文）。
 - 診斷：`perform()` 在 Console.app 記一行（subsystem `com.smartschedules.app`，category `QuickCapture`）：在哪個 process 執行（`com.smartschedules.app` 或 `com.smartschedules.app.widgets`），iOS 26 另記 `systemContext.currentMode`。
 - **要在實機上驗證**（第 7 節）：按下後停在快速輸入、鍵盤已叫出，動態島沒有新的 activity。
 
@@ -215,7 +215,7 @@ sequenceDiagram
 
 ## 7. 只能在實機上驗證的項目
 
-- [ ] 控制中心 → `OpenQuickCaptureIntent` 打開快速輸入、鍵盤已叫出（已鎖定和未鎖定都要測），動態島沒有新的 activity。iOS 18 和 iOS 26 各測三種狀態：App 沒在執行（從 App 切換器滑掉）、App 在背景、App 開著（在 App 裡拉下控制中心再按）。若仍停在主畫面：在 Console.app 看 `QuickCapture` 那一行是哪個 process、哪個 mode（沒有這一行代表 `perform()` 沒有執行）；再於 60 秒內切出去再回到 App，若這時才出現快速輸入，代表連結有寫入但沒收到 `.deepLink`。也從 Siri 說「Open Quick Capture in Smart Schedules」測一次。
+- [ ] 控制中心 → `OpenQuickCaptureIntent` 打開快速輸入、鍵盤已叫出（已鎖定和未鎖定都要測），動態島沒有新的 activity。**一定要用沒有 debugger 的 build 測**：`xcodebuild` 加 `xcrun devicectl device install app`、TestFlight，或在 Xcode 按 Run 之後按 Stop 再從主畫面打開；按著 Run 測不出問題（App 一直活著）。換 intent 的型別之後，先把控制中心裡的按鈕移除再加回來。iOS 18 和 iOS 26 各測三種狀態：App 沒在執行（從 App 切換器滑掉）、App 在背景、App 開著（在 App 裡拉下控制中心再按）。若仍停在主畫面：在 Console.app 看 `QuickCapture` 那一行是哪個 process、哪個 mode（沒有這一行代表 `perform()` 沒有執行）；再於 60 秒內切出去再回到 App，若這時才出現快速輸入，代表連結有寫入但沒收到 `.deepLink`。也從 Siri 說「Open Quick Capture in Smart Schedules」測一次。
 - [ ] iOS 26：App 關著時，`Activity.request(…, start:)` 排程的 activity 在提前量準時出現（1.0 的 build 沒有 `aps-environment`，也要準時出現）；同時排 10／20／50 筆，記下第幾筆丟出 `ActivityAuthorizationError`，減 2 回填 `ActivityPlanner.maxPending`；排程後重開機，pending 是否存活。
 - [ ] iOS 18（1.0 沒有 push-to-start）：提前時間內或行程進行中打開 App，即時動態馬上出現，關掉 App 後還在；App 一直關著時不會出現。設定 › 通知 › 動態島 的說明出現 iOS 18 那一句（「On iOS 18, an event appears only if you open Smart Schedules…」）。AI 同意畫面沒有伺服器那一段。
 - [ ] 上傳 build 後 App Store Connect 有沒有寄 ITMS-90078 之類的推播 entitlement 警告（二進位檔裡還有關掉的 push-to-start 程式碼）：警告不是退件，記下來就好（請在畫面上確認）。

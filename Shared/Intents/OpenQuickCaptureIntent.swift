@@ -9,8 +9,9 @@ import os
 /// the app on a given screen: the system brings the app to the front and runs `perform()` there, where the handler
 /// the app installs at launch (`DeepLinkRequests.install`) opens Quick Capture at once. Compiled into both the app and
 /// the widget extension, which the same page requires. No `openAppWhenRun` (deprecated in the iOS 26 SDK): set to
-/// `true` it is an error when the intent runs in an app extension, and on iOS 26 a control's intent ran in the
-/// widget extension, so `perform()` never ran and the app opened on its main screen. Should `perform()` still run in
+/// `true` it is an error when the intent runs in an app extension. The earlier plain intent most likely ran in the
+/// widget extension whenever the app was not already running (installed without Xcode's debugger keeping it alive),
+/// failed there before `perform()`, and the app opened on its main screen. Should `perform()` still run in
 /// the widget extension, the link waits in the App Group and the app opens it when it comes forward
 /// (`DeepLinkRequests`). Nothing here starts a Live Activity: the Dynamic Island shows only events about to start.
 struct OpenQuickCaptureIntent: OpenIntent {
@@ -21,10 +22,10 @@ struct OpenQuickCaptureIntent: OpenIntent {
     @Parameter(title: "Screen", default: .quickCapture)
     var target: QuickCaptureScreen
 
-    init() {}
-
-    init(target: QuickCaptureScreen) {
-        self.target = target
+    /// The control's action: the target is set here as well as by the parameter's default, so the action the
+    /// control saves always carries it (an intent waiting for a value never runs from a control).
+    init() {
+        self.target = .quickCapture
     }
 
     @MainActor
