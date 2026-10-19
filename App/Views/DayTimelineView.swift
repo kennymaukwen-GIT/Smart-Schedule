@@ -12,8 +12,13 @@ import SwiftUI
 ///   that overlap sit side by side in equal columns (`DayTimelineLayout.slots`); events from the evening before or
 ///   running past midnight are cut at the day's edges. Past events are dimmed.
 /// - All-day events, and timed ones lasting through the whole day, are chips above the grid (two, then "+N").
-/// - Today, a red line marks the time. It moves on with `MinuteTick`, not a `TimelineView` (the drawer froze with
+/// - Today, a red line marks the time `now`. CaptureDayPager moves it on once a minute with its one `MinuteTick`
+///   loop, outside the lazy pages: no page runs a timer of its own, and no `TimelineView` (the drawer froze with
 ///   nested ones: Shared/Core/MinuteTick.swift, CalendarDrawer.tickEveryMinute).
+/// - Each page sets its scroll position once per day it shows, when its height is first known; later height changes
+///   (the keyboard, the conversation's handle) leave the grid where it is. Quick Capture stopped opening after this
+///   view arrived (2026-10-18), and a page re-scrolling on every height change inside the lazy day pager was one of
+///   the suspects.
 struct DayTimelineView: View {
     let day: Date
     let events: [ScheduleEvent]
@@ -22,13 +27,13 @@ struct DayTimelineView: View {
     var onSelect: (ScheduleEvent) -> Void = { _ in }
 
     private let calendar = WallClock().calendar
-    /// Moved on at the start of every minute while this page shows today.
-    @State private var tick: Date?
     /// This grid's own offset. A `ScrollViewReader` here could also move the pager around the page (its
     /// `scrollTo` lines the target up in every enclosing scroll view), so a page appearing mid-swipe would pull the
     /// pager to itself; a `ScrollPosition` moves only this scroll view. `isPositionedByUser` says it was scrolled
     /// by hand, after which nothing moves it until the page shows another day.
     @State private var position = ScrollPosition(edge: .top)
+    /// The day this page last put its opening hour on top for: once per day shown.
+    @State private var positionedDay: Date?
     /// The grid's visible height, so a late opening hour stops at 24:00 instead of scrolling past it.
     @State private var viewportHeight: CGFloat = 0
     /// The whole page: caps the expanded all-day strip and tells narrow columns.
@@ -36,7 +41,7 @@ struct DayTimelineView: View {
 
     var body: some View {
         let interval = CalendarPaging.dayInterval(containing: day, calendar: calendar)
-        let current = currentNow
+        let current = now
         let isToday = calendar.isDate(day, inSameDayAs: current)
         let allDay = events.filter { Self.goesAboveGrid($0, on: interval) }
         let timed = events.filter { !Self.goesAboveGrid($0, on: interval) }
@@ -114,16 +119,21 @@ struct DayTimelineView: View {
                 proxy.size.height
             } action: { height in
                 viewportHeight = height
-                // First layout of a page the lazy pager has just made, the keyboard or the conversation's handle:
-                // the opening hour stays on top until the grid is scrolled by hand.
-                guard !position.isPositionedByUser else { return }
+                // Once per day shown: the first layout with a height puts the opening hour on top. Later heights
+                // (the keyboard, the conversation's handle) leave the grid where it is.
+                guard height > 0, positionedDay != interval.start, !position.isPositionedByUser else { return }
+                positionedDay = interval.start
                 scroll(to: opening, viewport: height, contentHeight: contentHeight)
             }
             .onAppear {
+                // Only if the height callback has not placed it yet; refined by it once the height is known.
+                guard positionedDay != interval.start else { return }
                 scroll(to: opening, viewport: viewportHeight, contentHeight: contentHeight)
+                if viewportHeight > 0 { positionedDay = interval.start }
             }
             .onChange(of: interval.start) {
                 // The pager re-anchored, so this page now shows another day: start over from its opening hour.
+                positionedDay = viewportHeight > 0 ? interval.start : nil
                 scroll(to: opening, viewport: viewportHeight, contentHeight: contentHeight)
             }
             .onChange(of: firstStart) {
@@ -140,14 +150,6 @@ struct DayTimelineView: View {
         } action: { size in
             pageSize = size
         }
-        .task(id: isToday) {
-            if isToday { await tickEveryMinute() }
-        }
-    }
-
-    private var currentNow: Date {
-        guard let tick, tick > now else { return now }
-        return tick
     }
 
     /// All-day events, and timed ones lasting through the whole day (the middle days of a trip, or exactly
@@ -191,20 +193,6 @@ struct DayTimelineView: View {
         }
         if event.isWaitingToSync { parts.append(String(localized: "Waiting to sync")) }
         return parts.joined(separator: ", ")
-    }
-
-    /// Moves `tick` on at the start of every minute until the page goes away or stops showing today.
-    private func tickEveryMinute() async {
-        while true {
-            // A little past the tick, so the time read is inside the new minute.
-            let wait = MinuteTick.next(after: Date()).timeIntervalSinceNow + 0.05
-            do {
-                try await Task.sleep(for: .seconds(max(0.05, wait)))
-            } catch {
-                return
-            }
-            tick = Date()
-        }
     }
 }
 

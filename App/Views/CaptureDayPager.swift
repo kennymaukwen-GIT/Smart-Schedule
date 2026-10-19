@@ -20,6 +20,9 @@ struct CaptureDayPager: View {
     /// The day at page 0; pages are day offsets from it.
     @State private var anchor: Date
     @State private var page: Int?
+    /// The time for the pages' red line, moved on at the start of every minute by the one loop below (outside the
+    /// lazy pages, which run no timers of their own).
+    @State private var tick: Date?
 
     init(focusDay: Date,
          now: Date = Date(),
@@ -40,12 +43,13 @@ struct CaptureDayPager: View {
     }
 
     var body: some View {
+        let current = tick.map { max($0, now) } ?? now
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 0) {
                     ForEach(CalendarPaging.dayPages, id: \.self) { offset in
                         let day = CalendarPaging.day(offset, after: anchor, calendar: calendar)
-                        DayTimelineView(day: day, events: eventsOnDay(day), now: now, hourHeight: 46,
+                        DayTimelineView(day: day, events: eventsOnDay(day), now: current, hourHeight: 46,
                                         onSelect: onSelectEvent)
                             .containerRelativeFrame(.horizontal)
                     }
@@ -79,6 +83,21 @@ struct CaptureDayPager: View {
         .onChange(of: calendar.startOfDay(for: focusDay), initial: true) { _, day in
             show(day)
             onRangeChange(CalendarPaging.dayInterval(containing: day, calendar: calendar))
+        }
+        .task { await tickEveryMinute() }
+    }
+
+    /// Moves `tick` on at the start of every minute until DAY goes away.
+    private func tickEveryMinute() async {
+        while true {
+            // A little past the tick, so the time read is inside the new minute.
+            let wait = MinuteTick.next(after: Date()).timeIntervalSinceNow + 0.05
+            do {
+                try await Task.sleep(for: .seconds(max(0.05, wait)))
+            } catch {
+                return
+            }
+            tick = Date()
         }
     }
 
