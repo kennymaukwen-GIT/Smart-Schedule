@@ -1,6 +1,8 @@
 /* zh-Hant translations of App/Info.plist strings (the English text lives in project.yml). Voice input (the mic
-   button) asks for these two on its first tap; speech is recognised on the iPhone only. Only the app's Info.plist
-   declares them, so the extensions, which share this folder, never use them. This folder also makes XcodeGen list
-   zh-Hant in the project's knownRegions, so keep the file. */
+   button) asks for the first two on its first tap; speech is recognised on the iPhone only. Departure reminders
+   「該出發了」 ask for the location (When In Use) the first time the user asks when to leave or how long a trip takes.
+   Only the app's Info.plist declares them, so the extensions, which share this folder, never use them. This folder
+   also makes XcodeGen list zh-Hant in the project's knownRegions, so keep the file. */
 "NSMicrophoneUsageDescription" = "點麥克風就能用說的輸入計畫，不用打字。語音會在這支 iPhone 上轉成文字，不會錄音存檔，也不會傳送到任何地方。";
 "NSSpeechRecognitionUsageDescription" = "你說的話會在這支 iPhone 上轉成文字，讓你用說的輸入計畫。語音不會錄音存檔，也不會傳送到任何地方。";
+"NSLocationWhenInUseUsageDescription" = "當你問什麼時候該出發、去某地要多久，或告訴助理你要在什麼時間到哪裡時，Smart Schedules 會用你的位置，透過 Apple 地圖估算交通時間。你的位置只會傳給 Apple 地圖，不會被保存。";

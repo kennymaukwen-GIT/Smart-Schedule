@@ -795,6 +795,73 @@ def lock_screen_checks() -> None:
         print(f"✓ AddPlanIntent asks a locked iPhone to unlock first (authenticationPolicy = .{match.group(1)})")
 
 
+
+# ---------- Departure reminders: location When In Use, in the app only ----------
+
+LOCATION_KEY = "NSLocationWhenInUseUsageDescription"
+ALWAYS_LOCATION_KEYS = ("NSLocationAlwaysAndWhenInUseUsageDescription", "NSLocationAlwaysUsageDescription")
+LOCATION_IMPORT = re.compile(r"^\s*(?:@preconcurrency\s+)?import\s+(?:CoreLocation|CoreLocationUI|MapKit)\b", re.M)
+LOCATION_MANAGER = re.compile(r"\bCLLocationManager\s*\(")
+LOCATION_DIR = "App/Departure"
+BACKGROUND_LOCATION = re.compile(r"\b(?:requestAlwaysAuthorization|allowsBackgroundLocationUpdates|startUpdatingLocation"
+                                 r"|startMonitoringSignificantLocationChanges|startMonitoringVisits"
+                                 r"|CLBackgroundActivitySession|CLMonitor|liveUpdates)\b")
+
+
+def location_checks() -> None:
+    """Check 14: departure reminders 「該出發了」 (docs/SETTINGS.md §7.11) use the location only when the user asks, in
+    the app in the foreground: When In Use permission, one fix at a time, nothing in the background. Core Location and
+    MapKit stay in the app target (App/), so the extensions and the pure rules in Shared/Departure never get them, and
+    only App/Departure creates a location manager. Comments are ignored."""
+    before = len(errors)
+    for directory in SWIFT_DIRS:
+        for path in sorted((ROOT / directory).rglob("*.swift")):
+            relative = path.relative_to(ROOT)
+            code = re.sub(r"//.*", "", path.read_text(encoding="utf-8"))
+            if LOCATION_IMPORT.search(code) and relative.parts[0] != "App":
+                errors.append(f"{relative}: imports Core Location or MapKit outside App/ (the extensions have no "
+                              "location; Shared/Departure keeps the rules pure behind protocols)")
+            if LOCATION_MANAGER.search(code) and relative.parts[:2] != tuple(LOCATION_DIR.split("/")):
+                errors.append(f"{relative}: creates a CLLocationManager outside {LOCATION_DIR} (DeviceLocation is the "
+                              "only place that asks for the location)")
+            for match in sorted(set(BACKGROUND_LOCATION.findall(code))):
+                errors.append(f"{relative}: {match} (departure reminders take one fix while the app is open, never "
+                              "continuous or background location)")
+
+    project = re.sub(r"(^|\s)#.*", r"\1", (ROOT / "project.yml").read_text(encoding="utf-8"))
+    app = target_block(project, APP_TARGET) or ""
+    match = re.search(rf"^\s+{LOCATION_KEY}:\s*(.+)$", app, re.M)
+    if not match:
+        errors.append(f"project.yml: target {APP_TARGET} needs {LOCATION_KEY} (asked the first time the user asks "
+                      "when to leave)")
+    elif "Apple Maps" not in match.group(1) or "not saved" not in match.group(1):
+        errors.append(f"project.yml: {LOCATION_KEY} must say the location goes only to Apple Maps and is not saved")
+    for key in ALWAYS_LOCATION_KEYS:
+        if key in project:
+            errors.append(f"project.yml: {key} declared; departure reminders use When In Use only")
+    modes = re.search(r"UIBackgroundModes:\s*\[([^\]]*)\]", app)
+    if modes and "location" in modes.group(1):
+        errors.append("project.yml: UIBackgroundModes has location; departure reminders never use it")
+    for name in EXTENSION_TARGETS:
+        block = target_block(project, name)
+        if block is not None and "NSLocation" in block:
+            errors.append(f"project.yml: {name} declares a location usage description, but the extensions have no "
+                          "location")
+    for path in STRINGS_FILES:
+        if path.name != "InfoPlist.strings":
+            continue
+        text = re.sub(r"/\*.*?\*/", "", path.read_text(encoding="utf-8"), flags=re.S)
+        found = re.search(rf'^"{LOCATION_KEY}"\s*=\s*"(.+)";$', text, re.M)
+        if not found:
+            errors.append(f"{path.relative_to(ROOT)}: {LOCATION_KEY} is missing (project.yml declares it in English)")
+        elif "Apple 地圖" not in found.group(1) or "不會被保存" not in found.group(1):
+            errors.append(f"{path.relative_to(ROOT)}: {LOCATION_KEY} must say the location goes only to Apple 地圖 "
+                          "and 不會被保存")
+    if len(errors) == before:
+        print(f"✓ Location for departure reminders: {LOCATION_KEY} only (en + zh-Hant), app target only, no Always key "
+              f"or background location; Core Location and MapKit only in App/, the location manager in {LOCATION_DIR}")
+
+
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
     by_name = {}
@@ -858,6 +925,7 @@ def main() -> int:
     notification_extension_checks()
     background_task_checks()
     lock_screen_checks()
+    location_checks()
 
     if errors:
         print("\n".join(f"✗ {e}" for e in errors), file=sys.stderr)
