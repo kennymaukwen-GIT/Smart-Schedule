@@ -106,7 +106,7 @@ Verification Center 的「Prepare for verification」在品牌**驗證並發佈*
 
 1. **Data access › Add or remove scopes**：勾 `openid`、`.../auth/userinfo.email`、`.../auth/calendar.events`、`.../auth/calendar.calendarlist.readonly`。清單裡找不到 Calendar 的 scope，代表 Calendar API 還沒啟用（APIs & Services › Library），或直接貼進「Manually add scopes」。不要加第 1 節列為「沒有要求」的 scope。
 2. 確認分類：2026-10-18 的控制台把 `calendar.calendarlist.readonly` 放在 **Your non-sensitive scopes**（和 `openid`、`userinfo.email` 一起），**Your sensitive scopes** 只有 `calendar.events`。以控制台顯示的為準。
-3. 「How will the scopes be used?」只有一個欄位，上限 1,000 字元：貼第 4.5 節（只講 `calendar.events`，分三段回答欄位的三個問題，含 Limited Use 聲明，994 字元）。`calendar.calendarlist.readonly` 又被列為敏感時，改貼 4.4 節的合併版（998 字元）。4.2、4.3 節的長版留著回覆審查員的提問。影片欄位貼 YouTube 連結。
+3. 「How will the scopes be used?」只有一個欄位，上限 1,000 字元：貼第 4.5 節（只講 `calendar.events`，分三段回答欄位的三個問題，含 Limited Use 聲明，984 字元）。`calendar.calendarlist.readonly` 又被列為敏感時，改貼 4.4 節的合併版（998 字元）。4.2、4.3 節的長版留著回覆審查員的提問。影片欄位貼 YouTube 連結。
 4. Save。
 
 ### 3.5 Audience：發佈到 In production
@@ -178,16 +178,16 @@ calendar.calendarlist.readonly: calendarList.list only, to list the user's calen
 Sync is direct between iPhone and Google. Only with in-app consent: limited event details (no account emails) pass through our server (not stored) to the paid Gemini API. Departure reminders send an event's place and start time to Apple's MapKit, its place to Google Maps on tap. Reminders and Live Activities are made on the iPhone; our server stores no calendar data. No ads, no sale, no AI training.
 ```
 
-### 4.5 只有 `calendar.events` 是敏感 scope 時（Data access 的欄位，994 字元）
+### 4.5 只有 `calendar.events` 是敏感 scope 時（Data access 的欄位，984 字元）
 
 照 Google 欄位下的三個問題分段回答：為什麼需要、怎麼用、為什麼更窄的 scope 不夠（2026-10-19 老闆要求精準回答問題）。
 
 ```text
-Why we need it: Smart Schedules is a Google Calendar app for iPhone. Its core features read and write the user's events: month, week and day views, event reminders and Live Activities, and creating, editing and deleting events, by hand or via the in-app AI assistant.
+Why we need calendar.events: Smart Schedules is a Google Calendar app for iPhone. Viewing and editing events on all of the user's calendars, including shared calendars, is the app's core function.
 
-How we use it: The app calls the Calendar API directly from the iPhone. Tokens stay on the iPhone; our server never receives them or stores calendar data. Events change only at the user's request. Only if the user opts in, limited event details pass through our server, unstored, to the paid Gemini API to answer the request, never used to train AI models. We comply with the Google API Services User Data Policy, including the Limited Use requirements.
+How we will use it: We read events to show month, week and day views and to time reminders and Live Activities. We create, change and delete events only when the user does so by hand or asks the in-app AI assistant. The iPhone calls Google directly; our server never receives tokens or stores calendar data. Only if the user opts in, limited event details pass through our server, unstored, to the paid Gemini API, never used to train AI models. We comply with the Google API Services User Data Policy, including Limited Use.
 
-Why narrower scopes don't work: calendar.readonly and calendar.events.readonly cannot create or change events; calendar.events.owned excludes calendars shared with the user; calendar.app.created covers only calendars the app creates; free/busy scopes lack event details.
+Why more limited scopes aren't sufficient: calendar.events.readonly cannot create or change events; calendar.events.owned excludes calendars shared with the user; calendar.app.created covers only calendars the app creates; free/busy scopes lack event details.
 ```
 
 ### 4.6 `openid`、`email`（非敏感，表單通常不問；審查員問到時用）
