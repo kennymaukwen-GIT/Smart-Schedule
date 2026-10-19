@@ -7,11 +7,13 @@ enum AppRefresh {
     /// "Not before": iOS picks the actual time.
     static let earliestInterval: TimeInterval = 15 * 60
 
-    /// Registers the handler for `AppConstants.backgroundRefreshTaskID`. Call it once, from
+    /// Registers the handler for `AppConstants.backgroundRefreshTaskID`. Call it once, first thing in
     /// `application(_:didFinishLaunchingWithOptions:)`: BGTaskScheduler wants every launch handler registered before
-    /// launch finishes and stops the app on a second registration. Not SwiftUI's `.backgroundTask(.appRefresh)`, which
-    /// registers it with the scene: when iOS launched the app to run the Control Center button's intent (no scene
-    /// yet), the app crashed as it opened (the same report in Apple's developer forums, thread 779354).
+    /// launch finishes and stops the app on a second registration. Not SwiftUI's `.backgroundTask(.appRefresh)`: Apple
+    /// DTS confirms SwiftUI can register it after launch has finished, which throws "All launch handlers must be
+    /// registered before application finishes launching" (developer forums 775182; 775497 with `@Environment(\.scenePhase)`
+    /// on the App, as here), seen when Control Center buttons or Shortcuts launch a swiped-away app. Most likely why the
+    /// app crashed as the Control Center button opened it (no crash log read yet); DTS's workaround is this one.
     static func registerHandler() {
         _ = BGTaskScheduler.shared.register(forTaskWithIdentifier: AppConstants.backgroundRefreshTaskID,
                                             using: nil) { task in

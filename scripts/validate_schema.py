@@ -37,9 +37,10 @@
     time phrase in its title, no reminder_minutes (the app gives an item created for later the same day a reminder
     10 minutes before and one at the start, ReminderPolicy.sameDayMinutes) and no end.
 
-11. Background refresh is registered with BGTaskScheduler in AppDelegate's didFinishLaunching (AppRefresh.registerHandler),
-    once, never with SwiftUI's .backgroundTask scene modifier: when iOS launched the app to run the Control Center
-    button's App Intent, the scene-registered handler made the app crash as it opened (owner's iPhone, 2026-10-19).
+11. Background refresh is registered with BGTaskScheduler once, as the first statement of AppDelegate's didFinishLaunching
+    (AppRefresh.registerHandler), for the one identifier in BGTaskSchedulerPermittedIdentifiers, never with SwiftUI's
+    .backgroundTask: Apple DTS confirms SwiftUI can register it after launch has finished (developer forums 775182), most
+    likely why the app crashed when the Control Center button launched it (owner's iPhone, 2026-10-19).
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -733,27 +734,42 @@ def notification_extension_checks() -> None:
 
 
 def background_task_checks() -> None:
-    """Check 11: BGTaskScheduler wants every launch handler registered before launch finishes. SwiftUI's
-    `.backgroundTask` registers it with the scene, which crashed the app when iOS launched it for an App Intent."""
-    registrations = 0
+    """Check 11: BGTaskScheduler wants every launch handler registered before launch finishes, once, for an identifier
+    in BGTaskSchedulerPermittedIdentifiers. SwiftUI's `.backgroundTask` can register it too late (Apple DTS, developer
+    forums 775182), which most likely crashed the app when the Control Center button launched it."""
+    before = len(errors)
+    registrations = calls = 0
     for directory in SWIFT_DIRS:
         for path in sorted((ROOT / directory).rglob("*.swift")):
             relative = path.relative_to(ROOT)
             code = re.sub(r"//.*", "", path.read_text(encoding="utf-8"))
             if re.search(r"\.backgroundTask\s*\(", code):
-                errors.append(f"{relative}: SwiftUI .backgroundTask crashes the app when an App Intent launches it; "
-                              "register with BGTaskScheduler in AppRefresh.registerHandler instead")
+                errors.append(f"{relative}: SwiftUI .backgroundTask can register its handler after launch and crash the "
+                              "app; register with BGTaskScheduler in AppRefresh.registerHandler instead")
             registrations += len(re.findall(r"BGTaskScheduler\.shared\.register\s*\(", code))
+            calls += len(re.findall(r"(?<!func )\bAppRefresh\.registerHandler\s*\(\)", code))
+            calls += len(re.findall(r"(?<![\w.])registerHandler\s*\(\)", code)) - len(re.findall(r"func registerHandler\s*\(\)", code))
     if registrations != 1:
         errors.append(f"BGTaskScheduler.shared.register appears {registrations} times; register the refresh handler "
                       "exactly once (AppRefresh.registerHandler)")
+    if calls != 1:
+        errors.append(f"AppRefresh.registerHandler() is called {calls} times; call it exactly once, in didFinishLaunching "
+                      "(a second registration stops the app)")
     app = re.sub(r"//.*", "", (ROOT / "App/SmartScheduleApp.swift").read_text(encoding="utf-8"))
-    launch = re.search(r"didFinishLaunchingWithOptions[^{]*\{(.*?)\n        return true", app, re.S)
-    if not launch or "AppRefresh.registerHandler()" not in launch.group(1):
-        errors.append("App/SmartScheduleApp.swift: AppDelegate's didFinishLaunching must call AppRefresh.registerHandler() "
-                      "before returning")
-    else:
-        print("✓ Background refresh registered once, in didFinishLaunching (no SwiftUI .backgroundTask)")
+    launch = re.search(r"didFinishLaunchingWithOptions[^{]*\{(.*?)\n\s*return true\s*\n\s*\}", app, re.S)
+    if not launch or not re.match(r"\s*AppRefresh\.registerHandler\(\)", launch.group(1)):
+        errors.append("App/SmartScheduleApp.swift: AppRefresh.registerHandler() must be the first statement of "
+                      "AppDelegate's didFinishLaunching (not deferred into a Task or a queue)")
+    constants = (ROOT / "Shared/Core/AppConstants.swift").read_text(encoding="utf-8")
+    identifier = re.search(r'static let backgroundRefreshTaskID = "([^"]+)"', constants)
+    project = re.sub(r"(^|\s)#.*", r"\1", (ROOT / "project.yml").read_text(encoding="utf-8"))
+    permitted = re.search(r"BGTaskSchedulerPermittedIdentifiers:\s*\[([^\]]*)\]", target_block(project, APP_TARGET) or "")
+    listed = [item.strip() for item in permitted.group(1).split(",")] if permitted else []
+    if not identifier or listed != [identifier.group(1)]:
+        errors.append(f"project.yml: BGTaskSchedulerPermittedIdentifiers {listed} must be exactly "
+                      f"[{identifier.group(1) if identifier else '?'}] (AppConstants.backgroundRefreshTaskID)")
+    if len(errors) == before:
+        print(f"✓ Background refresh {listed[0]} registered once, first in didFinishLaunching (no SwiftUI .backgroundTask)")
 
 
 def main() -> int:
