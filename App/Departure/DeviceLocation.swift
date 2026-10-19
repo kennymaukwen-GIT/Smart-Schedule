@@ -1,4 +1,5 @@
 import CoreLocation
+import UIKit
 
 /// `LocationProviding` on the iPhone, for 「該出發了」 (docs/SETTINGS.md §7.11): Core Location with When In Use
 /// permission only, asked the first time the user asks for a departure or a travel time, in the app in the foreground.
@@ -20,6 +21,10 @@ final class DeviceLocation: NSObject, LocationProviding {
         // Created on the main thread, so Core Location calls the delegate there.
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        // A prompt can't be answered once the app is in the background: whoever is still waiting checks again, finds
+        // no answer and gets noPermission, so the next request in the foreground asks again.
+        NotificationCenter.default.addObserver(self, selector: #selector(appEnteredBackground),
+                                               name: UIApplication.didEnterBackgroundNotification, object: nil)
     }
 
     func currentLocation() async throws -> GeoPoint {
@@ -34,12 +39,16 @@ final class DeviceLocation: NSObject, LocationProviding {
         }
     }
 
-    /// Asks for When In Use permission when the user hasn't been asked yet, and waits for the answer.
+    /// Asks for When In Use permission when the user hasn't been asked yet, and waits for the answer. The prompt only
+    /// shows while the app is in the foreground ("Your app must be in the foreground to show a location authorization
+    /// prompt"), so in the background, or when the app goes there before the user answers, it is noPermission.
     private func ensurePermission() async throws {
         if manager.authorizationStatus == .notDetermined {
+            guard UIApplication.shared.applicationState != .background else { throw TravelTimeError.noPermission }
             await withCheckedContinuation { continuation in
                 permissionWaiters.append(continuation)
-                if permissionWaiters.count == 1 { manager.requestWhenInUseAuthorization() }
+                // Asking again while the user hasn't decided is harmless, and makes sure this request has a prompt.
+                manager.requestWhenInUseAuthorization()
             }
         }
         switch manager.authorizationStatus {
@@ -72,6 +81,10 @@ final class DeviceLocation: NSObject, LocationProviding {
         let waiters = permissionWaiters
         permissionWaiters = []
         waiters.forEach { $0.resume() }
+    }
+
+    @objc private func appEnteredBackground() {
+        permissionAnswered()
     }
 }
 

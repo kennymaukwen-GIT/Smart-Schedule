@@ -45,6 +45,13 @@
     authenticationPolicy = .requiresAuthentication: a locked iPhone asks for Face ID or the passcode first (the default,
     .alwaysAllowed, runs it from the Lock Screen). App/ is not compiled into the unit tests, so this is checked here;
     NotificationActionsTests checks the notification reply action's .authenticationRequired.
+14. Departure reminders 「該出發了」 (docs/SETTINGS.md §7.11) use the location only when the user asks, in the app in the
+    foreground: NSLocationWhenInUseUsageDescription is declared for the app target (English in project.yml, saying
+    Apple Maps and not saved; zh-Hant in Shared/Localization/zh-Hant.lproj/InfoPlist.strings, saying Apple 地圖 and
+    不會被保存), with no Always key, no location background mode (flow or block list) and no location key in either
+    extension (NSLocation*, NSWidgetWantsLocation); Core Location and MapKit are imported only under App/ (every import
+    spelling), CLLocationManager appears only in App/Departure, and no Swift file uses continuous or background location
+    (startUpdatingLocation, requestAlwaysAuthorization, CLBackgroundActivitySession, CLMonitor, liveUpdates, …).
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -800,8 +807,14 @@ def lock_screen_checks() -> None:
 
 LOCATION_KEY = "NSLocationWhenInUseUsageDescription"
 ALWAYS_LOCATION_KEYS = ("NSLocationAlwaysAndWhenInUseUsageDescription", "NSLocationAlwaysUsageDescription")
-LOCATION_IMPORT = re.compile(r"^\s*(?:@preconcurrency\s+)?import\s+(?:CoreLocation|CoreLocationUI|MapKit)\b", re.M)
-LOCATION_MANAGER = re.compile(r"\bCLLocationManager\s*\(")
+# Every import spelling: attributes (@preconcurrency, @_exported, @_implementationOnly), access levels (SE-0409) and
+# scoped imports (`import class CoreLocation.CLLocationManager`).
+LOCATION_IMPORT = re.compile(r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|package|internal|fileprivate|private)\s+)?"
+                             r"import\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?"
+                             r"(?:CoreLocation|CoreLocationUI|MapKit|_MapKit_SwiftUI)\b", re.M)
+LOCATION_MANAGER = re.compile(r"\bCLLocationManager\b")
+EXTENSION_LOCATION_KEY = re.compile(r"\bNSLocation\w*|\bNSWidgetWantsLocation\b")
+ZH_INFOPLIST = ROOT / "Shared/Localization/zh-Hant.lproj/InfoPlist.strings"
 LOCATION_DIR = "App/Departure"
 BACKGROUND_LOCATION = re.compile(r"\b(?:requestAlwaysAuthorization|allowsBackgroundLocationUpdates|startUpdatingLocation"
                                  r"|startMonitoringSignificantLocationChanges|startMonitoringVisits"
@@ -822,8 +835,8 @@ def location_checks() -> None:
                 errors.append(f"{relative}: imports Core Location or MapKit outside App/ (the extensions have no "
                               "location; Shared/Departure keeps the rules pure behind protocols)")
             if LOCATION_MANAGER.search(code) and relative.parts[:2] != tuple(LOCATION_DIR.split("/")):
-                errors.append(f"{relative}: creates a CLLocationManager outside {LOCATION_DIR} (DeviceLocation is the "
-                              "only place that asks for the location)")
+                errors.append(f"{relative}: uses CLLocationManager outside {LOCATION_DIR} (DeviceLocation is the only "
+                              "place that asks for the location)")
             for match in sorted(set(BACKGROUND_LOCATION.findall(code))):
                 errors.append(f"{relative}: {match} (departure reminders take one fix while the app is open, never "
                               "continuous or background location)")
@@ -839,14 +852,18 @@ def location_checks() -> None:
     for key in ALWAYS_LOCATION_KEYS:
         if key in project:
             errors.append(f"project.yml: {key} declared; departure reminders use When In Use only")
+    # UIBackgroundModes as a flow list ([fetch]) or a block list (- fetch); a list item that is exactly `location` in the
+    # app target can only be that background mode.
     modes = re.search(r"UIBackgroundModes:\s*\[([^\]]*)\]", app)
-    if modes and "location" in modes.group(1):
+    if (modes and re.search(r"\blocation\b", modes.group(1))) \
+            or re.search(r"^[ \t]*-[ \t]*['\"]?location['\"]?[ \t]*$", app, re.M):
         errors.append("project.yml: UIBackgroundModes has location; departure reminders never use it")
     for name in EXTENSION_TARGETS:
         block = target_block(project, name)
-        if block is not None and "NSLocation" in block:
-            errors.append(f"project.yml: {name} declares a location usage description, but the extensions have no "
-                          "location")
+        if block is not None and EXTENSION_LOCATION_KEY.search(block):
+            errors.append(f"project.yml: {name} declares a location key, but the extensions have no location")
+    if not ZH_INFOPLIST.exists():
+        errors.append(f"{ZH_INFOPLIST.relative_to(ROOT)} is missing: the zh-Hant {LOCATION_KEY} lives there")
     for path in STRINGS_FILES:
         if path.name != "InfoPlist.strings":
             continue

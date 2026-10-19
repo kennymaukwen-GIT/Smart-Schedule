@@ -14,6 +14,11 @@ import Foundation
 struct GeoPoint: Equatable, Sendable {
     var latitude: Double
     var longitude: Double
+
+    /// A real place: finite degrees, latitude within ±90 and longitude within ±180.
+    var isValid: Bool {
+        latitude.isFinite && longitude.isFinite && abs(latitude) <= 90 && abs(longitude) <= 180
+    }
 }
 
 /// Where a trip starts.
@@ -43,6 +48,15 @@ enum TravelTimeError: Error, Equatable, Sendable {
     case tooFar
     /// The map service is busy (too many requests), the network is down, or no location fix came. Try again later.
     case temporarilyUnavailable
+}
+
+/// Every case bridges to the same `NSError` (one domain, code 0), so a generic error message can't tell the reasons
+/// apart. ScheduleAssistant's catch-all sends `localizedDescription` to Gemini, and Gemini must never learn why a time
+/// couldn't be worked out ("too far" and "no route" reveal distance, docs/SETTINGS.md §7.11). Step 6 answers each case
+/// itself.
+extension TravelTimeError: CustomNSError {
+    static var errorDomain: String { "SmartSchedule.TravelTime" }
+    var errorCode: Int { 0 }
 }
 
 /// A worked-out travel time.
@@ -75,7 +89,8 @@ protocol TravelTimeProviding: Sendable {
     ///   - mode: the way of travelling the user asked for, or nil when they didn't say (`TravelRules.defaultMode`).
     ///   - arriveBy: when the user wants to be there, so the estimate accounts for the traffic expected then; nil for
     ///     "how long does it take" (leaving now).
-    /// - Throws: `TravelTimeError`, or `CancellationError` when the task was cancelled.
+    /// - Throws: `TravelTimeError`, or `CancellationError` when the task is cancelled. Cancellation is checked between
+    ///   steps: a map request already sent finishes first, but nothing more is sent.
     func estimate(to destination: String, from origin: TravelOrigin, mode: TravelMode?,
                   arriveBy: Date?) async throws -> TravelEstimate
 }
@@ -122,20 +137,26 @@ struct TravelTimeService: TravelTimeProviding {
 
     private func work(to destination: String, from origin: TravelOrigin, mode requested: TravelMode?,
                       arriveBy: Date?) async throws -> TravelEstimate {
+        try Task.checkCancellation()
         let destinationText = DeparturePlanner.mapsText(destination)
         guard !destinationText.isEmpty else { throw TravelTimeError.placeNotFound(.destination) }
 
         let start: GeoPoint
         switch origin {
         case .current(let point):
+            guard point.isValid else { throw TravelTimeError.temporarilyUnavailable }  // not a usable fix
             start = point
         case .typed(let text):
             let startText = DeparturePlanner.mapsText(text)
             guard !startText.isEmpty else { throw TravelTimeError.placeNotFound(.start) }
             start = try await maps.findPlace(startText, near: nil, place: .start).point
+            guard start.isValid else { throw TravelTimeError.placeNotFound(.start) }
+            try Task.checkCancellation()
         }
 
         let found = try await maps.findPlace(destinationText, near: start, place: .destination)
+        guard found.point.isValid else { throw TravelTimeError.placeNotFound(.destination) }
+        try Task.checkCancellation()
         let distance = TravelRules.distanceMeters(start, found.point)
         guard distance <= TravelRules.tooFarMeters else { throw TravelTimeError.tooFar }
 
@@ -146,6 +167,7 @@ struct TravelTimeService: TravelTimeProviding {
         do {
             seconds = try await maps.travelSeconds(from: start, to: found.point, mode: mode, arriveBy: arrival)
         } catch TravelTimeError.routeUnavailable where requested == nil && mode == .transit {
+            try Task.checkCancellation()
             seconds = try await maps.travelSeconds(from: start, to: found.point, mode: .driving, arriveBy: arrival)
             mode = .driving
             isEstimate = true

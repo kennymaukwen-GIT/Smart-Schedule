@@ -77,8 +77,8 @@ targets:
         NSMicrophoneUsageDescription: Tap the mic to speak a plan instead of typing it. Your speech is turned into text on this iPhone; the audio is not saved or sent anywhere.
         NSSpeechRecognitionUsageDescription: Your speech is turned into text on this iPhone, so you can speak a plan instead of typing it. The audio is not saved or sent anywhere.
         # Departure reminders 「該出發了」 (App/Departure/DeviceLocation.swift, docs/SETTINGS.md §7.11): When In Use only,
-        # asked the first time the user asks when to leave or how long a trip takes. No Always key and no location
-        # background mode; the app target only. zh-Hant in Shared/Localization/zh-Hant.lproj/InfoPlist.strings;
+        # asked the first time the user says where they need to be and when, asks when to leave, or asks how long a
+        # trip takes. No Always key and no location background mode; the app target only. zh-Hant in Shared/Localization/zh-Hant.lproj/InfoPlist.strings;
         # scripts/validate_schema.py (check 14).
         NSLocationWhenInUseUsageDescription: When you ask when to leave or how long a trip takes, or tell the assistant where you need to be and when, Smart Schedules uses your location to estimate the travel time with Apple Maps. Your location goes only to Apple Maps and is not saved.
         BGTaskSchedulerPermittedIdentifiers: [com.smartschedule.refresh]

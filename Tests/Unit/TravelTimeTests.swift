@@ -170,6 +170,28 @@ final class TravelTimeTests: XCTestCase {
         }
     }
 
+    func testTheDrivingStandInKeepsTheArrivalTime() async throws {
+        let now = time(taipei, 2026, 10, 24, 9, 0)
+        let arriveBy = time(taipei, 2026, 10, 24, 15, 0)
+        let maps = FakeMapsLookup(places: ["露營地": GeoPoint(latitude: 24.9, longitude: 121.6)],
+                                  seconds: [.transit: .failure(TravelTimeError.routeUnavailable),
+                                            .driving: .success(5_400)])
+        _ = try await service(maps, now: now).estimate(to: "露營地", from: .current(taipei101), mode: nil,
+                                                        arriveBy: arriveBy)
+        let asked = await maps.routes.map(\.arriveBy)
+        XCTAssertEqual(asked, [arriveBy, arriveBy], "the driving time is for the same arrival, with its traffic")
+    }
+
+    func testADrivingStandInOver24HoursIsTooFar() async {
+        let maps = FakeMapsLookup(places: ["台北 101": taipei101],
+                                  seconds: [.transit: .failure(TravelTimeError.routeUnavailable),
+                                            .driving: .success(86_401)])
+        await assertThrows(.tooFar) {
+            _ = try await self.service(maps).estimate(to: "台北 101", from: .current(self.taipeiStation), mode: nil,
+                                                     arriveBy: nil)
+        }
+    }
+
     // MARK: Too far
 
     func testMoreThanAbout300KilometresIsTooFarWithoutAskingForARoute() async {
@@ -272,6 +294,40 @@ final class TravelTimeTests: XCTestCase {
         XCTAssertTrue(searches.isEmpty)
     }
 
+    func testApplesNameForThePlaceIsKept() async throws {
+        let maps = FakeMapsLookup(places: ["101": taipei101], names: ["101": "台北 101 購物中心"],
+                                  seconds: [.transit: .success(1_320)])
+        let estimate = try await service(maps).estimate(to: "101", from: .current(taipeiStation), mode: nil,
+                                                         arriveBy: nil)
+        XCTAssertEqual(estimate.placeName, "台北 101 購物中心")
+    }
+
+    func testPointsThatAreNotPlacesAreRefused() async {
+        let nowhere = GeoPoint(latitude: .nan, longitude: 121.5)
+        XCTAssertFalse(nowhere.isValid)
+        XCTAssertFalse(GeoPoint(latitude: 91, longitude: 0).isValid)
+        XCTAssertFalse(GeoPoint(latitude: 0, longitude: -180.5).isValid)
+        XCTAssertFalse(GeoPoint(latitude: 0, longitude: .infinity).isValid)
+        XCTAssertTrue(GeoPoint(latitude: -90, longitude: 180).isValid)
+        XCTAssertTrue(taipei101.isValid)
+
+        let maps = FakeMapsLookup(places: ["台北 101": taipei101, "壞掉的地點": nowhere, "壞掉的起點": nowhere],
+                                  seconds: [.transit: .success(60), .driving: .success(60)])
+        await assertThrows(.temporarilyUnavailable) {
+            _ = try await self.service(maps).estimate(to: "台北 101", from: .current(nowhere), mode: nil, arriveBy: nil)
+        }
+        await assertThrows(.placeNotFound(.destination)) {
+            _ = try await self.service(maps).estimate(to: "壞掉的地點", from: .current(self.taipeiStation), mode: nil,
+                                                     arriveBy: nil)
+        }
+        await assertThrows(.placeNotFound(.start)) {
+            _ = try await self.service(maps).estimate(to: "台北 101", from: .typed("壞掉的起點"), mode: nil,
+                                                     arriveBy: nil)
+        }
+        let routes = await maps.routes
+        XCTAssertTrue(routes.isEmpty, "no route is asked for between points that are not places")
+    }
+
     // MARK: Time
 
     func testTheArrivalTimeIsAskedAboutOnlyWhenItIsAhead() async throws {
@@ -358,6 +414,37 @@ final class TravelTimeTests: XCTestCase {
         }
     }
 
+    func testACancelledTaskSendsNothingToTheMapService() async {
+        let maps = FakeMapsLookup(places: ["台北車站": taipeiStation, "台北 101": taipei101],
+                                  seconds: [.transit: .success(1_320)])
+        let travel = service(maps)
+        let task = Task { () -> TravelEstimate in
+            _ = withUnsafeCurrentTask { $0?.cancel() }   // cancelled before the first step
+            return try await travel.estimate(to: "台北 101", from: .typed("台北車站"), mode: nil, arriveBy: nil)
+        }
+        do {
+            _ = try await task.value
+            XCTFail("expected cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "\(error)")
+        }
+        let searches = await maps.searches
+        let routes = await maps.routes
+        XCTAssertTrue(searches.isEmpty)
+        XCTAssertTrue(routes.isEmpty)
+    }
+
+    /// ScheduleAssistant's catch-all sends an error's description to Gemini, which must never learn why a time
+    /// couldn't be worked out (docs/SETTINGS.md §7.11): every reason looks the same.
+    func testEveryReasonLooksTheSameAsAGenericError() {
+        let all: [TravelTimeError] = [.noPermission, .placeNotFound(.destination), .placeNotFound(.start),
+                                      .routeUnavailable, .tooFar, .temporarilyUnavailable]
+        let errors = all.map { $0 as NSError }
+        XCTAssertEqual(Set(errors.map { $0.domain }), ["SmartSchedule.TravelTime"])
+        XCTAssertEqual(Set(errors.map { $0.code }), [0])
+        XCTAssertEqual(Set(all.map { $0.localizedDescription }).count, 1)
+    }
+
     func testARecentAccurateLocationIsReused() {
         XCTAssertTrue(TravelRules.isRecent(ageSeconds: 0, accuracyMeters: 65))
         XCTAssertTrue(TravelRules.isRecent(ageSeconds: 120, accuracyMeters: 1_000))
@@ -387,19 +474,24 @@ actor FakeMapsLookup: MapsLookup {
     }
 
     private let places: [String: GeoPoint]
+    private let names: [String: String]
     private let seconds: [TravelMode: Result<TimeInterval, Error>]
     private(set) var searches: [Search] = []
     private(set) var routes: [Route] = []
 
-    init(places: [String: GeoPoint], seconds: [TravelMode: Result<TimeInterval, Error>]) {
+    /// - Parameter names: Apple's name for a query's place, when it differs from what the user typed (otherwise the
+    ///   query itself).
+    init(places: [String: GeoPoint], names: [String: String] = [:],
+         seconds: [TravelMode: Result<TimeInterval, Error>]) {
         self.places = places
+        self.names = names
         self.seconds = seconds
     }
 
     func findPlace(_ query: String, near: GeoPoint?, place: TravelPlace) async throws -> FoundPlace {
         searches.append(Search(query: query, near: near, place: place))
         guard let point = places[query] else { throw TravelTimeError.placeNotFound(place) }
-        return FoundPlace(name: query, point: point)
+        return FoundPlace(name: names[query] ?? query, point: point)
     }
 
     func travelSeconds(from start: GeoPoint, to destination: GeoPoint, mode: TravelMode,
