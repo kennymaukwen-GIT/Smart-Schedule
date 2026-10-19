@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// What a tapped date in the main month grid opens: every event of that day, all-day ones first, then by time
+/// What holding down a date in the main month grid opens: every event of that day, all-day ones first, then by time
 /// (`DayAgenda`), with the place under the title. It follows changes as they happen (the rows come from the schedule).
-/// A row opens the event page on top, as a chip does; a draft (a plan or an "Ask me first" event still waiting for
-/// Add) closes the list and brings its card into view instead, as its chip does.
+/// A row opens the event page on top (`AppRouter.agendaEventID`, which a reminder tapped while the list is open uses
+/// too); a draft (a plan or an "Ask me first" event still waiting for Add) closes the list and brings its card into
+/// view instead, as its chip does.
 struct DayAgendaSheet: View {
     let day: Date
 
@@ -13,16 +14,18 @@ struct DayAgendaSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var environmentLocale
 
-    /// The event page open over the list.
-    @State private var openEventID: String?
-
     var body: some View {
         let clock = schedule.clock
         let items = DayAgenda.items(on: day, events: schedule.events(on: day), calendar: clock.calendar)
 
         NavigationStack {
             List {
-                if items.isEmpty {
+                if items.isEmpty && schedule.isLoadingRange {
+                    // The day's range is still being fetched: "No events" would not be true yet.
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                } else if items.isEmpty {
                     Text("No events on this day")
                         .foregroundStyle(Theme.textSecondary)
                         .listRowBackground(Color.clear)
@@ -54,8 +57,8 @@ struct DayAgendaSheet: View {
         .presentationDragIndicator(.visible)
         .preferredColorScheme(.dark)
         .sheet(item: Binding(
-            get: { openEventID.flatMap(schedule.event(id:)) },
-            set: { openEventID = $0?.id }
+            get: { router.agendaEventID.flatMap(schedule.event(id:)) },
+            set: { router.agendaEventID = $0?.id }
         )) { event in
             EventDetailSheet(event: event)
                 .environment(router)
@@ -70,7 +73,7 @@ struct DayAgendaSheet: View {
             dismiss()
             chat.revealOpenPlan()
         } else {
-            openEventID = event.id
+            router.agendaEventID = event.id
         }
     }
 }
@@ -81,14 +84,17 @@ private struct DayAgendaRow: View {
     let item: DayAgenda.Item
     let clock: WallClock
 
+    /// Wide enough for "18:00 →" at the user's text size.
+    @ScaledMetric(relativeTo: .subheadline) private var timeWidth: CGFloat = 64
+
     var body: some View {
         let event = item.event
         let tint = Color(hex: event.colorHex)
 
         HStack(alignment: .top, spacing: 10) {
             time
-                .font(.system(size: 14, weight: .semibold).monospacedDigit())
-                .frame(width: 64, alignment: .leading)
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .frame(width: timeWidth, alignment: .leading)
             RoundedRectangle(cornerRadius: 1.5)
                 .fill(tint)
                 .frame(width: 3)
@@ -97,11 +103,11 @@ private struct DayAgendaRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     if event.kind == .task {
                         Image(systemName: event.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                             .foregroundStyle(tint)
                     }
                     Text(event.title)
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.body.weight(.medium))
                         .foregroundStyle(.white)
                         .strikethrough(event.kind == .task && event.isCompleted)
                         .lineLimit(2)
@@ -111,7 +117,7 @@ private struct DayAgendaRow: View {
                 }
                 if let place = event.location?.trimmingCharacters(in: .whitespacesAndNewlines), !place.isEmpty {
                     Text(place)
-                        .font(.system(size: 13))
+                        .font(.footnote)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
                 }

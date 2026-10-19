@@ -109,6 +109,7 @@ final class LocalizationCatalogTests: XCTestCase {
     func testDayListLabels() throws {
         let table = try chineseTable()
         XCTAssertEqual(zh("No events on this day", in: table), "這天沒有行程")
+        XCTAssertEqual(zh("Shows this day's events", in: table), "顯示這天的行程")
         XCTAssertEqual(zh("All day", in: table), "全天")
         XCTAssertEqual(zh("Done", in: table), "完成")
     }

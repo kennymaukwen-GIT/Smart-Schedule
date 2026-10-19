@@ -151,9 +151,12 @@ final class AppRouter {
     /// tap's `perform()` doesn't open it again (`handleIntentLink`).
     @ObservationIgnored private var sceneOpenedQuickCaptureAt: Date?
     var selectedEventID: String?
-    /// The day whose events are listed (`DayAgendaSheet`): a date tapped in the main month grid. Like the other sheets
-    /// it stays when Quick Capture opens (an event page open over the list could hold an edit).
+    /// The day whose events are listed (`DayAgendaSheet`): a date held down in the main month grid. It closes when
+    /// Quick Capture or a Settings / Accounts link opens, unless an event page is open over it (that could hold an edit).
     var agendaDay: AgendaDay?
+    /// The event page open over the day list. A reminder tapped or an event link while the list is open opens here, on
+    /// top of it, since the main screen can't show a second sheet then (`showEvent`).
+    var agendaEventID: String?
     /// The calendar drawer (hamburger): accounts, calendars, visibility.
     var isDrawerOpen = false
     var sheet: Sheet?
@@ -183,19 +186,30 @@ final class AppRouter {
     }
 
     /// `source` only labels the log line: Console.app › subsystem com.smartschedules.app › category Launch.
+    /// Opens an event page wherever one can show now: over the day list when it is open, otherwise from the main screen.
+    func showEvent(_ id: String) {
+        if agendaDay != nil {
+            agendaEventID = id
+        } else {
+            selectedEventID = id
+        }
+    }
+
     func handle(_ url: URL, from source: String = "url") {
         guard url.scheme == AppConstants.urlScheme else { return }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         switch url.host {
         case "compose":
             Logger.launch.notice("Open Quick Capture (from \(source, privacy: .public))")
-            // The drawer closes (as for `openSheet`). A sheet or the event page stays, since closing it could lose an
-            // edit; Quick Capture opens under it and its composer brings the keyboard up instead of the mic
-            // (`ComposerBar.isCovered`), so nothing records out of sight.
+            // The drawer closes (as for `openSheet`), and so does the day list unless an event page is open over it.
+            // A sheet or the event page stays, since closing it could lose an edit; Quick Capture opens under it and
+            // its composer brings the keyboard up instead of the mic (`ComposerBar.isCovered`), so nothing records out
+            // of sight.
             isDrawerOpen = false
+            if agendaEventID == nil { agendaDay = nil }
             quickCapture = QuickCapture(startsWithVoice: DeepLink.startsVoiceInput(url))
         case "event":
-            selectedEventID = items.first { $0.name == "id" }?.value
+            if let id = items.first(where: { $0.name == "id" })?.value { showEvent(id) }
         case "settings":
             openSheet(.settings)
         case "accounts":
@@ -209,6 +223,7 @@ final class AppRouter {
     func openSheet(_ sheet: Sheet) {
         isDrawerOpen = false
         quickCapture = nil
+        if agendaEventID == nil { agendaDay = nil }
         self.sheet = sheet
     }
 }
@@ -314,7 +329,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             await ReminderScheduler.snooze(content, minutes: 10)
 
         case UNNotificationDefaultActionIdentifier:
-            if let eventID { await MainActor.run { AppRouter.shared.selectedEventID = eventID } }
+            if let eventID { await MainActor.run { AppRouter.shared.showEvent(eventID) } }
             await LiveActivityManager.shared.refreshIfRunning()
 
         default:

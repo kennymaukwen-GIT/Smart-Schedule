@@ -4230,6 +4230,17 @@
         }
       }
     },
+    "Shows this day's events" : {
+      "comment" : "VoiceOver hint on a date in the month grid: its action opens the day list",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示這天的行程"
+          }
+        }
+      }
+    },
     "Siri" : {
       "localizations" : {
         "zh-Hant" : {

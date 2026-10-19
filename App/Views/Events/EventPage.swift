@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The one page for an event: everything about it, editable in place. Opened from a chip in any calendar view, the
-/// drawer's Events section, the events list and the chat's "Manage" button (always through `EventDetailSheet`).
+/// day list, the drawer's Events section, the events list and the chat's "Manage" button (always through
+/// `EventDetailSheet`).
 ///
 /// Title, all day, start and end, location, reminders and notes can be changed; Save writes through the same path
 /// as the assistant (`ScheduleViewModel.updateEvent`: Google with If-Match, or the outbox while offline, where the
