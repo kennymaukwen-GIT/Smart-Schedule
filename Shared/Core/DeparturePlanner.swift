@@ -58,6 +58,14 @@ enum DeparturePlanner {
                              travelMode: travelMode, isEstimate: isEstimate)
     }
 
+    /// What the event keeps of `plan` for an event starting at `start` (the plan's minutes early and its departure,
+    /// both counted back from the start). Never the travel time itself.
+    static func settings(for plan: DeparturePlan, start: Date) -> DepartureSettings {
+        DepartureSettings(arriveEarlyMinutes: wholeMinutes(start.timeIntervalSince(plan.arriveBy)),
+                          travelMode: plan.travelMode,
+                          leaveMinutesBeforeStart: wholeMinutes(start.timeIntervalSince(plan.departAt)))
+    }
+
     /// When 「準備出門」 fires: `leadMinutes` before departure.
     static func readyReminder(for plan: DeparturePlan, leadMinutes: Int = DeparturePlanner.defaultReadyLeadMinutes) -> Date {
         plan.departAt.addingTimeInterval(-seconds(clamp(leadMinutes, to: readyLeadRange)))
@@ -119,6 +127,10 @@ enum DeparturePlanner {
 
     private static func clamp(_ value: Int, to range: ClosedRange<Int>) -> Int {
         min(max(value, range.lowerBound), range.upperBound)
+    }
+
+    private static func wholeMinutes(_ interval: TimeInterval) -> Int {
+        Int((interval / 60).rounded())
     }
 
     private static func seconds(_ minutes: Int) -> TimeInterval {
