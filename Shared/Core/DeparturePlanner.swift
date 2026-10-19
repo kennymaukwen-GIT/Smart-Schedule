@@ -65,20 +65,53 @@ enum DeparturePlanner {
 
     // MARK: Google Maps
 
+    /// Google's limit for a Maps URL: "URLs are limited to 2,048 characters for each request."
+    static let googleMapsURLLimit = 2_048
+
     /// What a query value keeps as it is (RFC 3986 "unreserved"). Everything else is percent-encoded as UTF-8, so a space,
     /// & # + = ? / , ' or a Chinese place name can't split or end the destination.
     private static let unreserved = CharacterSet(charactersIn:
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+    /// C0 and C1 control characters (tabs included). Not `.controlCharacters`, which also holds the joiners inside
+    /// emoji such as 👨‍👩‍👧.
+    private static let controls = CharacterSet(charactersIn: Unicode.Scalar(UInt8(0x00))...Unicode.Scalar(UInt8(0x1F)))
+        .union(CharacterSet(charactersIn: Unicode.Scalar(UInt8(0x7F))...Unicode.Scalar(UInt8(0x9F))))
 
     /// Directions in Google Maps (the app when installed, otherwise the website) to `destination`: the text as the user
-    /// typed it or as the event's location has it, only trimmed. Never coordinates, Apple's place data or a starting
-    /// point (docs/SETTINGS.md §7.11), so there is no `origin` and Google Maps starts from where the user is.
+    /// typed it or as the event's location has it, put on one line (`mapsText`) and, past Google's 2,048-character
+    /// limit, cut short at a whole character. Never coordinates, Apple's place data or a starting point
+    /// (docs/SETTINGS.md §7.11), so there is no `origin`: Google Maps usually starts from the device's location and
+    /// otherwise asks for a starting point. Callers pass a non-empty place; an empty one opens an empty directions form.
     /// Google's format: https://www.google.com/maps/dir/?api=1&destination=…&travelmode=…
     static func googleMapsURL(destination: String, mode: TravelMode) -> URL {
-        let text = destination.trimmingCharacters(in: .whitespacesAndNewlines)
-        let encoded = text.addingPercentEncoding(withAllowedCharacters: unreserved) ?? ""
+        let prefix = "https://www.google.com/maps/dir/?api=1&destination="
+        let suffix = "&travelmode=\(mode.rawValue)"
+        let budget = googleMapsURLLimit - prefix.count - suffix.count
+        var encoded = ""
+        var length = 0
+        for character in mapsText(destination) {
+            // Percent-encoding works character by character, so the pieces add up to the whole.
+            let piece = String(character).addingPercentEncoding(withAllowedCharacters: unreserved) ?? ""
+            guard length + piece.count <= budget else { break }
+            encoded += piece
+            length += piece.count
+        }
         // Only unreserved ASCII and %XX escapes go in, so the string is always a valid URL.
-        return URL(string: "https://www.google.com/maps/dir/?api=1&destination=\(encoded)&travelmode=\(mode.rawValue)")!
+        return URL(string: prefix + encoded + suffix)!
+    }
+
+    /// A place as one line for Google Maps: each line trimmed, empty lines dropped, lines joined with ", " (calendar
+    /// locations are often "Name" and "Address" on two lines), and every other run of spaces, tabs or control
+    /// characters made one space. Nothing else changes.
+    static func mapsText(_ text: String) -> String {
+        text.components(separatedBy: .newlines)
+            .map { line in
+                line.components(separatedBy: CharacterSet.whitespaces.union(controls))
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
+            }
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
     }
 
     private static func clamp(_ value: Int, to range: ClosedRange<Int>) -> Int {

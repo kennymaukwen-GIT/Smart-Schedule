@@ -221,10 +221,40 @@ final class DeparturePlannerTests: XCTestCase {
         XCTAssertEqual(queryItems(url)["destination"], "台北 101")
     }
 
-    func testAVeryLongPlaceStillMakesALink() {
-        let place = String(repeating: "台北市信義區市府路", count: 100)
-        let url = DeparturePlanner.googleMapsURL(destination: place, mode: .driving)
-        XCTAssertEqual(queryItems(url)["destination"], place)
+    func testTwoLineLocationsBecomeOneLine() {
+        let url = DeparturePlanner.googleMapsURL(destination: "台北101\n信義路五段7號", mode: .transit)
+        XCTAssertEqual(queryItems(url)["destination"], "台北101, 信義路五段7號")
+        XCTAssertFalse(url.absoluteString.contains("%0A"))
+        XCTAssertEqual(DeparturePlanner.mapsText("Taipei 101\r\n\r\n  7 Xinyi Rd\tSec. 5  \u{2028}Taipei"),
+                       "Taipei 101, 7 Xinyi Rd Sec. 5, Taipei")
+    }
+
+    func testEmojiJoinersAreKept() {
+        XCTAssertEqual(DeparturePlanner.mapsText("👨‍👩‍👧 Park"), "👨‍👩‍👧 Park")
+    }
+
+    func testAnEmptyPlaceGivesAnEmptyDestination() {
+        // Callers don't offer directions without a place; this pins what the link would be.
+        XCTAssertEqual(DeparturePlanner.googleMapsURL(destination: " \n ", mode: .transit).absoluteString,
+                       "https://www.google.com/maps/dir/?api=1&destination=&travelmode=transit")
+    }
+
+    /// Google: "URLs are limited to 2,048 characters". 51 characters before the place and 19 after leave 1,978.
+    func testALongPlaceIsCutAtGooglesLimit() {
+        let fits = String(repeating: "a", count: 1_978)
+        let exact = DeparturePlanner.googleMapsURL(destination: fits, mode: .driving)
+        XCTAssertEqual(exact.absoluteString.count, DeparturePlanner.googleMapsURLLimit)
+        XCTAssertEqual(queryItems(exact)["destination"], fits, "a place that fits is kept whole")
+
+        let cut = DeparturePlanner.googleMapsURL(destination: fits + "b", mode: .driving)
+        XCTAssertEqual(queryItems(cut)["destination"], fits)
+
+        // 台 takes 9 characters encoded: 219 of them fit (1,971), the 220th does not.
+        let chinese = String(repeating: "台", count: 300)
+        let url = DeparturePlanner.googleMapsURL(destination: chinese, mode: .transit)
+        XCTAssertLessThanOrEqual(url.absoluteString.count, DeparturePlanner.googleMapsURLLimit)
+        XCTAssertEqual(queryItems(url)["destination"], String(repeating: "台", count: 219), "never half a character")
+        XCTAssertTrue(url.absoluteString.hasSuffix("&travelmode=transit"))
     }
 
     func testTravelModeRawValuesMatchGoogleMaps() {
