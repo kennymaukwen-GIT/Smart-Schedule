@@ -1,0 +1,33 @@
+{
+  "utterance": "1 小時",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "earlier_utterances": [
+    "我今天下午 5 點要到台北 101 開會，想提早 30 分鐘到，建議我幾點出發"
+  ],
+  "expected_call": {
+    "name": "plan_departure",
+    "args": {
+      "destination": "台北 101",
+      "arrive_at_local": "2026-10-13T17:00",
+      "arrive_early_minutes": 30,
+      "create_event": true
+    }
+  },
+  "also_calls": [
+    {
+      "name": "create_events",
+      "args": {
+        "events": [
+          {
+            "title": "開會",
+            "start": "2026-10-13T17:00",
+            "duration_minutes": 60,
+            "kind": "event",
+            "location": "台北 101"
+          }
+        ]
+      }
+    }
+  ]
+}

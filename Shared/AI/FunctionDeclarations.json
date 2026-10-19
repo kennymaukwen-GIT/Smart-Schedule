@@ -362,11 +362,11 @@
       "properties": {
         "destination": {
           "type": "string",
-          "description": "Where the user is going, exactly as they wrote it in this message ('台北 101', 'Dishoom Shoreditch'). Omit for an event from UPCOMING or FOCUS unless the user names a place now: the app reads the event's place."
+          "description": "Where the user is going, exactly as they wrote it in this request (this message, or the earlier one your question was about): '台北 101', 'Dishoom Shoreditch'. Omit for an event from UPCOMING or FOCUS: the app reads the event's place."
         },
         "starting_point": {
           "type": "string",
-          "description": "Only when the user said in this message where they leave from, exactly as written ('台北車站'). Never ask for it: the app lets the user pick the current location or another place."
+          "description": "Only when the user said where they leave from in this request (this message, or the earlier one your question was about), exactly as written: '台北車站'. Never ask for it: the app lets the user pick the current location or another place."
         },
         "arrive_at_local": {
           "type": "string",
@@ -386,7 +386,7 @@
         "event_id": { "type": "string", "description": "Exact id from UPCOMING or FOCUS when the user asks about an event already in the calendar. Never invent ids." },
         "create_event": {
           "type": "boolean",
-          "description": "true when this turn's create_events call creates the event to leave for: exactly one event, starting at arrive_at_local."
+          "description": "true when this turn's create_events call creates the event to leave for: the one that starts at arrive_at_local."
         }
       }
     }

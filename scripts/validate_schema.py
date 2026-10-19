@@ -2,7 +2,8 @@
 """Validates Shared/AI/FunctionDeclarations.json and the example calls in Tests/fixtures.
 
 1. Lints the declarations against the OpenAPI subset Gemini accepts in `parameters`.
-2. Validates each fixture's expected args against its declaration (JSON Schema).
+2. Validates each fixture's expected args against its declaration (JSON Schema), for every call of the turn
+   (`expected_call` and `also_calls`).
 3. Re-implements the Swift mapper's date/RRULE rules as a reference and prints the Google Calendar
    payload a fixture produces, including DST-correct UNTIL values.
 4. Re-implements the draft-plan preview (Shared/Calendar/RecurrenceExpander.swift + PlanDraftBuilder.swift):
@@ -55,11 +56,17 @@
 15. plan_departure (departure reminders, prompt rule 13, docs/SETTINGS.md §7.11): nothing required (Gemini never sees an
     event's place, so an event from UPCOMING or FOCUS passes only its id), travel_mode is exactly the app's TravelMode and
     arrive_early_minutes the app's range (Shared/Core/DeparturePlanner.swift). A fixture's turn may hold several calls
-    (`also_calls`) and name functions it must not call (`must_not_call`): a new event to leave for is one create_events
-    event starting at arrive_at_local, with its length and the place as written; destination and starting_point are the
-    user's own words; a mode or minutes early only when the user said them; at least 3 "how long / when to leave"
-    turns, 3 with a new event and 3 ordinary events without plan_departure. The prompt builders never read an event's
-    place (AssistantPrompt) or its departure (either builder).
+    (`also_calls`, with plan_departure in expected_call), name functions it must not call (`must_not_call`) and give the
+    message an answer completes (`earlier_utterances`). One plan_departure per turn, with a destination or an event_id;
+    an event from UPCOMING or FOCUS (its id shown there) passes only its id (owner decision 1A); destination and
+    starting_point are the user's own words, never blank; arrive_at_local is 'YYYY-MM-DDTHH:mm' after now_local; asking
+    only how long has no minutes early or create_event; minutes early ("提早 N 分鐘到", "提早半小時到", "N minutes
+    early") and a way of travelling only when the user said them (places taken out first); a new event to leave for is
+    the one event of the turn's create_events call that starts at arrive_at_local, with the length the user said and the
+    place as written, and no reminder for the minutes early; a question that must not plan names no minutes or time. At
+    least 3 "how long / when to leave" turns, 3 with a new event and 3 ordinary events without plan_departure; no
+    minItems/maxItems. The prompt builders never read an event's place (AssistantPrompt) or its departure (either
+    builder), interpolations included.
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -391,10 +398,11 @@ def declaration_checks(by_name: dict) -> None:
         errors.append("create_events: suggested_notes must stay optional")
 
 
-def context_checks(root: dict, fixture: str) -> None:
+def context_checks(root: dict, fixture: str, call: dict | None = None) -> None:
     """Review fixtures: confirm_plan needs a draft plan or pending events on screen; a revision is a complete plan
-    that keeps its title; modify_event uses an id the prompt showed; update_preferences values are well-formed."""
-    call = root["expected_call"]
+    that keeps its title; modify_event uses an id the prompt showed; update_preferences values are well-formed. Runs
+    for each call of the turn (`call`; expected_call when not given)."""
+    call = call or root["expected_call"]
     if call["name"] == "confirm_plan" and not (root.get("draft_plan") or root.get("pending_events")):
         errors.append(f"{fixture}: confirm_plan is only valid while a DRAFT PLAN or PENDING EVENTS block is shown "
                       "(add 'draft_plan' or 'pending_events')")
@@ -405,7 +413,7 @@ def context_checks(root: dict, fixture: str) -> None:
         shown = {row.split("|")[0].strip() for row in rows if row.strip()}
         if call["args"]["event_id"] not in shown:
             errors.append(f"{fixture}: modify_event uses an id that is not in UPCOMING or FOCUS")
-    if "revises" in root:
+    if "revises" in root and call is root["expected_call"]:
         original = json.loads((FIXTURES / root["revises"]).read_text())["expected_call"]
         if original["name"] != call["name"] or call["name"] != "create_long_term_plan":
             errors.append(f"{fixture}: a revision must be create_long_term_plan, like {root['revises']}")
@@ -440,11 +448,11 @@ def relative_time_checks(root: dict, fixture: str) -> None:
     delta = root.get("relative_minutes")
     if delta is None:
         return
-    call = root["expected_call"]
-    if call["name"] != "create_events" or len(call["args"]["events"]) != 1:
+    creates = [c for c in [root["expected_call"]] + list(root.get("also_calls", [])) if c["name"] == "create_events"]
+    if len(creates) != 1 or len(creates[0]["args"]["events"]) != 1:
         errors.append(f"{fixture}: relative_minutes fixtures create exactly one event")
         return
-    event = call["args"]["events"][0]
+    event = creates[0]["args"]["events"][0]
     if not says_time_from_now(root["utterance"]):
         errors.append(f"{fixture}: the utterance says no time counted from now")
     expected = (datetime.fromisoformat(root["now_local"]) + timedelta(minutes=delta)).strftime("%Y-%m-%dT%H:%M")
@@ -894,15 +902,69 @@ DEPARTURE_PLANNER = ROOT / "Shared/Core/DeparturePlanner.swift"
 DEPARTURE_PROPERTIES = {"destination", "starting_point", "arrive_at_local", "arrive_early_minutes", "travel_mode",
                         "event_id", "create_event"}
 LOCAL_MINUTE = re.compile(r"\d{4}-\d\d-\d\dT([01]\d|2[0-3]):[0-5]\d")
-# How the user names a way of travelling (the declaration's travel_mode description).
+# How the user names a way of travelling (the declaration's travel_mode description). Matched in the request with the
+# places taken out, so 台北火車站 or "Paddington train station" is a place, not a way of travelling.
 MODE_WORDS = {
     "transit": re.compile(r"捷運|公車|火車|高鐵|大眾運輸|\b(?:bus|train|tube|metro|subway|public transport)\b", re.I),
     "driving": re.compile(r"開車|\b(?:drive|driving)\b", re.I),
     "walking": re.compile(r"走路|步行|\b(?:walk|walking)\b", re.I),
 }
-EARLY_ZH = re.compile(r"提早\s*(\d{1,3})\s*分鐘?\s*到")
-EARLY_EN = re.compile(r"\b(\d{1,3})\s*(?:minutes?|mins?)\s+early\b", re.I)
+ZH_NUMBER = r"\d{1,3}|[零〇一二兩两三四五六七八九十]{1,4}"
+# "提早 30 分鐘到", "提早半小時到", "提前十分鐘抵達", "30 minutes early", "half an hour early". Arriving early only: '提前 30
+# 分鐘提醒' (a reminder) has no 到 or 抵達 after it.
+EARLY_ZH = re.compile(rf"(?:提早|提前)\s*(?:(半)|({ZH_NUMBER})\s*(?:個|个)?\s*(半)?)\s*(?:個|个)?\s*"
+                      r"(分鐘|分钟|分|小時|小时|鐘頭|钟头)\s*(?:到|抵達|抵达)")
+EARLY_EN = re.compile(r"\b(?:(half an hour)|(an|one)\s+hour|(\d{1,3})\s*(minutes?|mins?|hours?))\s+early\b", re.I)
+# How long a new event lasts: "開 1 小時", "2 小時", "半小時", "一個半小時", "for 2 hours", "for 45 minutes". Not a
+# time counted from now ("1個小時後") and not the minutes early, which are taken out first.
+LENGTH_ZH = re.compile(rf"(?:(半)|({ZH_NUMBER})\s*(?:個|个)?\s*(半)?)\s*(?:個|个)?\s*(分鐘|分钟|小時|小时|鐘頭|钟头)"
+                       r"(?!\s*(?:以後|以后|之後|之后|後|后))")
+LENGTH_EN = re.compile(r"\bfor\s+(?:(half an hour)|(an|one)\s+hour|(\d{1,3})\s*(minutes?|mins?|hours?))\b", re.I)
 TRAVEL_TIME_TEXT = re.compile(r"\d+\s*(?:分鐘|minutes?|mins?)|" + r"\b\d{1,2}:\d{2}\b")
+ZH_DIGITS = {"零": 0, "〇": 0, "一": 1, "二": 2, "兩": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8,
+             "九": 9}
+
+
+def zh_number(text: str) -> int:
+    """'30' → 30, '十' → 10, '三十' → 30, '十五' → 15, '兩' → 2."""
+    if text.isdigit():
+        return int(text)
+    if "十" in text:
+        tens, _, ones = text.partition("十")
+        return (ZH_DIGITS.get(tens, 1) if tens else 1) * 10 + (ZH_DIGITS.get(ones, 0) if ones else 0)
+    return ZH_DIGITS.get(text, 0)
+
+
+def zh_minutes(half_alone, number, extra_half, unit) -> int:
+    amount = 0.5 if half_alone else zh_number(number) + (0.5 if extra_half else 0)
+    return round(amount * (1 if unit.startswith("分") else 60))
+
+
+def en_minutes(half_hour, an_hour, number, unit) -> int:
+    if half_hour:
+        return 30
+    if an_hour:
+        return 60
+    return int(number) * (60 if unit.lower().startswith("hour") else 1)
+
+
+def said_early(text: str) -> tuple[str, int] | None:
+    """The minutes early the user said, with the phrase, or None."""
+    if match := EARLY_ZH.search(text):
+        return match.group(0), zh_minutes(*match.groups())
+    if match := EARLY_EN.search(text):
+        return match.group(0), en_minutes(*match.groups())
+    return None
+
+
+def said_length(text: str) -> int | None:
+    """How long the new event lasts, in minutes, as the user said it (the minutes early taken out), or None."""
+    text = EARLY_EN.sub(" ", EARLY_ZH.sub(" ", text))
+    if match := LENGTH_ZH.search(text):
+        return zh_minutes(*match.groups())
+    if match := LENGTH_EN.search(text):
+        return en_minutes(*match.groups())
+    return None
 
 
 def swift_travel_modes() -> list[str]:
@@ -947,6 +1009,8 @@ def shown_ids(root: dict) -> set[str]:
 
 
 def departure_fixture_checks(root: dict, by_name: dict, fixture: str) -> None:
+    """Check 15 for one fixture's turn. The request is the utterance plus `earlier_utterances` (the message the
+    assistant's question was about, for a turn that answers it)."""
     calls = turn_calls(root)
     names = [call["name"] for call in calls]
     for name in root.get("must_not_call", []):
@@ -954,21 +1018,27 @@ def departure_fixture_checks(root: dict, by_name: dict, fixture: str) -> None:
             errors.append(f"{fixture}: must_not_call names an unknown function {name}")
         if name in names:
             errors.append(f"{fixture}: the turn calls {name}, which must_not_call forbids")
-    utterance, now_local = root["utterance"], root["now_local"]
+    request = " ".join(list(root.get("earlier_utterances", [])) + [root["utterance"]])
+    now_local = root["now_local"]
     if "plan_departure" in root.get("must_not_call", []) and calls[0]["name"] == "reply_to_user":
         if TRAVEL_TIME_TEXT.search(calls[0]["args"]["message"]):
             errors.append(f"{fixture}: reply_to_user names minutes or a time; the app alone works out travel times")
+    if "plan_departure" in names and names[0] != "plan_departure":
+        errors.append(f"{fixture}: put plan_departure in expected_call and the turn's other calls in also_calls")
+    if names.count("plan_departure") > 1:
+        errors.append(f"{fixture}: one plan_departure per turn")
     for call in calls:
         if call["name"] != "plan_departure":
             continue
         args = call["args"]
-        if names.count("plan_departure") > 1:
-            errors.append(f"{fixture}: one plan_departure per turn")
-        if not (args.get("destination") or args.get("event_id")):
+        if not (args.get("destination", "").strip() or args.get("event_id")):
             errors.append(f"{fixture}: plan_departure needs a destination or an event_id")
+        places = []
         for field in ("destination", "starting_point"):
-            if field in args and args[field] not in utterance:
-                errors.append(f"{fixture}: {field} {args[field]!r} is not the user's own words")
+            if field in args:
+                if not args[field].strip() or args[field] not in request:
+                    errors.append(f"{fixture}: {field} {args[field]!r} is not the user's own words")
+                places.append(args[field])
         arrive = args.get("arrive_at_local")
         if arrive is not None:
             if not LOCAL_MINUTE.fullmatch(arrive):
@@ -978,33 +1048,43 @@ def departure_fixture_checks(root: dict, by_name: dict, fixture: str) -> None:
         if "event_id" in args:
             if args["event_id"] not in shown_ids(root):
                 errors.append(f"{fixture}: plan_departure uses an event_id that is not in UPCOMING or FOCUS")
-            if arrive is not None or args.get("create_event"):
-                errors.append(f"{fixture}: an event from UPCOMING passes no arrive_at_local and no create_event")
+            if arrive is not None or args.get("create_event") or "destination" in args:
+                errors.append(f"{fixture}: an event from UPCOMING passes only its id: no destination, arrive_at_local "
+                              "or create_event (owner decision 1A)")
         if arrive is None and "event_id" not in args and ("arrive_early_minutes" in args or args.get("create_event")):
             errors.append(f"{fixture}: only asking how long: no arrive_early_minutes or create_event")
-        said = [m for m in (EARLY_ZH.search(utterance), EARLY_EN.search(utterance)) if m]
-        if said and args.get("arrive_early_minutes") != int(said[0].group(1)):
-            errors.append(f"{fixture}: the user said {said[0].group(0)!r}: arrive_early_minutes {said[0].group(1)}")
-        if not said and "arrive_early_minutes" in args:
+        early = said_early(request)
+        if early and args.get("arrive_early_minutes") != early[1]:
+            errors.append(f"{fixture}: the user said {early[0]!r}: arrive_early_minutes {early[1]}")
+        if not early and "arrive_early_minutes" in args:
             errors.append(f"{fixture}: arrive_early_minutes only when the user says how early")
-        named = [mode for mode, words in MODE_WORDS.items() if words.search(utterance)]
+        said_mode_text = request
+        for place in places:
+            said_mode_text = said_mode_text.replace(place, " ")
+        named = [mode for mode, words in MODE_WORDS.items() if words.search(said_mode_text)]
         if args.get("travel_mode") != (named[0] if len(named) == 1 else None):
             errors.append(f"{fixture}: travel_mode {args.get('travel_mode')} but the user named {named or 'none'}")
         companions = [c for c in calls if c["name"] == "create_events"]
         if args.get("create_event"):
-            events = [e for c in companions for e in c["args"]["events"]]
-            if arrive is None or len(companions) != 1 or len(events) != 1:
-                errors.append(f"{fixture}: create_event=true needs arrive_at_local and one create_events call with one event")
+            starting = [e for c in companions for e in c["args"]["events"] if e["start"] == arrive]
+            if arrive is None or len(companions) != 1 or len(starting) != 1:
+                errors.append(f"{fixture}: create_event=true needs arrive_at_local and one create_events call with "
+                              "exactly one event starting then")
             else:
-                event = events[0]
-                if event["start"] != arrive:
-                    errors.append(f"{fixture}: the new event starts at {event['start']}, not at arrive_at_local {arrive}")
-                if "end" not in event and "duration_minutes" not in event:
-                    errors.append(f"{fixture}: a new event to leave for has the length the user said (else ask first)")
+                event = starting[0]
+                length = said_length(request)
+                if "end" in event:
+                    minutes = int((datetime.fromisoformat(event["end"]) - datetime.fromisoformat(event["start"]))
+                                  .total_seconds() // 60)
+                else:
+                    minutes = event.get("duration_minutes")
+                if length is None or minutes != length:
+                    errors.append(f"{fixture}: the new event to leave for lasts {minutes}, but the user said "
+                                  f"{length if length is not None else 'no length'} (no length: ask first, rule 13)")
                 if args.get("destination") and event.get("location") != args["destination"]:
                     errors.append(f"{fixture}: the new event's location must be the destination as written")
-                if "reminder_minutes" in event and said:
-                    errors.append(f"{fixture}: '{said[0].group(0)}' is when to arrive, not reminder_minutes")
+                if "reminder_minutes" in event and early:
+                    errors.append(f"{fixture}: '{early[0]}' is when to arrive, not reminder_minutes")
         elif companions:
             errors.append(f"{fixture}: create_events next to plan_departure needs create_event=true")
 
@@ -1014,10 +1094,11 @@ DEPARTURE_PROMPT_READS = {"Shared/AI/AssistantPrompt.swift": re.compile(r"\.(?:l
 
 
 def departure_prompt_checks() -> None:
-    """Gemini never gets an event's place in the chat prompt (consent v7: only for AI suggestions) nor its departure."""
+    """Gemini never gets an event's place in the chat prompt (consent v7: only for AI suggestions) nor its departure.
+    String literals are searched too: rows are built with interpolation ("\\(event.location)")."""
     for relative, pattern in DEPARTURE_PROMPT_READS.items():
         for number, line in enumerate((ROOT / relative).read_text(encoding="utf-8").splitlines(), 1):
-            code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', line.split("//", 1)[0])
+            code = line.split("//", 1)[0]
             if pattern.search(code) or re.search(r"\bSSProperty\.(?:arriveEarly|travelMode|leaveBefore)\b", code):
                 errors.append(f"{relative}:{number}: a prompt builder reads an event's place or departure (§7.11)")
 
@@ -1040,7 +1121,6 @@ def departure_coverage(fixtures: list[tuple[str, dict]]) -> None:
         print(f"✓ plan_departure: {asking} how-long/when-to-leave turns, {with_event} with a new event, {ordinary} "
               "ordinary events without it; nothing required, TravelMode and the minutes-early range match the app; "
               "the prompt builders read no place or departure")
-
 
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
@@ -1074,7 +1154,8 @@ def main() -> int:
             style_checks(each["name"], each["args"], path.name)
             suggestion_checks(each["name"], each["args"], fixture, path.name)
         departure_fixture_checks(fixture, by_name, path.name)
-        context_checks(fixture, path.name)
+        for each in turn_calls(fixture):
+            context_checks(fixture, path.name, each)
         privacy_checks(fixture, path.name)
         relative_time_checks(fixture, path.name)
         print(f"✓ fixture {path.name}")

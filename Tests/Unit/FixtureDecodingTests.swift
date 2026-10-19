@@ -101,6 +101,35 @@ final class FixtureDecodingTests: XCTestCase {
         XCTAssertNil(events.first?.reminderMinutes, "提早 30 分鐘到 is when to arrive, not a reminder")
     }
 
+    func testTheAnswerToTheLengthQuestionMakesBothCalls() throws {
+        // The owner's example 1: the assistant asked how long the meeting lasts; 「1 小時」 completes the request, keeping
+        // the place and the minutes early from the first message.
+        let name = "plan_departure.after_length.json"
+        XCTAssertEqual(try Fixtures.utterance(name), "1 小時")
+        let earlier = try XCTUnwrap(Fixtures.root(name)["earlier_utterances"] as? [String])
+        XCTAssertTrue(earlier.first?.contains("想提早 30 分鐘到") == true, "\(earlier)")
+        let args = try Fixtures.args(PlanDepartureArgs.self, from: name)
+        XCTAssertEqual(args.destination, "台北 101")
+        XCTAssertEqual(args.arriveEarlyMinutes, 30)
+        XCTAssertEqual(args.createEvent, true)
+        let events = try TestJSON.decode(CreateEventsArgs.self,
+                                         data: try XCTUnwrap(Fixtures.alsoCalls(name).first).args).events
+        XCTAssertEqual(events.map(\.durationMinutes), [60])
+    }
+
+    func testOtherNewEventsGoInTheSameCreateEventsCall() throws {
+        let name = "plan_departure.with_other_event.json"
+        let args = try Fixtures.args(PlanDepartureArgs.self, from: name)
+        let companions = try Fixtures.alsoCalls(name)
+        XCTAssertEqual(companions.map(\.name), ["create_events"])
+        let events = try TestJSON.decode(CreateEventsArgs.self, data: try XCTUnwrap(companions.first).args).events
+        XCTAssertEqual(events.count, 2, "the dinner is created too")
+        // The event to leave for is the one that starts at arrive_at_local.
+        let leaving = events.filter { $0.start == args.arriveAtLocal }
+        XCTAssertEqual(leaving.count, 1)
+        XCTAssertEqual(leaving.first?.location, args.destination)
+    }
+
     func testAStartingPointTheUserSaidIsPassedAsWritten() throws {
         let name = "plan_departure.from_station.json"
         let args = try Fixtures.args(PlanDepartureArgs.self, from: name)

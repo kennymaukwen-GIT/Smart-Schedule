@@ -205,8 +205,8 @@ final class AssistantPromptTests: XCTestCase {
         // that reply, and needs_clarification and the one-tap answers stay.
         let mixed = try XCTUnwrap(scope.first { $0.hasPrefix("- A message with both: ") }, joined)
         XCTAssertEqual(mixed, "- A message with both: do the calendar part and decline the rest in one short sentence, "
-                       + "without the example. If you must ask a question for the calendar part (rules 5 and 7), put "
-                       + "that sentence first in the same reply_to_user, keeping needs_clarification=true and its "
+                       + "without the example. If you must ask a question for the calendar part (rules 5, 7 and 13), "
+                       + "put that sentence first in the same reply_to_user, keeping needs_clarification=true and its "
                        + "suggested_replies. "
                        + "Call reply_to_user at most once per turn.")
         XCTAssertTrue(mixed.contains("put that sentence first"), mixed)
@@ -225,7 +225,7 @@ final class AssistantPromptTests: XCTestCase {
     func testScopeCitesTheRulesThatAskAQuestion() throws {
         let text = prompt()
         let scope = try block("# Scope", in: text)
-        XCTAssertTrue(scope.contains { $0.contains("If you must ask a question for the calendar part (rules 5 and 7)") },
+        XCTAssertTrue(scope.contains { $0.contains("If you must ask a question for the calendar part (rules 5, 7 and 13)") },
                       scope.joined(separator: "\n"))
         let lines = text.components(separatedBy: "\n")
         let rule5 = try XCTUnwrap(lines.first { $0.hasPrefix("5. ") }, text)
@@ -561,24 +561,30 @@ final class AssistantPromptTests: XCTestCase {
         let text = prompt()
         let lines = text.components(separatedBy: "\n")
         let rule = try XCTUnwrap(lines.first { $0.hasPrefix("13. Travel times and departures → plan_departure.") }, text)
-        for phrase in ["Never estimate a travel time or a time to leave yourself, not even in reply_to_user",
-                       "pass its event_id and leave arrive_at_local out",
-                       "the app reads the event's place",
-                       "call create_events with that one event",
+        for phrase in ["Never estimate a travel time or a time to leave yourself, not even in reply_to_user, and never "
+                       + "ask for a starting point.",
+                       // Owner decision 1A: Gemini can't see an event's place, so it passes only the event.
+                       "pass its event_id, without destination or arrive_at_local (the app reads its place and start)",
+                       "call create_events with it (its location the place as written; the message's other new events "
+                       + "go in the same call)",
                        "plan_departure with create_event=true and arrive_at_local = its start, in the same turn",
-                       "create nothing yet and ask how long",
+                       "plan_departure alone, with destination and arrive_at_local",
+                       "call only reply_to_user (needs_clarification=true), one question at a time: the time (rule 7) "
+                       + "first, then the place ('要去哪裡？'), then, for a new event with neither an end nor a length, "
+                       + "how long it lasts",
                        "no default length here",
-                       "ask where they are going ('要去哪裡？')",
-                       "the time (rule 7) first, then the place, then the length",
-                       "'提早 30 分鐘到' or '30 minutes early' = arrive_early_minutes 30",
-                       "('提前 30 分鐘提醒' is reminder_minutes)",
-                       "never ask for a starting point",
+                       "The answer completes the same request",
+                       "keeping the place, minutes early, travel mode and starting point the user said",
+                       "'提早 30 分鐘到' or '30 minutes early' = arrive_early_minutes 30, when to arrive, not "
+                       + "reminder_minutes ('提前 30 分鐘提醒')",
                        "('明天下午 3 點看牙醫', 'lunch at Borough Market at 12:30') is create_events only: no plan_departure."] {
             XCTAssertTrue(rule.contains(phrase), "missing: \(phrase)\n\(rule)")
         }
+        // Being somewhere by a time triggers it, a way of travelling alone does not.
+        XCTAssertTrue(rule.contains("'I need to be at Dishoom by 19:30, I'm driving'"), rule)
         // The Chinese examples stay whole: no line break (and so no space) inside them.
         for example in ["'去台北 101 要多久？'", "'明天看牙醫幾點要出門？'", "'今天下午 5 點要到台北 101 開會'",
-                        "('8 點要到車站，幾點出門？')"] {
+                        "('8 點要到台北車站，幾點出門？')"] {
             XCTAssertTrue(rule.contains(example), example)
         }
         // Every request has it, and it comes right after rule 12.
@@ -587,7 +593,7 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertEqual(thirteen, twelve + 1)
     }
 
-    func testThePromptNeverCarriesAnEventsPlaceOrDeparture() {
+    func testThePromptNeverCarriesAnEventsPlaceOrDeparture() throws {
         // Consent v7 and the privacy policy: Gemini gets titles, times, notes and ids, never an event's place, and
         // nothing about its departure (docs/SETTINGS.md §7.11).
         var event = TestEvents.make(id: "ss101", title: "開會", start: TestClock.local(2026, 10, 13, 17),
@@ -600,6 +606,21 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertEqual(rows, Array(repeating: "ss101 | 開會 | 2026-10-13T17:00 | 2026-10-13T18:00 | event", count: 2), text)
         XCTAssertFalse(text.contains("台北101"), text)
         XCTAssertFalse(text.contains("信義路"), text)
+
+        // An "Ask me first" event waiting for approval: its row has no place or departure either.
+        let batch = PendingEventBatch(id: "batch-abc12345", createdAt: now, utterance: "開會", seed: "s",
+                                      argsJSON: Data("{}".utf8), previewEvents: [event])
+        let pending = prompt(pendingEvents: batch)
+        XCTAssertEqual(try block("# PENDING EVENTS (waiting for approval, NOT in the calendar; batch batch-abc12345)",
+                                 in: pending), ["開會 | 2026-10-13T17:00 | 2026-10-13T18:00 | event"])
+        XCTAssertFalse(pending.contains("信義路"), pending)
+
+        // The AI-suggestions request sends the place (consent item 3) but never the departure.
+        event.departure = DepartureSettings(arriveEarlyMinutes: 15, travelMode: .walking, leaveMinutesBeforeStart: 137)
+        let suggestions = NoteSuggestionPrompt.request(for: event, clock: clock, now: now, chinese: true, alreadySuggested: [])
+        XCTAssertTrue(suggestions.contains("信義路"), suggestions)
+        XCTAssertFalse(suggestions.contains("walking"), suggestions)
+        XCTAssertFalse(suggestions.contains("137"), suggestions)
     }
 
     // MARK: A time counted from now
