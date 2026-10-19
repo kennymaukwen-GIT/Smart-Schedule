@@ -33,7 +33,7 @@ final class TravelTimeTests: XCTestCase {
 
     /// 「今天 5 點要到台北 101 開會，想提早 30 分鐘到」: public transport 22 minutes → leave 15:58, get ready 15:48.
     func testTaipei101ByTransitLeavesAt1558() async throws {
-        let maps = FakeMapsLookup(places: ["台北 101": taipei101], seconds: [.transit: .success(22 * 60)])
+        let maps = FakeMapsLookup(places: ["台北 101": taipei101], seconds: [.transit: .success(1_320)])
         let start = time(taipei, 2026, 10, 19, 17, 0)
         let arriveBy = time(taipei, 2026, 10, 19, 16, 30)
         let estimate = try await service(maps, now: time(taipei, 2026, 10, 19, 14, 0))
@@ -68,7 +68,7 @@ final class TravelTimeTests: XCTestCase {
 
     func testFakeLocationFeedsTheService() async throws {
         let location: any LocationProviding = FakeLocation(result: .success(taipeiStation))
-        let maps = FakeMapsLookup(places: ["台北 101": taipei101], seconds: [.transit: .success(22 * 60)])
+        let maps = FakeMapsLookup(places: ["台北 101": taipei101], seconds: [.transit: .success(1_320)])
         let here = try await location.currentLocation()
         let estimate = try await service(maps).estimate(to: "台北 101", from: .current(here), mode: nil, arriveBy: nil)
         XCTAssertEqual(estimate.start, taipeiStation)
@@ -126,7 +126,7 @@ final class TravelTimeTests: XCTestCase {
     func testNoPublicTransportRouteFallsBackToDrivingAsAnEstimate() async throws {
         let maps = FakeMapsLookup(places: ["露營地": GeoPoint(latitude: 24.9, longitude: 121.6)],
                                   seconds: [.transit: .failure(TravelTimeError.routeUnavailable),
-                                            .driving: .success(90 * 60)])
+                                            .driving: .success(5_400)])
         let estimate = try await service(maps).estimate(to: "露營地", from: .current(taipei101), mode: nil,
                                                          arriveBy: nil)
         XCTAssertEqual(estimate.mode, .driving)
@@ -139,7 +139,7 @@ final class TravelTimeTests: XCTestCase {
     func testAModeTheUserAskedForIsNeverSwapped() async {
         let maps = FakeMapsLookup(places: ["露營地": GeoPoint(latitude: 24.9, longitude: 121.6)],
                                   seconds: [.transit: .failure(TravelTimeError.routeUnavailable),
-                                            .driving: .success(90 * 60)])
+                                            .driving: .success(5_400)])
         await assertThrows(.routeUnavailable) {
             _ = try await self.service(maps).estimate(to: "露營地", from: .current(self.taipei101), mode: .transit,
                                                      arriveBy: nil)
@@ -186,7 +186,7 @@ final class TravelTimeTests: XCTestCase {
         let origin = GeoPoint(latitude: 25, longitude: 121.5)
         let near = GeoPoint(latitude: 27.69, longitude: 121.5)   // 299.1 km
         let far = GeoPoint(latitude: 27.71, longitude: 121.5)    // 301.3 km
-        let maps = FakeMapsLookup(places: ["near": near, "far": far], seconds: [.driving: .success(4 * 3_600)])
+        let maps = FakeMapsLookup(places: ["near": near, "far": far], seconds: [.driving: .success(14_400)])
         let estimate = try await service(maps).estimate(to: "near", from: .current(origin), mode: nil, arriveBy: nil)
         XCTAssertEqual(estimate.minutes, 240)
         await assertThrows(.tooFar) {
@@ -196,7 +196,7 @@ final class TravelTimeTests: XCTestCase {
 
     func testMoreThan24HoursOfTravelIsTooFar() async throws {
         let maps = FakeMapsLookup(places: ["台北 101": taipei101],
-                                  seconds: [.walking: .success(24 * 3_600), .driving: .success(24 * 3_600 + 1)])
+                                  seconds: [.walking: .success(86_400), .driving: .success(86_401)])
         let walk = try await service(maps).estimate(to: "台北 101", from: .current(taipeiStation), mode: .walking,
                                                      arriveBy: nil)
         XCTAssertEqual(walk.minutes, 1_440)
