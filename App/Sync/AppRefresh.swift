@@ -7,6 +7,22 @@ enum AppRefresh {
     /// "Not before": iOS picks the actual time.
     static let earliestInterval: TimeInterval = 15 * 60
 
+    /// Registers the handler for `AppConstants.backgroundRefreshTaskID`. Call it once, from
+    /// `application(_:didFinishLaunchingWithOptions:)`: BGTaskScheduler wants every launch handler registered before
+    /// launch finishes and stops the app on a second registration. Not SwiftUI's `.backgroundTask(.appRefresh)`, which
+    /// registers it with the scene: when iOS launched the app to run the Control Center button's intent (no scene
+    /// yet), the app crashed as it opened (the same report in Apple's developer forums, thread 779354).
+    static func registerHandler() {
+        _ = BGTaskScheduler.shared.register(forTaskWithIdentifier: AppConstants.backgroundRefreshTaskID,
+                                            using: nil) { task in
+            let work = Task {
+                await AppRefresh.run()
+                task.setTaskCompleted(success: !Task.isCancelled)
+            }
+            task.expirationHandler = { work.cancel() }
+        }
+    }
+
     static func schedule() {
         let request = BGAppRefreshTaskRequest(identifier: AppConstants.backgroundRefreshTaskID)
         request.earliestBeginDate = Date(timeIntervalSinceNow: earliestInterval)

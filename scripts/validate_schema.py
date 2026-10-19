@@ -37,6 +37,10 @@
     time phrase in its title, no reminder_minutes (the app gives an item created for later the same day a reminder
     10 minutes before and one at the start, ReminderPolicy.sameDayMinutes) and no end.
 
+11. Background refresh is registered with BGTaskScheduler in AppDelegate's didFinishLaunching (AppRefresh.registerHandler),
+    once, never with SwiftUI's .backgroundTask scene modifier: when iOS launched the app to run the Control Center
+    button's App Intent, the scene-registered handler made the app crash as it opened (owner's iPhone, 2026-10-19).
+
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
 from __future__ import annotations
@@ -728,6 +732,30 @@ def notification_extension_checks() -> None:
         print(f"✓ Notification content extension links UserNotifications + UserNotificationsUI; categories {configured}")
 
 
+def background_task_checks() -> None:
+    """Check 11: BGTaskScheduler wants every launch handler registered before launch finishes. SwiftUI's
+    `.backgroundTask` registers it with the scene, which crashed the app when iOS launched it for an App Intent."""
+    registrations = 0
+    for directory in SWIFT_DIRS:
+        for path in sorted((ROOT / directory).rglob("*.swift")):
+            relative = path.relative_to(ROOT)
+            code = re.sub(r"//.*", "", path.read_text(encoding="utf-8"))
+            if re.search(r"\.backgroundTask\s*\(", code):
+                errors.append(f"{relative}: SwiftUI .backgroundTask crashes the app when an App Intent launches it; "
+                              "register with BGTaskScheduler in AppRefresh.registerHandler instead")
+            registrations += len(re.findall(r"BGTaskScheduler\.shared\.register\s*\(", code))
+    if registrations != 1:
+        errors.append(f"BGTaskScheduler.shared.register appears {registrations} times; register the refresh handler "
+                      "exactly once (AppRefresh.registerHandler)")
+    app = re.sub(r"//.*", "", (ROOT / "App/SmartScheduleApp.swift").read_text(encoding="utf-8"))
+    launch = re.search(r"didFinishLaunchingWithOptions[^{]*\{(.*?)\n        return true", app, re.S)
+    if not launch or "AppRefresh.registerHandler()" not in launch.group(1):
+        errors.append("App/SmartScheduleApp.swift: AppDelegate's didFinishLaunching must call AppRefresh.registerHandler() "
+                      "before returning")
+    else:
+        print("✓ Background refresh registered once, in didFinishLaunching (no SwiftUI .backgroundTask)")
+
+
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
     by_name = {}
@@ -789,6 +817,7 @@ def main() -> int:
     print(f"✓ Voice input on the iPhone only: {voice_checks()} recognition request(s) with requiresOnDeviceRecognition "
           f"= true in {VOICE_DIR}; usage descriptions for the app target only (en + zh-Hant)")
     notification_extension_checks()
+    background_task_checks()
 
     if errors:
         print("\n".join(f"✗ {e}" for e in errors), file=sys.stderr)

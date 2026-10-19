@@ -75,9 +75,6 @@ struct SmartScheduleApp: App {
             default: break
             }
         }
-        .backgroundTask(.appRefresh(AppConstants.backgroundRefreshTaskID)) {
-            await AppRefresh.run()
-        }
     }
 }
 
@@ -158,6 +155,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Before launch finishes, every time: also when iOS launches the app for an App Intent (AppRefresh).
+        AppRefresh.registerHandler()
         UNUserNotificationCenter.current().delegate = self
         NotificationIDs.registerCategories()
         // Every sync that changes the cache reschedules reminders and refreshes the Live Activity.

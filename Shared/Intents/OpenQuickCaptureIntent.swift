@@ -30,16 +30,11 @@ struct OpenQuickCaptureIntent: OpenIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        // Which process ran it (app or widget extension) and, on iOS 26, in which mode: Console.app, subsystem
-        // com.smartschedules.app, category QuickCapture.
-        let process = Bundle.main.bundleIdentifier ?? "?"
-        if #available(iOS 26.0, *) {
-            let mode = String(describing: systemContext.currentMode)
-            quickCaptureLog.notice("Open Quick Capture: perform() in \(process, privacy: .public), mode \(mode, privacy: .public)")
-        } else {
-            quickCaptureLog.notice("Open Quick Capture: perform() in \(process, privacy: .public)")
-        }
         DeepLinkRequests.open(DeepLink.compose)
+        // Which process ran it (the app, or the widget extension): Console.app, subsystem com.smartschedules.app,
+        // category QuickCapture. Logged after the hand-off, so nothing can stand in its way.
+        let process = Bundle.main.bundleIdentifier ?? "?"
+        quickCaptureLog.notice("Open Quick Capture: perform() in \(process, privacy: .public)")
         return .result()
     }
 }
