@@ -128,6 +128,11 @@ final class AppRouter {
         var id = UUID()
     }
 
+    struct AgendaDay: Identifiable, Equatable {
+        let date: Date
+        var id: Date { date }
+    }
+
     /// The sheets the main screen presents.
     enum Sheet: String, Identifiable {
         /// The avatar: Google accounts (and Smart Schedules Pro when `AppConstants.subscriptionsEnabled`).
@@ -146,6 +151,9 @@ final class AppRouter {
     /// tap's `perform()` doesn't open it again (`handleIntentLink`).
     @ObservationIgnored private var sceneOpenedQuickCaptureAt: Date?
     var selectedEventID: String?
+    /// The day whose events are listed (`DayAgendaSheet`): a date tapped in the main month grid. Like the other sheets
+    /// it stays when Quick Capture opens (an event page open over the list could hold an edit).
+    var agendaDay: AgendaDay?
     /// The calendar drawer (hamburger): accounts, calendars, visibility.
     var isDrawerOpen = false
     var sheet: Sheet?
@@ -154,7 +162,7 @@ final class AppRouter {
     /// while `selectedEventID` names an event the schedule has). The mic doesn't listen under them
     /// (`ComposerBar.isCovered`).
     func coversQuickCapture(_ schedule: ScheduleViewModel) -> Bool {
-        isDrawerOpen || sheet != nil || selectedEventID.flatMap(schedule.event(id:)) != nil
+        isDrawerOpen || sheet != nil || agendaDay != nil || selectedEventID.flatMap(schedule.event(id:)) != nil
     }
 
     /// iOS 26: the Control Center button's intent reached the scene before the app is shown (`QuickCaptureSceneRouting`).

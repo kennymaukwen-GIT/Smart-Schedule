@@ -39,7 +39,9 @@ struct MainView: View {
                     } else {
                         router.selectedEventID = event.id
                     }
-                }
+                },
+                // A date: all of that day's events, by time (DayAgendaSheet).
+                onSelectDay: { day in router.agendaDay = AppRouter.AgendaDay(date: day) }
             )
             // A new time zone or first weekday lays the pages out again from `displayedMonth`.
             .id(schedule.clockID)

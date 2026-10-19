@@ -12,6 +12,8 @@ struct MonthGridView: View {
     let isLoading: Bool
     let eventsOnDay: (Date) -> [ScheduleEvent]
     let onSelect: (ScheduleEvent) -> Void
+    /// A tap on a date (its number, the free space under the chips or "+N"); a chip still opens its own event.
+    var onSelectDay: ((Date) -> Void)?
     /// False on the main screen, whose header already names the month.
     var showsTitle = true
 
@@ -26,13 +28,15 @@ struct MonthGridView: View {
          isLoading: Bool = false,
          showsTitle: Bool = true,
          eventsOnDay: @escaping (Date) -> [ScheduleEvent],
-         onSelect: @escaping (ScheduleEvent) -> Void) {
+         onSelect: @escaping (ScheduleEvent) -> Void,
+         onSelectDay: ((Date) -> Void)? = nil) {
         _month = month
         self.today = today
         self.isLoading = isLoading
         self.showsTitle = showsTitle
         self.eventsOnDay = eventsOnDay
         self.onSelect = onSelect
+        self.onSelectDay = onSelectDay
         _anchor = State(initialValue: CalendarPaging.monthStart(containing: month.wrappedValue,
                                                                 calendar: WallClock().calendar))
         _page = State(initialValue: 0)
@@ -83,7 +87,8 @@ struct MonthGridView: View {
                                            eventsOnDay: eventsOnDay,
                                            maxChips: maxChips,
                                            calendar: calendar,
-                                           onSelect: onSelect)
+                                           onSelect: onSelect,
+                                           onSelectDay: onSelectDay)
                                 .containerRelativeFrame(.horizontal)
                         }
                     }
@@ -172,6 +177,7 @@ private struct MonthWeeksPage: View {
     let maxChips: Int
     let calendar: Calendar
     let onSelect: (ScheduleEvent) -> Void
+    let onSelectDay: ((Date) -> Void)?
 
     var body: some View {
         let monthInterval = CalendarPaging.monthInterval(containing: month, calendar: calendar)
@@ -188,7 +194,8 @@ private struct MonthWeeksPage: View {
                                 events: eventsOnDay(day),
                                 maxChips: maxChips,
                                 calendar: calendar,
-                                onSelect: onSelect
+                                onSelect: onSelect,
+                                onSelectDay: onSelectDay
                             )
                         }
                     }
@@ -207,6 +214,7 @@ private struct DayCell: View {
     let maxChips: Int
     let calendar: Calendar
     let onSelect: (ScheduleEvent) -> Void
+    let onSelectDay: ((Date) -> Void)?
 
     var body: some View {
         VStack(spacing: 2) {
@@ -228,6 +236,9 @@ private struct DayCell: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 64, alignment: .top)
+        // The whole cell, gaps included; a chip's own tap (above) wins over this one.
+        .contentShape(Rectangle())
+        .onTapGesture { onSelectDay?(day) }
         .opacity(isInMonth ? 1 : 0.55)
     }
 }

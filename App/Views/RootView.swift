@@ -65,6 +65,14 @@ struct RootView: View {
                 .environment(chat)
                 .environment(\.timeZone, schedule.clock.timeZone)
         }
+        // A date tapped in the month grid: that day's events, by time. Its rows open the event page over it.
+        .sheet(item: $router.agendaDay) { request in
+            DayAgendaSheet(day: request.date)
+                .environment(router)
+                .environment(schedule)
+                .environment(chat)
+                .environment(\.timeZone, schedule.clock.timeZone)
+        }
         .sheet(item: $router.sheet) { sheet in
             Group {
                 switch sheet {
