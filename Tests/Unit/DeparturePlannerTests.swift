@@ -173,27 +173,28 @@ final class DeparturePlannerTests: XCTestCase {
     func testTaipei101IsPercentEncodedAsUTF8() {
         let url = DeparturePlanner.googleMapsURL(destination: "台北101", mode: .transit)
         XCTAssertEqual(url.absoluteString,
-                       "https://www.google.com/maps/dir/?api=1&destination=%E5%8F%B0%E5%8C%97101&travelmode=transit")
+                       "https://www.google.com/maps/dir/?api=1&destination=%E5%8F%B0%E5%8C%97101&travelmode=transit&dir_action=navigate")
     }
 
     func testAnApostropheAndSpacesAreEncoded() {
         let url = DeparturePlanner.googleMapsURL(destination: "St Mary's School", mode: .driving)
         XCTAssertEqual(url.absoluteString,
-                       "https://www.google.com/maps/dir/?api=1&destination=St%20Mary%27s%20School&travelmode=driving")
+                       "https://www.google.com/maps/dir/?api=1&destination=St%20Mary%27s%20School&travelmode=driving&dir_action=navigate")
     }
 
     func testAmpersandAndHashCannotSplitTheLink() {
         let url = DeparturePlanner.googleMapsURL(destination: "Smith & Sons, 12 High St #3", mode: .walking)
         XCTAssertEqual(url.absoluteString,
-                       "https://www.google.com/maps/dir/?api=1&destination=Smith%20%26%20Sons%2C%2012%20High%20St%20%233&travelmode=walking")
+                       "https://www.google.com/maps/dir/?api=1&destination=Smith%20%26%20Sons%2C%2012%20High%20St%20%233&travelmode=walking&dir_action=navigate")
         XCTAssertNil(url.fragment)
-        XCTAssertEqual(queryItems(url), ["api": "1", "destination": "Smith & Sons, 12 High St #3", "travelmode": "walking"])
+        XCTAssertEqual(queryItems(url), ["api": "1", "destination": "Smith & Sons, 12 High St #3", "travelmode": "walking",
+                                         "dir_action": "navigate"])
     }
 
     func testOtherReservedCharactersAreEncoded() {
         let url = DeparturePlanner.googleMapsURL(destination: "C++ Café, Level 2/3? a=b; x:y @z", mode: .transit)
         XCTAssertEqual(url.absoluteString,
-                       "https://www.google.com/maps/dir/?api=1&destination=C%2B%2B%20Caf%C3%A9%2C%20Level%202%2F3%3F%20a%3Db%3B%20x%3Ay%20%40z&travelmode=transit")
+                       "https://www.google.com/maps/dir/?api=1&destination=C%2B%2B%20Caf%C3%A9%2C%20Level%202%2F3%3F%20a%3Db%3B%20x%3Ay%20%40z&travelmode=transit&dir_action=navigate")
     }
 
     func testEveryPlaceComesBackExactly() {
@@ -205,14 +206,15 @@ final class DeparturePlannerTests: XCTestCase {
     }
 
     func testEachModeIsGooglesTravelMode() {
-        XCTAssertEqual(DeparturePlanner.googleMapsURL(destination: "台北101", mode: .transit).absoluteString.hasSuffix("&travelmode=transit"), true)
-        XCTAssertEqual(DeparturePlanner.googleMapsURL(destination: "台北101", mode: .driving).absoluteString.hasSuffix("&travelmode=driving"), true)
-        XCTAssertEqual(DeparturePlanner.googleMapsURL(destination: "台北101", mode: .walking).absoluteString.hasSuffix("&travelmode=walking"), true)
+        for mode in TravelMode.allCases {
+            XCTAssertEqual(queryItems(DeparturePlanner.googleMapsURL(destination: "台北101", mode: mode))["travelmode"],
+                           mode.rawValue)
+        }
     }
 
     func testOnlyTheDestinationIsSent() {
         let url = DeparturePlanner.googleMapsURL(destination: "台北101", mode: .transit)
-        XCTAssertEqual(Set(queryItems(url).keys), ["api", "destination", "travelmode"], "no origin, no coordinates")
+        XCTAssertEqual(Set(queryItems(url).keys), ["api", "destination", "travelmode", "dir_action"], "no origin, no coordinates")
         XCTAssertTrue(url.absoluteString.hasPrefix("https://www.google.com/maps/dir/?api=1&destination="))
     }
 
@@ -236,12 +238,12 @@ final class DeparturePlannerTests: XCTestCase {
     func testAnEmptyPlaceGivesAnEmptyDestination() {
         // Callers don't offer directions without a place; this pins what the link would be.
         XCTAssertEqual(DeparturePlanner.googleMapsURL(destination: " \n ", mode: .transit).absoluteString,
-                       "https://www.google.com/maps/dir/?api=1&destination=&travelmode=transit")
+                       "https://www.google.com/maps/dir/?api=1&destination=&travelmode=transit&dir_action=navigate")
     }
 
-    /// Google: "URLs are limited to 2,048 characters". 51 characters before the place and 19 after leave 1,978.
+    /// Google: "URLs are limited to 2,048 characters". 51 characters before the place and 39 after leave 1,958.
     func testALongPlaceIsCutAtGooglesLimit() {
-        let fits = String(repeating: "a", count: 1_978)
+        let fits = String(repeating: "a", count: 1_958)
         let exact = DeparturePlanner.googleMapsURL(destination: fits, mode: .driving)
         XCTAssertEqual(exact.absoluteString.count, DeparturePlanner.googleMapsURLLimit)
         XCTAssertEqual(queryItems(exact)["destination"], fits, "a place that fits is kept whole")
@@ -249,12 +251,12 @@ final class DeparturePlannerTests: XCTestCase {
         let cut = DeparturePlanner.googleMapsURL(destination: fits + "b", mode: .driving)
         XCTAssertEqual(queryItems(cut)["destination"], fits)
 
-        // 台 takes 9 characters encoded: 219 of them fit (1,971), the 220th does not.
+        // 台 takes 9 characters encoded: 217 of them fit (1,953), the 218th does not.
         let chinese = String(repeating: "台", count: 300)
         let url = DeparturePlanner.googleMapsURL(destination: chinese, mode: .transit)
         XCTAssertLessThanOrEqual(url.absoluteString.count, DeparturePlanner.googleMapsURLLimit)
-        XCTAssertEqual(queryItems(url)["destination"], String(repeating: "台", count: 219), "never half a character")
-        XCTAssertTrue(url.absoluteString.hasSuffix("&travelmode=transit"))
+        XCTAssertEqual(queryItems(url)["destination"], String(repeating: "台", count: 217), "never half a character")
+        XCTAssertTrue(url.absoluteString.hasSuffix("&travelmode=transit&dir_action=navigate"))
     }
 
     func testTravelModeRawValuesMatchGoogleMaps() {

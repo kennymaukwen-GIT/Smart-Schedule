@@ -81,11 +81,14 @@ enum DeparturePlanner {
     /// typed it or as the event's location has it, put on one line (`mapsText`) and, past Google's 2,048-character
     /// limit, cut short at a whole character. Never coordinates, Apple's place data or a starting point
     /// (docs/SETTINGS.md §7.11), so there is no `origin`: Google Maps usually starts from the device's location and
-    /// otherwise asks for a starting point. Callers pass a non-empty place; an empty one opens an empty directions form.
-    /// Google's format: https://www.google.com/maps/dir/?api=1&destination=…&travelmode=…
+    /// otherwise asks for a starting point. `dir_action=navigate` starts turn-by-turn navigation right away (owner
+    /// decision 2026-10-19: 「出發」 starts navigating); Google shows the route instead where navigation isn't available
+    /// ("in those cases this parameter will be ignored"), for example in a browser or on some transit routes. Callers
+    /// pass a non-empty place; an empty one opens an empty directions form.
+    /// Google's format: https://www.google.com/maps/dir/?api=1&destination=…&travelmode=…&dir_action=navigate
     static func googleMapsURL(destination: String, mode: TravelMode) -> URL {
         let prefix = "https://www.google.com/maps/dir/?api=1&destination="
-        let suffix = "&travelmode=\(mode.rawValue)"
+        let suffix = "&travelmode=\(mode.rawValue)&dir_action=navigate"
         let budget = googleMapsURLLimit - prefix.count - suffix.count
         var encoded = ""
         var length = 0
