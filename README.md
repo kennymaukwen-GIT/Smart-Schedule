@@ -71,7 +71,7 @@ AI 做好一個長期計畫後，不會馬上寫進 Google Calendar，而是先�
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 平台限制對照表、process 和資料邊界、各介面的框架選型、延遲預算、安全、打破框架的建議 |
 | [`docs/SETTINGS.md`](docs/SETTINGS.md) | 新介面和設定功能的規格：畫面、資料模型、儲存、多帳號同步、`update_preferences`、通知、AI 同意、訂閱、匯出與清除、上架前檢查清單 |
-| [`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) | 9 個函式的 schema 設計理由（包括備註建議的 `suggest_event_notes` 和 `create_events` 的 `suggested_notes`）、request 和 response 範例、Gemini 3 thought signatures |
+| [`docs/GEMINI_FUNCTION_CALLING.md`](docs/GEMINI_FUNCTION_CALLING.md) | 10 個函式的 schema 設計理由（包括備註建議的 `suggest_event_notes`、`create_events` 的 `suggested_notes`，和建置中的出發提醒 `plan_departure`）、request 和 response 範例、Gemini 3 thought signatures |
 | [`docs/GOOGLE_CALENDAR_SYNC.md`](docs/GOOGLE_CALENDAR_SYNC.md) | OAuth PKCE、欄位對應、時區和 DST、RRULE、提醒（24h／1h／30m）、idempotent 寫入、雙向同步 |
 | [`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md) | Hold-to-spawn 流程、Info.plist、兩條輸入路徑、提醒來源（Smart Schedules／Google／兩者）、緊急程度、安靜時段、每日摘要、每日上限、64 個通知上限、略過提醒的學習 |
 | [`docs/google-oauth-verification.md`](docs/google-oauth-verification.md) | Google OAuth 品牌驗證和敏感 scope 驗證：要填的欄位、scope 用途說明（英文）、AI 資料使用說明、示範影片分鏡、送審順序、常見退件原因、回覆審查信的範本 |
@@ -177,7 +177,7 @@ open SmartSchedule.xcodeproj
 
 | 項目 | 狀態 |
 |---|---|
-| Gemini schema lint（OpenAPI subset，9 個函式）、16 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文）、1.0 不賣訂閱（`AppConstants.subscriptionsEnabled` 是 false，用到 StoreKit 或訂閱文字的檔案都讀這個旗標；1.1 的 AI 訂閱建置時一起改） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
+| Gemini schema lint（OpenAPI subset，10 個函式）、29 個 fixture 的 JSON Schema 驗證、DST 和 RRULE 參考測試、String Catalog（每個 key 都有繁體中文）、1.0 不賣訂閱（`AppConstants.subscriptionsEnabled` 是 false，用到 StoreKit 或訂閱文字的檔案都讀這個旗標；1.1 的 AI 訂閱建置時一起改） | ✅ `python3 -I scripts/validate_schema.py`，CI 每次 push 都會跑 |
 | Swift 編譯（App、Widgets、Notification extension） | ⏳ 設定、多帳號改動後待 CI 重新編譯（GitHub Actions 的 macOS runner：xcodegen 加 xcodebuild） |
 | 單元測試 | ⏳ 設定、多帳號改動後待 CI 重跑（hostless `SmartScheduleCoreTests`） |
 | 只能在實機上確認的行為（控制中心打開快速輸入、iOS 26 排程啟動的 Live Activity、iOS 18 打開 App 時出現的 Live Activity（1.0 沒有 push-to-start）、通知內 inline TextField、160 pt 高度） | ⏳ 清單在 `docs/ARCHITECTURE.md` 第 7 節 |

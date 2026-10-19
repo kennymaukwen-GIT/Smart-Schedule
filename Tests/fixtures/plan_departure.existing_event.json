@@ -1,0 +1,12 @@
+{
+  "utterance": "明天看牙醫幾點要出門？",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "upcoming": "ssd3nt1st | Dentist | 2026-10-14T09:00 | 2026-10-14T09:45 | event",
+  "expected_call": {
+    "name": "plan_departure",
+    "args": {
+      "event_id": "ssd3nt1st"
+    }
+  }
+}

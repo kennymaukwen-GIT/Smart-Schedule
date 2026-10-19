@@ -1,0 +1,21 @@
+{
+  "utterance": "今天下午 5 點要到台北 101 開會，想提早 30 分鐘到",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "reply_to_user",
+    "args": {
+      "message": "台北 101 的會議會開多久？",
+      "needs_clarification": true,
+      "suggested_replies": [
+        "30 分鐘",
+        "1 小時",
+        "2 小時"
+      ]
+    }
+  },
+  "must_not_call": [
+    "plan_departure",
+    "create_events"
+  ]
+}

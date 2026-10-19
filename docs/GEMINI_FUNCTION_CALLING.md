@@ -3,7 +3,7 @@
 唯一的 schema 來源是 [`Shared/AI/FunctionDeclarations.json`](../Shared/AI/FunctionDeclarations.json)，App 和 notification extension 都直接讀這個檔，作為 bundle resource 載入。
 驗證方式：`python3 -I scripts/validate_schema.py --print-payloads`（lint、fixtures、DST 參考測試）。
 
-## 1. 為什麼拆成 9 個函式，而不是一個大函式
+## 1. 為什麼拆成 10 個函式，而不是一個大函式
 
 需求是「一個 schema 同時處理單一事件和長期計畫」。實作上用的是**一組 toolset**，由模型自己選要呼叫哪一個：
 
@@ -17,6 +17,7 @@
 | `confirm_plan` | 使用者對畫面上的草稿計畫或「等你確認的行程」說「好」「looks good」或「不要了」 | `decision`：`add` 或 `discard`。只有 prompt 裡有 DRAFT PLAN 或 PENDING EVENTS 區塊時才能呼叫；兩個都有時，套用在比較新的那個 |
 | `reply_to_user` | 缺資訊時追問，或婉拒（行程和時間以外的要求一律用它婉拒，不帶 `needs_clarification` 和 `suggested_replies`；也可以和其他呼叫一起婉拒離題的部分，每一輪最多一次，見第 13.1 節） | `suggested_replies` 讓使用者一鍵回答 |
 | `update_preferences` | 「以後」「從現在開始」「別再」「always」這類**長期**指示：「8 點前不要提醒我」「健身提前 2 小時提醒」「以後用學校帳號」 | `changes[]`（`key` 是 18 個固定值之一，`value` 依 key 編碼）+ `summary_for_user`。只改設定，不碰行事曆；App 顯示「設定已更新」卡片並提供復原（見第 10 節） |
+| `plan_departure` | 「去台北 101 要多久？」「明天看牙醫幾點要出門？」「今天下午 5 點要到台北 101 開會」（出發提醒「該出發了」，**建置中**） | 全部選填：`destination`、`starting_point` 是使用者自己說的字；行事曆裡的行程只傳 `event_id`（Gemini 看不到行程地點）；新行程同一輪再呼叫 `create_events`，`create_event=true`。交通時間和出發時間由 App 用 Apple 地圖算，Gemini 不估算（見第 14 節） |
 | `suggest_event_notes` | 行程頁按「✨ AI 建議」：這個行程可能需要帶什麼、準備什麼 | **只在自己的 request 裡用**（mode ANY、`allowedFunctionNames` 只有它），聊天的每一輪都不允許呼叫。`items[]`（2–4 個）+ 選填的 `reason`。不寫入任何東西（見第 12 節） |
 
 不做成一個大函式加 `oneOf` 的理由：
@@ -28,7 +29,7 @@
 
 | 決策 | 原因 |
 |---|---|
-| `functionCallingConfig.mode = "ANY"` | 每一輪都**一定**是結構化呼叫，純聊天走 `reply_to_user`。解析結果可預測，不需要處理自由文字。聊天時 `allowedFunctionNames` 是 `AssistantFunction.conversational`（`suggest_event_notes` 以外的 8 個） |
+| `functionCallingConfig.mode = "ANY"` | 每一輪都**一定**是結構化呼叫，純聊天走 `reply_to_user`。解析結果可預測，不需要處理自由文字。聊天時 `allowedFunctionNames` 是 `AssistantFunction.conversational`（`suggest_event_notes` 以外的 9 個） |
 | 時間一律輸出**本地牆上時間** `YYYY-MM-DDTHH:mm`（不帶 offset、不帶 Z） | 模型最常犯的錯是算 offset，尤其跨夏令時間時。由 client 加上 IANA `timeZone`，交給 Google 展開，DST 就不會出錯（見 Calendar 文件第 3 節） |
 | `sessions` 攤平，用 `phase_index` 指回所屬階段，不巢狀在 `phases` 底下 | 減少 2 層巢狀，降低格式錯誤率 |
 | `summary_for_user` 放在函式參數裡 | 模型解析的同時也把要回給使用者的話寫好了，**一次 round trip** 就完成，不用執行完再呼叫第二次產生回覆，大約省 1 秒。內容只寫 1–2 句（見第 6 節） |
@@ -57,7 +58,7 @@ App Attest 在 iOS 的 app extension 裡不能用（Apple 文件：`generateKey`
     { "role": "user", "parts": [{ "text": "I want to be muscular in 6 month design me a daily routine" }] }
   ],
   "tools": [{ "functionDeclarations": [ "...FunctionDeclarations.json..." ] }],
-  "toolConfig": { "functionCallingConfig": { "mode": "ANY", "allowedFunctionNames": ["create_events", "…（suggest_event_notes 以外的 8 個）"] } },
+  "toolConfig": { "functionCallingConfig": { "mode": "ANY", "allowedFunctionNames": ["create_events", "…（suggest_event_notes 以外的 9 個）"] } },
   "safetySettings": [
     { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
     { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE" },
@@ -214,7 +215,7 @@ App Store 審查規則 5.1.2(i)（2025 年 11 月）：把個人資料分享給�
 
 ## 9. 模型設定
 
-**`create_events` 不寫 `minItems`／`maxItems`（2026-10-17）。** gemini-3.8-flash 在 `mode: ANY` 下，只要 `create_events` 的結構裡有 `minItems` 或 `maxItems`（`events` 1–20、`reminder_minutes` 最多 5、`suggested_notes` 最多 4），整個請求就回 `400 INVALID_ARGUMENT Request contains an invalid argument.`，沒有欄位說明；其他 8 個函式單獨送都正常，`mode: AUTO` 也正常（`npm run check-request` 逐一測出來的）。所以這三個上限改寫在描述裡（"at least 1 and at most 20"、"Max 5 values"、"Up to 4"），由 App 自己執行：`ScheduleAssistant` 只取前 20 筆（`args.events.prefix(20)`）、`ReminderPolicy` 最多 5 個提醒（`googleMaxOverrides`）、`NoteSuggester.cleanedItems` 最多 4 項。`scripts/validate_schema.py` 和 `SuggestedNotesTests` 會擋住有人把它們加回去。其他函式的 `minItems`／`maxItems` 照舊。換模型時先跑一次 `npm run check-request`。
+**`create_events` 不寫 `minItems`／`maxItems`（2026-10-17）。** gemini-3.8-flash 在 `mode: ANY` 下，只要 `create_events` 的結構裡有 `minItems` 或 `maxItems`（`events` 1–20、`reminder_minutes` 最多 5、`suggested_notes` 最多 4），整個請求就回 `400 INVALID_ARGUMENT Request contains an invalid argument.`，沒有欄位說明；其他 8 個函式單獨送都正常，`mode: AUTO` 也正常（`npm run check-request` 逐一測出來的；2026-10-19 加入的 `plan_departure` 也沒有 `minItems`／`maxItems`，validator 第 15 項會擋）。所以這三個上限改寫在描述裡（"at least 1 and at most 20"、"Max 5 values"、"Up to 4"），由 App 自己執行：`ScheduleAssistant` 只取前 20 筆（`args.events.prefix(20)`）、`ReminderPolicy` 最多 5 個提醒（`googleMaxOverrides`）、`NoteSuggester.cleanedItems` 最多 4 項。`scripts/validate_schema.py` 和 `SuggestedNotesTests` 會擋住有人把它們加回去。其他函式的 `minItems`／`maxItems` 照舊。換模型時先跑一次 `npm run check-request`。
 
 - `GEMINI_MODEL_ID`：由 xcconfig 注入，預設 `gemini-3.8-flash`（2026-10-17 從 `gemini-3.5-flash` 換過來；1.0 還沒上架，Worker 的 `SESSION_MODELS` 只留 3.8）。2.5 系列已經過了公告的最早關機日（2026-10-16），3.x 的版本也換得很快。**上線前到 ai.google.dev/gemini-api/docs/deprecations 確認 ID**，最好改成 remote config。換 ID 前先把它加進 Worker 的 `SESSION_MODELS`（`server/worker/wrangler.toml`）並部署，舊 ID 留到舊版 App 不再使用；remote config 能選的每個模型也都要在裡面，否則通知擴充的回覆會被拒。
 - `thinkingLevel: "low"`：只對 Gemini 3.x 有效。2.x 用的是 `thinkingBudget`，參數不相容。
@@ -318,7 +319,7 @@ Gemini 看到的行事曆和帳號都經過 `CalendarAliases`（`Shared/AI/Calen
 python3 -I scripts/validate_schema.py --print-payloads
 ```
 - Lint 只允許 Gemini OpenAPI subset 支援的 key；檢查 `required` 是否都存在、`enum` 是否只用在 string 上、陣列是否都有 `items`。
-- 用 JSON Schema 驗證 `Tests/fixtures/*.json` 裡的 `expected_call`。
+- 用 JSON Schema 驗證 `Tests/fixtures/*.json` 裡的 `expected_call`，以及同一輪的其他呼叫 `also_calls`（例如 `plan_departure` 旁邊的 `create_events`）；`must_not_call` 列出這一輪不能呼叫的函式。
 - Python 參考版的 mapper 會重算 RRULE、UNTIL（UTC）和 DTSTART 對齊，並 assert 倫敦 GMT 和 BST 的邊界值。
 - 草稿預覽的參考展開（`--print-payloads` 會印出每個計畫 fixture 的預覽數量），並 assert 18:30 在兩次夏令時間切換前後都不變。
 - `confirm_plan` 的 fixture 必須帶 `draft_plan`；帶 `revises` 的 fixture 必須是 `create_long_term_plan`，而且保留原本的 `plan_title`。
@@ -327,6 +328,7 @@ python3 -I scripts/validate_schema.py --print-payloads
 - 備註建議（第 12 節）：`suggest_event_notes` 的 `items` 和 `create_events` 的 `suggested_notes` 每項最多 40 字、跟行程標題同一種語言、沒有項目符號或句點、不重複、沒有價格或劑量，也不能重複行程備註或 request 的 `ALREADY SUGGESTED` 那一行已經有的東西；`suggest_event_notes` 的 fixture 要帶 `event`，`utterance` 就是 App 送出的那段文字。另外檢查 `suggest_event_notes` 宣告存在（`items` 必填、最多 4 個），`create_events.events[].suggested_notes` 是選填、最多 4 個。
 - 從現在起算的時間（第 2 節、prompt 規則 7）：帶 `relative_minutes` 的 fixture，`utterance` 要有這種說法，而且只建立一個行程：開始時間是 `now_local` 加上那麼多分鐘（過午夜就是隔天），標題沒有時間的說法，沒有 `reminder_minutes`（App 自己給當天稍後的項目 10 分鐘前和開始時的提醒），沒有 `end`。
 - String Catalog：每個 key 都有 zh-Hant 翻譯、格式參數一致，原始碼裡的每個 `String(localized:)` 都在 catalog 裡。
+- `plan_departure`（第 14 節，validator 第 15 項）：沒有必填欄位；`travel_mode` 的 enum 就是 App 的 `TravelMode`，`arrive_early_minutes` 的範圍就是 `DeparturePlanner.arriveEarlyRange`；fixture 裡要有 `destination` 或 `event_id`，`destination` 和 `starting_point` 是 `utterance` 裡的原字；`arrive_at_local` 在 `now_local` 之後；`event_id` 出現在 `upcoming` 或 `focus_event`，這時不帶 `arrive_at_local` 和 `create_event`；只問多久時不帶提早分鐘和 `create_event`；使用者說了「提早 N 分鐘到」才有 `arrive_early_minutes` 而且就是 N，說了交通方式才有 `travel_mode`；`create_event=true` 時同一輪剛好一個 `create_events`、一個行程，開始時間等於 `arrive_at_local`，有長度，地點就是 `destination`；追問的 `reply_to_user` 不寫分鐘或時間。至少 3 個「多久／幾點出發」、3 個有新行程、3 個不該呼叫 `plan_departure` 的一般行程。另外檢查 `AssistantPrompt` 不讀行程的地點，兩個 prompt builder 都不讀出發設定。
 
 ## 12. 備註建議：規則、`suggest_event_notes`、`suggested_notes`
 
@@ -420,11 +422,11 @@ App Review Guidelines 1.2 和 4.7.1 要求產生內容的 App 能過濾不當內
 
 ### 13.1 prompt 的 `# Scope`：只處理行程和時間
 
-`AssistantPrompt.system(...)` 在開頭的角色說明後面、`# Clock` 前面加上 `# Scope`（標題下 6 行、2,505 字元；`testScopeSectionFollowsTheRoleParagraph` 的上限是 2,600），既有的規則和編號都沒變。對話、快速輸入、Siri 和捷徑（`AddPlanIntent`）、在通知裡打字回覆都走 `ScheduleAssistant.handle`，用的是同一個 prompt，所以每個助理（對話）的 request 都有這一段；prompt 裡不另外寫這件事。內容（模型收到的英文原文在 `Shared/AI/AssistantPrompt.swift`）：
+`AssistantPrompt.system(...)` 在開頭的角色說明後面、`# Clock` 前面加上 `# Scope`（標題下 6 行、2,497 字元；`testScopeSectionFollowsTheRoleParagraph` 的上限是 2,600），既有的規則和編號都沒變。對話、快速輸入、Siri 和捷徑（`AddPlanIntent`）、在通知裡打字回覆都走 `ScheduleAssistant.handle`，用的是同一個 prompt，所以每個助理（對話）的 request 都有這一段；prompt 裡不另外寫這件事。內容（模型收到的英文原文在 `Shared/AI/AssistantPrompt.swift`）：
 
 | 規則（第幾行） | 說明 |
 |---|---|
-| 只幫忙行程和時間（第 1 行） | 新增、移動、修改、刪除和查詢行程和空檔；行程表上有什麼；提醒和 Smart Schedules 自己的設定；什麼時候該出發（模型不知道交通時間：先問路上要多久，再設提醒）；日期、時間、時區，以及到某個時間還有多久、兩個時間差多久（「還有幾天到…」「東京現在幾點」）；會變成行程的目標計畫（運動、讀書、習慣），以及關於這些計畫的問題（「每次要練多久？」）；怎麼使用 Smart Schedules（不能編造選單名稱）。問候或道謝，以及沒有東西在等確認時的「ok」，用 `reply_to_user` 簡短友善地回（有草稿計畫或等你確認的行程時，「ok」照第 1 節交給 `confirm_plan`） |
+| 只幫忙行程和時間（第 1 行） | 新增、移動、修改、刪除和查詢行程和空檔；行程表上有什麼；提醒和 Smart Schedules 自己的設定；路上要多久、什麼時候該出發（由 `plan_departure` 交給 App 算，模型不知道交通時間；2026-10-19 起，以前是先問路上要多久再設提醒）；日期、時間、時區，以及到某個時間還有多久、兩個時間差多久（「還有幾天到…」「東京現在幾點」）；會變成行程的目標計畫（運動、讀書、習慣），以及關於這些計畫的問題（「每次要練多久？」）；怎麼使用 Smart Schedules（不能編造選單名稱）。問候或道謝，以及沒有東西在等確認時的「ok」，用 `reply_to_user` 簡短友善地回（有草稿計畫或等你確認的行程時，「ok」照第 1 節交給 `confirm_plan`） |
 | 其他一律婉拒（第 2 行） | 常識問答、作業、寫作或翻譯、程式、對行程以外的事的意見、閒聊、天氣或新聞、醫療／法律／財務建議，以及任何有害或露骨的內容。呼叫 `reply_to_user`，**不帶** `needs_clarification` 也不帶 `suggested_replies`（帶了 `needs_clarification` 的話，`ScheduleAssistant` 會把離題的話當成正在追問的要求，接到使用者下一句前面），只寫**一句**有禮貌的話說只能幫忙行程和時間，再給一個能做的例子，語言照 `# Writing style` 的回覆語言：『我只能幫你處理行程和時間相關的事，例如：「明天 12:30 和 Joe 吃午餐」。』／ "I can only help with your schedule and times. For example: “Lunch with Joe tomorrow at 12:30”."。離題的部分一個字都不回答，也不為它呼叫其他函式 |
 | 排程不看主題（第 3 行） | 「9 點提醒我吃藥」「考試前每週排 3 次讀書」「每月 1 號繳房租」照常處理，長期計畫的 sessions 和 `suggested_notes` 也可以，除非那個行程本身是傷害使用者自己或任何人的計畫。模型**自己加的**建議或其他離題內容（「of your own」：吃哪種藥、劑量、投資什麼、作業的答案、程式、文章）不行，寫進標題或備註裡也不行；使用者自己說的內容照樣可以寫進標題或備註 |
 | 兩者都有（第 4 行） | 同一輪做行事曆的部分，其餘用一句話簡短婉拒，不給例子（`ScheduleAssistant` 會把每個呼叫的回覆接起來，所以 `create_events` 和婉拒的 `reply_to_user` 可以在同一輪）。行事曆的部分必須追問時（規則 5：好幾個行程符合；規則 7：問幾點；使用者自己問的行事曆問題不算，直接回答、不帶 `needs_clarification`），婉拒的那句**放在前面**，寫進同一個 `reply_to_user`，保留 `needs_clarification=true` 和它的 `suggested_replies`。每一輪最多呼叫一次 `reply_to_user`。模型還是送了兩次時（先問幾點、再婉拒），`ScheduleAssistant` 照樣把兩段文字接起來，後一次不會蓋掉前一次的追問：`needsClarification` 只要其中一次是 true 就是 true，`suggestions` 只在後一次有 `suggested_replies` 時才換掉 |
@@ -502,3 +504,39 @@ App Review Guidelines 1.2 和 4.7.1 要求產生內容的 App 能過濾不當內
 開發者會讀每一則回報，用 email 回覆（支援頁：通常 3 個工作天內）。
 
 測試（`Tests/Unit/ReplyReportTests.swift`，22 個）：scheme、收件人、沒有 host；主旨和內文解碼後完全一樣（換行、`&`、`+`、`=`、`#`、emoji、中文）；只有 unreserved 字元不編碼；去掉空白；1,500 字元上限和「…」；剛好在上限的回覆不切；emoji 不切開；沒有地址；純文字版；`reportText` 只有計畫、只有行程、文字在卡片前面、只有計畫標題、什麼都沒有時是 ""、計畫經過 mailto 連結完整保留；建議膠囊在最後一段（去掉空白、空的和重複的）、只有膠囊也回報、沒有膠囊時和原本的版本一樣；行程那一行有地點時加「 · 地點」（nil 和空白不加）、地點和膠囊經過 mailto 連結完整保留；沒有引用時郵件請使用者貼上或描述；有引用時不出現那一行。
+
+## 14. 出發提醒：`plan_departure`（建置中）
+
+「該出發了」的 AI 部分（第 5 步，2026-10-19）。完整規則和隱私承諾在 [SETTINGS.md](SETTINGS.md) 第 7.11 節；App 這一端在第 6 步才接上，現在 `ScheduleAssistant` 對它只回固定的 `{"ok": true, "departure_reminders": "not_set"}`，什麼都不算、不寫。
+
+**什麼時候呼叫（prompt 規則 13）。**
+- 問路上要多久或幾點出發：「去台北 101 要多久？」→ 只有 `destination`；「明天看牙醫幾點要出門？」→ 只有那個行程的 `event_id`；「明天早上 8 點要到 King's Cross，幾點要出門？」→ `destination` 和 `arrive_at_local`，沒有新行程。
+- 說要在什麼時間到某個地方，而且是新的行程（開會、上課、吃飯、看診）：同一輪呼叫 `create_events`（只有那一個行程，地點照使用者寫的）和 `plan_departure`（`create_event=true`、`arrive_at_local` 就是行程開始時間）。使用者沒說行程多長時，先用 `reply_to_user` 問「會開多久？」，什麼都還不建立，不套用預設長度（一般行程照舊用「預設長度」設定）。
+- 沒地點也不是行事曆裡的行程：先問「要去哪裡？」。一次只問一件事：先問幾點（規則 7），再問地點，最後問多長。
+- 「明天下午 3 點看牙醫」「Lunch at Borough Market at 12:30」這種一般行程只呼叫 `create_events`，不呼叫 `plan_departure`。
+- 模型自己絕對不估算交通時間或出發時間，`reply_to_user` 裡也不行。
+
+**參數（全部選填）。**
+
+| 參數 | 意思 |
+|---|---|
+| `destination` | 要去的地方，照使用者這句話寫的字（「台北 101」）。行事曆裡的行程不傳，除非使用者這次說了地點：App 自己讀行程的地點 |
+| `starting_point` | 只有使用者在這句話裡說了從哪裡出發才填（「我從台北車站出發」），照原字。模型不問出發地 |
+| `arrive_at_local` | 要到的時間，就是新行程的開始時間（`YYYY-MM-DDTHH:mm`），不減掉提早的分鐘。只問多久、或是行事曆裡的行程時不傳 |
+| `arrive_early_minutes` | 「提早 30 分鐘到」= 30，是幾點到，不是提醒（「提前 30 分鐘提醒」是 `reminder_minutes`）。0–180 |
+| `travel_mode` | 使用者說了才填：`transit`（捷運、公車、火車、大眾運輸）、`driving`（開車）、`walking`（走路）。沒說時 App 選 |
+| `event_id` | UPCOMING 或 FOCUS 裡的 id |
+| `create_event` | 這一輪的 `create_events` 建立的就是要出發去的那個行程 |
+
+**為什麼沒有必填。** Gemini 只看得到行程的標題、時間、備註和 id，看不到地點（AI 同意第 7 版、隱私權政策第 4 節）。問行事曆裡的行程時，模型給不出目的地，所以 `destination` 不能必填；Gemini 的 schema 也沒有「沒有 `event_id` 時才必填」這種條件。App 自己檢查兩個至少有一個（第 6 步）。
+
+**擁有者的決定（2026-10-19）。**
+- 行事曆裡的行程只傳 `event_id`，App 讀行程上的地點去問 Apple 地圖，Gemini 從頭到尾不知道地點；行程沒有地點時，App 回覆「這個行程還沒有地點，請先在行程加上地點。」（1A）。
+- 出發地：回覆卡片一律讓使用者選「現在的位置」或「想要出發的位置」（自己輸入，只給 Apple 地圖）。使用者在句子裡說了出發地時，卡片預先選好那個地點，可以改成現在的位置；所以宣告裡有 `starting_point`（2A）。
+- 加入這個函式需要在 `ScheduleAssistant` 和 `FixtureDecodingTests` 的 `switch` 各加一個 `case`（只新增，原本的行為不變）：擁有者同意。
+
+**Gemini 拿到什麼。** 只有固定的值：第 5 步是 `not_set`；第 6 步也只會是「已設定」「未設定」「需要出發地」這類固定值，沒有座標、地名、交通時間、出發時間，也沒有算不出來的原因（「太遠」「沒有路線」會透露距離）。`TravelTimeError` 每一種都變成同一個 `NSError`（固定 domain、code 0），就算錯誤走到 `ScheduleAssistant` 的通用錯誤處理，Gemini 也看不出原因。UPCOMING、FOCUS 和 PENDING 區塊不加地點或出發設定的欄位（`AssistantPromptTests.testThePromptNeverCarriesAnEventsPlaceOrDeparture`、validator 第 15 項）。
+
+**示範模式。** 一樣允許呼叫（不然模型會改用 `reply_to_user` 自己估時間）；第 6 步 App 回覆示範模式不規劃出發時間。
+
+**Fixture。** `plan_departure.*.json`（4 個問多久或幾點出發、3 個有新行程，其中一個帶 `starting_point`）、`create_events.no_departure_*.json`（3 個一般行程，`must_not_call: ["plan_departure"]`）、`reply_to_user.departure_length.json`（先問多長）和 `reply_to_user.departure_where.json`（先問去哪裡）。有新行程的 fixture 把 `create_events` 放在 `also_calls`。

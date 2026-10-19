@@ -1,0 +1,30 @@
+{
+  "utterance": "明天早上 10 點要到新竹科學園區開會 2 小時，我從台北車站出發",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "plan_departure",
+    "args": {
+      "destination": "新竹科學園區",
+      "starting_point": "台北車站",
+      "arrive_at_local": "2026-10-14T10:00",
+      "create_event": true
+    }
+  },
+  "also_calls": [
+    {
+      "name": "create_events",
+      "args": {
+        "events": [
+          {
+            "title": "開會",
+            "start": "2026-10-14T10:00",
+            "duration_minutes": 120,
+            "kind": "event",
+            "location": "新竹科學園區"
+          }
+        ]
+      }
+    }
+  ]
+}

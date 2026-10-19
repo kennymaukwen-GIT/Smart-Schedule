@@ -1,0 +1,12 @@
+{
+  "utterance": "明天早上 8 點要到 King's Cross，幾點要出門？",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "plan_departure",
+    "args": {
+      "destination": "King's Cross",
+      "arrive_at_local": "2026-10-14T08:00"
+    }
+  }
+}

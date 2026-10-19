@@ -58,6 +58,22 @@ enum Fixtures {
         return (function, data)
     }
 
+    /// The other calls of the same turn (`also_calls`, for example the create_events next to a plan_departure), each
+    /// re-serialized like `call`. Empty when the fixture has none.
+    static func alsoCalls(_ name: String) throws -> [(name: String, args: Data)] {
+        let calls = root(name)["also_calls"] as? [[String: Any]] ?? []
+        return try calls.map { call in
+            let function = try XCTUnwrap(call["name"] as? String, name)
+            let args = try XCTUnwrap(call["args"] as? [String: Any], name)
+            return (function, try JSONSerialization.data(withJSONObject: args))
+        }
+    }
+
+    /// Functions the fixture's turn must not call (`must_not_call`).
+    static func mustNotCall(_ name: String) throws -> [String] {
+        try root(name)["must_not_call"] as? [String] ?? []
+    }
+
     static func args<T: Decodable>(_ type: T.Type, from name: String) throws -> T {
         try TestJSON.decode(type, data: call(name).args)
     }

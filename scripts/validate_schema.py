@@ -52,6 +52,14 @@
     extension (NSLocation*, NSWidgetWantsLocation); Core Location and MapKit are imported only under App/ (every import
     spelling), CLLocationManager appears only in App/Departure, and no Swift file uses continuous or background location
     (startUpdatingLocation, requestAlwaysAuthorization, CLBackgroundActivitySession, CLMonitor, liveUpdates, …).
+15. plan_departure (departure reminders, prompt rule 13, docs/SETTINGS.md §7.11): nothing required (Gemini never sees an
+    event's place, so an event from UPCOMING or FOCUS passes only its id), travel_mode is exactly the app's TravelMode and
+    arrive_early_minutes the app's range (Shared/Core/DeparturePlanner.swift). A fixture's turn may hold several calls
+    (`also_calls`) and name functions it must not call (`must_not_call`): a new event to leave for is one create_events
+    event starting at arrive_at_local, with its length and the place as written; destination and starting_point are the
+    user's own words; a mode or minutes early only when the user said them; at least 3 "how long / when to leave"
+    turns, 3 with a new event and 3 ordinary events without plan_departure. The prompt builders never read an event's
+    place (AssistantPrompt) or its departure (either builder).
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -879,6 +887,161 @@ def location_checks() -> None:
               f"or background location; Core Location and MapKit only in App/, the location manager in {LOCATION_DIR}")
 
 
+
+# ---------- plan_departure (check 15) ----------
+
+DEPARTURE_PLANNER = ROOT / "Shared/Core/DeparturePlanner.swift"
+DEPARTURE_PROPERTIES = {"destination", "starting_point", "arrive_at_local", "arrive_early_minutes", "travel_mode",
+                        "event_id", "create_event"}
+LOCAL_MINUTE = re.compile(r"\d{4}-\d\d-\d\dT([01]\d|2[0-3]):[0-5]\d")
+# How the user names a way of travelling (the declaration's travel_mode description).
+MODE_WORDS = {
+    "transit": re.compile(r"捷運|公車|火車|高鐵|大眾運輸|\b(?:bus|train|tube|metro|subway|public transport)\b", re.I),
+    "driving": re.compile(r"開車|\b(?:drive|driving)\b", re.I),
+    "walking": re.compile(r"走路|步行|\b(?:walk|walking)\b", re.I),
+}
+EARLY_ZH = re.compile(r"提早\s*(\d{1,3})\s*分鐘?\s*到")
+EARLY_EN = re.compile(r"\b(\d{1,3})\s*(?:minutes?|mins?)\s+early\b", re.I)
+TRAVEL_TIME_TEXT = re.compile(r"\d+\s*(?:分鐘|minutes?|mins?)|" + r"\b\d{1,2}:\d{2}\b")
+
+
+def swift_travel_modes() -> list[str]:
+    body = re.search(r"enum TravelMode\b[^{]*\{(.*?)\n\}", DEPARTURE_PLANNER.read_text(encoding="utf-8"), re.S)
+    return re.findall(r"^\s*case (\w+)\s*$", body.group(1), re.M) if body else []
+
+
+def swift_arrive_early_range() -> tuple[int, int] | None:
+    match = re.search(r"static let arriveEarlyRange = (\d+)\.\.\.(\d+)", DEPARTURE_PLANNER.read_text(encoding="utf-8"))
+    return (int(match.group(1)), int(match.group(2))) if match else None
+
+
+def departure_declaration_checks(by_name: dict) -> None:
+    decl = by_name.get("plan_departure")
+    if not decl:
+        errors.append("plan_departure is missing from the declarations")
+        return
+    params = decl["parameters"]
+    if params.get("required"):
+        errors.append("plan_departure: nothing may be required (an event from UPCOMING passes only its id)")
+    props = params.get("properties", {})
+    if set(props) != DEPARTURE_PROPERTIES:
+        errors.append(f"plan_departure: parameters must be exactly {sorted(DEPARTURE_PROPERTIES)}, got {sorted(props)}")
+    modes = swift_travel_modes()
+    if not modes or props.get("travel_mode", {}).get("enum") != modes:
+        errors.append(f"plan_departure: travel_mode enum must be TravelMode's cases {modes}")
+    early, bounds = props.get("arrive_early_minutes", {}), swift_arrive_early_range()
+    if early.get("type") != "integer" or not bounds or (early.get("minimum"), early.get("maximum")) != bounds:
+        errors.append(f"plan_departure: arrive_early_minutes must be an integer {bounds} (DeparturePlanner.arriveEarlyRange)")
+    if re.search(r'"(minItems|maxItems)"', json.dumps(decl)):
+        errors.append("plan_departure: no minItems/maxItems (Gemini 3.8 Flash rejects them under mode ANY)")
+
+
+def turn_calls(root: dict) -> list[dict]:
+    """The calls of a fixture's turn: expected_call, then also_calls."""
+    return [root["expected_call"]] + list(root.get("also_calls", []))
+
+
+def shown_ids(root: dict) -> set[str]:
+    rows = (root.get("upcoming", "") + "\n" + root.get("focus_event", "")).splitlines()
+    return {row.split("|")[0].strip() for row in rows if row.strip()}
+
+
+def departure_fixture_checks(root: dict, by_name: dict, fixture: str) -> None:
+    calls = turn_calls(root)
+    names = [call["name"] for call in calls]
+    for name in root.get("must_not_call", []):
+        if name not in by_name:
+            errors.append(f"{fixture}: must_not_call names an unknown function {name}")
+        if name in names:
+            errors.append(f"{fixture}: the turn calls {name}, which must_not_call forbids")
+    utterance, now_local = root["utterance"], root["now_local"]
+    if "plan_departure" in root.get("must_not_call", []) and calls[0]["name"] == "reply_to_user":
+        if TRAVEL_TIME_TEXT.search(calls[0]["args"]["message"]):
+            errors.append(f"{fixture}: reply_to_user names minutes or a time; the app alone works out travel times")
+    for call in calls:
+        if call["name"] != "plan_departure":
+            continue
+        args = call["args"]
+        if names.count("plan_departure") > 1:
+            errors.append(f"{fixture}: one plan_departure per turn")
+        if not (args.get("destination") or args.get("event_id")):
+            errors.append(f"{fixture}: plan_departure needs a destination or an event_id")
+        for field in ("destination", "starting_point"):
+            if field in args and args[field] not in utterance:
+                errors.append(f"{fixture}: {field} {args[field]!r} is not the user's own words")
+        arrive = args.get("arrive_at_local")
+        if arrive is not None:
+            if not LOCAL_MINUTE.fullmatch(arrive):
+                errors.append(f"{fixture}: arrive_at_local {arrive!r} is not 'YYYY-MM-DDTHH:mm'")
+            elif arrive <= now_local:
+                errors.append(f"{fixture}: arrive_at_local {arrive} is not after now_local")
+        if "event_id" in args:
+            if args["event_id"] not in shown_ids(root):
+                errors.append(f"{fixture}: plan_departure uses an event_id that is not in UPCOMING or FOCUS")
+            if arrive is not None or args.get("create_event"):
+                errors.append(f"{fixture}: an event from UPCOMING passes no arrive_at_local and no create_event")
+        if arrive is None and "event_id" not in args and ("arrive_early_minutes" in args or args.get("create_event")):
+            errors.append(f"{fixture}: only asking how long: no arrive_early_minutes or create_event")
+        said = [m for m in (EARLY_ZH.search(utterance), EARLY_EN.search(utterance)) if m]
+        if said and args.get("arrive_early_minutes") != int(said[0].group(1)):
+            errors.append(f"{fixture}: the user said {said[0].group(0)!r}: arrive_early_minutes {said[0].group(1)}")
+        if not said and "arrive_early_minutes" in args:
+            errors.append(f"{fixture}: arrive_early_minutes only when the user says how early")
+        named = [mode for mode, words in MODE_WORDS.items() if words.search(utterance)]
+        if args.get("travel_mode") != (named[0] if len(named) == 1 else None):
+            errors.append(f"{fixture}: travel_mode {args.get('travel_mode')} but the user named {named or 'none'}")
+        companions = [c for c in calls if c["name"] == "create_events"]
+        if args.get("create_event"):
+            events = [e for c in companions for e in c["args"]["events"]]
+            if arrive is None or len(companions) != 1 or len(events) != 1:
+                errors.append(f"{fixture}: create_event=true needs arrive_at_local and one create_events call with one event")
+            else:
+                event = events[0]
+                if event["start"] != arrive:
+                    errors.append(f"{fixture}: the new event starts at {event['start']}, not at arrive_at_local {arrive}")
+                if "end" not in event and "duration_minutes" not in event:
+                    errors.append(f"{fixture}: a new event to leave for has the length the user said (else ask first)")
+                if args.get("destination") and event.get("location") != args["destination"]:
+                    errors.append(f"{fixture}: the new event's location must be the destination as written")
+                if "reminder_minutes" in event and said:
+                    errors.append(f"{fixture}: '{said[0].group(0)}' is when to arrive, not reminder_minutes")
+        elif companions:
+            errors.append(f"{fixture}: create_events next to plan_departure needs create_event=true")
+
+
+DEPARTURE_PROMPT_READS = {"Shared/AI/AssistantPrompt.swift": re.compile(r"\.(?:location|departure)\b"),
+                          "Shared/AI/NoteSuggestionPrompt.swift": re.compile(r"\.departure\b")}
+
+
+def departure_prompt_checks() -> None:
+    """Gemini never gets an event's place in the chat prompt (consent v7: only for AI suggestions) nor its departure."""
+    for relative, pattern in DEPARTURE_PROMPT_READS.items():
+        for number, line in enumerate((ROOT / relative).read_text(encoding="utf-8").splitlines(), 1):
+            code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', line.split("//", 1)[0])
+            if pattern.search(code) or re.search(r"\bSSProperty\.(?:arriveEarly|travelMode|leaveBefore)\b", code):
+                errors.append(f"{relative}:{number}: a prompt builder reads an event's place or departure (§7.11)")
+
+
+def departure_coverage(fixtures: list[tuple[str, dict]]) -> None:
+    asking, with_event, ordinary = 0, 0, 0
+    for _, root in fixtures:
+        departures = [c for c in turn_calls(root) if c["name"] == "plan_departure"]
+        if departures:
+            if departures[0]["args"].get("create_event"):
+                with_event += 1
+            else:
+                asking += 1
+        if "plan_departure" in root.get("must_not_call", []) and root["expected_call"]["name"] == "create_events":
+            ordinary += 1
+    if asking < 3 or with_event < 3 or ordinary < 3:
+        errors.append(f"plan_departure fixtures: need at least 3 how-long/when-to-leave turns ({asking}), 3 with a new "
+                      f"event ({with_event}) and 3 ordinary events that must not call it ({ordinary})")
+    else:
+        print(f"✓ plan_departure: {asking} how-long/when-to-leave turns, {with_event} with a new event, {ordinary} "
+              "ordinary events without it; nothing required, TravelMode and the minutes-early range match the app; "
+              "the prompt builders read no place or departure")
+
+
 def main() -> int:
     declarations = json.loads(DECLARATIONS.read_text())
     by_name = {}
@@ -894,18 +1057,23 @@ def main() -> int:
         print(f"✓ {name:<24} nesting depth {depth}")
     declaration_checks(by_name)
 
+    departure_declaration_checks(by_name)
+    loaded: list[tuple[str, dict]] = []
     for path in sorted(FIXTURES.glob("*.json")):
         fixture = json.loads(path.read_text())
         call = fixture["expected_call"]
-        schema = by_name.get(call["name"])
-        if not schema:
-            errors.append(f"{path.name}: unknown function {call['name']}")
+        unknown = [c["name"] for c in turn_calls(fixture) if c["name"] not in by_name]
+        if unknown:
+            errors.append(f"{path.name}: unknown function {', '.join(unknown)}")
             continue
-        for err in jsonschema.Draft202012Validator(schema["parameters"]).iter_errors(call["args"]):
-            errors.append(f"{path.name}: {'/'.join(map(str, err.path))}: {err.message}")
-        semantic_checks(call["name"], call["args"], path.name)
-        style_checks(call["name"], call["args"], path.name)
-        suggestion_checks(call["name"], call["args"], fixture, path.name)
+        loaded.append((path.name, fixture))
+        for each in turn_calls(fixture):
+            for err in jsonschema.Draft202012Validator(by_name[each["name"]]["parameters"]).iter_errors(each["args"]):
+                errors.append(f"{path.name}: {each['name']}: {'/'.join(map(str, err.path))}: {err.message}")
+            semantic_checks(each["name"], each["args"], path.name)
+            style_checks(each["name"], each["args"], path.name)
+            suggestion_checks(each["name"], each["args"], fixture, path.name)
+        departure_fixture_checks(fixture, by_name, path.name)
         context_checks(fixture, path.name)
         privacy_checks(fixture, path.name)
         relative_time_checks(fixture, path.name)
@@ -932,6 +1100,8 @@ def main() -> int:
 
     prompt_source_checks()
     print("✓ prompt builders name calendars without account emails")
+    departure_prompt_checks()
+    departure_coverage(loaded)
 
     print(f"✓ String Catalog: {catalog_checks()} keys with zh-Hant")
     strings_file_checks()

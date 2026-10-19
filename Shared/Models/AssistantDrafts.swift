@@ -15,6 +15,8 @@ enum AssistantFunction: String, CaseIterable, Sendable {
     case replyToUser = "reply_to_user"
     case confirmPlan = "confirm_plan"
     case updatePreferences = "update_preferences"
+    /// Departure reminders 「該出發了」 (docs/SETTINGS.md §7.11): a travel time or when to leave, worked out by the app.
+    case planDeparture = "plan_departure"
     /// Only in its own request (`ScheduleAssistant.suggestNotes`), never in conversation.
     case suggestEventNotes = "suggest_event_notes"
 
@@ -186,6 +188,58 @@ struct UpdatePreferencesArgs: Decodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey { case changes, summaryForUser }
+}
+
+// MARK: plan_departure
+
+/// `plan_departure` (docs/SETTINGS.md §7.11, prompt rule 13). Every field is optional and decoding never fails: a field
+/// of the wrong type reads as absent, so a stray value can't turn into an error that would reach Gemini.
+struct PlanDepartureArgs: Decodable, Sendable {
+    /// Where the user is going, as they wrote it. Absent for an event from UPCOMING or FOCUS: the app reads its place.
+    var destination: String?
+    /// Where the user said they leave from, as written. Absent: the user picks on the reply card.
+    var startingPoint: String?
+    /// "YYYY-MM-DDTHH:mm": when the user must be there (the new event's start). Absent for "how long" and for an event
+    /// from UPCOMING or FOCUS.
+    var arriveAtLocal: String?
+    /// Minutes before the start the user wants to arrive ("提早 30 分鐘到" = 30).
+    var arriveEarlyMinutes: Int?
+    /// "transit", "driving" or "walking" when the user said how they travel (`mode`).
+    var travelMode: String?
+    var eventId: String?
+    /// The event to leave for is the one this turn's create_events call creates.
+    var createEvent: Bool?
+
+    init(destination: String? = nil, startingPoint: String? = nil, arriveAtLocal: String? = nil,
+         arriveEarlyMinutes: Int? = nil, travelMode: String? = nil, eventId: String? = nil, createEvent: Bool? = nil) {
+        self.destination = destination
+        self.startingPoint = startingPoint
+        self.arriveAtLocal = arriveAtLocal
+        self.arriveEarlyMinutes = arriveEarlyMinutes
+        self.travelMode = travelMode
+        self.eventId = eventId
+        self.createEvent = createEvent
+    }
+
+    init(from decoder: Decoder) throws {
+        guard let c = try? decoder.container(keyedBy: CodingKeys.self) else { return }
+        destination = try? c.decodeIfPresent(String.self, forKey: .destination)
+        startingPoint = try? c.decodeIfPresent(String.self, forKey: .startingPoint)
+        arriveAtLocal = try? c.decodeIfPresent(String.self, forKey: .arriveAtLocal)
+        arriveEarlyMinutes = try? c.decodeIfPresent(Int.self, forKey: .arriveEarlyMinutes)
+        travelMode = try? c.decodeIfPresent(String.self, forKey: .travelMode)
+        eventId = try? c.decodeIfPresent(String.self, forKey: .eventId)
+        createEvent = try? c.decodeIfPresent(Bool.self, forKey: .createEvent)
+    }
+
+    /// The way of travelling the user named, or nil (the app chooses).
+    var mode: TravelMode? {
+        travelMode.flatMap { TravelMode(rawValue: $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case destination, startingPoint, arriveAtLocal, arriveEarlyMinutes, travelMode, eventId, createEvent
+    }
 }
 
 // MARK: suggest_event_notes

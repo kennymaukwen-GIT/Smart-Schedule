@@ -1,0 +1,16 @@
+{
+  "utterance": "今天下午 5 點要帶 Anna 去上課，幾點要出門？",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "reply_to_user",
+    "args": {
+      "message": "要去哪裡上課？",
+      "needs_clarification": true
+    }
+  },
+  "must_not_call": [
+    "plan_departure",
+    "create_events"
+  ]
+}

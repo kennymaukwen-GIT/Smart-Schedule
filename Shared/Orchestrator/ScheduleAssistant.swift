@@ -672,6 +672,12 @@ actor ScheduleAssistant {
             }
             return ["ok": rejected.isEmpty, "applied": applied, "rejected": refused]
 
+        case .planDeparture:
+            // Departure reminders 「該出發了」 (docs/SETTINGS.md §7.11) are wired in build step 6. Until then nothing is
+            // worked out or written, and Gemini gets one fixed answer whatever was asked: nothing location-derived and
+            // no reason, so this must never throw (an error's text would go to Gemini).
+            return ["ok": true, "departure_reminders": "not_set"]
+
         case .suggestEventNotes:
             // Only allowed in suggestNotes' own request; a chat turn that calls it changes nothing.
             return ["ok": false, "error": "suggest_event_notes is only for the note suggestion request"]

@@ -25,7 +25,7 @@
               },
               "duration_minutes": {
                 "type": "integer",
-                "description": "Used only when end is omitted. Defaults: meeting 60, call 30, lunch 60, task 30.",
+                "description": "Used only when end is omitted. Defaults: meeting 60, call 30, lunch 60, task 30. For an event the user must leave for (plan_departure), ask how long it lasts instead (rule 13).",
                 "minimum": 5,
                 "maximum": 1440
               },
@@ -352,6 +352,43 @@
         }
       },
       "required": ["changes", "summary_for_user"]
+    }
+  },
+  {
+    "name": "plan_departure",
+    "description": "Work out how long a trip takes or when to leave, with the iPhone's location and Apple Maps; the app answers the user itself. Call it when the user asks how long it takes to get somewhere or when to leave ('去台北 101 要多久？', 'when should I leave for the dentist?'), or says they need to be at a place at a time ('今天下午 5 點要到台北 101 開會'). Never estimate a travel time or a time to leave yourself (rule 13). Not for a plain new event with a place and a time ('明天下午 3 點看牙醫'): that is create_events only.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "type": "string",
+          "description": "Where the user is going, exactly as they wrote it in this message ('台北 101', 'Dishoom Shoreditch'). Omit for an event from UPCOMING or FOCUS unless the user names a place now: the app reads the event's place."
+        },
+        "starting_point": {
+          "type": "string",
+          "description": "Only when the user said in this message where they leave from, exactly as written ('台北車站'). Never ask for it: the app lets the user pick the current location or another place."
+        },
+        "arrive_at_local": {
+          "type": "string",
+          "description": "When the user must be there, local 'YYYY-MM-DDTHH:mm': the new event's start, not moved earlier by arrive_early_minutes. Omit when the user only asks how long a trip takes, and for an event from UPCOMING or FOCUS (the app knows its start)."
+        },
+        "arrive_early_minutes": {
+          "type": "integer",
+          "description": "'提早 30 分鐘到' or 'be there 30 minutes early' = 30: how much before the start the user wants to arrive. Not a reminder ('提前 30 分鐘提醒' is reminder_minutes). Omit when not said.",
+          "minimum": 0,
+          "maximum": 180
+        },
+        "travel_mode": {
+          "type": "string",
+          "enum": ["transit", "driving", "walking"],
+          "description": "Only when the user said how they travel: transit for 捷運, 公車, 火車, 大眾運輸, bus, train, tube or public transport; driving for 開車 or drive; walking for 走路 or walk. Omit otherwise: the app chooses."
+        },
+        "event_id": { "type": "string", "description": "Exact id from UPCOMING or FOCUS when the user asks about an event already in the calendar. Never invent ids." },
+        "create_event": {
+          "type": "boolean",
+          "description": "true when this turn's create_events call creates the event to leave for: exactly one event, starting at arrive_at_local."
+        }
+      }
     }
   },
   {

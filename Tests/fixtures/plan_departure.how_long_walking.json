@@ -1,0 +1,12 @@
+{
+  "utterance": "How long does it take to walk to Hyde Park?",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "plan_departure",
+    "args": {
+      "destination": "Hyde Park",
+      "travel_mode": "walking"
+    }
+  }
+}

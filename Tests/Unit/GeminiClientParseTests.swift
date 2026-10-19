@@ -146,10 +146,11 @@ final class GeminiClientParseTests: XCTestCase {
                                 "Shared/AI/FunctionDeclarations.json must be a resource of the test bundle")
         let declarations = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
         let names = declarations.compactMap { $0["name"] as? String }
-        XCTAssertEqual(names.count, 9)
+        XCTAssertEqual(names.count, 10)
         XCTAssertEqual(Set(names), Set(AssistantFunction.allCases.map(\.rawValue)))
         // A chat turn may call every function but suggest_event_notes, which has its own request.
-        XCTAssertEqual(AssistantFunction.conversational.count, 8)
+        XCTAssertEqual(AssistantFunction.conversational.count, 9)
+        XCTAssertTrue(AssistantFunction.conversational.contains(.planDeparture))
         XCTAssertFalse(AssistantFunction.conversational.contains(.suggestEventNotes))
         for declaration in declarations {
             XCTAssertNotNil(declaration["parameters"] as? [String: Any], "\(declaration["name"] ?? "?")")
@@ -160,6 +161,49 @@ final class GeminiClientParseTests: XCTestCase {
         XCTAssertEqual(parameters["required"] as? [String], ["decision"])
         let decision = try XCTUnwrap((parameters["properties"] as? [String: Any])?["decision"] as? [String: Any])
         XCTAssertEqual(decision["enum"] as? [String], ["add", "discard"])
+
+        // plan_departure: nothing required (an event from UPCOMING has no place Gemini can see), the app's ways of
+        // travelling and its range of minutes early.
+        let departure = try XCTUnwrap(declarations.first { $0["name"] as? String == "plan_departure" })
+        let departureParameters = try XCTUnwrap(departure["parameters"] as? [String: Any])
+        XCTAssertNil(departureParameters["required"])
+        let properties = try XCTUnwrap(departureParameters["properties"] as? [String: [String: Any]])
+        XCTAssertEqual(Set(properties.keys), ["destination", "starting_point", "arrive_at_local", "arrive_early_minutes",
+                                              "travel_mode", "event_id", "create_event"])
+        XCTAssertEqual(properties["travel_mode"]?["enum"] as? [String], TravelMode.allCases.map(\.rawValue))
+        XCTAssertEqual(properties["arrive_early_minutes"]?["minimum"] as? Int, DeparturePlanner.arriveEarlyRange.lowerBound)
+        XCTAssertEqual(properties["arrive_early_minutes"]?["maximum"] as? Int, DeparturePlanner.arriveEarlyRange.upperBound)
+    }
+
+    func testPlanDepartureCallDecodesAndNeverFails() throws {
+        let response = try parse("""
+        {"candidates": [{"content": {"parts": [
+          {"functionCall": {"name": "plan_departure", "args": {"destination": "台北 101", "starting_point": "台北車站",
+            "arrive_at_local": "2026-10-13T17:00", "arrive_early_minutes": 30, "travel_mode": "transit",
+            "create_event": true}}}
+        ]}, "finishReason": "STOP"}]}
+        """)
+        let call = try XCTUnwrap(response.functionCalls.first)
+        XCTAssertEqual(AssistantFunction(rawValue: call.name), .planDeparture)
+        let args = try call.decode(PlanDepartureArgs.self)
+        XCTAssertEqual(args.destination, "台北 101")
+        XCTAssertEqual(args.startingPoint, "台北車站")
+        XCTAssertEqual(args.arriveAtLocal, "2026-10-13T17:00")
+        XCTAssertEqual(args.arriveEarlyMinutes, 30)
+        XCTAssertEqual(args.mode, .transit)
+        XCTAssertEqual(args.createEvent, true)
+        XCTAssertNil(args.eventId)
+
+        // Wrong types and unknown ways of travelling read as absent instead of failing.
+        let odd = try TestJSON.decode(PlanDepartureArgs.self, json: """
+        {"event_id": "ss101", "arrive_early_minutes": "thirty", "travel_mode": "bicycle", "create_event": "yes"}
+        """)
+        XCTAssertEqual(odd.eventId, "ss101")
+        XCTAssertNil(odd.arriveEarlyMinutes)
+        XCTAssertNil(odd.mode)
+        XCTAssertNil(odd.createEvent)
+        XCTAssertNil(try TestJSON.decode(PlanDepartureArgs.self, json: "{}").destination)
+        XCTAssertEqual(try TestJSON.decode(PlanDepartureArgs.self, json: #"{"travel_mode": " Driving "}"#).mode, .driving)
     }
 
     func testConfirmPlanCallDecodes() throws {

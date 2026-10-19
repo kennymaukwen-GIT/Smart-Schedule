@@ -148,9 +148,10 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertTrue(topics.hasPrefix("Help only with the user's calendar and time: adding, moving, changing, deleting "
                                        + "and finding events and free time; what is on their schedule; reminders and Smart "
                                        + "Schedules' own settings;"), topics)
-        // The model knows no travel times: it asks how long the trip takes instead of guessing when to leave.
-        XCTAssertTrue(topics.contains("when to leave for an event (you know no travel times: ask how long the trip takes, "
-                                      + "then set a reminder);"), topics)
+        // The model knows no travel times: plan_departure works them out (rule 13).
+        XCTAssertTrue(topics.contains("how long a trip takes and when to leave (plan_departure works it out; you know no "
+                                      + "travel times);"), topics)
+        XCTAssertFalse(topics.contains("ask how long the trip takes"), topics)
         XCTAssertTrue(topics.contains(#"dates, times, time zones and how long until or between them ("how many days "#
                                       + #"until …", "what time is it in Tokyo")"#), topics)
         // Questions about such a plan ("how long should each session be?") are in scope too.
@@ -513,7 +514,7 @@ final class AssistantPromptTests: XCTestCase {
     func testPendingEventsBlockAndRuleOnlyWhileEventsWait() throws {
         let without = prompt()
         XCTAssertFalse(without.contains("# PENDING EVENTS"))
-        XCTAssertFalse(without.contains("13. PENDING EVENTS"))
+        XCTAssertFalse(without.contains("14. PENDING EVENTS"))
 
         let preview = TestEvents.make(id: "draft-ev-abc12345-0", title: "Lunch | with Andrew",
                                       start: TestClock.local(2026, 10, 14, 13), end: TestClock.local(2026, 10, 14, 14))
@@ -522,7 +523,9 @@ final class AssistantPromptTests: XCTestCase {
         let text = prompt(pendingEvents: batch)
         XCTAssertEqual(try block("# PENDING EVENTS (waiting for approval, NOT in the calendar; batch batch-abc12345)", in: text),
                        ["Lunch / with Andrew | 2026-10-14T13:00 | 2026-10-14T14:00 | event"])
-        XCTAssertTrue(text.contains("13. PENDING EVENTS are waiting for the user's approval"), text)
+        XCTAssertTrue(text.contains("14. PENDING EVENTS are waiting for the user's approval"), text)
+        let departures = try XCTUnwrap(text.range(of: "\n13. Travel times and departures")).lowerBound
+        XCTAssertLessThan(departures, try XCTUnwrap(text.range(of: "\n14. PENDING EVENTS")).lowerBound)
         XCTAssertTrue(text.contains("confirm_plan decision 'add'"), text)
     }
 
@@ -550,6 +553,53 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertTrue(text.contains("'use my second account from now on' → its 'My calendar | Account 2' line"), text)
         XCTAssertTrue(text.contains("Never guess an Account number."), text)
         XCTAssertFalse(text.contains("'Use my school account from now on' → default_calendar"), text)
+    }
+
+    // MARK: Departures (rule 13)
+
+    func testDepartureRule() throws {
+        let text = prompt()
+        let lines = text.components(separatedBy: "\n")
+        let rule = try XCTUnwrap(lines.first { $0.hasPrefix("13. Travel times and departures → plan_departure.") }, text)
+        for phrase in ["Never estimate a travel time or a time to leave yourself, not even in reply_to_user",
+                       "pass its event_id and leave arrive_at_local out",
+                       "the app reads the event's place",
+                       "call create_events with that one event",
+                       "plan_departure with create_event=true and arrive_at_local = its start, in the same turn",
+                       "create nothing yet and ask how long",
+                       "no default length here",
+                       "ask where they are going ('要去哪裡？')",
+                       "the time (rule 7) first, then the place, then the length",
+                       "'提早 30 分鐘到' or '30 minutes early' = arrive_early_minutes 30",
+                       "('提前 30 分鐘提醒' is reminder_minutes)",
+                       "never ask for a starting point",
+                       "('明天下午 3 點看牙醫', 'lunch at Borough Market at 12:30') is create_events only: no plan_departure."] {
+            XCTAssertTrue(rule.contains(phrase), "missing: \(phrase)\n\(rule)")
+        }
+        // The Chinese examples stay whole: no line break (and so no space) inside them.
+        for example in ["'去台北 101 要多久？'", "'明天看牙醫幾點要出門？'", "'今天下午 5 點要到台北 101 開會'",
+                        "('8 點要到車站，幾點出門？')"] {
+            XCTAssertTrue(rule.contains(example), example)
+        }
+        // Every request has it, and it comes right after rule 12.
+        let twelve = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("12. Lasting preferences") })
+        let thirteen = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("13. Travel times") })
+        XCTAssertEqual(thirteen, twelve + 1)
+    }
+
+    func testThePromptNeverCarriesAnEventsPlaceOrDeparture() {
+        // Consent v7 and the privacy policy: Gemini gets titles, times, notes and ids, never an event's place, and
+        // nothing about its departure (docs/SETTINGS.md §7.11).
+        var event = TestEvents.make(id: "ss101", title: "開會", start: TestClock.local(2026, 10, 13, 17),
+                                    end: TestClock.local(2026, 10, 13, 18))
+        event.location = "台北101 信義路五段7號"
+        event.departure = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit, leaveMinutesBeforeStart: 62)
+        let text = prompt(upcoming: [event], focus: event)
+        // The same row in FOCUS and UPCOMING, with no column for the place or the departure.
+        let rows = text.components(separatedBy: "\n").filter { $0.hasPrefix("ss101 |") }
+        XCTAssertEqual(rows, Array(repeating: "ss101 | 開會 | 2026-10-13T17:00 | 2026-10-13T18:00 | event", count: 2), text)
+        XCTAssertFalse(text.contains("台北101"), text)
+        XCTAssertFalse(text.contains("信義路"), text)
     }
 
     // MARK: A time counted from now

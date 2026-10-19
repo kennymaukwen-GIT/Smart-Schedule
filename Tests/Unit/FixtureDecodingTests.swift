@@ -8,29 +8,112 @@ final class FixtureDecodingTests: XCTestCase {
         let names = try Fixtures.allNames()
         XCTAssertGreaterThanOrEqual(names.count, 11)
         for name in names {
-            let call = try Fixtures.call(name)
-            let function = try XCTUnwrap(AssistantFunction(rawValue: call.name), "\(name): unknown function \(call.name)")
-            switch function {
-            case .createEvents:
-                XCTAssertNoThrow(try TestJSON.decode(CreateEventsArgs.self, data: call.args), name)
-            case .createLongTermPlan:
-                XCTAssertNoThrow(try TestJSON.decode(LongTermPlanArgs.self, data: call.args), name)
-            case .modifyEvent:
-                XCTAssertNoThrow(try TestJSON.decode(ModifyEventArgs.self, data: call.args), name)
-            case .deleteEvents:
-                XCTAssertNoThrow(try TestJSON.decode(DeleteEventsArgs.self, data: call.args), name)
-            case .querySchedule:
-                XCTAssertNoThrow(try TestJSON.decode(QueryScheduleArgs.self, data: call.args), name)
-            case .replyToUser:
-                XCTAssertNoThrow(try TestJSON.decode(ReplyToUserArgs.self, data: call.args), name)
-            case .confirmPlan:
-                XCTAssertNoThrow(try TestJSON.decode(ConfirmPlanArgs.self, data: call.args), name)
-            case .updatePreferences:
-                XCTAssertNoThrow(try TestJSON.decode(UpdatePreferencesArgs.self, data: call.args), name)
-            case .suggestEventNotes:
-                XCTAssertNoThrow(try TestJSON.decode(SuggestEventNotesArgs.self, data: call.args), name)
+            for call in try [Fixtures.call(name)] + Fixtures.alsoCalls(name) {
+                try assertDecodes(call, fixture: name)
+            }
+            for function in try Fixtures.mustNotCall(name) {
+                XCTAssertNotNil(AssistantFunction(rawValue: function), "\(name): must_not_call names unknown \(function)")
             }
         }
+    }
+
+    private func assertDecodes(_ call: (name: String, args: Data), fixture name: String) throws {
+        let function = try XCTUnwrap(AssistantFunction(rawValue: call.name), "\(name): unknown function \(call.name)")
+        switch function {
+        case .createEvents:
+            XCTAssertNoThrow(try TestJSON.decode(CreateEventsArgs.self, data: call.args), name)
+        case .createLongTermPlan:
+            XCTAssertNoThrow(try TestJSON.decode(LongTermPlanArgs.self, data: call.args), name)
+        case .modifyEvent:
+            XCTAssertNoThrow(try TestJSON.decode(ModifyEventArgs.self, data: call.args), name)
+        case .deleteEvents:
+            XCTAssertNoThrow(try TestJSON.decode(DeleteEventsArgs.self, data: call.args), name)
+        case .querySchedule:
+            XCTAssertNoThrow(try TestJSON.decode(QueryScheduleArgs.self, data: call.args), name)
+        case .replyToUser:
+            XCTAssertNoThrow(try TestJSON.decode(ReplyToUserArgs.self, data: call.args), name)
+        case .confirmPlan:
+            XCTAssertNoThrow(try TestJSON.decode(ConfirmPlanArgs.self, data: call.args), name)
+        case .updatePreferences:
+            XCTAssertNoThrow(try TestJSON.decode(UpdatePreferencesArgs.self, data: call.args), name)
+        case .planDeparture:
+            XCTAssertNoThrow(try TestJSON.decode(PlanDepartureArgs.self, data: call.args), name)
+        case .suggestEventNotes:
+            XCTAssertNoThrow(try TestJSON.decode(SuggestEventNotesArgs.self, data: call.args), name)
+        }
+    }
+
+    // MARK: plan_departure (prompt rule 13)
+
+    /// The calls of a fixture's turn: `expected_call` first, then `also_calls`.
+    private func turn(_ name: String) throws -> [String] {
+        try ([Fixtures.call(name)] + Fixtures.alsoCalls(name)).map(\.name)
+    }
+
+    func testDepartureFixturesCoverTheOwnersExamples() throws {
+        let names = try Fixtures.allNames()
+        let departures = try names.filter { try turn($0).contains("plan_departure") }
+        let withNewEvent = try departures.filter { try Fixtures.args(PlanDepartureArgs.self, from: $0).createEvent == true }
+        XCTAssertGreaterThanOrEqual(departures.count - withNewEvent.count, 3, "asking how long or when to leave")
+        XCTAssertGreaterThanOrEqual(withNewEvent.count, 3, "being somewhere at a time, with a new event")
+        let ordinary = try names.filter { try Fixtures.mustNotCall($0).contains("plan_departure") }
+        XCTAssertGreaterThanOrEqual(ordinary.count, 3, "ordinary events that must not plan a departure")
+        for name in ordinary {
+            XCTAssertFalse(try turn(name).contains("plan_departure"), name)
+        }
+    }
+
+    func testHowLongIsTheDestinationOnly() throws {
+        let args = try Fixtures.args(PlanDepartureArgs.self, from: "plan_departure.how_long.json")
+        XCTAssertEqual(args.destination, "台北 101")
+        XCTAssertNil(args.arriveAtLocal, "only how long: no time to arrive")
+        XCTAssertNil(args.eventId)
+        XCTAssertNil(args.createEvent)
+        XCTAssertNil(args.mode, "the app chooses the way of travelling")
+        XCTAssertTrue(try Fixtures.alsoCalls("plan_departure.how_long.json").isEmpty)
+    }
+
+    func testAnExistingEventPassesItsIdOnly() throws {
+        // Gemini never sees an event's place (consent v7, docs/SETTINGS.md §7.11): the app reads it (owner, 2026-10-19).
+        let name = "plan_departure.existing_event.json"
+        let args = try Fixtures.args(PlanDepartureArgs.self, from: name)
+        XCTAssertEqual(args.eventId, "ssd3nt1st")
+        XCTAssertNil(args.destination)
+        XCTAssertNil(args.arriveAtLocal, "the app knows the event's start")
+        let upcoming = try XCTUnwrap(Fixtures.root(name)["upcoming"] as? String)
+        XCTAssertTrue(upcoming.hasPrefix("ssd3nt1st | Dentist |"), upcoming)
+    }
+
+    func testANewEventToLeaveForComesWithItsCreateEvents() throws {
+        let name = "plan_departure.new_meeting.json"
+        let args = try Fixtures.args(PlanDepartureArgs.self, from: name)
+        XCTAssertEqual(args.destination, "台北 101")
+        XCTAssertEqual(args.arriveAtLocal, "2026-10-13T17:00", "the event's start, not 30 minutes earlier")
+        XCTAssertEqual(args.arriveEarlyMinutes, 30)
+        XCTAssertEqual(args.createEvent, true)
+        let companions = try Fixtures.alsoCalls(name)
+        XCTAssertEqual(companions.map(\.name), ["create_events"])
+        let events = try TestJSON.decode(CreateEventsArgs.self, data: try XCTUnwrap(companions.first).args).events
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.start, args.arriveAtLocal)
+        XCTAssertEqual(events.first?.location, "台北 101")
+        XCTAssertEqual(events.first?.durationMinutes, 60, "the length the user said")
+        XCTAssertNil(events.first?.reminderMinutes, "提早 30 分鐘到 is when to arrive, not a reminder")
+    }
+
+    func testAStartingPointTheUserSaidIsPassedAsWritten() throws {
+        let name = "plan_departure.from_station.json"
+        let args = try Fixtures.args(PlanDepartureArgs.self, from: name)
+        XCTAssertEqual(args.startingPoint, "台北車站")
+        XCTAssertTrue(try Fixtures.utterance(name).contains("台北車站"))
+    }
+
+    func testANewDepartureEventWithoutALengthAsksFirst() throws {
+        let name = "reply_to_user.departure_length.json"
+        let args = try Fixtures.args(ReplyToUserArgs.self, from: name)
+        XCTAssertEqual(args.needsClarification, true)
+        XCTAssertEqual(args.suggestedReplies?.count, 3)
+        XCTAssertEqual(Set(try Fixtures.mustNotCall(name)), ["plan_departure", "create_events"])
     }
 
     func testFixturesUseLondonWallClock() throws {

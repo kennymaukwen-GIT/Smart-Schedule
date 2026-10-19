@@ -1,0 +1,20 @@
+{
+  "utterance": "明天早上 8 點買早餐",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "create_events",
+    "args": {
+      "events": [
+        {
+          "title": "買早餐",
+          "start": "2026-10-14T08:00",
+          "kind": "task"
+        }
+      ]
+    }
+  },
+  "must_not_call": [
+    "plan_departure"
+  ]
+}

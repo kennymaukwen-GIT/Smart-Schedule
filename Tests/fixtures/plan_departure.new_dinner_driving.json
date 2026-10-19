@@ -1,0 +1,31 @@
+{
+  "utterance": "Dinner at Dishoom Shoreditch tomorrow at 19:30 for 2 hours, I'm driving and want to be there 10 minutes early",
+  "now_local": "2026-10-13T10:15",
+  "time_zone": "Europe/London",
+  "expected_call": {
+    "name": "plan_departure",
+    "args": {
+      "destination": "Dishoom Shoreditch",
+      "arrive_at_local": "2026-10-14T19:30",
+      "arrive_early_minutes": 10,
+      "travel_mode": "driving",
+      "create_event": true
+    }
+  },
+  "also_calls": [
+    {
+      "name": "create_events",
+      "args": {
+        "events": [
+          {
+            "title": "Dinner",
+            "start": "2026-10-14T19:30",
+            "duration_minutes": 120,
+            "kind": "event",
+            "location": "Dishoom Shoreditch"
+          }
+        ]
+      }
+    }
+  ]
+}
