@@ -1445,7 +1445,19 @@ Decided by the owner on 2026-10-18 for version 1.0 and being built during the Go
 - **When the time can't be worked out** (no location permission; Siri or a reply typed on a notification, where the app can't get the location; more than about 300 km; or MapKit finds no route): the event is still created, no departure notifications are scheduled, and the reply says so (for example: open the app to work it out). Without location permission the assistant may ask 「你從哪裡出發？」 and use the typed starting point, which goes to MapKit the same way and, as typed text, to Gemini.
 - **Offline rules.** The on-device offline rules (`DemoAssistant`: demo mode without AI permission, and the fallback when the AI can't be used) never plan departures, never ask for location and never call MapKit: policy §1 and §4 say they send nothing. Demo mode with AI permission: if it plans departures (the real current location and the sample event's fictional place go to MapKit), policy §1 must say "as described in sections 4 and 8" before it ships; otherwise it does not plan departures either. Decide before the Google submission, since the policy should not change during the review.
 - **App Privacy.** No Location type (docs/app-store-metadata.md §5.3); the label stays at two types (Other User Content and Device ID).
-- **Still to settle in the build** (not owner decisions): the English UI strings, notification identifiers and category, where departures sit in the 64-request budget (§7.5), the "Ask me first" path, whether demo mode with AI permission plans departures (offline rules never do), and handling MapKit throttling.
+- **Owner decisions, 2026-10-19** (where the phase-1 spec differs from the rules above, these rules win):
+  - Replies say 大眾運輸 / public transport, never 捷運 or a line: MapKit's ETA does not name the vehicle.
+  - The 「準備出門」 and 「該出發了」 bodies never show the travel time (see Apple's map service above).
+  - The event keeps only the three values under Google Calendar above; no separate departure time or travel time (the spec's `ssDepartAt` and `ssTravelMinutes` are not used).
+  - No departure plan beyond about 300 km; the reply says the place is too far.
+  - The reply shows a small Apple map. It is its own step, after spec step 6 and before step 7.
+  - 「準備出門」 `.active`, 「該出發了」 `.timeSensitive`, quiet hours `.passive` (see Notifications above), not the event reminder's own level.
+  - A new event made for a departure with no length given: the assistant asks how long it lasts. Ordinary events keep the 60-minute default.
+  - Demo mode never plans departures, with or without AI permission, so the policy's §1 stays as it is.
+  - Limits (`Shared/Core/DeparturePlanner.swift`): minutes early 0–180, travel time 0–1,440 minutes, the margin and the 「準備出門」 lead 0–180; a negative number counts as 0.
+  - Without location permission, the starting point is typed in a field on the reply card and goes only to MapKit, never to Gemini, so App Privacy stays without Location. (The policy's "the assistant may ask where you are leaving from … also goes to Gemini" covers more than the app does, which is allowed.)
+  - Built on the branch `claude/departure-reminders` and merged only after testing on the iPhone. If Google approves the OAuth verification first, 1.0 ships without the feature and it comes in 1.1: remove its review-notes paragraphs as `docs/app-store-metadata.md` §0 says.
+- **Still to settle in the build** (not owner decisions): the English UI strings, notification identifiers and category, where departures sit in the 64-request budget (§7.5), the "Ask me first" path, and handling MapKit throttling.
 
 ---
 
