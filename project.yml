@@ -67,6 +67,12 @@ targets:
       properties:
         CFBundleDisplayName: Smart Schedules
         UILaunchScreen: {}
+        # One scene only, but iOS 26 delivers the Control Center button's intent to the scene at launch (so Quick Capture
+        # is open on the first frame) only with this on: "The App Intents framework requires support for multiple scenes
+        # to dispatch app intents to your scene at launch time." RootView's handlesExternalEvents keeps everything in the
+        # one scene. scripts/validate_schema.py (check 13).
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
         UIUserInterfaceStyle: Dark
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         NSSupportsLiveActivities: true

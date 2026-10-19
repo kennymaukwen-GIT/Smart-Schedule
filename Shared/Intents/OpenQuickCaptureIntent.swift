@@ -14,6 +14,14 @@ import os
 /// failed there before `perform()`, and the app opened on its main screen. Should `perform()` still run in
 /// the widget extension, the link waits in the App Group and the app opens it when it comes forward
 /// (`DeepLinkRequests`). Nothing here starts a Live Activity: the Dynamic Island shows only events about to start.
+///
+/// iOS 26: `perform()` runs only after the app is in front ("The system runs this method after bringing your app to the
+/// foreground"), so the main screen showed for about 1.7 s before Quick Capture (owner's recording, 2026-10-19). As a
+/// `TargetContentProvidingIntent` (extension below) the intent first reaches the app's scene, "before the app comes to
+/// the foreground and before the system calls the app intent's perform() method": `QuickCaptureSceneRouting` in
+/// App/SmartScheduleApp.swift opens Quick Capture there, so it is on the first frame, and the later `perform()` is
+/// skipped as an echo (`DeepLinkRequests.isSceneEcho`). That needs `UIApplicationSupportsMultipleScenes` in the app's
+/// Info.plist (project.yml). iOS 18 has neither API and keeps opening it from `perform()`.
 struct OpenQuickCaptureIntent: OpenIntent {
     static let title: LocalizedStringResource = "Open Quick Capture"
     static let description = IntentDescription("Opens Smart Schedules ready to type a plan.")
@@ -38,6 +46,11 @@ struct OpenQuickCaptureIntent: OpenIntent {
         return .result()
     }
 }
+
+/// iOS 26: delivered to the scene before the app is shown (Apple, "Directing app intents to your app's scenes"). The
+/// default `contentIdentifier` (the type name) is enough: the app has one scene, which accepts every identifier.
+@available(iOS 26.0, *)
+extension OpenQuickCaptureIntent: TargetContentProvidingIntent {}
 
 /// The screens `OpenQuickCaptureIntent` opens: Quick Capture only.
 enum QuickCaptureScreen: String, AppEnum {
