@@ -1,0 +1,14 @@
+{
+  "arriveBy": "2026-10-15T09:00:00Z",
+  "destination": {
+    "address": "台北101"
+  },
+  "language": "zh-TW",
+  "mode": "transit",
+  "origin": {
+    "lat": 25.04776,
+    "lng": 121.51706
+  },
+  "region": "tw",
+  "utcOffsetMinutes": 480
+}

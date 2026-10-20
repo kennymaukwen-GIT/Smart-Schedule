@@ -1,0 +1,87 @@
+{
+  "arriveAt": "2026-10-15T10:00:00Z",
+  "departAt": "2026-10-15T08:50:00Z",
+  "estimate": false,
+  "late": false,
+  "mode": "drive",
+  "plan": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "plansLeft": 19,
+  "result": "ok",
+  "route": {
+    "description": "國道1號",
+    "distanceMeters": 72100,
+    "duration": "4200s",
+    "legs": [
+      {
+        "steps": [
+          {
+            "distanceMeters": 800,
+            "localizedValues": {
+              "distance": {
+                "text": "0.8 公里"
+              },
+              "staticDuration": {
+                "text": "3 分鐘"
+              }
+            },
+            "navigationInstruction": {
+              "instructions": "往西北走忠孝西路一段",
+              "maneuver": "DEPART"
+            },
+            "staticDuration": "180s",
+            "travelMode": "DRIVE"
+          },
+          {
+            "distanceMeters": 69800,
+            "localizedValues": {
+              "distance": {
+                "text": "69.8 公里"
+              },
+              "staticDuration": {
+                "text": "58 分鐘"
+              }
+            },
+            "navigationInstruction": {
+              "instructions": "走國道1號",
+              "maneuver": "MERGE"
+            },
+            "staticDuration": "3480s",
+            "travelMode": "DRIVE"
+          },
+          {
+            "distanceMeters": 1500,
+            "localizedValues": {
+              "distance": {
+                "text": "1.5 公里"
+              },
+              "staticDuration": {
+                "text": "4 分鐘"
+              }
+            },
+            "navigationInstruction": {
+              "instructions": "右轉進入園區二路\n目的地在右側",
+              "maneuver": "TURN_RIGHT"
+            },
+            "staticDuration": "240s",
+            "travelMode": "DRIVE"
+          }
+        ]
+      }
+    ],
+    "localizedValues": {
+      "distance": {
+        "text": "72.1 公里"
+      },
+      "duration": {
+        "text": "1 小時 10 分鐘"
+      },
+      "staticDuration": {
+        "text": "1 小時 5 分鐘"
+      }
+    },
+    "staticDuration": "3900s",
+    "warnings": [
+      "此路線有收費路段"
+    ]
+  }
+}

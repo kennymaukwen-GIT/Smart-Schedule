@@ -1,0 +1,14 @@
+{
+  "arriveBy": "2026-10-15T10:00:00Z",
+  "debugBuild": true,
+  "destination": {
+    "address": "新竹科學園區"
+  },
+  "language": "zh-TW",
+  "mode": "drive",
+  "origin": {
+    "address": "台北車站"
+  },
+  "region": "tw",
+  "utcOffsetMinutes": 480
+}

@@ -1,0 +1,184 @@
+{
+  "arriveAt": "2026-10-15T08:50:00Z",
+  "departAt": "2026-10-15T08:31:00Z",
+  "estimate": false,
+  "late": false,
+  "mode": "transit",
+  "plan": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "plansLeft": 1,
+  "result": "ok",
+  "route": {
+    "distanceMeters": 5370,
+    "duration": "1500s",
+    "legs": [
+      {
+        "steps": [
+          {
+            "distanceMeters": 350,
+            "localizedValues": {
+              "distance": {
+                "text": "0.4 公里"
+              },
+              "staticDuration": {
+                "text": "5 分鐘"
+              }
+            },
+            "navigationInstruction": {
+              "instructions": "步行至台北車站",
+              "maneuver": "DEPART"
+            },
+            "staticDuration": "300s",
+            "travelMode": "WALK"
+          },
+          {
+            "distanceMeters": 4700,
+            "localizedValues": {
+              "distance": {
+                "text": "4.7 公里"
+              },
+              "staticDuration": {
+                "text": "10 分鐘"
+              }
+            },
+            "navigationInstruction": {
+              "instructions": "捷運 往象山"
+            },
+            "staticDuration": "600s",
+            "transitDetails": {
+              "headsign": "象山",
+              "headway": "240s",
+              "localizedValues": {
+                "arrivalTime": {
+                  "time": {
+                    "text": "下午4:46"
+                  },
+                  "timeZone": "Asia/Taipei"
+                },
+                "departureTime": {
+                  "time": {
+                    "text": "下午4:36"
+                  },
+                  "timeZone": "Asia/Taipei"
+                }
+              },
+              "stopCount": 6,
+              "stopDetails": {
+                "arrivalStop": {
+                  "location": {
+                    "latLng": {
+                      "latitude": 25.033,
+                      "longitude": 121.5636
+                    }
+                  },
+                  "name": "台北101/世貿"
+                },
+                "arrivalTime": "2026-10-15T08:46:00Z",
+                "departureStop": {
+                  "location": {
+                    "latLng": {
+                      "latitude": 25.0461,
+                      "longitude": 121.5175
+                    }
+                  },
+                  "name": "台北車站"
+                },
+                "departureTime": "2026-10-15T08:36:00Z"
+              },
+              "transitLine": {
+                "agencies": [
+                  {
+                    "name": "臺北大眾捷運股份有限公司"
+                  }
+                ],
+                "color": "#e3002c",
+                "name": "淡水信義線",
+                "nameShort": "R",
+                "textColor": "#ffffff",
+                "vehicle": {
+                  "name": {
+                    "text": "捷運"
+                  },
+                  "type": "SUBWAY"
+                }
+              }
+            },
+            "travelMode": "TRANSIT"
+          },
+          {
+            "distanceMeters": 200,
+            "localizedValues": {
+              "distance": {
+                "text": "0.2 公里"
+              },
+              "staticDuration": {
+                "text": "3 分鐘"
+              }
+            },
+            "navigationInstruction": {
+              "instructions": "往東走信義路五段",
+              "maneuver": "TURN_LEFT"
+            },
+            "staticDuration": "150s",
+            "travelMode": "WALK"
+          },
+          {
+            "distanceMeters": 120,
+            "localizedValues": {
+              "distance": {
+                "text": "0.1 公里"
+              },
+              "staticDuration": {
+                "text": "2 分鐘"
+              }
+            },
+            "navigationInstruction": {
+              "instructions": "目的地在左側",
+              "maneuver": "STRAIGHT"
+            },
+            "staticDuration": "90s",
+            "travelMode": "WALK"
+          }
+        ],
+        "stepsOverview": {
+          "multiModalSegments": [
+            {
+              "navigationInstruction": {
+                "instructions": "步行至台北車站"
+              },
+              "stepEndIndex": 0,
+              "stepStartIndex": 0,
+              "travelMode": "WALK"
+            },
+            {
+              "navigationInstruction": {
+                "instructions": "捷運 往象山"
+              },
+              "stepEndIndex": 1,
+              "stepStartIndex": 1,
+              "travelMode": "TRANSIT"
+            },
+            {
+              "navigationInstruction": {
+                "instructions": "步行至台北101"
+              },
+              "stepEndIndex": 3,
+              "stepStartIndex": 2,
+              "travelMode": "WALK"
+            }
+          ]
+        }
+      }
+    ],
+    "localizedValues": {
+      "distance": {
+        "text": "5.4 公里"
+      },
+      "duration": {
+        "text": "25 分鐘"
+      },
+      "transitFare": {
+        "text": "NT$25"
+      }
+    }
+  }
+}

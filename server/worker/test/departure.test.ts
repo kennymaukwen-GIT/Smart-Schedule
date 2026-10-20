@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import type { Attempt, DepartureRequest, GoogleRoute, Timing } from "../src/departure.ts";
 import {
@@ -825,6 +826,23 @@ describe("POST /v1/departure/routes", () => {
     assert.equal(body.plan, null, "no stored plan, so no token");
     assert.equal(h.ledger.kv.get("sku:essentials:20261015"), 2, "the whole reservation stays counted");
   });
+
+  // The app and the Worker share these samples (Tests/fixtures/departure/README.md): the app's request body must be
+  // accepted, and the Worker's answer to it must be exactly what the app's tests read.
+  for (const name of ["transit", "drive"]) {
+    it(`answers the app's ${name} sample exactly as the app expects (Tests/fixtures/departure)`, async () => {
+      const sample = (file: string) =>
+        JSON.parse(readFileSync(new URL(`../../../Tests/fixtures/departure/${file}`, import.meta.url), "utf8")) as Record<string, unknown>;
+      const h = departureHarness();
+      const google = sample(`google.${name}.json`);
+      h.setResponder(() => Response.json(google));
+      const response = await post(h, sample(`request.${name}.json`));
+      assert.equal(response.status, 200);
+      const body = await jsonOf(response);
+      assert.match(String(body.plan), /^[A-Za-z0-9_-]{43}$/);
+      assert.deepEqual({ ...body, plan: "A".repeat(43) }, sample(`response.${name}.json`));
+    });
+  }
 
   it("needs the Routes key, a POST, a valid body and the app (no Session token)", async () => {
     const missing = departureHarness({ GOOGLE_ROUTES_API_KEY: undefined });
