@@ -8,7 +8,7 @@ Smart Schedules 的伺服器端（Cloudflare Worker，TypeScript，**零 runtime
   **1.0 版不使用**：App 的 `AppConstants.pushToStartEnabled = false`，不要求 push token、不上傳任何行程、沒有 `aps-environment`；
   `wrangler.toml` 的正式環境 `crons = []`，也不需要 APNs secrets（`.p8`）。路由與程式碼保留給之後的版本，開啟方式見「1.0：push-to-start 關閉」。
 - **「該出發了」路線**（1.1）：Google Routes API 金鑰只存在 Worker secret；App Attest 驗證、每人每週 2 次、全站每天都在 Google 免費額度內、
-  英國不提供，不記錄任何地點。見「該出發了：Google 路線」。
+  歐洲經濟區、瑞士和英國不提供，不記錄任何地點。見「該出發了：Google 路線」。
 
 | 路徑 | 驗證 | 用途 |
 | --- | --- | --- |
@@ -211,7 +211,8 @@ Google 金鑰只在 Worker。**1.0 不使用**：App 還沒有呼叫它的程式
 
 ### 每位使用者的次數
 
-- 每週（使用者當地的星期一 00:00 開始）新規劃 `DEPARTURE_WEEKLY_PLANS` 次，預設 2 次。一次出發規劃、或問一次「要多久」，算 1 次；
+- 每週（使用者當地的星期一 00:00 開始）新規劃 `DEPARTURE_WEEKLY_PLANS` 次，預設 2 次；開發者用 Xcode 裝的 Debug build
+  是 `DEPARTURE_DEBUG_WEEKLY_PLANS` 次（預設 20，方便測試；每天的上限照樣適用，所以不會多花錢）。一次出發規劃、或問一次「要多久」，算 1 次；
   只有真的給出路線才算（帳本先保留這一次，沒有路線就退回）。
 - 同一次規劃的重算（同一個目的地和到達時間；換出發地或交通方式也算）不另外算，最多 `DEPARTURE_PLAN_RECHECKS` 次。
 - 不管結果如何（包括找不到地點，Google 照樣收費），每人每天在每個計價等級最多呼叫 Google `DEPARTURE_USER_DAILY_CALLS` 次（預設 30），
@@ -221,9 +222,12 @@ Google 金鑰只在 Worker。**1.0 不使用**：App 還沒有呼叫它的程式
 
 ### 不提供的國家
 
-`DEPARTURE_BLOCKED_COUNTRIES`（預設 `GB`）裡的國家，以及 Cloudflare 判斷不出國家的請求（`XX`、Tor 的 `T1`、沒有國家），
-依 IP 拒絕（`403 region_unavailable`）；App 也會在 iPhone 上判斷（地區設定、App Store 國家、目前位置）。
-唯一的例外是開發者自己用 Xcode 裝的 Debug build，**而且出發地是打字的地址**，用來在英國測試台灣的路線。
+Google Maps Platform 條款 §4.4(c)(ii)：不可以把「歐洲使用者」的個人資料提供給 Google，「歐洲」指歐洲經濟區、瑞士和英國。
+所以 `DEPARTURE_BLOCKED_COUNTRIES` 預設擋這整區（擁有者 2026-10-20 決定）：歐盟 27 國、冰島、列支敦斯登、挪威、瑞士、英國，
+加上 Cloudflare 可能用自己代碼回報的地方（英國的澤西、根西、曼島與直布羅陀；屬於歐盟的奧蘭與法國海外大區）。
+這些國家，以及 Cloudflare 判斷不出國家的請求（`XX`、Tor 的 `T1`、沒有國家），依 IP 拒絕（`403 region_unavailable`）；
+App 也會在 iPhone 上判斷（地區設定、App Store 國家、目前位置）。唯一的例外是開發者自己用 Xcode 裝的 Debug build，
+**而且出發地是打字的地址**，用來在英國測試台灣的路線。
 
 ### Google Cloud 設定（Routes API 金鑰，做一次）
 
@@ -310,8 +314,9 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `SESSION_DAILY_LIMIT` | var | 每個身分每 UTC 日以 session 呼叫 generateContent 的上限，預設 `200`（extension 每次回覆 1–3 次）；Bearer 不受影響 |
 | `ATTEST_DAILY_PER_IP` | var | 每個 IP bucket（IPv6 以 /64 計）每 UTC 日**成功** attest 的上限（= 新身分數），預設 `200`（行動網路常有許多使用者共用一個 IPv4） |
 | `GOOGLE_ROUTES_API_KEY` | secret | 「該出發了」用的 Google Maps Platform 金鑰，**只限 Routes API**（見「Google Cloud 設定」）。沒設時 `/v1/departure/routes` 回 `500 server_misconfigured`，不會呼叫 Google |
-| `DEPARTURE_BLOCKED_COUNTRIES` | var | 這些國家不提供「該出發了」（Cloudflare 判斷的 `request.cf.country`，逗號分隔），預設 `GB`（英國）。App 也會在 iPhone 上判斷 |
+| `DEPARTURE_BLOCKED_COUNTRIES` | var | 這些國家不提供「該出發了」（Cloudflare 判斷的 `request.cf.country`，逗號分隔），預設是歐洲經濟區、瑞士和英國（`EUROPEAN_COUNTRIES`，43 個代碼）。App 也會在 iPhone 上判斷；`test/config-sync.test.ts` 不允許少列 |
 | `DEPARTURE_WEEKLY_PLANS` | var | 每位使用者（App Attest key）每週可以新規劃幾次，週一開始（使用者當地時間），預設 `2` |
+| `DEPARTURE_DEBUG_WEEKLY_PLANS` | var | 用 Xcode 裝的 Debug build 每週可以新規劃幾次（給開發者測試），預設 `20`；每天的上限照樣適用 |
 | `DEPARTURE_PLAN_RECHECKS` | var | 同一次規劃（同一個目的地和到達時間）可以免費重算幾次（換出發地或交通方式也算重算），預設 `5` |
 | `DEPARTURE_USER_DAILY_CALLS` | var | 每位使用者每個計價等級每 UTC 日最多呼叫 Google 幾次（不管結果），預設 `30`；另外最多是該等級每日上限的三分之一（至少一個請求最多的次數） |
 | `DEPARTURE_DAILY_ESSENTIALS` / `_PRO` / `_ENTERPRISE` | var | 每個 Google 計價等級每 UTC 日最多呼叫幾次。正式 + 開發兩個 Worker 加起來 × 32 是每月免費次數的 80 %（250 / 125 / 25），所以任何一個月都不會超過免費次數。小於一個請求最多的次數（3，Essentials 是 2），包括 `0`，就等於關閉那個等級；`test/config-sync.test.ts` 不允許加總超過 |
@@ -506,7 +511,7 @@ Body（JSON，≤ 4 KB，欄位以外的 key 一律拒絕）：
 （每個計價等級分開算，`429 user_daily_limit`；兩者的 `Retry-After` 都到 UTC 00:00）→ 呼叫 Google → 在帳本結算
 （呼叫和結算在 `ctx.waitUntil` 裡，App 斷線也會做完）。
 
-- **國家**：`request.cf.country` 在 `DEPARTURE_BLOCKED_COUNTRIES`（預設英國）、或判斷不出國家就拒絕。例外只有 `debugBuild: true`
+- **國家**：`request.cf.country` 在 `DEPARTURE_BLOCKED_COUNTRIES`（預設歐洲經濟區、瑞士和英國）、或判斷不出國家就拒絕。例外只有 `debugBuild: true`
   **而且**出發地是打字的地址（開發者在英國用台灣地址測試；英國的位置永遠不會送到 Google）。`debugBuild` 在 App Attest 簽過的 body 裡，中間人加不進去。
 - **怎麼問 Google**（`POST https://routes.googleapis.com/directions/v2:computeRoutes`，只要一條路線、不要替代路線，`X-Goog-FieldMask` 固定在 Worker）：
   - 大眾運輸：`TRANSIT` + `arrivalTime`（Google 依時刻表排出趕得上的班次）。出門時間 = 第一班車的發車時間 − 前面走路的時間。

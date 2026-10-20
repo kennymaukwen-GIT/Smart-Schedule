@@ -59,6 +59,7 @@ export interface Env {
    * calls per user per UTC day, and Google calls per pricing tier per UTC day (0 turns a tier off). */
   DEPARTURE_BLOCKED_COUNTRIES?: string;
   DEPARTURE_WEEKLY_PLANS?: string;
+  DEPARTURE_DEBUG_WEEKLY_PLANS?: string;
   DEPARTURE_PLAN_RECHECKS?: string;
   DEPARTURE_USER_DAILY_CALLS?: string;
   DEPARTURE_DAILY_ESSENTIALS?: string;

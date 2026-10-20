@@ -94,12 +94,16 @@ GEMINI_INPUT_USD_PER_M = "0.75"
 GEMINI_CACHED_USD_PER_M = "0.075"
 GEMINI_OUTPUT_USD_PER_M = "3.75"
 # 「該出發了」 (POST /v1/departure/routes, src/departure.ts; README "該出發了：Google 路線"). Off in these countries
-# (Cloudflare's request.cf.country, comma-separated; the app also checks on the iPhone).
-DEPARTURE_BLOCKED_COUNTRIES = "GB"
+# (Cloudflare's request.cf.country, comma-separated; the app also checks on the iPhone): Google's terms forbid sending
+# it personal data of users in the EEA, Switzerland or the UK (src/departure.ts EUROPEAN_COUNTRIES; the 27 EU countries,
+# IS LI NO CH GB, then GG JE IM GI AX GF GP MQ RE YT MF). test/config-sync.test.ts keeps every one of them here.
+DEPARTURE_BLOCKED_COUNTRIES = "AT,BE,BG,CY,CZ,DE,DK,EE,ES,FI,FR,GR,HR,HU,IE,IT,LT,LU,LV,MT,NL,PL,PT,RO,SE,SI,SK,IS,LI,NO,CH,GB,GG,JE,IM,GI,AX,GF,GP,MQ,RE,YT,MF"
 # New plans per user (attested key) per week, the week starting on the user's Monday; rechecks of one plan are free,
 # up to DEPARTURE_PLAN_RECHECKS. DEPARTURE_USER_DAILY_CALLS: Google calls per user, pricing tier and UTC day, whatever
 # the outcome, and never more than a third of that tier's daily cap (but at least one request's most calls).
 DEPARTURE_WEEKLY_PLANS = "2"
+# Debug builds (the owner's, from Xcode; the flag is inside the App Attest-signed body) get more, for testing.
+DEPARTURE_DEBUG_WEEKLY_PLANS = "20"
 DEPARTURE_PLAN_RECHECKS = "5"
 DEPARTURE_USER_DAILY_CALLS = "30"
 # Google calls per pricing tier per UTC day. This Worker and [env.dev] together get 80 % of the tier's monthly free
@@ -183,8 +187,9 @@ GEMINI_CACHED_USD_PER_M = "0.075"
 GEMINI_OUTPUT_USD_PER_M = "3.75"
 # The rest of the 80 % (see the production [vars]): both Workers may use keys of the same Google Cloud project.
 # Each is at least one request's most calls (3), so every way of travelling can be tested here.
-DEPARTURE_BLOCKED_COUNTRIES = "GB"
+DEPARTURE_BLOCKED_COUNTRIES = "AT,BE,BG,CY,CZ,DE,DK,EE,ES,FI,FR,GR,HR,HU,IE,IT,LT,LU,LV,MT,NL,PL,PT,RO,SE,SI,SK,IS,LI,NO,CH,GB,GG,JE,IM,GI,AX,GF,GP,MQ,RE,YT,MF"
 DEPARTURE_WEEKLY_PLANS = "2"
+DEPARTURE_DEBUG_WEEKLY_PLANS = "20"
 DEPARTURE_PLAN_RECHECKS = "5"
 DEPARTURE_USER_DAILY_CALLS = "30"
 DEPARTURE_DAILY_ESSENTIALS = "10"

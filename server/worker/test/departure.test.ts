@@ -28,6 +28,7 @@ import {
   transitTimes,
   untilNextWeek,
   untilPacificMidnight,
+  debugWeeklyPlans,
   userDailyCalls,
   userTierCalls,
   weekOf,
@@ -140,9 +141,12 @@ describe("departure request", () => {
 });
 
 describe("departure configuration and region", () => {
-  it("blocks the United Kingdom by default; DEPARTURE_BLOCKED_COUNTRIES replaces the list", () => {
-    assert.deepEqual([...blockedCountries({} as Env)], ["GB"]);
-    assert.deepEqual([...blockedCountries({ DEPARTURE_BLOCKED_COUNTRIES: " " } as Env)], ["GB"]);
+  it("blocks the EEA, Switzerland and the UK by default; DEPARTURE_BLOCKED_COUNTRIES replaces the list", () => {
+    const byDefault = blockedCountries({} as Env);
+    assert.equal(byDefault.size, 43);
+    for (const code of ["GB", "FR", "DE", "IE", "NO", "IS", "LI", "CH", "JE", "GI", "AX", "RE"]) assert.ok(byDefault.has(code), code);
+    for (const code of ["TW", "US", "JP", "HK", "TR", "UA", "RS"]) assert.ok(!byDefault.has(code), code);
+    assert.deepEqual(blockedCountries({ DEPARTURE_BLOCKED_COUNTRIES: " " } as Env), byDefault);
     assert.deepEqual([...blockedCountries({ DEPARTURE_BLOCKED_COUNTRIES: "gb, ie,CH" } as Env)], ["GB", "IE", "CH"]);
   });
 
@@ -171,6 +175,7 @@ describe("departure configuration and region", () => {
 
   it("reads the limits, with 0 turning a tier off", () => {
     assert.equal(weeklyPlans({} as Env), 2);
+    assert.equal(debugWeeklyPlans({} as Env), 20);
     assert.equal(weeklyPlans({ DEPARTURE_WEEKLY_PLANS: "x" } as Env), 2);
     assert.equal(userDailyCalls({} as Env), 30);
     assert.equal(dailyCap({} as Env, "enterprise"), 25);
@@ -648,6 +653,14 @@ describe("POST /v1/departure/routes", () => {
     assert.ok(googleCalls(daily).length <= 9);
   });
 
+  it("gives a Debug build 20 new plans a week, so the owner can test", async () => {
+    const h = departureHarness();
+    transitAnswer(h);
+    for (let i = 0; i < 3; i++) assert.equal((await post(h, { ...request, debugBuild: true })).status, 200);
+    assert.equal((await jsonOf(await post(h, { ...request, debugBuild: true }))).plansLeft, 16);
+    assert.equal((await post(h, request)).status, 429, "a Release build in the same week: its 2 are long gone");
+  });
+
   it("allows two new plans a week; the third waits for Monday", async () => {
     const h = departureHarness();
     transitAnswer(h);
@@ -700,7 +713,7 @@ describe("POST /v1/departure/routes", () => {
   it("is off in the United Kingdom and where the country is unknown, except a Debug build planning from a typed start", async () => {
     const h = departureHarness();
     transitAnswer(h);
-    for (const country of ["GB", "XX", "T1", null]) {
+    for (const country of ["GB", "FR", "CH", "NO", "XX", "T1", null]) {
       const refused = await post(h, request, country);
       assert.equal(refused.status, 403, String(country));
       assert.deepEqual(await refused.json(), { error: "region_unavailable" });

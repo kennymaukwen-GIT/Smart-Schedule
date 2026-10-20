@@ -13,8 +13,8 @@
 //     a plan's rechecks (same destination and arrival time; the start and the way to travel may change) are free,
 //     up to DEPARTURE_PLAN_RECHECKS per plan; and at most DEPARTURE_USER_DAILY_CALLS Google calls a day whatever
 //     the outcome (a place Google can't find is billed too).
-// Not in the countries DEPARTURE_BLOCKED_COUNTRIES lists, nor where Cloudflare can't tell the country (by the
-// request's IP; the app also checks on the iPhone).
+// Not in the countries DEPARTURE_BLOCKED_COUNTRIES lists (the EEA, Switzerland and the UK), nor where Cloudflare can't
+// tell the country (by the request's IP; the app also checks on the iPhone). Debug builds: DEPARTURE_DEBUG_WEEKLY_PLANS.
 
 import type { Identity } from "./auth.ts";
 import { b64urlEncode, hex, sha256, utf8 } from "./encoding.ts";
@@ -47,8 +47,24 @@ export const MODE_SKU: Readonly<Record<Mode, Sku>> = {
  */
 export const MAX_CALLS: Readonly<Record<Mode, number>> = { transit: 2, drive: 3, walk: 1, two_wheeler: 3 };
 
-/** The owner's decision (2026-10-20): not in the United Kingdom. */
-export const DEFAULT_BLOCKED_COUNTRIES = ["GB"];
+/**
+ * Google Maps Platform Terms §4.4(c)(ii): the customer will not provide "any European End User's Personal Data (where
+ * 'European' means 'European Economic Area, Switzerland, or the UK')". Owner decisions 2026-10-20: off in the UK, and
+ * then in the whole of that area: the 27 EU countries, Iceland, Liechtenstein, Norway, Switzerland and the UK, plus the
+ * places with codes of their own that Cloudflare may report for them (the UK's Crown Dependencies and Gibraltar; Åland
+ * and the French overseas regions, which are in the EU).
+ */
+export const EUROPEAN_COUNTRIES: readonly string[] = [
+  // EU
+  "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT",
+  "NL", "PL", "PT", "RO", "SE", "SI", "SK",
+  // the rest of the EEA, Switzerland, the UK
+  "IS", "LI", "NO", "CH", "GB",
+  // own codes inside that area
+  "GG", "JE", "IM", "GI", "AX", "GF", "GP", "MQ", "RE", "YT", "MF",
+];
+
+export const DEFAULT_BLOCKED_COUNTRIES = EUROPEAN_COUNTRIES;
 
 /** Each tier's monthly free calls (Google Maps Platform pricing, Compute Routes Essentials / Pro / Enterprise). */
 export const FREE_MONTHLY_CALLS: Readonly<Record<Sku, number>> = { essentials: 10_000, pro: 5_000, enterprise: 1_000 };
@@ -226,6 +242,14 @@ export function blockedCountries(env: Env): Set<string> {
 
 export function weeklyPlans(env: Env): number {
   return count(env.DEPARTURE_WEEKLY_PLANS, 2);
+}
+
+/**
+ * New plans per week for a Debug build (the owner's own, installed from Xcode; owner decision 2026-10-20): more, so
+ * the feature can be tested. The daily caps still apply, so this costs nothing more.
+ */
+export function debugWeeklyPlans(env: Env): number {
+  return count(env.DEPARTURE_DEBUG_WEEKLY_PLANS, 20);
 }
 
 export function planRechecks(env: Env): number {
@@ -688,7 +712,7 @@ export async function handleDepartureRoutes(
   const day = utcDay(now);
   const week = weekOf(now, trip.utcOffsetMinutes);
   const reserved = MAX_CALLS[trip.mode];
-  const allowance = weeklyPlans(env);
+  const allowance = trip.debugBuild ? debugWeeklyPlans(env) : weeklyPlans(env);
   const recheck = trip.plan
     ? { hash: await planHash(trip.plan), binding: await planBinding(trip.plan, trip.destination, trip.arriveBy), maxRechecks: planRechecks(env) }
     : null;

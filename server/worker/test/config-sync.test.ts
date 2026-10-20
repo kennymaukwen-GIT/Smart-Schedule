@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { Env } from "../src/env.ts";
 import type { Sku } from "../src/departure.ts";
-import { DAYS_PER_GOOGLE_MONTH, DEFAULT_DAILY_CAPS, FREE_MONTHLY_CALLS, MAX_CALLS, MODES, MODE_SKU, dailyCap } from "../src/departure.ts";
+import { DAYS_PER_GOOGLE_MONTH, DEFAULT_DAILY_CAPS, EUROPEAN_COUNTRIES, FREE_MONTHLY_CALLS, MAX_CALLS, MODES, MODE_SKU, dailyCap } from "../src/departure.ts";
 import { bundleIds, DEFAULT_BUNDLE_IDS, DEFAULT_SESSION_MODELS, sessionModels } from "../src/env.ts";
 
 /** A file of this repository, relative to its root (this file is server/worker/test/), with LF line endings. */
@@ -118,8 +118,11 @@ describe("app ↔ Worker configuration", () => {
         const most = Math.max(...MODES.filter((mode) => MODE_SKU[mode] === sku).map((mode) => MAX_CALLS[mode]));
         assert.ok(cap === 0 || cap >= most, `${key} (${name}) = ${cap}: 0, or at least ${most}`);
       }
-      const blocked = match(toml, /^[ \t]*DEPARTURE_BLOCKED_COUNTRIES[ \t]*=[ \t]*"([^"]*)"/m, `DEPARTURE_BLOCKED_COUNTRIES (${name})`);
-      assert.ok(blocked.split(",").map((c) => c.trim()).includes("GB"), `the United Kingdom stays blocked (${name})`);
+      const blocked = match(toml, /^[ \t]*DEPARTURE_BLOCKED_COUNTRIES[ \t]*=[ \t]*"([^"]*)"/m, `DEPARTURE_BLOCKED_COUNTRIES (${name})`)
+        .split(",")
+        .map((c) => c.trim());
+      const missing = EUROPEAN_COUNTRIES.filter((c) => !blocked.includes(c));
+      assert.deepEqual(missing, [], `the EEA, Switzerland and the UK stay blocked (${name}): add ${missing.join(",")}`);
     }
     for (const sku of ["essentials", "pro", "enterprise"] as const) {
       assert.ok(
