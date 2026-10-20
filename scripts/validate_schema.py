@@ -818,6 +818,38 @@ def lock_screen_checks() -> None:
         print(f"✓ AddPlanIntent asks a locked iPhone to unlock first (authenticationPolicy = .{match.group(1)})")
 
 
+QUICK_CAPTURE_INTENT = "Shared/Intents/OpenQuickCaptureIntent.swift"
+
+
+def scene_routing_checks() -> None:
+    """Check 13: on iOS 26 the Control Center button's intent reaches the scene before the app is shown, so Quick Capture
+    is open on the first frame instead of after ~1.7 s on the main screen (owner's recording, 2026-10-19). All three
+    parts are needed, and none fails to build without the others, so a missing one would silently bring the wait back:
+    the iOS 26-only TargetContentProvidingIntent conformance, the scene's onAppIntentExecution (with the one scene
+    taking every external event), and UIApplicationSupportsMultipleScenes in the app's Info.plist ("The App Intents
+    framework requires support for multiple scenes to dispatch app intents to your scene at launch time")."""
+    before = len(errors)
+    intent = re.sub(r"//.*", "", (ROOT / QUICK_CAPTURE_INTENT).read_text(encoding="utf-8"))
+    if not re.search(r"@available\(iOS 26\.0,\s*\*\)\s*extension\s+OpenQuickCaptureIntent\s*:\s*"
+                     r"TargetContentProvidingIntent\b", intent):
+        errors.append(f"{QUICK_CAPTURE_INTENT}: OpenQuickCaptureIntent needs `@available(iOS 26.0, *) extension "
+                      "OpenQuickCaptureIntent: TargetContentProvidingIntent {}` so iOS 26 routes it to the scene")
+    app = re.sub(r"//.*", "", (ROOT / "App/SmartScheduleApp.swift").read_text(encoding="utf-8"))
+    for needle, why in ((r"\.onAppIntentExecution\(\s*OpenQuickCaptureIntent\.self", "the scene opens Quick Capture"),
+                        (r"\.modifier\(\s*QuickCaptureSceneRouting\(\)\s*\)", "RootView uses QuickCaptureSceneRouting"),
+                        (r'\.handlesExternalEvents\(\s*preferring:\s*\[\]\s*,\s*allowing:\s*\["\*"\]\s*\)',
+                         'the one scene takes every link and intent (handlesExternalEvents(preferring: [], allowing: ["*"]))')):
+        if not re.search(needle, app):
+            errors.append(f"App/SmartScheduleApp.swift: missing the iOS 26 Quick Capture scene route: {why}")
+    project = re.sub(r"(^|\s)#.*", r"\1", (ROOT / "project.yml").read_text(encoding="utf-8"))
+    if not re.search(r"UIApplicationSceneManifest:\s*\n\s+UIApplicationSupportsMultipleScenes:\s*true\b",
+                     target_block(project, APP_TARGET) or ""):
+        errors.append("project.yml: the app target's Info.plist needs UIApplicationSceneManifest › "
+                      "UIApplicationSupportsMultipleScenes: true, or iOS 26 never routes the intent to the scene")
+    if len(errors) == before:
+        print("✓ iOS 26 Control Center → Quick Capture opens in the scene before the app is shown "
+              "(TargetContentProvidingIntent, onAppIntentExecution, UIApplicationSupportsMultipleScenes)")
+
 
 # ---------- Departure reminders: location When In Use, in the app only ----------
 
@@ -1193,6 +1225,7 @@ def main() -> int:
     notification_extension_checks()
     background_task_checks()
     lock_screen_checks()
+    scene_routing_checks()
     location_checks()
 
     if errors:

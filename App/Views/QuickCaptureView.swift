@@ -1,3 +1,4 @@
+import os
 import SwiftUI
 
 private let modeStorageKey = "quickCaptureMode"
@@ -17,9 +18,13 @@ struct QuickCaptureView: View {
     @Environment(ScheduleViewModel.self) private var schedule
     @Environment(AppRouter.self) private var router
     @Environment(\.locale) private var environmentLocale
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(modeStorageKey) private var storedMode: CalendarScope = .day
     @State private var mode: CalendarScope
     @FocusState private var inputFocused: Bool
+    /// iOS 26: Quick Capture can appear while the app is still being prepared in the background (the Control Center
+    /// button reaches the scene first), where the keyboard may not come up; it is asked for again once the app is in front.
+    @State private var focusesWhenActive = false
     /// Pulled up by its handle, by a plan card arriving, or by scrolling back through the history.
     @State private var isConversationExpanded: Bool
     /// The handle's drag so far (negative = up); eases back when the drag ends.
@@ -105,9 +110,19 @@ struct QuickCaptureView: View {
         .padding(.horizontal, 10)
         .padding(.top, 6)
         .onAppear {
+            Logger.launch.notice("Quick Capture on screen")
             // With voice, the composer brings the keyboard up itself if the mic can't start.
-            if voiceRequest == nil { inputFocused = true }
+            // Not while the app is still being prepared in the background: the keyboard can't come up then, and a
+            // focus that didn't take would make the write on `.active` a no-op.
+            if voiceRequest == nil {
+                if scenePhase == .active { inputFocused = true } else { focusesWhenActive = true }
+            }
             if showsPlanCard { isConversationExpanded = true }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, focusesWhenActive else { return }
+            focusesWhenActive = false
+            inputFocused = true
         }
         .onChange(of: mode) { _, newMode in
             storedMode = newMode

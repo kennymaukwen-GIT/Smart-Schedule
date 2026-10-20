@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Main view, the calendar drawer, and the Quick Capture overlay that "spawns" from the Dynamic Island position.
-/// Sheets: the event page, accounts (avatar), Settings (drawer › General), Add Google account and AI consent. A short
+/// Sheets: the event page, the day list (a date held down in the month grid, with its own event page on top), accounts
+/// (avatar), Settings (drawer › General), Add Google account and AI consent. A short
 /// confirmation ("Connected …", "Removed …") shows on top of everything but the sheets.
 struct RootView: View {
     @Environment(AppRouter.self) private var router
@@ -60,6 +61,14 @@ struct RootView: View {
         )) { event in
             // The event page reads and writes through the schedule; its pickers follow Settings › Time zone.
             EventDetailSheet(event: event)
+                .environment(router)
+                .environment(schedule)
+                .environment(chat)
+                .environment(\.timeZone, schedule.clock.timeZone)
+        }
+        // A date held down in the month grid: that day's events, by time. Its rows open the event page over it.
+        .sheet(item: $router.agendaDay, onDismiss: { router.agendaEventID = nil }) { request in
+            DayAgendaSheet(day: request.date)
                 .environment(router)
                 .environment(schedule)
                 .environment(chat)

@@ -27,6 +27,38 @@ final class DeepLinkRequestsTests: XCTestCase {
         XCTAssertNil(defaults.string(forKey: DeepLinkRequests.pendingURLKey), "and cleared")
     }
 
+    // MARK: iOS 26 scene route (OpenQuickCaptureIntent reaches the scene before perform())
+
+    func testPerformAfterTheSceneOpenedQuickCaptureIsAnEcho() {
+        let opened = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertTrue(DeepLinkRequests.isSceneEcho(DeepLink.compose, sceneOpenedAt: opened, now: opened.addingTimeInterval(1.7)))
+        XCTAssertTrue(DeepLinkRequests.isSceneEcho(DeepLink.compose, sceneOpenedAt: opened, now: opened))
+    }
+
+    func testALaterTapIsNotAnEcho() {
+        let opened = Date(timeIntervalSince1970: 1_800_000_000)
+        let window = DeepLinkRequests.sceneEchoWindow
+        XCTAssertEqual(window, DeepLinkRequests.maxAge, "as long as the App Group hand-off lives")
+        XCTAssertTrue(DeepLinkRequests.isSceneEcho(DeepLink.compose, sceneOpenedAt: opened, now: opened.addingTimeInterval(window - 0.1)))
+        XCTAssertFalse(DeepLinkRequests.isSceneEcho(DeepLink.compose, sceneOpenedAt: opened, now: opened.addingTimeInterval(window)))
+    }
+
+    func testWithoutASceneRouteNothingIsSkipped() {
+        XCTAssertFalse(DeepLinkRequests.isSceneEcho(DeepLink.compose, sceneOpenedAt: nil, now: Date()))
+    }
+
+    func testOnlyThePlainComposeLinkCounts() {
+        let opened = Date(timeIntervalSince1970: 1_800_000_000)
+        let soon = opened.addingTimeInterval(1)
+        XCTAssertFalse(DeepLinkRequests.isSceneEcho(DeepLink.composeVoice, sceneOpenedAt: opened, now: soon))
+        XCTAssertFalse(DeepLinkRequests.isSceneEcho(DeepLink.event("abc"), sceneOpenedAt: opened, now: soon))
+    }
+
+    func testAClockThatWentBackIsNotAnEcho() {
+        let opened = Date(timeIntervalSince1970: 1_800_000_000)
+        XCTAssertFalse(DeepLinkRequests.isSceneEcho(DeepLink.compose, sceneOpenedAt: opened, now: opened.addingTimeInterval(-1)))
+    }
+
     func testNothingWaiting() {
         XCTAssertNil(DeepLinkRequests.takePending(defaults: defaults))
     }

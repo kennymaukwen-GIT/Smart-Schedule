@@ -12,6 +12,9 @@ struct MonthGridView: View {
     let isLoading: Bool
     let eventsOnDay: (Date) -> [ScheduleEvent]
     let onSelect: (ScheduleEvent) -> Void
+    /// Holding a date down (anywhere in its cell, chips included) lists the whole day; a tap on a chip still opens its
+    /// own event. VoiceOver: the date's button.
+    var onSelectDay: ((Date) -> Void)?
     /// False on the main screen, whose header already names the month.
     var showsTitle = true
 
@@ -26,13 +29,15 @@ struct MonthGridView: View {
          isLoading: Bool = false,
          showsTitle: Bool = true,
          eventsOnDay: @escaping (Date) -> [ScheduleEvent],
-         onSelect: @escaping (ScheduleEvent) -> Void) {
+         onSelect: @escaping (ScheduleEvent) -> Void,
+         onSelectDay: ((Date) -> Void)? = nil) {
         _month = month
         self.today = today
         self.isLoading = isLoading
         self.showsTitle = showsTitle
         self.eventsOnDay = eventsOnDay
         self.onSelect = onSelect
+        self.onSelectDay = onSelectDay
         _anchor = State(initialValue: CalendarPaging.monthStart(containing: month.wrappedValue,
                                                                 calendar: WallClock().calendar))
         _page = State(initialValue: 0)
@@ -83,7 +88,8 @@ struct MonthGridView: View {
                                            eventsOnDay: eventsOnDay,
                                            maxChips: maxChips,
                                            calendar: calendar,
-                                           onSelect: onSelect)
+                                           onSelect: onSelect,
+                                           onSelectDay: onSelectDay)
                                 .containerRelativeFrame(.horizontal)
                         }
                     }
@@ -172,6 +178,7 @@ private struct MonthWeeksPage: View {
     let maxChips: Int
     let calendar: Calendar
     let onSelect: (ScheduleEvent) -> Void
+    let onSelectDay: ((Date) -> Void)?
 
     var body: some View {
         let monthInterval = CalendarPaging.monthInterval(containing: month, calendar: calendar)
@@ -188,7 +195,8 @@ private struct MonthWeeksPage: View {
                                 events: eventsOnDay(day),
                                 maxChips: maxChips,
                                 calendar: calendar,
-                                onSelect: onSelect
+                                onSelect: onSelect,
+                                onSelectDay: onSelectDay
                             )
                         }
                     }
@@ -207,6 +215,12 @@ private struct DayCell: View {
     let maxChips: Int
     let calendar: Calendar
     let onSelect: (ScheduleEvent) -> Void
+    let onSelectDay: ((Date) -> Void)?
+
+    /// How long a date is held before its day list opens.
+    private static let holdDuration = 0.4
+    /// Counts holds, for the haptic tap that says the hold worked.
+    @State private var holds = 0
 
     var body: some View {
         VStack(spacing: 2) {
@@ -215,11 +229,19 @@ private struct DayCell: View {
                 .foregroundStyle(isToday ? Color.black : (isInMonth ? Color.white : Theme.textSecondary.opacity(0.6)))
                 .frame(width: 24, height: 24)
                 .background(Circle().fill(isToday ? Color.white : Color.clear))
+                // VoiceOver reads the whole date and offers the day list as the number's action (a hold is hard there).
+                .accessibilityLabel(Text(day, format: Date.FormatStyle(date: .complete, time: .omitted,
+                                                                       timeZone: calendar.timeZone)))
+                .accessibilityAddTraits(onSelectDay == nil ? [] : .isButton)
+                .accessibilityHint(onSelectDay == nil ? Text(verbatim: "") : Text("Shows this day's events"))
+                .accessibilityAction { listDay() }
 
             ForEach(events.prefix(maxChips)) { event in
                 EventChip(event: event, day: day, calendar: calendar)
                     .contentShape(Rectangle())
                     .onTapGesture { onSelect(event) }
+                    // On the chip itself too, so a tap and a hold on a chip never compete with the cell's hold.
+                    .onLongPressGesture(minimumDuration: Self.holdDuration) { listDay() }
             }
             if events.count > maxChips {
                 Text("+\(events.count - maxChips)")
@@ -228,7 +250,17 @@ private struct DayCell: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 64, alignment: .top)
+        // The whole cell, gaps included. A hold, not a tap: a tap on a chip opens that event.
+        .contentShape(Rectangle())
+        .onLongPressGesture(minimumDuration: Self.holdDuration) { listDay() }
+        .sensoryFeedback(.impact(weight: .medium), trigger: holds)
         .opacity(isInMonth ? 1 : 0.55)
+    }
+
+    private func listDay() {
+        guard let onSelectDay else { return }
+        holds += 1
+        onSelectDay(day)
     }
 }
 

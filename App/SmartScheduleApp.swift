@@ -1,3 +1,6 @@
+// AppIntents with SwiftUI loads the overlay that declares View.onAppIntentExecution (QuickCaptureSceneRouting).
+import AppIntents
+import os
 import SwiftUI
 import UserNotifications
 
@@ -10,10 +13,12 @@ struct SmartScheduleApp: App {
     @State private var chat: ChatViewModel
 
     init() {
+        Logger.launch.notice("App init")
         // The Control Center button's intent (an `OpenIntent`, run in this process) opens Quick Capture through the
         // router at once. Should it run in the widget extension, it leaves the link in the App Group: see `.active`
-        // below and `deepLinkObservation`.
-        DeepLinkRequests.install { AppRouter.shared.handle($0) }
+        // below and `deepLinkObservation`. On iOS 26 the scene usually opened it already (`QuickCaptureSceneRouting`),
+        // and this repeat is skipped.
+        DeepLinkRequests.install { AppRouter.shared.handleIntentLink($0, from: "perform") }
         let schedule = ScheduleViewModel()
         _schedule = State(initialValue: schedule)
         _chat = State(initialValue: ChatViewModel(schedule: schedule))
@@ -26,11 +31,17 @@ struct SmartScheduleApp: App {
                 .environment(schedule)
                 .environment(chat)
                 .preferredColorScheme(.dark)
-                .onOpenURL { router.handle($0) }
+                .onOpenURL { router.handle($0, from: "url") }
+                // iOS 26: Quick Capture opens before the app is shown when the Control Center button launches it.
+                .modifier(QuickCaptureSceneRouting())
+                // The app's one scene takes every link and app intent (UIApplicationSupportsMultipleScenes is on only so
+                // App Intents can reach the scene at launch), so iOS never makes a second one for them.
+                .handlesExternalEvents(preferring: [], allowing: ["*"])
                 .task {
+                    Logger.launch.notice("First task")
                     // Cold start: a Quick Capture link the widget extension wrote before the app launched opens with
                     // the first frame (the `.active` check below finds nothing then: taken once).
-                    DeepLinkRequests.routePending(to: { router.handle($0) })
+                    DeepLinkRequests.routePending(to: { router.handleIntentLink($0, from: "pending at launch") })
                     // History first: cards for a draft or batch found in the App Group are matched against it.
                     await chat.loadHistory()
                     await schedule.bootstrap()
@@ -43,13 +54,14 @@ struct SmartScheduleApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
+                Logger.launch.notice("Scene active")
                 // A Quick Capture request the intent could only leave in the App Group. The widget extension may write
                 // it just after the app comes forward, so with nothing waiting the app looks once more a moment
                 // later; a later write still arrives through `.deepLink` (AppDelegate). Taken once, opened once.
-                if !DeepLinkRequests.routePending(to: { router.handle($0) }) {
+                if !DeepLinkRequests.routePending(to: { router.handleIntentLink($0, from: "pending on active") }) {
                     Task {
                         try? await Task.sleep(for: DeepLinkRequests.lateWriteDelay)
-                        DeepLinkRequests.routePending(to: { router.handle($0) })
+                        DeepLinkRequests.routePending(to: { router.handleIntentLink($0, from: "pending, late") })
                     }
                 }
                 Task {
@@ -78,6 +90,28 @@ struct SmartScheduleApp: App {
     }
 }
 
+/// iOS 26: the Control Center button's `OpenQuickCaptureIntent` reaches this scene before the app is shown (Apple: "Your
+/// closure runs before the app comes to the foreground and before the system calls the app intent's perform() method"),
+/// so Quick Capture is already open on the first frame instead of after the main screen. iOS 18 has no such API and
+/// opens it from `perform()`, as before.
+private struct QuickCaptureSceneRouting: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.onAppIntentExecution(OpenQuickCaptureIntent.self) { _ in
+                AppRouter.shared.openQuickCaptureFromScene()
+            }
+        } else {
+            content
+        }
+    }
+}
+
+extension Logger {
+    /// Console.app › the iPhone › subsystem com.smartschedules.app, category "Launch": when the app starts, comes forward
+    /// and opens Quick Capture (and from where), to time the Control Center button without a debugger.
+    static let launch = Logger(subsystem: "com.smartschedules.app", category: "Launch")
+}
+
 /// Deep-link router (island / lock-screen links) and what the main screen presents.
 @MainActor
 @Observable
@@ -94,6 +128,11 @@ final class AppRouter {
         var id = UUID()
     }
 
+    struct AgendaDay: Identifiable, Equatable {
+        let date: Date
+        var id: Date { date }
+    }
+
     /// The sheets the main screen presents.
     enum Sheet: String, Identifiable {
         /// The avatar: Google accounts (and Smart Schedules Pro when `AppConstants.subscriptionsEnabled`).
@@ -108,7 +147,16 @@ final class AppRouter {
     }
 
     var quickCapture: QuickCapture?
+    /// iOS 26: when the scene opened Quick Capture for a Control Center tap (`openQuickCaptureFromScene`), so the same
+    /// tap's `perform()` doesn't open it again (`handleIntentLink`).
+    @ObservationIgnored private var sceneOpenedQuickCaptureAt: Date?
     var selectedEventID: String?
+    /// The day whose events are listed (`DayAgendaSheet`): a date held down in the main month grid. It closes when
+    /// Quick Capture or a Settings / Accounts link opens, unless an event page is open over it (that could hold an edit).
+    var agendaDay: AgendaDay?
+    /// The event page open over the day list. A reminder tapped or an event link while the list is open opens here, on
+    /// top of it, since the main screen can't show a second sheet then (`showEvent`).
+    var agendaEventID: String?
     /// The calendar drawer (hamburger): accounts, calendars, visibility.
     var isDrawerOpen = false
     var sheet: Sheet?
@@ -117,21 +165,51 @@ final class AppRouter {
     /// while `selectedEventID` names an event the schedule has). The mic doesn't listen under them
     /// (`ComposerBar.isCovered`).
     func coversQuickCapture(_ schedule: ScheduleViewModel) -> Bool {
-        isDrawerOpen || sheet != nil || selectedEventID.flatMap(schedule.event(id:)) != nil
+        isDrawerOpen || sheet != nil || agendaDay != nil || selectedEventID.flatMap(schedule.event(id:)) != nil
     }
 
-    func handle(_ url: URL) {
+    /// iOS 26: the Control Center button's intent reached the scene before the app is shown (`QuickCaptureSceneRouting`).
+    func openQuickCaptureFromScene(now: Date = Date()) {
+        sceneOpenedQuickCaptureAt = now
+        handle(DeepLink.compose, from: "scene")
+    }
+
+    /// A link from the Control Center intent's `perform()` or its App Group hand-off. Skipped once when the scene already
+    /// opened Quick Capture for the same tap, so a Quick Capture the user has just closed doesn't come back.
+    func handleIntentLink(_ url: URL, from source: String, now: Date = Date()) {
+        if DeepLinkRequests.isSceneEcho(url, sceneOpenedAt: sceneOpenedQuickCaptureAt, now: now) {
+            sceneOpenedQuickCaptureAt = nil
+            Logger.launch.notice("Quick Capture already open from the scene; \(source, privacy: .public) skipped")
+            return
+        }
+        handle(url, from: source)
+    }
+
+    /// `source` only labels the log line: Console.app › subsystem com.smartschedules.app › category Launch.
+    /// Opens an event page wherever one can show now: over the day list when it is open, otherwise from the main screen.
+    func showEvent(_ id: String) {
+        if agendaDay != nil {
+            agendaEventID = id
+        } else {
+            selectedEventID = id
+        }
+    }
+
+    func handle(_ url: URL, from source: String = "url") {
         guard url.scheme == AppConstants.urlScheme else { return }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         switch url.host {
         case "compose":
-            // The drawer closes (as for `openSheet`). A sheet or the event page stays, since closing it could lose an
-            // edit; Quick Capture opens under it and its composer brings the keyboard up instead of the mic
-            // (`ComposerBar.isCovered`), so nothing records out of sight.
+            Logger.launch.notice("Open Quick Capture (from \(source, privacy: .public))")
+            // The drawer closes (as for `openSheet`), and so does the day list unless an event page is open over it.
+            // A sheet or the event page stays, since closing it could lose an edit; Quick Capture opens under it and
+            // its composer brings the keyboard up instead of the mic (`ComposerBar.isCovered`), so nothing records out
+            // of sight.
             isDrawerOpen = false
+            if agendaEventID == nil { agendaDay = nil }
             quickCapture = QuickCapture(startsWithVoice: DeepLink.startsVoiceInput(url))
         case "event":
-            selectedEventID = items.first { $0.name == "id" }?.value
+            if let id = items.first(where: { $0.name == "id" })?.value { showEvent(id) }
         case "settings":
             openSheet(.settings)
         case "accounts":
@@ -145,6 +223,7 @@ final class AppRouter {
     func openSheet(_ sheet: Sheet) {
         isDrawerOpen = false
         quickCapture = nil
+        if agendaEventID == nil { agendaDay = nil }
         self.sheet = sheet
     }
 }
@@ -157,6 +236,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // Before launch finishes, every time: also when iOS launches the app for an App Intent (AppRefresh).
         AppRefresh.registerHandler()
+        Logger.launch.notice("didFinishLaunching")
         // Neither needs permission; it is asked in context (ScheduleViewModel.requestNotificationPermissionIfNeeded).
         UNUserNotificationCenter.current().delegate = self
         NotificationIDs.registerCategories()
@@ -189,7 +269,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         deepLinkObservation = SharedChangeNotifier.observe(.deepLink) {
             Task { @MainActor in
                 guard UIApplication.shared.applicationState != .background else { return }
-                DeepLinkRequests.routePending(to: { AppRouter.shared.handle($0) })
+                DeepLinkRequests.routePending(to: { AppRouter.shared.handleIntentLink($0, from: "pending, darwin") })
             }
         }
         // Finishes transactions that arrived while the app was closed and keeps `isPro` current. Version 1.0 sells
@@ -249,7 +329,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             await ReminderScheduler.snooze(content, minutes: 10)
 
         case UNNotificationDefaultActionIdentifier:
-            if let eventID { await MainActor.run { AppRouter.shared.selectedEventID = eventID } }
+            if let eventID { await MainActor.run { AppRouter.shared.showEvent(eventID) } }
             await LiveActivityManager.shared.refreshIfRunning()
 
         default:

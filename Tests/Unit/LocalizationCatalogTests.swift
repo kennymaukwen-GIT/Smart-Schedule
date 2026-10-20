@@ -105,6 +105,15 @@ final class LocalizationCatalogTests: XCTestCase {
                        "你對 Siri 說話或使用鍵盤的聽寫時，語音由 Apple 轉成文字；Smart Schedules 的麥克風按鈕則在你的 iPhone 上轉成文字。Smart Schedules 只傳送文字，不傳送語音。")
     }
 
+    /// The list a tapped date in the month grid opens.
+    func testDayListLabels() throws {
+        let table = try chineseTable()
+        XCTAssertEqual(zh("No events on this day", in: table), "這天沒有行程")
+        XCTAssertEqual(zh("Shows this day's events", in: table), "顯示這天的行程")
+        XCTAssertEqual(zh("All day", in: table), "全天")
+        XCTAssertEqual(zh("Done", in: table), "完成")
+    }
+
     /// Voice input: the mic button, Settings › Assistant › Voice input, and the alert after a refused permission.
     func testVoiceInputLabels() throws {
         let table = try chineseTable()

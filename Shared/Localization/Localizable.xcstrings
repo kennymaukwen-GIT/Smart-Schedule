@@ -3040,6 +3040,17 @@
         }
       }
     },
+    "No events on this day" : {
+      "comment" : "Day list (a date tapped in the month grid) with nothing on it",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這天沒有行程"
+          }
+        }
+      }
+    },
     "No more suggestions" : {
       "comment" : "Event page: AI found nothing new to suggest",
       "localizations" : {
@@ -4215,6 +4226,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "顯示同步狀態"
+          }
+        }
+      }
+    },
+    "Shows this day's events" : {
+      "comment" : "VoiceOver hint on a date in the month grid: its action opens the day list",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "顯示這天的行程"
           }
         }
       }
