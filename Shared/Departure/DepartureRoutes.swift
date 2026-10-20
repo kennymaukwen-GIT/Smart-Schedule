@@ -308,7 +308,9 @@ enum DepartureRouteReader {
         switch attestation {
         case .unsupported, .attestationRejected, .deviceCheck, .sessionMissing: .unverified
         case .notConfigured, .serverNotReady, .updateRequired: .notReady
-        case .rateLimited, .dailyLimit: .busy(retryAfter: nil)
+        case .rateLimited: .busy(retryAfter: nil)
+        // Only the server's daily cap on new installs attesting from one network: until the next UTC day.
+        case .dailyLimit: .userDailyLimit(retryAfter: nil)
         case .server, .malformed: .unavailable
         }
     }

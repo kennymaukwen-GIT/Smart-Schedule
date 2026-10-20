@@ -243,6 +243,8 @@ final class DepartureRoutesTests: XCTestCase {
         XCTAssertEqual(DepartureRouteReader.error(attestation: .notConfigured), .notReady)
         XCTAssertEqual(DepartureRouteReader.error(attestation: .serverNotReady), .notReady)
         XCTAssertEqual(DepartureRouteReader.error(attestation: .rateLimited), .busy(retryAfter: nil))
+        XCTAssertEqual(DepartureRouteReader.error(attestation: .dailyLimit), .userDailyLimit(retryAfter: nil),
+                       "a network's daily cap on new installs lasts until tomorrow, not a moment")
         XCTAssertEqual(DepartureRouteReader.error(attestation: .server(status: 500)), .unavailable)
     }
 
