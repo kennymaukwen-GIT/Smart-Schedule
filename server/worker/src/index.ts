@@ -62,7 +62,7 @@ export interface Worker {
   scheduled(event: ScheduledEventLike, env: Env, ctx: ExecutionContextLike): Promise<void>;
 }
 
-async function route(request: Request, env: Env, deps: Deps): Promise<Response> {
+async function route(request: Request, env: Env, deps: Deps, ctx: ExecutionContextLike): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
@@ -116,7 +116,7 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
     // App only: no Session tokens (the notification extension never plans a route).
     const { identity, body, via } = await authenticate(request, env, deps, { maxBody: MAX_DEPARTURE_BODY });
     await enforceRateLimit(env, identity.id, deps.now(), { strict: via !== "assertion" });
-    return handleDepartureRoutes(request, body, identity, env, deps);
+    return handleDepartureRoutes(request, body, identity, env, deps, ctx);
   }
 
   throw new HttpError(404, "not_found");
@@ -132,9 +132,9 @@ export function createWorker(overrides: Partial<Deps> = {}): Worker {
   };
 
   return {
-    async fetch(request, env) {
+    async fetch(request, env, ctx) {
       try {
-        return await route(request, env, deps);
+        return await route(request, env, deps, ctx);
       } catch (e) {
         if (e instanceof HttpError) return errorResponse(e.status, e.code, e.headers);
         log("error", "unhandled_error", { error: e instanceof Error ? `${e.name}: ${e.message}` : String(e) });

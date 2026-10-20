@@ -97,7 +97,8 @@ GEMINI_OUTPUT_USD_PER_M = "3.75"
 # (Cloudflare's request.cf.country, comma-separated; the app also checks on the iPhone).
 DEPARTURE_BLOCKED_COUNTRIES = "GB"
 # New plans per user (attested key) per week, the week starting on the user's Monday; rechecks of one plan are free,
-# up to DEPARTURE_PLAN_RECHECKS. DEPARTURE_USER_DAILY_CALLS: Google calls per user per UTC day, whatever the outcome.
+# up to DEPARTURE_PLAN_RECHECKS. DEPARTURE_USER_DAILY_CALLS: Google calls per user, pricing tier and UTC day, whatever
+# the outcome, and never more than a third of that tier's daily cap (but at least one request's most calls).
 DEPARTURE_WEEKLY_PLANS = "2"
 DEPARTURE_PLAN_RECHECKS = "5"
 DEPARTURE_USER_DAILY_CALLS = "30"

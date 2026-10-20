@@ -49,6 +49,8 @@ export interface Harness {
   env: Env;
   worker: Worker;
   calls: FetchCall[];
+  /** Promises the Worker handed to ctx.waitUntil (work that must finish even if the client disconnects). */
+  background: Promise<unknown>[];
   respond: FetchResponder;
   setResponder(responder: FetchResponder): void;
   request(path: string, init?: RequestInit): Promise<Response>;
@@ -83,6 +85,7 @@ export function makeHarness(
   const ledger = makeFakeLedger();
   if (!("SS_DEPARTURE_LEDGER" in (options.env ?? {}))) env.SS_DEPARTURE_LEDGER = ledger;
   const calls: FetchCall[] = [];
+  const background: Promise<unknown>[] = [];
   const harness: Harness = {
     clock,
     kv,
@@ -90,6 +93,7 @@ export function makeHarness(
     ledger,
     env,
     calls,
+    background,
     respond: () => new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
     setResponder(responder) {
       harness.respond = responder;
@@ -114,7 +118,11 @@ export function makeHarness(
       const request = new Request(`https://worker.test${path}`, { ...init, headers });
       // Cloudflare's request.cf (e.g. the country): Node's Request has none, so it is attached as Cloudflare does.
       if (init.cf) Object.defineProperty(request, "cf", { value: init.cf });
-      return harness.worker.fetch(request, env, { waitUntil() {} });
+      return harness.worker.fetch(request, env, {
+        waitUntil(promise) {
+          background.push(promise);
+        },
+      });
     },
     async runCron() {
       const pending: Promise<unknown>[] = [];

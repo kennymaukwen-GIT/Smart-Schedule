@@ -19,6 +19,7 @@
 import type { Identity } from "./auth.ts";
 import { b64urlEncode, hex, sha256, utf8 } from "./encoding.ts";
 import type { Deps, Env } from "./env.ts";
+import type { ExecutionContextLike } from "./index.ts";
 import { HttpError, json, log, parseJson } from "./http.ts";
 import type { ReserveInput, ReserveResult, SettleInput } from "./ledger.ts";
 
@@ -236,6 +237,15 @@ export function userDailyCalls(env: Env): number {
   return count(env.DEPARTURE_USER_DAILY_CALLS, 30);
 }
 
+/**
+ * One user's Google calls per tier and UTC day: DEPARTURE_USER_DAILY_CALLS, but at most a third of the tier's daily
+ * cap (so one user can't use up a small tier such as the scooter's for everyone), and at least one request's most calls.
+ */
+export function userTierCalls(env: Env, sku: Sku): number {
+  const most = Math.max(...MODES.filter((mode) => MODE_SKU[mode] === sku).map((mode) => MAX_CALLS[mode]));
+  return Math.min(userDailyCalls(env), Math.max(most, Math.floor(dailyCap(env, sku) / 3)));
+}
+
 /** Calls per tier and UTC day; a cap below the tier's largest MAX_CALLS (0 included) turns the tier off. */
 export function dailyCap(env: Env, sku: Sku): number {
   const raw = { essentials: env.DEPARTURE_DAILY_ESSENTIALS, pro: env.DEPARTURE_DAILY_PRO, enterprise: env.DEPARTURE_DAILY_ENTERPRISE }[sku];
@@ -292,6 +302,15 @@ export function utcDay(now: number): string {
 
 function untilNextUtcDay(now: number): number {
   return Math.max(1, Math.ceil(((Math.floor(now / DAY_MS) + 1) * DAY_MS - now) / 1000));
+}
+
+/** Seconds until midnight US Pacific time, when Google's daily quotas start again (± 1 hour on the two DST days). */
+export function untilPacificMidnight(now: number): number {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hourCycle: "h23", hour: "numeric", minute: "numeric", second: "numeric" })
+    .formatToParts(new Date(now));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const elapsed = get("hour") * 3600 + get("minute") * 60 + get("second");
+  return Math.max(1, 86_400 - elapsed);
 }
 
 /** Where the ledger keeps a plan: hex SHA-256 of its token (only the iPhone has the token). */
@@ -487,7 +506,8 @@ export async function solveTransit(arriveBy: number | null, now: number, call: C
   const attempt = await call({ arrive: arriveBy });
   if (attempt.kind !== "route") return attempt;
   const times = transitTimes(attempt.route) ?? { departAt: arriveBy - attempt.seconds * 1000, arriveAt: arriveBy };
-  if (times.departAt < now - NOW_SLACK_MS) return fromNow();
+  // Already behind that itinerary (even by seconds: the first vehicle may be missed): plan from now instead.
+  if (times.departAt < now) return fromNow();
   return {
     kind: "ok",
     departAt: floorMinute(Math.max(now, times.departAt)),
@@ -571,11 +591,19 @@ export async function solveRoad(arriveBy: number | null, now: number, call: Call
     return { kind: "ok", departAt: floorMinute(now), arriveAt: now + leavingNow.ms, late: true, estimate: leavingNow.fallback, route: leavingNow.route };
   }
   const last = samples[samples.length - 1];
-  if (!last) return failure ?? { kind: "no_route" };
-  // No answer was in time and none was "now": go by the trend, with the last miss again as margin.
+  // Google failed before any answer in time: say so (no guess, nothing counted as a plan).
+  if (!last || failure) return failure ?? { kind: "no_route" };
+  // No answer was in time and none was "now": go by the trend, with the last miss again as margin. When the trend
+  // says leaving now is already too late, or arriving doesn't get earlier by leaving earlier, it is "late".
   const overshoot = last.t + last.ms - arriveBy;
-  const departAt = floorMinute(Math.max(now, nextDeparture(samples, arriveBy) - Math.max(5 * MINUTE, overshoot)));
-  return { kind: "ok", departAt, arriveAt: arriveBy, late: false, estimate: true, route: last.route };
+  const target = nextDeparture(samples, arriveBy) - Math.max(5 * MINUTE, overshoot);
+  const prev = samples[samples.length - 2];
+  const improves = !prev || prev.t === last.t || (prev.t + prev.ms - (last.t + last.ms)) / (prev.t - last.t) > 0.05;
+  if (target <= now + NOW_SLACK_MS || !improves) {
+    const longest = Math.max(...samples.map((s) => s.ms));
+    return { kind: "ok", departAt: floorMinute(now), arriveAt: now + longest, late: true, estimate: true, route: last.route };
+  }
+  return { kind: "ok", departAt: floorMinute(target), arriveAt: arriveBy, late: false, estimate: true, route: last.route };
 }
 
 /** Walking takes the same time whenever you leave: one call. */
@@ -632,7 +660,14 @@ async function ledger<T>(env: Env, op: "reserve" | "settle", body: ReserveInput 
 // ---------------------------------------------------------------------------------------------------------------------
 // Handler
 
-export async function handleDepartureRoutes(request: Request, body: Uint8Array, identity: Identity, env: Env, deps: Deps): Promise<Response> {
+export async function handleDepartureRoutes(
+  request: Request,
+  body: Uint8Array,
+  identity: Identity,
+  env: Env,
+  deps: Deps,
+  ctx: ExecutionContextLike,
+): Promise<Response> {
   const now = deps.now();
   const trip = parseDepartureRequest(parseJson(body), now);
   if (!trip) throw new HttpError(400, "invalid_request");
@@ -664,7 +699,7 @@ export async function handleDepartureRoutes(request: Request, body: Uint8Array, 
     week,
     calls: reserved,
     tierCap: dailyCap(env, sku),
-    userDailyCalls: userDailyCalls(env),
+    userDailyCalls: userTierCalls(env, sku),
     weeklyPlans: allowance,
     recheck,
     now,
@@ -717,39 +752,47 @@ export async function handleDepartureRoutes(request: Request, body: Uint8Array, 
     return attempt;
   };
 
-  let solved: Solved;
-  try {
-    solved = await solve(trip, now, call);
-  } catch (e) {
-    // Unexpected: give back only the calls never made; the reservation of the rest stays.
-    await ledger(env, "settle", { id: identity.id, sku, day, week, unbilled: reserved - made, releasePlan: false, releaseRecheck: null, createPlan: null }).catch(() => {});
-    throw e;
-  }
-
-  const ok = solved.kind === "ok";
-  const failed = solved.kind === "quota" || solved.kind === "unavailable";
-  const token = !recheck && ok ? b64urlEncode(crypto.getRandomValues(new Uint8Array(32))) : null;
-  let plansUsed = reservation.plansUsed;
-  let planToken: string | null = recheck ? trip.plan : token;
-  try {
-    const settled = await ledger<{ plansUsed: number }>(env, "settle", {
-      id: identity.id,
-      sku,
-      day,
-      week,
-      unbilled: reserved - made + unbilled,
-      releasePlan: !recheck && !ok, // only a plan that gave the user a route counts
-      releaseRecheck: recheck && failed ? recheck.hash : null,
-      createPlan: token
-        ? { hash: await planHash(token), entry: { id: identity.id, binding: await planBinding(token, trip.destination, trip.arriveBy), rechecks: 0, expiresAt: planExpiry(trip.arriveBy, now) } }
-        : null,
-    });
-    plansUsed = settled.plansUsed;
-  } catch (e) {
-    // The reservation stays counted (the safe side); without a stored plan, its rechecks would count as new plans.
-    log("warn", "departure_settle_failed", { error: e instanceof HttpError ? e.code : "error" });
-    if (token) planToken = null;
-  }
+  // Solving and settling run as one task the runtime finishes even when the app disconnects (ctx.waitUntil), so a
+  // plan without a route still gives its week slot back and unbilled calls are still returned.
+  const work = async (): Promise<{ solved: Solved; plansUsed: number; planToken: string | null }> => {
+    let solved: Solved;
+    try {
+      solved = await solve(trip, now, call);
+    } catch (e) {
+      // Unexpected: give back only the calls never made; the reservation of the rest stays.
+      await ledger(env, "settle", { id: identity.id, sku, day, week, unbilled: reserved - made, releasePlan: false, releaseRecheck: null, createPlan: null }).catch(() => {});
+      throw e;
+    }
+    const ok = solved.kind === "ok";
+    const failed = solved.kind === "quota" || solved.kind === "unavailable";
+    const token = !recheck && ok ? b64urlEncode(crypto.getRandomValues(new Uint8Array(32))) : null;
+    let plansUsed = reservation.plansUsed;
+    let planToken: string | null = recheck ? trip.plan : token;
+    try {
+      const settled = await ledger<{ plansUsed: number }>(env, "settle", {
+        id: identity.id,
+        sku,
+        day,
+        week,
+        unbilled: reserved - made + unbilled,
+        releasePlan: !recheck && !ok, // only a plan that gave the user a route counts
+        releaseRecheck: recheck && failed ? recheck.hash : null,
+        createPlan: token
+          ? { hash: await planHash(token), entry: { id: identity.id, binding: await planBinding(token, trip.destination, trip.arriveBy), rechecks: 0, expiresAt: planExpiry(trip.arriveBy, now) } }
+          : null,
+      });
+      plansUsed = settled.plansUsed;
+    } catch (e) {
+      // The reservation stays counted (the safe side); a new plan without a stored record gets no token, so its
+      // rechecks would count as new plans.
+      log("warn", "departure_settle_failed", { error: e instanceof HttpError ? e.code : "error" });
+      if (token) planToken = null;
+    }
+    return { solved, plansUsed, planToken };
+  };
+  const done = work();
+  ctx.waitUntil(done.catch(() => {}));
+  const { solved, plansUsed, planToken } = await done;
 
   log("info", "departure_route", {
     mode: trip.mode,
@@ -762,7 +805,8 @@ export async function handleDepartureRoutes(request: Request, body: Uint8Array, 
     recheck: recheck !== null,
   });
 
-  if (solved.kind === "quota") throw new HttpError(429, "capacity_reached", { "retry-after": String(untilNextUtcDay(now)) });
+  // Google's own daily quota (the Google Cloud cap) starts again at midnight US Pacific time.
+  if (solved.kind === "quota") throw new HttpError(429, "capacity_reached", { "retry-after": String(untilPacificMidnight(now)) });
   if (solved.kind === "unavailable") throw new HttpError(502, "upstream_unavailable");
   const plansLeft = Math.max(0, allowance - plansUsed);
   if (solved.kind === "no_route") return json(200, { result: "no_route", plansLeft });

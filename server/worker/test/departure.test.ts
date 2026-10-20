@@ -27,7 +27,9 @@ import {
   solveWalk,
   transitTimes,
   untilNextWeek,
+  untilPacificMidnight,
   userDailyCalls,
+  userTierCalls,
   weekOf,
   weeklyPlans,
 } from "../src/departure.ts";
@@ -176,6 +178,18 @@ describe("departure configuration and region", () => {
     assert.equal(dailyCap({ DEPARTURE_DAILY_ESSENTIALS: "-1" } as Env, "essentials"), 250);
   });
 
+  it("lets one user use at most a third of a tier's day, and always one whole request", () => {
+    const production = { DEPARTURE_USER_DAILY_CALLS: "30", DEPARTURE_DAILY_ESSENTIALS: "240", DEPARTURE_DAILY_PRO: "119", DEPARTURE_DAILY_ENTERPRISE: "22" } as Env;
+    assert.deepEqual([userTierCalls(production, "essentials"), userTierCalls(production, "pro"), userTierCalls(production, "enterprise")], [30, 30, 7]);
+    const dev = { DEPARTURE_USER_DAILY_CALLS: "30", DEPARTURE_DAILY_ESSENTIALS: "10", DEPARTURE_DAILY_PRO: "6", DEPARTURE_DAILY_ENTERPRISE: "3" } as Env;
+    assert.deepEqual([userTierCalls(dev, "essentials"), userTierCalls(dev, "pro"), userTierCalls(dev, "enterprise")], [3, 3, 3]);
+  });
+
+  it("counts Google's daily quota to midnight US Pacific time", () => {
+    assert.equal(untilPacificMidnight(START), 23 * 3600, "08:00 UTC is 01:00 PDT");
+    assert.equal(untilPacificMidnight(Date.UTC(2026, 11, 15, 7, 59, 0)), 60, "23:59 PST");
+  });
+
   it("keeps every tier's daily cap within 80 % of its monthly free calls over the 32 UTC days a Google month touches", () => {
     for (const sku of ["essentials", "pro", "enterprise"] as const) {
       assert.ok(DEFAULT_DAILY_CAPS[sku] * DAYS_PER_GOOGLE_MONTH <= FREE_MONTHLY_CALLS[sku] * 0.8, sku);
@@ -311,6 +325,17 @@ describe("when to leave", () => {
     assert.ok(solved.kind === "ok" && solved.late && solved.arriveAt === START + 25 * MIN);
   });
 
+  it("transit: seconds behind Google's itinerary already plans from now (the first vehicle may be missed)", async () => {
+    const now = START + 50_000;
+    const timings: Timing[] = [];
+    const solved = await solveTransit(START + 30 * MIN, now, async (timing) => {
+      timings.push(timing);
+      return "arrive" in timing ? ok(transitRoute(START + 4 * MIN, START + 25 * MIN)) : ok(transitRoute(START + 10 * MIN, START + 31 * MIN));
+    });
+    assert.deepEqual(timings, [{ arrive: START + 30 * MIN }, { leave: "now" }]);
+    assert.ok(solved.kind === "ok" && solved.late && solved.departAt === START + 6 * MIN);
+  });
+
   it("transit: a walk-only answer leaves the route's duration before the arrival", async () => {
     const solved = await solveTransit(A, START, async () => ok(roadRoute(900)));
     assert.ok(solved.kind === "ok" && solved.departAt === A - 15 * MIN && solved.arriveAt === A);
@@ -372,6 +397,22 @@ describe("when to leave", () => {
     assert.ok(onset.kind === "ok" && !onset.late && onset.arriveAt <= by, JSON.stringify(onset));
   });
 
+  it("driving: Google failing before any answer in time is a failure, not a guess", async () => {
+    // 40 min drive, arrive by 35 minutes from now: the first guess is late, then Google fails.
+    let n = 0;
+    const solved = await solveRoad(START + 35 * MIN, START, async () => (++n === 1 ? ok(roadRoute(2400)) : { kind: "unavailable", status: 503 }), 3);
+    assert.deepEqual(solved, { kind: "unavailable", status: 503 });
+  });
+
+  it("driving: when leaving earlier doesn't help (a closure lifting later), it says late, never a made-up arrival", async () => {
+    // Closed until 09:20, then 30 min: leaving at t takes (09:20 − t) + 30 min. Arrive by 09:45: impossible.
+    const now = Date.UTC(2026, 9, 15, 9, 0);
+    const open = Date.UTC(2026, 9, 15, 9, 20);
+    const by = Date.UTC(2026, 9, 15, 9, 45);
+    const solved = await solveRoad(by, now, road((t) => Math.max(0, (open - t) / MIN) + 30), 3);
+    assert.ok(solved.kind === "ok" && solved.late && solved.estimate && solved.departAt === now && solved.arriveAt > by, JSON.stringify(solved));
+  });
+
   it("driving: never more calls than allowed", async () => {
     let calls = 0;
     const flapping = await solveRoad(START + 3 * 60 * MIN, START, async () => {
@@ -426,7 +467,7 @@ describe("departure ledger", () => {
     const kv = new MemorySyncKv();
     assert.deepEqual(reserve(kv, base), { ok: true, plansUsed: 1 });
     assert.equal(kv.get("sku:pro:20261015"), 3);
-    assert.equal(kv.get("user:key-a:20261015"), 3);
+    assert.equal(kv.get("user:key-a:pro:20261015"), 3);
     assert.deepEqual(reserve(kv, { ...base, id: "key-b" }), { ok: true, plansUsed: 1 });
     assert.deepEqual(reserve(kv, { ...base, id: "key-c" }), { ok: false, reason: "capacity_reached", plansUsed: 0 });
     assert.equal(kv.get("sku:pro:20261015"), 6, "a refusal reserves nothing");
@@ -446,7 +487,7 @@ describe("departure ledger", () => {
       plansUsed: 0,
     });
     assert.equal(kv.get("sku:pro:20261015"), 2);
-    assert.equal(kv.get("user:key-a:20261015"), 2);
+    assert.equal(kv.get("user:key-a:pro:20261015"), 2);
     assert.equal(kv.get("week:key-a:20261012"), undefined);
   });
 
@@ -476,7 +517,7 @@ describe("departure ledger", () => {
   it("forgets past days, past weeks and expired plans", () => {
     const kv = new MemorySyncKv();
     const now = Date.UTC(2026, 9, 20, 12, 0);
-    for (const key of ["sku:pro:20261018", "sku:pro:20261019", "user:k:20261018", "week:k:20261005", "week:k:20261012"]) kv.put(key, 1);
+    for (const key of ["sku:pro:20261018", "sku:pro:20261019", "user:k:pro:20261018", "week:k:20261005", "week:k:20261012"]) kv.put(key, 1);
     kv.put("plan:old", { id: "k", binding: "b", rechecks: 0, expiresAt: now - 1 });
     kv.put("plan:new", { id: "k", binding: "b", rechecks: 0, expiresAt: now + 1 });
     assert.equal(sweep(kv, now), 4);
@@ -561,7 +602,8 @@ describe("POST /v1/departure/routes", () => {
     // START is Thursday 2026-10-15; the week starts Monday 2026-10-12. Transit reserved 2, used 1.
     assert.equal(h.ledger.kv.get("week:dev:20261012"), 1);
     assert.equal(h.ledger.kv.get("sku:essentials:20261015"), 1);
-    assert.equal(h.ledger.kv.get("user:dev:20261015"), 1);
+    assert.equal(h.ledger.kv.get("user:dev:essentials:20261015"), 1);
+    assert.equal(h.background.length, 1, "solving and settling run under ctx.waitUntil");
     assert.equal([...h.ledger.kv.store.keys()].filter((k) => k.startsWith("plan:")).length, 1);
     assert.equal(h.kv.keysWithPrefix("dep:").length, 0, "nothing in KV");
     assert.ok(h.ledger.alarm !== null, "daily clean-up scheduled");
@@ -585,16 +627,25 @@ describe("POST /v1/departure/routes", () => {
     assert.equal(h.ledger.kv.get("sku:pro:20261015"), 1, "then settled to the calls made");
   });
 
-  it("never lets requests running at the same time past a cap or the week's plans", async () => {
-    const h = departureHarness({ DEPARTURE_DAILY_PRO: "6", DEPARTURE_WEEKLY_PLANS: "2" });
-    h.setResponder(async () => {
+  it("never lets requests running at the same time past the week's plans or a daily cap", async () => {
+    const slowGoogle = async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
       return Response.json({ routes: [roadRoute(1800)] });
-    });
-    const statuses = await Promise.all(Array.from({ length: 10 }, () => post(h, { ...request, mode: "drive" }).then((r) => r.status)));
-    assert.equal(statuses.filter((s) => s === 200).length, 2);
-    assert.ok(googleCalls(h).length <= 6);
-    assert.equal(h.ledger.kv.get("week:dev:20261012"), 2);
+    };
+    const burst = async (h: Harness) => (await Promise.all(Array.from({ length: 10 }, () => post(h, { ...request, mode: "drive" })))).map((r) => r.status);
+
+    const week = departureHarness({ DEPARTURE_DAILY_PRO: "30", DEPARTURE_WEEKLY_PLANS: "2" });
+    week.setResponder(slowGoogle);
+    assert.equal((await burst(week)).filter((s) => s === 200).length, 2);
+    assert.equal(week.ledger.kv.get("week:dev:20261012"), 2);
+
+    // Pro cap 30 → one user's share is 10 calls: three drive requests (3 reserved each), however many at once.
+    const daily = departureHarness({ DEPARTURE_DAILY_PRO: "30", DEPARTURE_WEEKLY_PLANS: "10" });
+    daily.setResponder(slowGoogle);
+    const statuses = await burst(daily);
+    assert.equal(statuses.filter((s) => s === 200).length, 3);
+    assert.equal(statuses.filter((s) => s === 429).length, 7);
+    assert.ok(googleCalls(daily).length <= 9);
   });
 
   it("allows two new plans a week; the third waits for Monday", async () => {
@@ -713,6 +764,7 @@ describe("POST /v1/departure/routes", () => {
     const quota = await post(h, request);
     assert.equal(quota.status, 429);
     assert.deepEqual(await quota.json(), { error: "capacity_reached" });
+    assert.equal(quota.headers.get("retry-after"), String(23 * 3600), "Google's quota starts again at midnight Pacific time");
     h.setResponder(() => new Response("{}", { status: 503 }));
     const outage = await post(h, request);
     assert.equal(outage.status, 502);

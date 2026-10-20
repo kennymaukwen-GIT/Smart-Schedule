@@ -29,17 +29,25 @@ echo "Routes API: HTTP $status"
 if [ "$status" = 000 ]; then sed 's/^/  /' "$tmp/err.txt"; exit 1; fi
 node -e '
   const fs = require("fs");
+  const status = Number(process.argv[2]);
   const text = fs.readFileSync(process.argv[1], "utf8");
-  try {
-    const json = JSON.parse(text);
-    if (json.error) {
-      const reasons = (json.error.details || []).map((d) => d.reason).filter(Boolean);
-      console.log(`  ${[json.error.status, ...reasons].filter(Boolean).join(" ")} ${String(json.error.message || "").slice(0, 200)}`);
-      console.log("  403 PERMISSION_DENIED: the key is not allowed to use the Routes API (step 3 or 4), or billing is off (step 2).");
-    } else if (json.routes?.length) {
-      console.log(`  OK: 台北車站 → 台北 101 by public transport, ${json.routes[0].localizedValues?.duration?.text ?? json.routes[0].duration}`);
-    } else {
-      console.log("  The key works, but Google found no route this time.");
+  let json;
+  try { json = JSON.parse(text); } catch { console.log(`  ${text.slice(0, 200)}`); process.exit(1); }
+  if (json.error) {
+    const reasons = (json.error.details || []).map((d) => d.reason).filter(Boolean);
+    console.log(`  ${[json.error.status, ...reasons].filter(Boolean).join(" ")} ${String(json.error.message || "").slice(0, 200)}`);
+    if (reasons.some((r) => String(r).startsWith("API_KEY_"))) {
+      console.log("  The pasted key is wrong or incomplete: copy it again (Show key) and run this once more.");
+    } else if (status === 403) {
+      console.log("  The key may not use the Routes API (step 3 or 4), or billing is off (step 2).");
+    } else if (status === 429) {
+      console.log("  Google refused it for its quota (step 5). Try again after midnight US Pacific time.");
     }
-  } catch { console.log(`  ${text.slice(0, 200)}`); }
-' "$tmp/out.json"
+    process.exit(1);
+  }
+  if (json.routes?.length) {
+    console.log(`  OK: 台北車站 → 台北 101 by public transport, ${json.routes[0].localizedValues?.duration?.text ?? json.routes[0].duration}`);
+  } else {
+    console.log("  The key works, but Google found no route this time.");
+  }
+' "$tmp/out.json" "$status"

@@ -2,7 +2,7 @@
 // limits depend on, so a check and its increment happen together and no two requests can both pass the same check.
 //
 //   sku:<sku>:<UTC YYYYMMDD>    Google calls reserved or made in that pricing tier that day (everyone together)
-//   user:<id>:<UTC YYYYMMDD>    Google calls reserved or made for one identity that day
+//   user:<id>:<sku>:<UTC YYYYMMDD>  Google calls reserved or made for one identity in that tier that day
 //   week:<id>:<local Monday>    new plans this week
 //   plan:<hex SHA-256(token)>   { id, binding, rechecks, expiresAt } (binding: SHA-256 of token, destination, arrival)
 //
@@ -47,6 +47,7 @@ export interface ReserveInput {
   /** Google calls to reserve: the most this request can make. */
   calls: number;
   tierCap: number;
+  /** One identity's calls in this tier per day (src/departure.ts userTierCalls). */
   userDailyCalls: number;
   weeklyPlans: number;
   /** A recheck of this plan, or null for a new plan. */
@@ -94,7 +95,7 @@ function plan(kv: SyncKv, hash: string): PlanEntry | null {
 /** All checks first, then all increments: synchronous, so nothing else runs in between. */
 export function reserve(kv: SyncKv, input: ReserveInput): ReserveResult {
   const tierKey = `sku:${input.sku}:${input.day}`;
-  const userKey = `user:${input.id}:${input.day}`;
+  const userKey = `user:${input.id}:${input.sku}:${input.day}`;
   const weekKey = `week:${input.id}:${input.week}`;
   const plansUsed = count(kv, weekKey);
   const refuse = (reason: ReserveRefusal): ReserveResult => ({ ok: false, reason, plansUsed });
@@ -123,7 +124,7 @@ export function reserve(kv: SyncKv, input: ReserveInput): ReserveResult {
 export function settle(kv: SyncKv, input: SettleInput): { plansUsed: number } {
   if (input.unbilled > 0) {
     add(kv, `sku:${input.sku}:${input.day}`, -input.unbilled);
-    add(kv, `user:${input.id}:${input.day}`, -input.unbilled);
+    add(kv, `user:${input.id}:${input.sku}:${input.day}`, -input.unbilled);
   }
   const weekKey = `week:${input.id}:${input.week}`;
   if (input.releasePlan) add(kv, weekKey, -1);
