@@ -6,6 +6,8 @@
 //   ANY  /v1beta/*                assertion-authenticated → Gemini API with the server's key; a session token only
 //                                 for POST /v1beta/models/<SESSION_MODELS>:generateContent
 //   POST /devices/push-to-start   assertion-authenticated → store the device's push-to-start registration
+//   POST /v1/departure/routes     assertion-authenticated → when to leave and the route (Google Routes API), with
+//                                 per-user weekly and per-day free-tier limits (src/departure.ts)
 //   cron * * * * *                send due push-to-start notifications
 // Version 1.0 of the app uses no push-to-start: it never calls /devices/push-to-start, and wrangler.toml runs no cron.
 
@@ -13,8 +15,9 @@ import { APPLE_APP_ATTESTATION_ROOT_CA_PEM } from "./apple-root-ca.ts";
 import { handleAttest, handleChallenge } from "./attest-routes.ts";
 import { authenticate } from "./auth.ts";
 import { runCron } from "./cron.ts";
-import type { Deps, Env, KV, RateLimiter } from "./env.ts";
+import type { Deps, DurableObjectNamespaceLike, Env, KV, RateLimiter } from "./env.ts";
 import { sessionModels } from "./env.ts";
+import { MAX_DEPARTURE_BODY, handleDepartureRoutes } from "./departure.ts";
 import { proxyGemini } from "./gemini.ts";
 import { HttpError, errorResponse, log } from "./http.ts";
 import {
@@ -29,11 +32,14 @@ import { handlePushToStart } from "./registration.ts";
 import { MAX_SESSION_BODY, handleSession } from "./session.ts";
 
 export type { Env } from "./env.ts";
+// The Durable Object class must be exported by the Worker's main module (wrangler.toml [[durable_objects.bindings]]).
+export { DepartureLedger } from "./ledger.ts";
 
 // Compile-time checks that the real bindings satisfy the subsets this Worker relies on.
 export type KVNamespaceSatisfiesKV = KVNamespace extends KV ? true : never;
 export type RateLimitSatisfiesRateLimiter = RateLimit extends RateLimiter ? true : never;
-const _bindingCheck: [KVNamespaceSatisfiesKV, RateLimitSatisfiesRateLimiter] = [true, true];
+export type DurableObjectNamespaceSatisfies = DurableObjectNamespace extends DurableObjectNamespaceLike ? true : never;
+const _bindingCheck: [KVNamespaceSatisfiesKV, RateLimitSatisfiesRateLimiter, DurableObjectNamespaceSatisfies] = [true, true, true];
 void _bindingCheck;
 
 /** The app sends text prompts; 2 MB leaves ample room and bounds what an unauthenticated caller can make us read. */
@@ -103,6 +109,14 @@ async function route(request: Request, env: Env, deps: Deps): Promise<Response> 
     const { identity, body, via } = await authenticate(request, env, deps, { maxBody: MAX_REGISTRATION_BODY });
     await enforceRateLimit(env, identity.id, deps.now(), { strict: via !== "assertion" });
     return handlePushToStart(body, identity, env, deps);
+  }
+
+  if (path === "/v1/departure/routes") {
+    if (method !== "POST") throw new HttpError(405, "method_not_allowed", { allow: "POST" });
+    // App only: no Session tokens (the notification extension never plans a route).
+    const { identity, body, via } = await authenticate(request, env, deps, { maxBody: MAX_DEPARTURE_BODY });
+    await enforceRateLimit(env, identity.id, deps.now(), { strict: via !== "assertion" });
+    return handleDepartureRoutes(request, body, identity, env, deps);
   }
 
   throw new HttpError(404, "not_found");

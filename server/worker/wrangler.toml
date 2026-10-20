@@ -29,6 +29,17 @@ crons = []
 binding = "SS_KV"
 id = "c4a254a6957942a0b0c2ff1e29f22db1"
 
+# 「該出發了」's counts (src/ledger.ts): one Durable Object, so a limit's check and its increment happen together and
+# requests running at the same time cannot all pass the same check. SQLite-backed (the only kind the Workers Free plan
+# allows). The first deploy creates it (the migration below; [env.dev] inherits the migration but not the binding).
+[[durable_objects.bindings]]
+name = "SS_DEPARTURE_LEDGER"
+class_name = "DepartureLedger"
+
+[[migrations]]
+tag = "v1-departure-ledger"
+new_sqlite_classes = ["DepartureLedger"]
+
 # Atomic rate limiting without KV writes (Cloudflare Workers Rate Limiting). Keys: id:<identity> (per keyId / "dev";
 # a session counts as its keyId), ip:<IPv4 or IPv6 /64> (/attest*), pre:<ip>:<keyId> (Bearer body reads).
 # Keep simple.limit equal to RATE_LIMIT_PER_MIN. namespace_id is any positive integer you choose, unique among the
@@ -82,6 +93,22 @@ ATTEST_DAILY_PER_IP = "200"
 GEMINI_INPUT_USD_PER_M = "0.75"
 GEMINI_CACHED_USD_PER_M = "0.075"
 GEMINI_OUTPUT_USD_PER_M = "3.75"
+# 「該出發了」 (POST /v1/departure/routes, src/departure.ts; README "該出發了：Google 路線"). Off in these countries
+# (Cloudflare's request.cf.country, comma-separated; the app also checks on the iPhone).
+DEPARTURE_BLOCKED_COUNTRIES = "GB"
+# New plans per user (attested key) per week, the week starting on the user's Monday; rechecks of one plan are free,
+# up to DEPARTURE_PLAN_RECHECKS. DEPARTURE_USER_DAILY_CALLS: Google calls per user per UTC day, whatever the outcome.
+DEPARTURE_WEEKLY_PLANS = "2"
+DEPARTURE_PLAN_RECHECKS = "5"
+DEPARTURE_USER_DAILY_CALLS = "30"
+# Google calls per pricing tier per UTC day. This Worker and [env.dev] together get 80 % of the tier's monthly free
+# calls ÷ 32 (250 / 125 / 25; a Google month, midnight to midnight US Pacific time, touches 32 UTC days), so a month
+# never reaches the free calls (Essentials 10,000: transit and walking; Pro 5,000: driving with traffic; Enterprise
+# 1,000: scooter). A value below 3 (2 for Essentials: one request's most calls), "0" included, turns the tier off at the
+# next deploy. test/config-sync.test.ts refuses a sum above that.
+DEPARTURE_DAILY_ESSENTIALS = "240"
+DEPARTURE_DAILY_PRO = "119"
+DEPARTURE_DAILY_ENTERPRISE = "22"
 
 # Secrets — never in this file. They are kept across deploys (a deploy replaces the vars above, not secrets):
 #   npx wrangler secret put GEMINI_API_KEY
@@ -92,6 +119,8 @@ GEMINI_OUTPUT_USD_PER_M = "3.75"
 #   npx wrangler secret put APNS_TEAM_ID        the Team ID that owns the key  } (APNs token-based auth)
 #   npx wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8
 #   npx wrangler secret put SS_DEV_TOKEN        only where ALLOW_DEV_TOKEN = "true"
+#   「該出發了」 only (version 1.1): Google Maps Platform key restricted to the Routes API (README "Google Cloud 設定"):
+#   npx wrangler secret put GOOGLE_ROUTES_API_KEY
 # A name cannot be both a var and a secret: these must not appear in [vars] (test/config-sync.test.ts checks).
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -128,6 +157,10 @@ crons = []
 [[env.dev.kv_namespaces]]
 binding = "SS_KV"
 
+[[env.dev.durable_objects.bindings]]
+name = "SS_DEPARTURE_LEDGER"
+class_name = "DepartureLedger"
+
 [[env.dev.ratelimits]]
 name = "SS_RATE_LIMITER"
 namespace_id = "1002"
@@ -147,3 +180,12 @@ ATTEST_DAILY_PER_IP = "200"
 GEMINI_INPUT_USD_PER_M = "0.75"
 GEMINI_CACHED_USD_PER_M = "0.075"
 GEMINI_OUTPUT_USD_PER_M = "3.75"
+# The rest of the 80 % (see the production [vars]): both Workers may use keys of the same Google Cloud project.
+# Each is at least one request's most calls (3), so every way of travelling can be tested here.
+DEPARTURE_BLOCKED_COUNTRIES = "GB"
+DEPARTURE_WEEKLY_PLANS = "2"
+DEPARTURE_PLAN_RECHECKS = "5"
+DEPARTURE_USER_DAILY_CALLS = "30"
+DEPARTURE_DAILY_ESSENTIALS = "10"
+DEPARTURE_DAILY_PRO = "6"
+DEPARTURE_DAILY_ENTERPRISE = "3"

@@ -7,6 +7,8 @@ Smart Schedules 的伺服器端（Cloudflare Worker，TypeScript，**零 runtime
 - **Live Activity push-to-start**：iOS 18 無法排程 Live Activity，由 Worker 的 cron 在每個行程的 `triggerAt` 透過 APNs push-to-start 啟動。
   **1.0 版不使用**：App 的 `AppConstants.pushToStartEnabled = false`，不要求 push token、不上傳任何行程、沒有 `aps-environment`；
   `wrangler.toml` 的正式環境 `crons = []`，也不需要 APNs secrets（`.p8`）。路由與程式碼保留給之後的版本，開啟方式見「1.0：push-to-start 關閉」。
+- **「該出發了」路線**（1.1）：Google Routes API 金鑰只存在 Worker secret；App Attest 驗證、每人每週 2 次、全站每天都在 Google 免費額度內、
+  英國不提供，不記錄任何地點。見「該出發了：Google 路線」。
 
 | 路徑 | 驗證 | 用途 |
 | --- | --- | --- |
@@ -15,6 +17,7 @@ Smart Schedules 的伺服器端（Cloudflare Worker，TypeScript，**零 runtime
 | `POST /session` | App Attest assertion（或 dev token） | 發 session token 給 App 的 notification content extension |
 | `ANY /v1beta/*` | App Attest assertion（或 dev token）；**Session token 只限 `POST /v1beta/models/<SESSION_MODELS>:generateContent`** | 轉送到 `https://generativelanguage.googleapis.com/v1beta/*` |
 | `POST /devices/push-to-start` | App Attest assertion（或 dev token） | 存裝置的 push-to-start 註冊（整份取代）；1.0 的 App 不會呼叫 |
+| `POST /v1/departure/routes` | App Attest assertion（或 dev token）；不接受 Session token | 「該出發了」：用 Google Routes API 算幾點出門和路線，每人每週、全站每天都有免費額度內的上限（1.1，見「該出發了：Google 路線」） |
 | cron `* * * * *` | — | 送出到期的 push-to-start；**1.0 關閉**（`crons = []`） |
 
 ---
@@ -58,6 +61,8 @@ npx wrangler secret put GEMINI_API_KEY --env=""
 npx wrangler secret put APPLE_TEAM_ID --env=""   # 10 字元 Team ID（developer.apple.com › Membership details）
 npx wrangler secret list --env=""                # 只列名稱，確認上面兩個都在
 ```
+
+**1.0 也不需要 `GOOGLE_ROUTES_API_KEY`**：「該出發了」在 1.1 才推出，金鑰的建立和設定見「該出發了：Google 路線」›「Google Cloud 設定」。
 
 **1.0 不需要 APNs secrets**（`APNS_KEY_ID`、`APNS_TEAM_ID`、`APNS_PRIVATE_KEY`），也不必建立 `.p8`：1.0 沒有 push-to-start，
 正式環境的 cron 也關閉（`crons = []`）。只有之後的版本開啟 push-to-start 時才需要，步驟見「1.0：push-to-start 關閉」與「APNs .p8 設定」。
@@ -171,6 +176,92 @@ iOS 26 仍在 iPhone 上自行排程 Live Activity；iOS 18 只有在 App 執行
 3. App 端把 `aps-environment`、`APS_ENVIRONMENT` 與 `remote-notification` 加回 `project.yml`，`pushToStartEnabled` 改為 `true`，
    並提高 `AIConsent.disclosureVersion`，更新隱私權政策、privacy manifest 與 App Store Connect 的 App 隱私權答案。
 
+## 該出發了：Google 路線（1.1）
+
+「該出發了」用 Google Routes API 算「幾點出門」和路線（大眾運輸、開車、機車、走路），App 經過 `POST /v1/departure/routes` 呼叫，
+Google 金鑰只在 Worker。**1.0 不使用**：App 還沒有呼叫它的程式；沒設 `GOOGLE_ROUTES_API_KEY` 時這個路由只回 `500 server_misconfigured`，不會呼叫 Google。
+
+### 不會被扣錢：三層保護
+
+1. **Worker 自己的每日上限（主要保護）**：每個計價等級每天（UTC）最多呼叫 `DEPARTURE_DAILY_*` 次。Google 的「一個月」從美國太平洋時間的
+   午夜開始，最多碰到 32 個 UTC 日，所以兩個 Worker 的每日上限加起來 × 32 ≤ 每月免費次數的 80 %：就算每天都用滿，一個月也到不了免費次數。
+
+   | Google 計價等級 | 什麼時候算這一級 | 每月免費 | 每天上限（正式 + 開發） | 一個月最多 |
+   | --- | --- | --- | --- | --- |
+   | Compute Routes Essentials | 大眾運輸、走路（沒有用到下面兩級的功能） | 10,000 | 240 + 10 = 250 | 8,000 |
+   | Compute Routes Pro | 開車：`routingPreference` 是 `TRAFFIC_AWARE` / `TRAFFIC_AWARE_OPTIMAL` | 5,000 | 119 + 6 = 125 | 4,000 |
+   | Compute Routes Enterprise | 機車（two-wheeled vehicle routing）；也包括過路費、路線上的路況，這裡都不用 | 1,000 | 22 + 3 = 25 | 800 |
+
+   - **先保留，再呼叫**：每個請求先在「該出發了」帳本（Durable Object `SS_DEPARTURE_LEDGER`，`src/ledger.ts`）保留它最多會用到的次數
+     （開車、機車 3 次，大眾運輸 2 次，走路 1 次），保留成功才呼叫 Google；結束後只退回確定沒被收費的次數（沒用到的、Google 回
+     429 / 401 / 403 / 5xx、金鑰被拒）。帳本一次只處理一個請求，所以同時進來的請求不可能都通過同一個上限；
+     請求中途斷線時，保留的次數不退（寧可多算）。結果不明的呼叫（逾時、連線中斷）也當作已收費。
+   - Google 一個請求只收一個等級（用到的最高那一級）。免費次數是**整個帳單帳戶**每月合計（所有專案一起算），
+     所以這個帳單帳戶不要再給其他會用到 Routes API 的專案用。欄位遮罩固定在 Worker，沒有過路費、油耗、路線上的路況這些會升級的欄位。
+2. **Google Cloud 的每日配額**：Routes API 的 ComputeRoutes 每天最多 400 次（= 上表每天上限的合計；見下面「Google Cloud 設定」第 5 步）。
+   這是萬一 Worker 出錯時的保險；它不分計價等級，所以單靠它保護不了機車那一級，主要保護仍是第 1 層。Google 擋下時回 429，App 一樣顯示額度已用完。
+3. **預算警示**：Google Cloud 帳單設 1 美元的預算警示，有任何費用就寄信。預算警示**只通知、不會停止服務**，所以前兩層才是真正的保護。
+
+想要立刻停掉所有 Google 呼叫：把 `DEPARTURE_DAILY_ESSENTIALS`、`DEPARTURE_DAILY_PRO`、`DEPARTURE_DAILY_ENTERPRISE` 都改成 `"0"` 再部署，
+或 `npx wrangler secret delete GOOGLE_ROUTES_API_KEY --env=""`。
+
+### 每位使用者的次數
+
+- 每週（使用者當地的星期一 00:00 開始）新規劃 `DEPARTURE_WEEKLY_PLANS` 次，預設 2 次。一次出發規劃、或問一次「要多久」，算 1 次；
+  只有真的給出路線才算（帳本先保留這一次，沒有路線就退回）。
+- 同一次規劃的重算（同一個目的地和到達時間；換出發地或交通方式也算）不另外算，最多 `DEPARTURE_PLAN_RECHECKS` 次。
+- 不管結果如何（包括找不到地點，Google 照樣收費），每人每天最多呼叫 Google `DEPARTURE_USER_DAILY_CALLS` 次（預設 30），
+  一個人不能把全站的每日上限用光。
+- 「使用者」是 App Attest key：重新安裝 App 會拿到新的 key，也就有新的每週次數。全站的每日上限不受影響，所以費用仍然有上限。
+
+### 不提供的國家
+
+`DEPARTURE_BLOCKED_COUNTRIES`（預設 `GB`）裡的國家，以及 Cloudflare 判斷不出國家的請求（`XX`、Tor 的 `T1`、沒有國家），
+依 IP 拒絕（`403 region_unavailable`）；App 也會在 iPhone 上判斷（地區設定、App Store 國家、目前位置）。
+唯一的例外是開發者自己用 Xcode 裝的 Debug build，**而且出發地是打字的地址**，用來在英國測試台灣的路線。
+
+### Google Cloud 設定（Routes API 金鑰，做一次）
+
+全部在 Mac 的瀏覽器和終端機操作，約 20–30 分鐘。**金鑰只貼到終端機，不要貼給任何人或任何聊天視窗。**
+畫面的文字可能是中文或英文，括號裡是英文版的名稱；Google 偶爾會改版面，找不到時用上方的搜尋列搜尋括號裡的字。
+
+1. **建立專案**：打開 <https://console.cloud.google.com>，用你的 Google 帳號登入 → 上方的專案選單 › **新增專案（New project）**
+   → 名稱 `smart-schedules-routes` → **建立**。之後每一步都確認上方選的是這個專案。
+2. **帳單（要信用卡）**：左上選單 › **帳單（Billing）** › 連結或建立帳單帳戶。
+   - 用一個**沒有其他 Google 地圖服務**的帳單帳戶：Google 的每月免費次數是整個帳單帳戶一起算的。
+   - Google 可能提供新帳戶免費試用（贈金）。試用結束時 Google 會請你「升級」成一般帳戶；升級本身不收費，只要用量在每月免費次數內就是 0 元。
+3. **只啟用 Routes API**：左上選單 › **API 和服務（APIs & Services）** › **程式庫（Library）** → 搜尋 `Routes API` → **啟用（Enable）**。
+   不要啟用舊的 Directions API 或其他地圖 API。
+4. **金鑰**：**API 和服務** › **憑證（Credentials）**。
+   - 如果清單裡已經有 Google 自動建立的金鑰（例如「Maps Platform API Key」），點它 › **刪除**（它預設可以用很多 API）。
+   - **建立憑證（Create credentials）** › **API 金鑰（API key）** → 點新金鑰進去編輯：
+     - 名稱：`smart-schedules-worker`
+     - **應用程式限制（Application restrictions）**：**無（None）**。金鑰只存在 Worker 裡；Cloudflare 沒有固定 IP，設 IP 限制反而會擋掉自己。
+     - **API 限制（API restrictions）**：**限制金鑰（Restrict key）** → 只勾 **Routes API** → **儲存**。
+   - 先不要關掉這個頁面，第 7 步要複製金鑰（**顯示金鑰 / Show key**）。
+5. **每天的配額上限（第二層保護）**：左上選單 › **Google Maps Platform** › **配額（Quotas）** → 上方選 **Routes API**。
+   - 找名稱有 **ComputeRoutes** 和 **per day**（每天）的那一列 → 勾選 → **編輯（Edit）** → 填 `400` → 送出。
+     （Worker 每天最多 250 + 125 + 25 = 400 次；這一層是 Worker 萬一算錯時的保險。）
+   - 名稱有 **ComputeRouteMatrix** 和 **per day** 的那一列 → 填 `0`（App 不用它；如果不接受 0，填 `1`）。
+   - 找不到「per day」的列時，改 **ComputeRoutes** 的 **per minute**（每分鐘）那一列 → 填 `30`，並截圖給我。
+6. **預算警示（第三層，只會寄信，不會擋）**：左上選單 › **帳單** › **預算與快訊（Budgets & alerts）** › **建立預算（Create budget）**：
+   - 名稱 `routes-1-usd`；範圍（Scope）：專案選 `smart-schedules-routes`，服務選 **Routes API**；期間：每月
+   - 如果有「抵免額（Credits）」的勾選項目，**全部取消勾選**（試用贈金才不會把實際費用藏起來）
+   - 金額：**指定金額 1 美元**（或 30 新台幣）；門檻：**50 %**、**100 %**，以電子郵件通知帳單管理員 → **完成**
+7. **把金鑰放進 Worker**（Mac 的終端機）：
+
+   ```sh
+   cd ~/Desktop/Smart-Schedule/server/worker
+   npm run check-routes-key                                  # 貼上金鑰（畫面不顯示）→ 應該看到「HTTP 200」和「OK: 台北車站 → 台北 101 …」
+   npx wrangler secret put GOOGLE_ROUTES_API_KEY --env=""    # 再貼一次金鑰，按 Enter
+   npx wrangler secret list --env=""                         # 只列名稱，確認有 GOOGLE_ROUTES_API_KEY
+   ```
+
+   `check-routes-key` 只呼叫 Google 一次（最便宜的等級，在免費次數內），只印 HTTP 狀態和交通時間。
+   看到 `403 PERMISSION_DENIED` 代表第 2–4 步有一步沒完成（帳單、啟用 Routes API、金鑰限制）。
+8. **之後每個月看一次**：**Google Maps Platform** › **指標（Metrics）** 看次數，**帳單** › **報表（Reports）** 確認是 0 元。
+   金鑰可能外洩時：第 4 步建一把新的、第 7 步重新 `secret put`，再刪掉舊的。
+
 ## APNs .p8 設定
 
 1.0 不需要這一節（見上一節）；開啟 push-to-start 時才做。
@@ -211,6 +302,13 @@ APNs 只接受 HTTP/2。本機 `wrangler dev` 無法可靠地連到 APNs；實�
 | `SESSION_MODELS` | var | Session token 可呼叫的模型（逗號分隔，完整 ID，不接受 prefix），預設 `gemini-3.8-flash`（2026-10-17 起；之前的 `gemini-3.5-flash` 已移除，1.0 還沒上架，沒有已發布的 build 用它）。**必須包含所有仍在使用的 App 版本的 `GEMINI_MODEL_ID`**（`Config/Base.xcconfig`）：新 ID 要在送審使用它的 build 之前加入並部署 Worker（App Review 會測 notification extension）；舊 ID 等到沒有受支援的 build 再送它、或 Google 已關閉它時才移除。`test/config-sync.test.ts` 會檢查目前的 `GEMINI_MODEL_ID` 有列在這裡 |
 | `SESSION_DAILY_LIMIT` | var | 每個身分每 UTC 日以 session 呼叫 generateContent 的上限，預設 `200`（extension 每次回覆 1–3 次）；Bearer 不受影響 |
 | `ATTEST_DAILY_PER_IP` | var | 每個 IP bucket（IPv6 以 /64 計）每 UTC 日**成功** attest 的上限（= 新身分數），預設 `200`（行動網路常有許多使用者共用一個 IPv4） |
+| `GOOGLE_ROUTES_API_KEY` | secret | 「該出發了」用的 Google Maps Platform 金鑰，**只限 Routes API**（見「Google Cloud 設定」）。沒設時 `/v1/departure/routes` 回 `500 server_misconfigured`，不會呼叫 Google |
+| `DEPARTURE_BLOCKED_COUNTRIES` | var | 這些國家不提供「該出發了」（Cloudflare 判斷的 `request.cf.country`，逗號分隔），預設 `GB`（英國）。App 也會在 iPhone 上判斷 |
+| `DEPARTURE_WEEKLY_PLANS` | var | 每位使用者（App Attest key）每週可以新規劃幾次，週一開始（使用者當地時間），預設 `2` |
+| `DEPARTURE_PLAN_RECHECKS` | var | 同一次規劃（同一個目的地和到達時間）可以免費重算幾次（換出發地或交通方式也算重算），預設 `5` |
+| `DEPARTURE_USER_DAILY_CALLS` | var | 每位使用者每 UTC 日最多呼叫 Google 幾次（不管結果），預設 `30` |
+| `DEPARTURE_DAILY_ESSENTIALS` / `_PRO` / `_ENTERPRISE` | var | 每個 Google 計價等級每 UTC 日最多呼叫幾次。正式 + 開發兩個 Worker 加起來 × 32 是每月免費次數的 80 %（250 / 125 / 25），所以任何一個月都不會超過免費次數。小於一個請求最多的次數（3，Essentials 是 2），包括 `0`，就等於關閉那個等級；`test/config-sync.test.ts` 不允許加總超過 |
+| `SS_DEPARTURE_LEDGER` | Durable Object binding | 「該出發了」的帳本（`DepartureLedger`，SQLite），兩個環境都要綁定；第一次部署由 `[[migrations]]` 建立。沒有時 `/v1/departure/routes` 回 500，不呼叫 Google |
 | `APNS_BUNDLE_ID` | var | 預設 `com.smartschedules.app` |
 | `APNS_ENV` | var | `sandbox` → `api.sandbox.push.apple.com`；`production` → `api.push.apple.com` |
 
@@ -382,6 +480,48 @@ eventID 須為非空、≤ 1024 bytes、不含控制字元；`attributesJSON` / 
 > Client 注意：deviceID 要長期保留；不要因為換了 App Attest key 或收到錯誤就換 deviceID。只有在 client 自己的還原 / 遺失 key 流程中
 > （例如 App Group 裡的 deviceID 已不存在）才產生新的 deviceID。`403` 代表 dev / attested 或 App 不符，是設定問題。
 
+### `POST /v1/departure/routes`（「該出發了」，1.1）
+Body（JSON，≤ 4 KB，欄位以外的 key 一律拒絕）：
+
+```json
+{"mode":"transit|drive|walk|two_wheeler",
+ "origin":{"lat":25.0478,"lng":121.517} 或 {"address":"使用者打的出發地"},
+ "destination":{"address":"行程的地點"},
+ "arriveBy":"2026-10-21T08:30:00Z",        // 省略 = 現在出發（問「要多久」）
+ "plan":"<上次回的 token>",                 // 重算同一次規劃時才帶
+ "utcOffsetMinutes":480, "language":"zh-TW", "region":"tw",
+ "debugBuild":true}                         // 只有 Xcode 的 Debug build 會帶
+```
+
+依序檢查：驗證與每分鐘 rate limit → body（`400 invalid_request`）→ 國家（`403 region_unavailable`）→ 金鑰與帳本（`500 server_misconfigured`）
+→ **在帳本保留**（一次完成，`503 server_busy` 表示帳本連不到）：重算的規劃（`403 invalid_plan`、`429 recheck_limit`）或本週次數
+（`429 weekly_limit`，`Retry-After` 到使用者當地下週一 00:00）、計價等級今天的額度（`429 capacity_reached`）、這個人今天的次數
+（`429 user_daily_limit`；兩者的 `Retry-After` 都到 UTC 00:00）→ 呼叫 Google → 在帳本結算。
+
+- **國家**：`request.cf.country` 在 `DEPARTURE_BLOCKED_COUNTRIES`（預設英國）、或判斷不出國家就拒絕。例外只有 `debugBuild: true`
+  **而且**出發地是打字的地址（開發者在英國用台灣地址測試；英國的位置永遠不會送到 Google）。`debugBuild` 在 App Attest 簽過的 body 裡，中間人加不進去。
+- **怎麼問 Google**（`POST https://routes.googleapis.com/directions/v2:computeRoutes`，只要一條路線、不要替代路線，`X-Goog-FieldMask` 固定在 Worker）：
+  - 大眾運輸：`TRANSIT` + `arrivalTime`（Google 依時刻表排出趕得上的班次）。出門時間 = 第一班車的發車時間 − 前面走路的時間。
+    如果那樣要在過去出門，再問一次「現在出發」並回 `late: true`。最多 2 次。
+  - 開車：`DRIVE` + `TRAFFIC_AWARE_OPTIMAL` + `trafficModel: PESSIMISTIC`（「多數日子會比實際久」，比較不會遲到）。
+    開車沒有「幾點前到達」，所以要找「最晚、而且 Google 確認來得及」的出門時間：先問「到達前 30 分鐘出發」，第二次問 `到達 − 車程`，
+    第三次用前兩次的結果推算（車程隨出發時間線性變化時剛好準），只問整分鐘，最多 3 次。**回覆的出門時間一定是 Google 實際算過、而且來得及的那一個**
+    （到達時間和路線也是那一次的）。三次都來不及時：有問過「現在出發」就回 `late: true`；沒有就依趨勢再提早並標 `estimate: true`。
+  - 機車：`TWO_WHEELER` + `TRAFFIC_AWARE_OPTIMAL`（`trafficModel` 只適用開車），同樣最多 3 次。
+  - 走路：`WALK`，1 次（走路時間跟幾點出發無關）。
+  - Google 沒辦法用即時路況時（回覆有 `fallbackInfo`），車程乘 1.25，並標 `estimate: true`。
+  - 出門時間一律**無條件捨去到分鐘**（只會提早，不會變晚）。
+- 回覆 `200`：
+  `{"result":"ok","mode","departAt","arriveAt","late","estimate","route":<Google 的第一條路線>,"plan":"<token>"|null,"plansLeft":1}`；
+  找不到地點 `{"result":"place_not_found","place":"origin|destination","plansLeft"}`；沒有路線 `{"result":"no_route","plansLeft"}`
+  （包括 Google 回 400：例如出發地不在機車路線支援的地區）。只有 `ok` 的新規劃才算一次；找不到地點、沒有路線、Google 出錯都不算。
+- **重算**：帶著 `plan` 再問同一個目的地和到達時間，不算本週次數；出發地（現在的位置 ↔ 打字的地點）和交通方式可以換。
+  token 只存在 iPhone，帳本只存它的 SHA-256 與 `binding`，所以帳本裡看不出使用者要去哪裡。別人的 token、不同目的地或時間、過期 → `403 invalid_plan`。
+  Google 出錯的重算不算次數。帳本結算失敗時 `plan` 是 `null`（之後的重算會算成新規劃）。
+- Google 回 429（Google Cloud 的配額用完）→ `429 capacity_reached`；連不到、5xx、金鑰被拒（401、403，或 400 且原因是 `API_KEY_*`）
+  → `502 upstream_unavailable`，不算次數。
+- **Log 只有一行數字**：`{"event":"departure_route","mode","sku","calls","billed","result","late","estimate","recheck"}`，不含地點、座標、路線、身分或金鑰。
+
 ### Cron（每分鐘；1.0 關閉）
 1.0 的正式環境不跑 cron（`crons = []`，見「1.0：push-to-start 關閉」）。開啟後的行為如下：
 對 now − 2 min 到 now 的每一分鐘 m，列出 `due:<m>:`（之後的分鐘不可能已到期，所以不列），對每筆重新讀取目前的 `p2s:<deviceID>`，
@@ -436,6 +576,17 @@ APNs request：`POST https://<host>/3/device/<token>`，headers `authorization: 
 | `claim:<deviceID>:<eventHash>:<triggerAt s>` | 送出中的標記 | 300 s |
 | `sent:<deviceID>:<eventHash>:<triggerAt s>` | 已送出標記 | 3 天 |
 | `apns:jwt` | 共用的 APNs provider token | ≤ 50 min |
+
+「該出發了」的次數不在 KV，而在 Durable Object `SS_DEPARTURE_LEDGER`（一個 `DepartureLedger`，SQLite，強一致、一次處理一個請求）：
+
+| Key | 內容 | 保留到 |
+| --- | --- | --- |
+| `sku:<essentials\|pro\|enterprise>:<UTC YYYYMMDD>` | 該計價等級當天保留或用掉的 Google 呼叫次數 | 隔天之後 |
+| `user:<id>:<UTC YYYYMMDD>` | 該身分當天保留或用掉的 Google 呼叫次數 | 隔天之後 |
+| `week:<id>:<當地週一 YYYYMMDD>` | 該身分這週的新規劃次數 | 下週之後 |
+| `plan:<hex SHA-256(token)>` | 一次規劃：`{id, binding, rechecks, expiresAt}`；`binding` = SHA-256(token、目的地、到達時間)，**不存地點** | 到達時間 + 2 h |
+
+帳本每天用 alarm 清掉過去的日、週與過期的規劃。
 
 ### 一致性（eventually consistent）
 
@@ -501,6 +652,8 @@ npx wrangler tail --env="" --format pretty
 - Rate Limiting binding 的呼叫不算 KV 讀寫。
 - 每次 push-to-start 註冊：1 次寫入 `p2s:`，加上每個「新的」(eventID, triggerAt) 1 次 `due:` 寫入（最多 50）。
 - 每則送出的推播：claim 寫入 + sent 寫入 + claim 刪除，另有數次讀取；JWT 每 50 分鐘 1 次寫入。
+- 「該出發了」：KV 只有驗證的 2 次寫入；次數在帳本（Durable Object），每個請求 2 次帳本呼叫（保留、結算）。
+  Durable Object 的請求與 SQLite 讀寫另有計費與免費額度（請在 Cloudflare 的方案頁確認）；這個功能每人每週只有幾次，用量很小。
 - Cron 每分鐘 **3 次 KV list**（約 4,320 次/天）；**1.0 關閉 cron，這一項是 0**，也沒有 push-to-start 註冊與推播的寫入。
 
 Workers Free plan 的 KV 額度是每天 1,000 次寫入、1,000 次 list。開啟 cron 時光是它的 list 就超過；1.0 沒有 cron，但每個 assertion
@@ -526,6 +679,8 @@ Workers Free plan 的 KV 額度是每天 1,000 次寫入、1,000 次 list。開�
   並與申請者共用 rate limit（binding + 寫入必要的 KV 計數）與每日上限。這些都是**每個身分**的上限；裝置擁有者能自己產生新身分，
   所以還需要營運端的 Gemini quota / 預算上限與警示（見 `POST /session`）。dev session 綁定目前的 dev token。
 - 已知限制：若 Apple 未來在 App Attest 憑證加入本 verifier 不認得的 critical extension，驗證會 fail closed（log 會寫出 OID）。
+- 「該出發了」：送到 Google 的只有出發地（座標或打字的地址）、目的地文字、時間、交通方式、語言與地區；不轉送任何 client header。
+  使用者的 IP 一定會被 Cloudflare 看到，但 Google 只看到 Worker。Worker 不記錄、不保存任何地點或路線（KV 只有次數和雜湊）。
 - Gemini proxy 對 Bearer / dev 依合約開放整個 `/v1beta/*`（濫用需要 jailbreak 才能產生 assertion）；若只需要
   `models/*:generateContent`，也可以把 Bearer 收窄到同樣的範圍（屬於合約變更）。
 
@@ -565,7 +720,13 @@ IPv6 /64 bucket；dev token；rate limit 429（含 100 個平行 session request
 未知 token、與 keyId 共用 rate limit、dev session 隨 dev token 輪替或關閉而失效）；Gemini proxy（body bytes 完全相同、加 key、移除認證 headers、`cf-*` 與 `key` 參數）；
 push-to-start 驗證（整份 vs 單一 event、title 截斷、長 eventID）、整份取代、sent marker 在覆寫後仍保留、同 App 換 key 可接手、dev / 不同 App 回 403；
 cron（triggerAt 才送、只送一次、claim（含 m+2 不重送）、略過刪除/移動的事件、`p2sdead`、不覆寫新註冊、重試視窗、單筆失敗隔離、最多 10 個並行）；
-APNs payload 與 headers（含 `apns-expiration`）；JWT ES256 以公鑰驗證。
+APNs payload 與 headers（含 `apns-expiration`）；JWT ES256 以公鑰驗證；
+「該出發了」（`test/departure.test.ts`：body 驗證、週一起算的週次、英國／判斷不出國家與 Debug build 的例外、每週 2 次、免費重算與綁定、
+帳本先保留再呼叫（呼叫 Google 時次數已經記上）、10 個同時的請求不會超過上限、每人每日次數、帳本連不到時不呼叫 Google、結算失敗時保留的次數不退、
+Google 的 request（大眾運輸用到達時間、開車保守路況、機車沒有 trafficModel）與欄位遮罩、大眾運輸的出門時間、開車在車程隨時間變化時（每分鐘 0.5–0.8 分鐘、
+階梯、尖峰開始）仍然準時且只回 Google 確認過的時間、沒有即時路況時的 1.25 倍與 estimate、找不到地點不算規劃但算呼叫、Google 429/5xx/金鑰被拒不算次數、
+結果不明算已收費、log 與帳本不含地點；帳本的保留、結算、重算與清除）；兩個 Worker 的每日額度加總 × 32 不超過免費次數的 80 %、
+每個等級的上限至少是一個請求最多的次數、兩個環境都綁定帳本（`test/config-sync.test.ts`）。
 
 ## 檔案結構
 
@@ -588,6 +749,8 @@ src/
   gemini.ts           Gemini proxy（generateContent 回覆另記 gemini_usage）
   usage.ts            usageMetadata 的數字與每則成本（gemini_usage）
   registration.ts     /devices/push-to-start
+  departure.ts        /v1/departure/routes（「該出發了」：Google Routes API、出門時間、國家；上限交給 ledger.ts）
+  ledger.ts           「該出發了」的帳本（Durable Object）：先保留再呼叫的每日、每人與每週次數，重算的規劃
   cron.ts             每分鐘的 push-to-start 排程
   apns.ts             APNs request 與 payload
   jwt.ts              APNs provider JWT（ES256）

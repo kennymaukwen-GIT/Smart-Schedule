@@ -14,6 +14,12 @@ export interface KV {
   }>;
 }
 
+/** A Durable Object namespace as this Worker uses it (fetch-style stubs); src/index.ts checks the real type satisfies it. */
+export interface DurableObjectNamespaceLike {
+  idFromName(name: string): unknown;
+  get(id: unknown): { fetch(input: string, init?: RequestInit): Promise<Response> };
+}
+
 /** Cloudflare Workers Rate Limiting binding (`[[ratelimits]]`); src/index.ts checks the real type satisfies it. */
 export interface RateLimiter {
   limit(options: { key: string }): Promise<{ success: boolean }>;
@@ -23,6 +29,8 @@ export interface Env {
   SS_KV: KV;
   /** Atomic per-location limiter (no KV writes). Optional: without it the KV counters below do the limiting. */
   SS_RATE_LIMITER?: RateLimiter;
+  /** 「該出發了」's counts (src/ledger.ts); without it /v1/departure/routes answers 500 and never calls Google. */
+  SS_DEPARTURE_LEDGER?: DurableObjectNamespaceLike;
   // Secrets (wrangler secret put …): kept across deploys, never in the repository.
   GEMINI_API_KEY?: string;
   SS_DEV_TOKEN?: string;
@@ -30,6 +38,8 @@ export interface Env {
   APPLE_TEAM_ID?: string;
   APNS_KEY_ID?: string;
   APNS_TEAM_ID?: string;
+  /** Google Maps Platform key restricted to the Routes API (「該出發了」, src/departure.ts). */
+  GOOGLE_ROUTES_API_KEY?: string;
   // Vars (wrangler.toml [vars]; every deploy sets them from the file)
   BUNDLE_IDS?: string;
   APP_ATTEST_ENV?: string;
@@ -45,6 +55,15 @@ export interface Env {
   GEMINI_INPUT_USD_PER_M?: string;
   GEMINI_CACHED_USD_PER_M?: string;
   GEMINI_OUTPUT_USD_PER_M?: string;
+  /** 「該出發了」 (src/departure.ts): countries where it is off, new plans per user per week, rechecks per plan, Google
+   * calls per user per UTC day, and Google calls per pricing tier per UTC day (0 turns a tier off). */
+  DEPARTURE_BLOCKED_COUNTRIES?: string;
+  DEPARTURE_WEEKLY_PLANS?: string;
+  DEPARTURE_PLAN_RECHECKS?: string;
+  DEPARTURE_USER_DAILY_CALLS?: string;
+  DEPARTURE_DAILY_ESSENTIALS?: string;
+  DEPARTURE_DAILY_PRO?: string;
+  DEPARTURE_DAILY_ENTERPRISE?: string;
 }
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;

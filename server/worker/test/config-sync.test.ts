@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import type { Env } from "../src/env.ts";
+import type { Sku } from "../src/departure.ts";
+import { DAYS_PER_GOOGLE_MONTH, DEFAULT_DAILY_CAPS, FREE_MONTHLY_CALLS, MAX_CALLS, MODES, MODE_SKU, dailyCap } from "../src/departure.ts";
 import { bundleIds, DEFAULT_BUNDLE_IDS, DEFAULT_SESSION_MODELS, sessionModels } from "../src/env.ts";
 
 /** A file of this repository, relative to its root (this file is server/worker/test/), with LF line endings. */
@@ -84,7 +86,7 @@ describe("app ↔ Worker configuration", () => {
 
   it("the Team ID, APNs IDs and keys are secrets: never assigned in wrangler.toml, where a deploy would reset them", () => {
     const toml = repoFile("server/worker/wrangler.toml");
-    for (const name of ["GEMINI_API_KEY", "SS_DEV_TOKEN", "APNS_PRIVATE_KEY", "APPLE_TEAM_ID", "APNS_KEY_ID", "APNS_TEAM_ID"]) {
+    for (const name of ["GEMINI_API_KEY", "SS_DEV_TOKEN", "APNS_PRIVATE_KEY", "APPLE_TEAM_ID", "APNS_KEY_ID", "APNS_TEAM_ID", "GOOGLE_ROUTES_API_KEY"]) {
       assert.ok(!new RegExp(`^[ \\t]*${name}[ \\t]*=`, "m").test(toml), `${name} must not be in wrangler.toml: npx wrangler secret put ${name}`);
     }
   });
@@ -103,6 +105,40 @@ describe("app ↔ Worker configuration", () => {
       assert.match(toml, /^\[(?:env\.[A-Za-z0-9_-]+\.)?observability\.logs\]\ninvocation_logs[ \t]*=[ \t]*false$/m, `invocation_logs = false (${name})`);
     }
     assert.deepEqual(DEFAULT_BUNDLE_IDS, [app]);
+  });
+
+  it("「該出發了」 stays within Google's free calls: all environments together, at most 80 % of each tier in any month", () => {
+    const total: Record<Sku, number> = { essentials: 0, pro: 0, enterprise: 0 };
+    for (const [name, toml] of wranglerEnvironments()) {
+      for (const sku of ["essentials", "pro", "enterprise"] as const) {
+        const key = `DEPARTURE_DAILY_${sku.toUpperCase()}`;
+        const cap = dailyCap({ [key]: match(toml, new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*"(\\d+)"`, "m"), `${key} (${name})`) } as unknown as Env, sku);
+        total[sku] += cap;
+        // A cap below one request's most calls refuses every request in that tier.
+        const most = Math.max(...MODES.filter((mode) => MODE_SKU[mode] === sku).map((mode) => MAX_CALLS[mode]));
+        assert.ok(cap === 0 || cap >= most, `${key} (${name}) = ${cap}: 0, or at least ${most}`);
+      }
+      const blocked = match(toml, /^[ \t]*DEPARTURE_BLOCKED_COUNTRIES[ \t]*=[ \t]*"([^"]*)"/m, `DEPARTURE_BLOCKED_COUNTRIES (${name})`);
+      assert.ok(blocked.split(",").map((c) => c.trim()).includes("GB"), `the United Kingdom stays blocked (${name})`);
+    }
+    for (const sku of ["essentials", "pro", "enterprise"] as const) {
+      assert.ok(
+        total[sku] * DAYS_PER_GOOGLE_MONTH <= FREE_MONTHLY_CALLS[sku] * 0.8,
+        `${sku}: ${total[sku]} calls a day in all environments × ${DAYS_PER_GOOGLE_MONTH} > 80 % of ${FREE_MONTHLY_CALLS[sku]}`,
+      );
+      assert.ok(DEFAULT_DAILY_CAPS[sku] * DAYS_PER_GOOGLE_MONTH <= FREE_MONTHLY_CALLS[sku] * 0.8, `DEFAULT_DAILY_CAPS.${sku}`);
+    }
+  });
+
+  it("every environment binds the 「該出發了」 ledger, a SQLite-backed Durable Object the main module exports", () => {
+    const toml = repoFile("server/worker/wrangler.toml");
+    for (const [name, part] of wranglerEnvironments()) {
+      const table = name === "production" ? "[[durable_objects.bindings]]" : `[[env.${name}.durable_objects.bindings]]`;
+      assert.match(part, new RegExp(`^${table.replace(/[[\].]/g, "\\$&")}\nname = "SS_DEPARTURE_LEDGER"\nclass_name = "DepartureLedger"$`, "m"), `${table} (${name})`);
+    }
+    assert.match(toml, /^\[\[migrations\]\]\ntag = "[^"]+"\nnew_sqlite_classes = \["DepartureLedger"\]$/m, "migration creating DepartureLedger (SQLite)");
+    assert.doesNotMatch(toml, /^new_classes/m, "SQLite-backed only (the Free plan has no key-value Durable Objects)");
+    assert.match(repoFile("server/worker/src/index.ts"), /^export \{ DepartureLedger \} from "\.\/ledger\.ts";$/m);
   });
 
   it("every app configuration attests in App Attest's production environment, the one every Worker checks", () => {

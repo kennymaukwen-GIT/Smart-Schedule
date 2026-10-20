@@ -3,6 +3,8 @@
 import type { Env, RateLimiter } from "../../src/env.ts";
 import type { Worker } from "../../src/index.ts";
 import { createWorker } from "../../src/index.ts";
+import type { FakeLedger } from "./ledger.ts";
+import { makeFakeLedger } from "./ledger.ts";
 import { MemoryKV } from "./memory-kv.ts";
 import { TEAM_ID } from "./app-attest.ts";
 
@@ -42,6 +44,8 @@ export interface Harness {
   kv: MemoryKV;
   /** The fake SS_RATE_LIMITER binding (null when the harness was made with rateLimiter: false). */
   limiter: FakeRateLimiter | null;
+  /** The 「該出發了」 ledger Durable Object (bound like in wrangler.toml). */
+  ledger: FakeLedger;
   env: Env;
   worker: Worker;
   calls: FetchCall[];
@@ -76,11 +80,14 @@ export function makeHarness(
     ...options.env,
   };
   if (limiter) env.SS_RATE_LIMITER = limiter;
+  const ledger = makeFakeLedger();
+  if (!("SS_DEPARTURE_LEDGER" in (options.env ?? {}))) env.SS_DEPARTURE_LEDGER = ledger;
   const calls: FetchCall[] = [];
   const harness: Harness = {
     clock,
     kv,
     limiter,
+    ledger,
     env,
     calls,
     respond: () => new Response("{}", { status: 200, headers: { "content-type": "application/json" } }),
@@ -104,7 +111,10 @@ export function makeHarness(
       if ((typeof init.body === "string" || init.body instanceof Uint8Array) && !headers.has("content-length")) {
         headers.set("content-length", String(typeof init.body === "string" ? new TextEncoder().encode(init.body).length : init.body.byteLength));
       }
-      return harness.worker.fetch(new Request(`https://worker.test${path}`, { ...init, headers }), env, { waitUntil() {} });
+      const request = new Request(`https://worker.test${path}`, { ...init, headers });
+      // Cloudflare's request.cf (e.g. the country): Node's Request has none, so it is attached as Cloudflare does.
+      if (init.cf) Object.defineProperty(request, "cf", { value: init.cf });
+      return harness.worker.fetch(request, env, { waitUntil() {} });
     },
     async runCron() {
       const pending: Promise<unknown>[] = [];
