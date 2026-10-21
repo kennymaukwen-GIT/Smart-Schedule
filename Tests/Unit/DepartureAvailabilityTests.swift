@@ -1,6 +1,7 @@
 import XCTest
 
-/// Where 「該出發了」 is offered, and the user's answer to 「使用 Google 地圖規劃出發時間？」 (docs/SETTINGS.md §7.11,
+/// Where 「該出發了」 is offered (the iPhone's region and time zone; the App Store country is not read, owner decision
+/// 2026-10-21), and the user's answer to 「使用 Google 地圖規劃出發時間？」 (docs/SETTINGS.md §7.11,
 /// owner decisions 2026-10-20). The server's own list is checked against this one in
 /// server/worker/test/config-sync.test.ts.
 final class DepartureAvailabilityTests: XCTestCase {
@@ -16,27 +17,32 @@ final class DepartureAvailabilityTests: XCTestCase {
         }
     }
 
-    func testEveryStorefrontIsABlockedCountryAndEveryCountryHasOne() {
-        XCTAssertEqual(Set(DepartureRegion.storefronts.values), DepartureRegion.blockedCountries)
-        XCTAssertEqual(DepartureRegion.storefronts.count, 43)
-        for code in DepartureRegion.storefronts.keys {
-            XCTAssertNotNil(code.range(of: "^[A-Z]{3}$", options: .regularExpression), code)
-        }
-        XCTAssertEqual(DepartureRegion.storefronts["GBR"], "GB")
-        XCTAssertEqual(DepartureRegion.storefronts["CHE"], "CH")
-        XCTAssertNil(DepartureRegion.storefronts["TWN"])
-    }
-
     func testEveryTimeZoneIsABlockedCountryAndEveryCountryHasOne() {
         XCTAssertEqual(Set(DepartureRegion.timeZones.values), DepartureRegion.blockedCountries)
-        // One real zone per country, as iOS names it.
-        for identifier in ["Europe/London", "Europe/Zurich", "Europe/Oslo", "Atlantic/Reykjavik", "Europe/Vaduz",
-                           "Europe/Paris", "Europe/Berlin", "Europe/Lisbon", "Atlantic/Canary", "Asia/Nicosia",
-                           "Europe/Guernsey", "Europe/Jersey", "Europe/Isle_of_Man", "Europe/Gibraltar",
-                           "Europe/Mariehamn", "America/Cayenne", "America/Guadeloupe", "America/Martinique",
-                           "Indian/Reunion", "Indian/Mayotte", "America/Marigot"] {
+        // Every name is one iOS knows (old aliases such as Eire and GB included), so none is misspelt.
+        for identifier in DepartureRegion.timeZones.keys {
             XCTAssertNotNil(TimeZone(identifier: identifier), identifier)
-            XCTAssertNotNil(DepartureRegion.timeZones[identifier], identifier)
+        }
+        // Each country's main zone, so deleting one fails even where an alias still covers the country.
+        let main = ["AT": "Europe/Vienna", "BE": "Europe/Brussels", "BG": "Europe/Sofia", "HR": "Europe/Zagreb",
+                    "CY": "Asia/Nicosia", "CZ": "Europe/Prague", "DK": "Europe/Copenhagen", "EE": "Europe/Tallinn",
+                    "FI": "Europe/Helsinki", "FR": "Europe/Paris", "DE": "Europe/Berlin", "GR": "Europe/Athens",
+                    "HU": "Europe/Budapest", "IE": "Europe/Dublin", "IT": "Europe/Rome", "LV": "Europe/Riga",
+                    "LT": "Europe/Vilnius", "LU": "Europe/Luxembourg", "MT": "Europe/Malta", "NL": "Europe/Amsterdam",
+                    "PL": "Europe/Warsaw", "PT": "Europe/Lisbon", "RO": "Europe/Bucharest", "SK": "Europe/Bratislava",
+                    "SI": "Europe/Ljubljana", "ES": "Europe/Madrid", "SE": "Europe/Stockholm",
+                    "IS": "Atlantic/Reykjavik", "LI": "Europe/Vaduz", "NO": "Europe/Oslo", "CH": "Europe/Zurich",
+                    "GB": "Europe/London", "GG": "Europe/Guernsey", "JE": "Europe/Jersey", "IM": "Europe/Isle_of_Man",
+                    "GI": "Europe/Gibraltar", "AX": "Europe/Mariehamn", "GF": "America/Cayenne",
+                    "GP": "America/Guadeloupe", "MQ": "America/Martinique", "RE": "Indian/Reunion",
+                    "YT": "Indian/Mayotte", "MF": "America/Marigot"]
+        XCTAssertEqual(Set(main.keys), DepartureRegion.blockedCountries)
+        for (country, zone) in main {
+            XCTAssertEqual(DepartureRegion.timeZones[zone], country, zone)
+        }
+        // Spain's and Portugal's islands and Cyprus' north count too.
+        for zone in ["Atlantic/Canary", "Africa/Ceuta", "Atlantic/Madeira", "Atlantic/Azores", "Asia/Famagusta"] {
+            XCTAssertNotNil(DepartureRegion.timeZones[zone], zone)
         }
     }
 
@@ -55,14 +61,6 @@ final class DepartureAvailabilityTests: XCTestCase {
         XCTAssertFalse(DepartureRegion.isBlocked(region: nil))
     }
 
-    func testTheAppStoreCountry() {
-        XCTAssertTrue(DepartureRegion.isBlocked(storefront: "GBR"))
-        XCTAssertTrue(DepartureRegion.isBlocked(storefront: "fra"))
-        XCTAssertFalse(DepartureRegion.isBlocked(storefront: "TWN"))
-        XCTAssertFalse(DepartureRegion.isBlocked(storefront: "USA"))
-        XCTAssertFalse(DepartureRegion.isBlocked(storefront: nil), "not signed in, or not read yet")
-    }
-
     func testTheTimeZoneStandsForWhereTheIPhoneIs() {
         XCTAssertTrue(DepartureRegion.isBlocked(timeZone: "Europe/London"))
         XCTAssertTrue(DepartureRegion.isBlocked(timeZone: "Atlantic/Canary"))
@@ -75,17 +73,17 @@ final class DepartureAvailabilityTests: XCTestCase {
 
     // MARK: The decision
 
-    private func resolve(region: String? = "TW", storefront: String? = "TWN", timeZone: String? = "Asia/Taipei",
+    private func resolve(region: String? = "TW", timeZone: String? = "Asia/Taipei",
                          consent: DepartureConsent = .notAsked, debugBuild: Bool = false,
                          debugAllowsBlocked: Bool = false) -> DepartureAvailability {
-        DepartureAvailability.resolve(region: region, storefront: storefront, timeZone: timeZone, consent: consent,
+        DepartureAvailability.resolve(region: region, timeZone: timeZone, consent: consent,
                                       debugBuild: debugBuild, debugAllowsBlocked: debugAllowsBlocked)
     }
 
     func testTaiwanIsOnBeforeAndAfterAllowing() {
         XCTAssertEqual(resolve(), .on, "not asked yet: the app asks before the first request goes out")
         XCTAssertEqual(resolve(consent: .allowed), .on)
-        XCTAssertEqual(resolve(storefront: nil), .on)
+        XCTAssertEqual(resolve(region: nil, timeZone: nil), .on, "nothing says it is in the area")
     }
 
     func testNotNowTurnsItOff() {
@@ -95,7 +93,6 @@ final class DepartureAvailabilityTests: XCTestCase {
 
     func testAnyOneSignalInTheAreaTurnsItOff() {
         XCTAssertEqual(resolve(region: "GB"), .off)
-        XCTAssertEqual(resolve(storefront: "GBR"), .off)
         XCTAssertEqual(resolve(timeZone: "Europe/London"), .off, "a Taiwanese iPhone in London")
         XCTAssertEqual(resolve(region: "150"), .off)
     }

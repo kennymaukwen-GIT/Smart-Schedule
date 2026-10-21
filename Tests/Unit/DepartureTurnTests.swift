@@ -24,6 +24,18 @@ final class DepartureTurnTests: XCTestCase {
         XCTAssertEqual(DepartureTurn.target(args, newEventStarts: starts, clock: clock), .newEvent(index: 2))
     }
 
+    func testOnlyCreateEventTiesThePlanToANewEvent() {
+        let start = TestClock.local(2026, 10, 20, 17)
+        for flag in [nil, false] as [Bool?] {
+            let args = PlanDepartureArgs(destination: "台北車站", arriveAtLocal: "2026-10-20T17:00", createEvent: flag)
+            XCTAssertEqual(DepartureTurn.target(args, newEventStarts: [start], clock: clock),
+                           .arriveBy(destination: "台北車站", at: start), "\(String(describing: flag))")
+        }
+        let both = PlanDepartureArgs(arriveAtLocal: "2026-10-20T17:00", eventId: "ss101", createEvent: true)
+        XCTAssertEqual(DepartureTurn.target(both, newEventStarts: [start], clock: clock), .existingEvent(id: "ss101"),
+                       "an event from the calendar wins")
+    }
+
     func testWithoutAMatchingNewEventItIsAnArrivalWithNoEvent() {
         let args = PlanDepartureArgs(destination: "台北 101", arriveAtLocal: "2026-10-20T17:00", createEvent: true)
         XCTAssertEqual(DepartureTurn.target(args, newEventStarts: [TestClock.local(2026, 10, 20, 18)], clock: clock),
@@ -94,6 +106,15 @@ final class DepartureTurnTests: XCTestCase {
         XCTAssertEqual(DepartureTurn.mode(said: .walking, kept: .driving), .init(mode: .walking, saidByUser: true))
         XCTAssertEqual(DepartureTurn.mode(said: nil, kept: .scooter), .init(mode: .scooter, saidByUser: true))
         XCTAssertEqual(DepartureTurn.mode(said: nil, kept: nil), .init(mode: .transit, saidByUser: false))
+        XCTAssertEqual(DepartureTurn.mode(said: .transit, kept: nil), .init(mode: .transit, saidByUser: true))
+    }
+
+    /// An event keeps public transport whether the user said it or the app chose it, so planning it again may still
+    /// fall back to driving.
+    func testPublicTransportAnEventKeepsMayStillFallBack() {
+        let choice = DepartureTurn.mode(said: nil, kept: .transit)
+        XCTAssertEqual(choice, .init(mode: .transit, saidByUser: false))
+        XCTAssertEqual(DepartureTurn.fallback(after: choice), .driving)
     }
 
     func testOnlyThePublicTransportTheAppChoseFallsBackToDriving() {
@@ -168,6 +189,25 @@ final class DepartureTurnTests: XCTestCase {
         XCTAssertEqual(DepartureTurn.outcome(route(departAt: now, arriveAt: target.addingTimeInterval(30), late: true),
                                              target: target, now: now),
                        .late(arriveAt: target.addingTimeInterval(30), minutes: 1), "the server's late flag counts")
+        XCTAssertEqual(DepartureTurn.outcome(route(departAt: now, arriveAt: target.addingTimeInterval(-60), late: true),
+                                             target: target, now: now),
+                       .late(arriveAt: target.addingTimeInterval(-60), minutes: 1), "never 0 minutes late")
+        XCTAssertEqual(DepartureTurn.outcome(route(departAt: now, arriveAt: target.addingTimeInterval(61)),
+                                             target: target, now: now),
+                       .late(arriveAt: target.addingTimeInterval(61), minutes: 1), "past a minute's rounding is late")
+    }
+
+    /// The minutes agree with the clock times the reply shows: 16:41:47 shows as 16:41, 11 minutes after 16:30.
+    func testTheMinutesMatchTheTimesShown() {
+        let target = TestClock.local(2026, 10, 20, 16, 30)
+        let arrive = TestClock.local(2026, 10, 20, 16, 41).addingTimeInterval(47)
+        XCTAssertEqual(DepartureTurn.outcome(route(departAt: TestClock.local(2026, 10, 20, 16, 20), arriveAt: arrive),
+                                             target: target, now: TestClock.local(2026, 10, 20, 16, 20)),
+                       .late(arriveAt: arrive, minutes: 11))
+        let now = TestClock.local(2026, 10, 20, 16, 0).addingTimeInterval(10)
+        let at = TestClock.local(2026, 10, 20, 16, 25).addingTimeInterval(50)
+        XCTAssertEqual(DepartureTurn.outcome(route(departAt: now, arriveAt: at), target: nil, now: now),
+                       .trip(minutes: 25, arriveAt: at, estimate: false), "16:00 to 16:25")
     }
 
     func testATimeToLeaveAlreadyPastBecomesNow() {
@@ -219,13 +259,11 @@ final class DepartureTurnTests: XCTestCase {
         XCTAssertEqual(DepartureTurn.Saved.allCases.map(\.rawValue), ["set", "awaiting_user_approval", "not_set"])
     }
 
-    func testWholeMinutesRoundUp() {
-        XCTAssertEqual(DepartureTurn.wholeMinutesUp(0), 0)
-        XCTAssertEqual(DepartureTurn.wholeMinutesUp(1), 1)
-        XCTAssertEqual(DepartureTurn.wholeMinutesUp(60), 1)
-        XCTAssertEqual(DepartureTurn.wholeMinutesUp(61), 2)
-        XCTAssertEqual(DepartureTurn.wholeMinutesUp(-5), 0)
-        XCTAssertEqual(DepartureTurn.wholeMinutesUp(.nan), 0)
-        XCTAssertEqual(DepartureTurn.wholeMinutesUp(.infinity), 0)
+    func testClockMinutes() {
+        let start = TestClock.local(2026, 10, 20, 16, 0)
+        XCTAssertEqual(DepartureTurn.clockMinutes(from: start, to: TestClock.local(2026, 10, 20, 16, 25)), 25)
+        XCTAssertEqual(DepartureTurn.clockMinutes(from: start.addingTimeInterval(59), to: start.addingTimeInterval(60)), 1)
+        XCTAssertEqual(DepartureTurn.clockMinutes(from: start, to: start.addingTimeInterval(59)), 0)
+        XCTAssertEqual(DepartureTurn.clockMinutes(from: start, to: start.addingTimeInterval(-600)), 0, "never negative")
     }
 }

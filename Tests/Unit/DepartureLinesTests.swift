@@ -11,33 +11,33 @@ final class DepartureLinesTests: XCTestCase {
     func testTheTimeToLeave() {
         let outcome = DepartureTurn.Outcome.leave(at: TestClock.local(2026, 10, 20, 15, 48),
                                                   arriveAt: TestClock.local(2026, 10, 20, 16, 28), estimate: false)
-        XCTAssertEqual(DepartureLines.shown(outcome, place: "Taipei 101", target: target, mode: .transit, fellBack: false,
+        XCTAssertEqual(DepartureLines.shown(outcome, place: "Taipei 101", target: target, fellBack: false,
                                             clock: clock),
-                       "Based on being at Taipei 101 by 16:30, leave at 15:48 (by public transport).")
+                       "Based on being at Taipei 101 by 16:30, leave at 15:48.")
     }
 
     func testAnEstimateAndTheDrivingFallbackAreSaid() {
         let outcome = DepartureTurn.Outcome.leave(at: TestClock.local(2026, 10, 20, 15, 30),
                                                   arriveAt: TestClock.local(2026, 10, 20, 16, 30), estimate: true)
-        XCTAssertEqual(DepartureLines.shown(outcome, place: "Taipei 101", target: target, mode: .driving, fellBack: true,
+        XCTAssertEqual(DepartureLines.shown(outcome, place: "Taipei 101", target: target, fellBack: true,
                                             clock: clock),
-                       "Based on being at Taipei 101 by 16:30, leave at 15:30 (by car). This is an estimate. "
+                       "Based on being at Taipei 101 by 16:30, leave at 15:30. This is an estimate. "
                            + "No public transport route was found, so this is by car.")
     }
 
     /// Owner decision 2026-10-21 (B).
     func testLateSaysLeaveNowAndHowLate() {
         let outcome = DepartureTurn.Outcome.late(arriveAt: TestClock.local(2026, 10, 20, 16, 42), minutes: 12)
-        XCTAssertEqual(DepartureLines.shown(outcome, place: "Taipei 101", target: target, mode: .scooter, fellBack: false,
+        XCTAssertEqual(DepartureLines.shown(outcome, place: "Taipei 101", target: target, fellBack: false,
                                             clock: clock),
-                       "Based on being at Taipei 101 by 16:30, leave now (by scooter): you'll arrive at 16:42, about 12 min late.")
+                       "Based on being at Taipei 101 by 16:30, leave now: you'll arrive at 16:42, about 12 min late.")
     }
 
     func testHowLong() {
         let outcome = DepartureTurn.Outcome.trip(minutes: 95, arriveAt: TestClock.local(2026, 10, 20, 17, 35), estimate: false)
-        XCTAssertEqual(DepartureLines.shown(outcome, place: "Hyde Park", target: nil, mode: .walking, fellBack: false,
+        XCTAssertEqual(DepartureLines.shown(outcome, place: "Hyde Park", target: nil, fellBack: false,
                                             clock: clock),
-                       "Leaving now for Hyde Park takes about 1 hr 35 min (on foot): you'll arrive at 17:35.")
+                       "Leaving now for Hyde Park takes about 1 hr 35 min: you'll arrive at 17:35.")
     }
 
     /// Google's terms allow no storing of its times: what history keeps has only the place and the user's own time.
@@ -121,12 +121,12 @@ final class DepartureLinesTests: XCTestCase {
     // MARK: The reply
 
     func testTheChatShowsGooglesTimeWhileHistoryKeepsTheOtherLine() {
-        let reply = DepartureReply(shown: "Based on being at Taipei 101 by 16:30, leave at 15:48 (by public transport).",
+        let reply = DepartureReply(shown: "Based on being at Taipei 101 by 16:30, leave at 15:48.",
                                    kept: "Planned when to leave for Taipei 101 (be there by 16:30).",
                                    destination: "Taipei 101", mode: .transit, planToken: nil)
         let text = "Added: Meeting · Tue, Oct 20 · 17:00–18:00\nPlanned when to leave for Taipei 101 (be there by 16:30)."
         XCTAssertEqual(DepartureReply.displayText(text, departure: reply),
-                       "Added: Meeting · Tue, Oct 20 · 17:00–18:00\nBased on being at Taipei 101 by 16:30, leave at 15:48 (by public transport).")
+                       "Added: Meeting · Tue, Oct 20 · 17:00–18:00\nBased on being at Taipei 101 by 16:30, leave at 15:48.")
         XCTAssertEqual(DepartureReply.displayText(text, departure: nil), text)
         XCTAssertEqual(DepartureReply.displayText("Something else", departure: reply), "Something else")
     }

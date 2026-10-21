@@ -90,13 +90,16 @@ enum DepartureTurn {
 
     struct ModeChoice: Equatable, Sendable {
         let mode: TravelMode
-        /// The user said it, now or when the event's departure was set. False when the app chose public transport.
+        /// The user chose it. False when the app chose public transport.
         let saidByUser: Bool
     }
 
-    /// The way of travelling the user said, else the one the event keeps, else public transport.
+    /// The way of travelling the user said, else the one the event keeps, else public transport. An event keeps
+    /// public transport both when the user said it and when the app chose it, and can't tell which, so a kept public
+    /// transport counts as the app's choice: it may still fall back to driving.
     static func mode(said: TravelMode?, kept: TravelMode?) -> ModeChoice {
-        if let mode = said ?? kept { return ModeChoice(mode: mode, saidByUser: true) }
+        if let said { return ModeChoice(mode: said, saidByUser: true) }
+        if let kept { return ModeChoice(mode: kept, saidByUser: kept != .transit) }
         return ModeChoice(mode: .transit, saidByUser: false)
     }
 
@@ -145,15 +148,16 @@ enum DepartureTurn {
         case trip(minutes: Int, arriveAt: Date, estimate: Bool)
     }
 
+    /// The minutes match the clock times the reply shows (whole minutes, as `ReplyFormatter.clockTime` writes them):
+    /// arriving at 16:41:47 for 16:30 is "16:41, about 11 min late".
     /// - Parameter target: the time to be there, nil for "how long".
     static func outcome(_ route: DepartureRoute, target: Date?, now: Date) -> Outcome {
         guard let target else {
-            return .trip(minutes: wholeMinutesUp(route.arriveAt.timeIntervalSince(now)), arriveAt: route.arriveAt,
+            return .trip(minutes: clockMinutes(from: now, to: route.arriveAt), arriveAt: route.arriveAt,
                          estimate: route.estimate)
         }
-        let lateBy = route.arriveAt.timeIntervalSince(target)
-        if route.late || lateBy > onTimeSlack {
-            return .late(arriveAt: route.arriveAt, minutes: max(1, wholeMinutesUp(lateBy)))
+        if route.late || route.arriveAt.timeIntervalSince(target) > onTimeSlack {
+            return .late(arriveAt: route.arriveAt, minutes: max(1, clockMinutes(from: target, to: route.arriveAt)))
         }
         return .leave(at: max(route.departAt, now), arriveAt: route.arriveAt, estimate: route.estimate)
     }
@@ -188,11 +192,11 @@ enum DepartureTurn {
 
     // MARK: Helpers
 
-    /// Seconds as whole minutes, rounded up; a negative time counts as 0.
-    static func wholeMinutesUp(_ seconds: TimeInterval) -> Int {
-        guard seconds.isFinite else { return 0 }
-        let minutes = (max(seconds, 0) / 60).rounded(.up)
-        return minutes > Double(Int32.max) ? Int(Int32.max) : Int(minutes)
+    /// Minutes between the two clock times as a reply shows them ("16:00" to "16:25" is 25); never negative.
+    static func clockMinutes(from start: Date, to end: Date) -> Int {
+        let minutes = (end.timeIntervalSince1970 / 60).rounded(.down) - (start.timeIntervalSince1970 / 60).rounded(.down)
+        guard minutes.isFinite else { return 0 }
+        return Int(min(max(minutes, 0), Double(Int32.max)))
     }
 
     private static func nonBlank(_ text: String?) -> String? {

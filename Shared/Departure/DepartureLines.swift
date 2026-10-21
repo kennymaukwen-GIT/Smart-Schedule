@@ -18,23 +18,21 @@ enum DepartureLines {
     /// - Parameters:
     ///   - place: the destination as the user or the event wrote it.
     ///   - target: when the user wants to be there; nil for "how long".
-    ///   - mode: the way of travelling the time is for.
     ///   - fellBack: no public-transport route was found, so this is by car.
-    static func shown(_ outcome: DepartureTurn.Outcome, place: String, target: Date?, mode: TravelMode,
-                      fellBack: Bool, clock: WallClock) -> String {
+    static func shown(_ outcome: DepartureTurn.Outcome, place: String, target: Date?, fellBack: Bool,
+                      clock: WallClock) -> String {
         let spot = inSentence(place)
-        let how = modeName(mode)
         var line: String
         switch outcome {
         case let .leave(at, _, estimate):
             let by = time(target ?? at, clock)
-            line = String(localized: "Based on being at \(spot) by \(by), leave at \(time(at, clock)) (\(how)).")
+            line = String(localized: "Based on being at \(spot) by \(by), leave at \(time(at, clock)).")
             if estimate { line = joined(line, String(localized: "This is an estimate.")) }
         case let .late(arriveAt, minutes):
             let by = time(target ?? arriveAt, clock)
-            line = String(localized: "Based on being at \(spot) by \(by), leave now (\(how)): you'll arrive at \(time(arriveAt, clock)), about \(minutes) min late.")
+            line = String(localized: "Based on being at \(spot) by \(by), leave now: you'll arrive at \(time(arriveAt, clock)), about \(minutes) min late.")
         case let .trip(minutes, arriveAt, estimate):
-            line = String(localized: "Leaving now for \(spot) takes about \(duration(minutes: minutes)) (\(how)): you'll arrive at \(time(arriveAt, clock)).")
+            line = String(localized: "Leaving now for \(spot) takes about \(duration(minutes: minutes)): you'll arrive at \(time(arriveAt, clock)).")
             if estimate { line = joined(line, String(localized: "This is an estimate.")) }
         }
         if fellBack { line = joined(line, String(localized: "No public transport route was found, so this is by car.")) }
@@ -133,7 +131,7 @@ enum DepartureLines {
 
     // MARK: Pieces
 
-    /// "by public transport" / 「大眾運輸」.
+    /// "by public transport" / 「大眾運輸」, for "no route there by …".
     static func modeName(_ mode: TravelMode) -> String {
         switch mode {
         case .transit: String(localized: "by public transport")

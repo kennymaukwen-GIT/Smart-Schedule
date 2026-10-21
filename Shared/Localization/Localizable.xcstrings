@@ -1054,24 +1054,24 @@
         }
       }
     },
-    "Based on being at %@ by %@, leave at %@ (%@)." : {
-      "comment" : "Departure reply (shown in the chat only): place, time to be there, Google's time to leave, way of travelling",
+    "Based on being at %@ by %@, leave at %@." : {
+      "comment" : "Departure reply (shown in the chat only): place, time to be there, Google's time to leave",
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "根據你 %2$@ 到%1$@的需求，建議 %3$@ 出門（%4$@）。"
+            "value" : "根據你 %2$@ 到%1$@的需求，建議 %3$@ 出門。"
           }
         }
       }
     },
-    "Based on being at %@ by %@, leave now (%@): you'll arrive at %@, about %lld min late." : {
-      "comment" : "Departure reply when even leaving now is late: place, time to be there, way of travelling, arrival, minutes late",
+    "Based on being at %@ by %@, leave now: you'll arrive at %@, about %lld min late." : {
+      "comment" : "Departure reply when even leaving now is late: place, time to be there, arrival, minutes late",
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "根據你 %2$@ 到%1$@的需求，建議現在就出門（%3$@），預計 %4$@ 到，晚約 %5$lld 分鐘。"
+            "value" : "根據你 %2$@ 到%1$@的需求，建議現在就出門，預計 %3$@ 到，晚約 %4$lld 分鐘。"
           }
         }
       }
@@ -2943,13 +2943,13 @@
         }
       }
     },
-    "Leaving now for %@ takes about %@ (%@): you'll arrive at %@." : {
-      "comment" : "How long a trip takes: place, duration, way of travelling, arrival",
+    "Leaving now for %@ takes about %@: you'll arrive at %@." : {
+      "comment" : "How long a trip takes: place, duration, arrival",
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "根據你去%1$@的需求，現在出門約 %2$@（%3$@），%4$@ 到。"
+            "value" : "根據你去%1$@的需求，現在出門約需 %2$@，%3$@ 到。"
           }
         }
       }

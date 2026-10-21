@@ -138,8 +138,6 @@ describe("app ↔ Worker configuration", () => {
     const block = (name: string): string => match(swift, new RegExp(`static let ${name}: [^=]+= \\[([^\\]]*)\\]`), `DepartureRegion.${name}`);
     const countries = [...block("blockedCountries").matchAll(/"([A-Z]{2})"/g)].map((m) => m[1]);
     assert.deepEqual([...countries].sort(), [...EUROPEAN_COUNTRIES].sort(), "DepartureRegion.blockedCountries = EUROPEAN_COUNTRIES");
-    const storefronts = [...block("storefronts").matchAll(/"([A-Z]{3})": "([A-Z]{2})"/g)].map((m) => m[2]);
-    assert.deepEqual([...new Set(storefronts)].sort(), [...EUROPEAN_COUNTRIES].sort(), "one App Store code per blocked country");
     const zones = [...block("timeZones").matchAll(/"[^"]+": "([A-Z]{2})"/g)].map((m) => m[1]);
     assert.deepEqual([...new Set(zones)].sort(), [...EUROPEAN_COUNTRIES].sort(), "every blocked country has a time zone, and only those");
   });
