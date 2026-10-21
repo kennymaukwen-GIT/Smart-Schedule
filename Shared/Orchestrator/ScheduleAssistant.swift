@@ -238,9 +238,6 @@ actor ScheduleAssistant {
         if var state = plan {
             await prepareDeparture(&state, calls: response.functionCalls, requestSeed: requestSeed, request: request,
                                    now: now, ctx: ctx, aliases: aliases)
-            if ctx.preferences.autonomy == .askFirst {
-                Self.carryDepartures(&state, calls: response.functionCalls, replacing: pendingEvents, aliases: aliases)
-            }
             plan = state
         }
         for (index, call) in response.functionCalls.enumerated() {
@@ -254,7 +251,7 @@ actor ScheduleAssistant {
                 outcome = try await execute(call, seed: "\(requestSeed)|\(index)", utterance: utterance, request: request,
                                             upcoming: known, now: now, aliases: aliases, ctx: ctx,
                                             newEventDepartures: index == plan?.createCallIndex
-                                                ? plan?.departuresToWrite ?? [:] : [:],
+                                                ? plan?.newEventSettings ?? [:] : [:],
                                             reply: &reply)
             } catch {
                 // Gemini reads the error on the next turn: no address in it ("Google sign-in for … expired" names
@@ -936,16 +933,6 @@ extension ScheduleAssistant {
         var newEventTarget: Date?
         /// The turn also creates events (create_events).
         var createsEvents = false
-        /// The event of create_events this turn's plan was for.
-        var plannedIndex: Int?
-        /// "Ask me first" revised: the departures new events keep from the proposal they replace, without a new plan.
-        var carried: [Int: DepartureSettings] = [:]
-
-        /// What create_events writes: a new plan's settings, else the ones carried over (an event planned this turn
-        /// and given none, because it is late, passed or refused, keeps none).
-        var departuresToWrite: [Int: DepartureSettings] {
-            carried.filter { $0.key != plannedIndex }.merging(newEventSettings) { _, planned in planned }
-        }
 
         /// The app answers about the departure this turn. A call with nothing to plan (no event and no place) leaves
         /// the answer to Gemini's reply_to_user.
@@ -1008,7 +995,6 @@ extension ScheduleAssistant {
         state.createsEvents = createIndex != nil
         guard case let .newEvent(eventIndex) = state.target, let createIndex else { return }
         state.createCallIndex = createIndex
-        state.plannedIndex = eventIndex
 
         // The event as create_events will write it (a weekly series starts on its first day).
         let draft = drafts[eventIndex]
@@ -1138,40 +1124,7 @@ extension ScheduleAssistant {
     /// A plan_departure meant for a new event (create_event) that matched none of the turn's new events (Gemini's
     /// arrive_at_local isn't any event's start) is answered as an arrival: say that the new event got no reminders.
     private static func noEventNote(_ state: DeparturePlanState) -> String? {
-        state.args.createEvent == true && state.createsEvents && state.carried.isEmpty ? DepartureLines.notSet : nil
-    }
-
-    /// "Ask me first" revised ("make it 17:00", a new title or length): a new event that is the same as one in the
-    /// proposal it replaces (the same title, or the same place) keeps that one's departure, with no new plan and
-    /// nothing sent. The event keeps only the user's two choices, so they hold for a new time too; rule 13 asks Gemini
-    /// to plan again when the time or the place changes, to show the new time to leave.
-    private static func carryDepartures(_ state: inout DeparturePlanState, calls: [GeminiFunctionCall],
-                                        replacing batch: PendingEventBatch?, aliases: CalendarAliases) {
-        guard let batch, batch.previewEvents.contains(where: { $0.departure != nil }),
-              let createIndex = calls.firstIndex(where: { $0.name == AssistantFunction.createEvents.rawValue }),
-              state.createCallIndex == nil || state.createCallIndex == createIndex,
-              let args = try? restoringAccountEmails(in: calls[createIndex], aliases: aliases).decode(CreateEventsArgs.self)
-        else { return }
-        state.carried = carriedDepartures(Array(args.events.prefix(20)), from: batch.previewEvents)
-        if !state.carried.isEmpty { state.createCallIndex = createIndex }
-    }
-
-    /// Each timed new event takes the departure of the first unmatched earlier preview with the same title or place.
-    static func carriedDepartures(_ drafts: [EventDraft], from previews: [ScheduleEvent]) -> [Int: DepartureSettings] {
-        func key(_ text: String?) -> String? {
-            nonBlank(text)?.lowercased()
-        }
-        var left = previews.filter { $0.departure != nil && !$0.isAllDay }
-        var carried: [Int: DepartureSettings] = [:]
-        for (index, draft) in drafts.enumerated() where draft.allDay != true && draft.start.contains("T") {
-            guard let match = left.firstIndex(where: { preview in
-                (key(preview.title) != nil && key(preview.title) == key(draft.title))
-                    || (key(preview.location) != nil && key(preview.location) == key(draft.location))
-            }) else { continue }
-            carried[index] = left[match].departure
-            left.remove(at: match)
-        }
-        return carried
+        state.args.createEvent == true && state.createsEvents ? DepartureLines.notSet : nil
     }
 
     /// Asks the server for the trip (once, or twice with the one driving retry). Never throws. A request once sent is

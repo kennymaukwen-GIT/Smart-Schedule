@@ -832,31 +832,28 @@ final class DepartureAssistantTests: XCTestCase {
 
     // MARK: "Ask me first", revised
 
-    /// A revised proposal without a new plan ("make it 17:00"): the same event keeps the departure the user chose, with
-    /// nothing sent to Google, and Add writes it.
-    func testARevisedProposalKeepsTheDepartureWithoutANewPlan() async throws {
+    /// A revised proposal without a new plan: the new proposal has no departure (rule 13 asks Gemini to plan again), and
+    /// nothing is sent to Google.
+    func testARevisedProposalWithoutANewPlanHasNoDeparture() async throws {
         let rig = await makeRig(askFirst: true)
         await rig.routes.answer([route(leave: at(15, 48), arrive: at(16, 28))])
         answer(turn([("create_events", createMeeting), ("plan_departure", planNewMeeting)]),
                call("create_events", createMeeting.replacingOccurrences(of: "16:40", with: "17:00")))
         let first = try await rig.assistant.handleFromChat(newMeetingUtterance, now: now)
-        let settings = DepartureSettings(arriveEarlyMinutes: 10, travelMode: .transit)
-        XCTAssertEqual(first.pendingEvents?.previewEvents.first?.departure, settings)
+        XCTAssertNotNil(first.pendingEvents?.previewEvents.first?.departure)
 
         let revised = try await rig.assistant.handleFromChat("Make it 17:00", now: now)
         let batch = try XCTUnwrap(revised.pendingEvents)
-        XCTAssertEqual(batch.previewEvents.first?.start, at(17, 0))
-        XCTAssertEqual(batch.previewEvents.first?.departure, settings)
+        XCTAssertNil(batch.previewEvents.first?.departure)
         XCTAssertNil(revised.departure)
-        XCTAssertFalse(revised.text.contains("No departure reminders were set."), revised.text)
         let sent = await rig.routes.requests
         XCTAssertEqual(sent.count, 1, "no new plan")
 
         _ = try await rig.assistant.commitPendingEvents(batch, now: now)
         let writes = await rig.google.writes
         let properties = try privateProperties(writes.last?.body)
-        XCTAssertEqual(properties[SSProperty.arriveEarly], "10")
-        XCTAssertEqual(properties[SSProperty.travelMode], "transit")
+        XCTAssertNil(properties[SSProperty.arriveEarly])
+        XCTAssertNil(properties[SSProperty.travelMode])
     }
 
     /// Something else proposed while a planned proposal waits: it replaces the proposal but gets no departure, and the

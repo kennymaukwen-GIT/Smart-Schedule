@@ -372,9 +372,8 @@ enum AssistantPrompt {
         and starting point the user said. '提早 30 分鐘到' or '30 minutes early' = arrive_early_minutes 30, when to \
         arrive, not reminder_minutes ('提前 30 分鐘提醒'). A plain new event with a place and a time \
         ('明天下午 3 點看牙醫', 'lunch at Borough Market at 12:30') is create_events only: no plan_departure. \
-        Correcting the start or place of a PENDING EVENTS event that was proposed with plan_departure: call \
-        plan_departure again for that event (create_event=true, arrive_at_local = its corrected start) with the \
-        corrected create_events, in the same turn; other corrections need no plan_departure (the app keeps the \
-        event's departure).
+        Correcting a PENDING EVENTS event that was proposed with plan_departure: call plan_departure again for that \
+        event (create_event=true, arrive_at_local = its corrected start, and the minutes early and travel mode the \
+        user said) with the corrected create_events, in the same turn; without it the event has no departure.
         """
 }
