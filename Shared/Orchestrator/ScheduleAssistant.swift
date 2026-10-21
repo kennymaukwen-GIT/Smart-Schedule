@@ -947,7 +947,8 @@ extension ScheduleAssistant {
     /// where the feature is available and not turned off (owner decision 3A).
     private func activeDepartures(_ offered: DepartureServices?,
                                   onDevice: Bool) async -> (services: DepartureServices, availability: DepartureAvailability)? {
-        guard let offered, !onDevice else { return nil }
+        // Not now turns it off here too, whatever the installed availability check reads.
+        guard let offered, !onDevice, offered.consent.read() != .declined else { return nil }
         let availability = await offered.availability()
         return availability == .off ? nil : (offered, availability)
     }
