@@ -72,9 +72,18 @@ enum DepartureTurn {
 
     /// Be there `arriveEarlyMinutes` before `start`.
     static func arrival(start: Date, arriveEarlyMinutes: Int, now: Date) -> Arrival {
+        arrival(by: target(start: start, arriveEarlyMinutes: arriveEarlyMinutes), now: now)
+    }
+
+    /// The time to be there: `arriveEarlyMinutes` (kept within range) before `start`.
+    static func target(start: Date, arriveEarlyMinutes: Int) -> Date {
         let early = min(max(arriveEarlyMinutes, DeparturePlanner.arriveEarlyRange.lowerBound),
                         DeparturePlanner.arriveEarlyRange.upperBound)
-        let target = start.addingTimeInterval(-TimeInterval(early) * 60)
+        return start.addingTimeInterval(-TimeInterval(early) * 60)
+    }
+
+    /// Whether the time to be there has passed, is under two minutes away, or is ahead, seen at `now`.
+    static func arrival(by target: Date, now: Date) -> Arrival {
         if target <= now { return .passed }
         if target.timeIntervalSince(now) < leaveNowWithin { return .leaveNow(target: target) }
         return .by(target)

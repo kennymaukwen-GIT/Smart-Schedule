@@ -583,7 +583,11 @@ final class AssistantPromptTests: XCTestCase {
                        "keeping the place, minutes early, travel mode and starting point the user said",
                        "'提早 30 分鐘到' or '30 minutes early' = arrive_early_minutes 30, when to arrive, not "
                        + "reminder_minutes ('提前 30 分鐘提醒')",
-                       "('明天下午 3 點看牙醫', 'lunch at Borough Market at 12:30') is create_events only: no plan_departure."] {
+                       "('明天下午 3 點看牙醫', 'lunch at Borough Market at 12:30') is create_events only: no plan_departure.",
+                       // A revised "Ask me first" proposal plans again (docs/SETTINGS.md §7.11).
+                       "Correcting PENDING EVENTS that were proposed with plan_departure: call plan_departure again "
+                       + "(create_event=true, arrive_at_local = the corrected start) with the corrected create_events, "
+                       + "in the same turn."] {
             XCTAssertTrue(rule.contains(phrase), "missing: \(phrase)\n\(rule)")
         }
         // Being somewhere by a time triggers it, a way of travelling alone does not.

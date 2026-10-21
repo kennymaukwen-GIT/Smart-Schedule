@@ -259,6 +259,23 @@ final class DepartureTurnTests: XCTestCase {
         XCTAssertEqual(DepartureTurn.Saved.allCases.map(\.rawValue), ["set", "awaiting_user_approval", "not_set"])
     }
 
+    /// The time to be there, and how it stands at a later time (after a first 「使用 Google 地圖規劃出發時間？」).
+    func testTheTimeToBeThereSeenAgainLater() {
+        let start = TestClock.local(2026, 10, 20, 16, 40)
+        let target = DepartureTurn.target(start: start, arriveEarlyMinutes: 10)
+        XCTAssertEqual(target, TestClock.local(2026, 10, 20, 16, 30))
+        XCTAssertEqual(DepartureTurn.target(start: start, arriveEarlyMinutes: -5), start, "kept within range")
+        XCTAssertEqual(DepartureTurn.arrival(by: target, now: TestClock.local(2026, 10, 20, 14, 0)), .by(target))
+        XCTAssertEqual(DepartureTurn.arrival(by: target, now: target.addingTimeInterval(-119)), .leaveNow(target: target))
+        XCTAssertEqual(DepartureTurn.arrival(by: target, now: target.addingTimeInterval(-120)), .by(target))
+        XCTAssertEqual(DepartureTurn.arrival(by: target, now: target), .passed)
+        for minutes in [0, 10, 45] {
+            let now = TestClock.local(2026, 10, 20, 16, 0)
+            XCTAssertEqual(DepartureTurn.arrival(start: start, arriveEarlyMinutes: minutes, now: now),
+                           DepartureTurn.arrival(by: DepartureTurn.target(start: start, arriveEarlyMinutes: minutes), now: now))
+        }
+    }
+
     // MARK: Earlier turns, for a request without the feature
 
     /// Siri after a chat that planned, or the chat after Not now: the history Gemini gets has no call to, or answer

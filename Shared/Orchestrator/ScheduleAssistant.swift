@@ -268,6 +268,12 @@ actor ScheduleAssistant {
             let json = (try? JSONSerialization.data(withJSONObject: DepartureTurn.functionResult(saved))) ?? Data("{}".utf8)
             results[index] = .init(name: results[index].name, id: results[index].id, responseJSON: json)
         }
+        if let state = plan, state.callIndex == nil, let replaced = pendingEvents,
+           replaced.previewEvents.contains(where: { $0.departure != nil }),
+           let batch = reply.pendingEvents, batch.id != replaced.id {
+            // "Ask me first" revised without planning again: the departure the earlier proposal had isn't carried over.
+            reply.append(DepartureLines.notSet)
+        }
         if !results.isEmpty { exchange.append(.functionResponses(results)) }
         remember(exchange)
         // A chain of questions keeps the first request; anything else ends it.
@@ -931,6 +937,8 @@ extension ScheduleAssistant {
         var newEventAnswer: DepartureAnswer?
         var newEventPlace = ""
         var newEventTarget: Date?
+        /// The turn also creates events (create_events).
+        var createsEvents = false
 
         /// The app answers about the departure this turn. A call with nothing to plan (no event and no place) leaves
         /// the answer to Gemini's reply_to_user.
@@ -939,8 +947,26 @@ extension ScheduleAssistant {
 
     /// What one plan gave.
     private enum DepartureAnswer {
-        case planned(outcome: DepartureTurn.Outcome, mode: TravelMode, fellBack: Bool, plansLeft: Int, planToken: String?)
+        case planned(DeparturePlanned)
         case refused(DepartureLines.Reason)
+    }
+
+    /// Google's answer to one plan.
+    private struct DeparturePlanned {
+        let outcome: DepartureTurn.Outcome
+        /// The way of travelling the answer is for (by car after the one retry).
+        let mode: TravelMode
+        /// The way of travelling the event keeps: the user's choice, or the app's public transport even when the retry
+        /// went by car, so the next plan tries public transport again.
+        let keptMode: TravelMode
+        let fellBack: Bool
+        let plansLeft: Int
+        let planToken: String?
+        /// The time the plan was checked against: later than the request's after a first 「使用 Google 地圖規劃出發時間？」.
+        let now: Date
+
+        /// A time to leave still ahead, for a trip of at most 24 hours.
+        var setsReminders: Bool { DepartureTurn.setsReminders(outcome, now: now) }
     }
 
     /// The departure services for this request, or nil: only what the chat offered, never in demo mode, and only
@@ -972,6 +998,7 @@ extension ScheduleAssistant {
         } ?? []
         let starts: [Date?] = drafts.map { $0.allDay == true ? nil : ctx.clock.dateTime($0.start) }
         state.target = DepartureTurn.target(state.args, newEventStarts: starts, clock: ctx.clock)
+        state.createsEvents = createIndex != nil
         guard case let .newEvent(eventIndex) = state.target, let createIndex else { return }
         state.createCallIndex = createIndex
 
@@ -989,16 +1016,16 @@ extension ScheduleAssistant {
             return
         }
         let early = DepartureTurn.arriveEarlyMinutes(said: state.args.arriveEarlyMinutes, kept: nil)
-        let arrival = DepartureTurn.arrival(start: start, arriveEarlyMinutes: early, now: now)
-        let answer = await planTrip(to: place, arrival: arrival, choice: DepartureTurn.mode(said: state.args.mode, kept: nil),
+        let target = DepartureTurn.target(start: start, arriveEarlyMinutes: early)
+        let answer = await planTrip(to: place, by: target, choice: DepartureTurn.mode(said: state.args.mode, kept: nil),
                                     startingPoint: state.args.startingPoint, forEvent: false, services: state.services,
                                     availability: state.availability, now: now, clock: ctx.clock)
-        if case let .planned(outcome, mode, _, _, _) = answer, DepartureTurn.setsReminders(outcome, now: now) {
-            state.newEventSettings[eventIndex] = DepartureSettings(arriveEarlyMinutes: early, travelMode: mode)
+        if case let .planned(planned) = answer, planned.setsReminders {
+            state.newEventSettings[eventIndex] = DepartureSettings(arriveEarlyMinutes: early, travelMode: planned.keptMode)
         }
         state.newEventAnswer = answer
         state.newEventPlace = place
-        state.newEventTarget = arrival.target
+        state.newEventTarget = target
     }
 
     /// Plans what the turn's plan_departure was for (an event in the calendar, an arrival or a trip), or reports the
@@ -1025,7 +1052,7 @@ extension ScheduleAssistant {
                 saved = .notSet
                 if wanted { note = DepartureLines.notSet }
             }
-            if note == nil, case let .planned(outcome, _, _, _, _) = answer, DepartureTurn.isTooLongForReminders(outcome) {
+            if note == nil, case let .planned(planned) = answer, DepartureTurn.isTooLongForReminders(planned.outcome) {
                 note = DepartureLines.tooLongForReminders
             }
             Self.add(answer, place: state.newEventPlace, target: state.newEventTarget, note: note, clock: clock, to: &reply)
@@ -1046,16 +1073,16 @@ extension ScheduleAssistant {
             }
             let early = DepartureTurn.arriveEarlyMinutes(said: state.args.arriveEarlyMinutes,
                                                          kept: event.departure?.arriveEarlyMinutes)
-            let arrival = DepartureTurn.arrival(start: event.start, arriveEarlyMinutes: early, now: now)
-            let answer = await planTrip(to: place, arrival: arrival,
+            let target = DepartureTurn.target(start: event.start, arriveEarlyMinutes: early)
+            let answer = await planTrip(to: place, by: target,
                                         choice: DepartureTurn.mode(said: state.args.mode, kept: event.departure?.travelMode),
                                         startingPoint: state.args.startingPoint, forEvent: true, services: state.services,
                                         availability: state.availability, now: now, clock: clock)
             var saved = DepartureTurn.Saved.notSet
             var note: String?
-            if case let .planned(outcome, mode, _, _, _) = answer {
-                if DepartureTurn.setsReminders(outcome, now: now) {
-                    let settings = DepartureSettings(arriveEarlyMinutes: early, travelMode: mode)
+            if case let .planned(planned) = answer {
+                if planned.setsReminders {
+                    let settings = DepartureSettings(arriveEarlyMinutes: early, travelMode: planned.keptMode)
                     do {
                         // A repeating event: the whole series (owner decision 2026-10-20).
                         if event.seriesID != nil {
@@ -1073,44 +1100,61 @@ extension ScheduleAssistant {
                         // To the user only; Gemini gets not_set.
                         note = DepartureLines.notSet + "\n" + error.localizedDescription
                     }
-                } else if DepartureTurn.isTooLongForReminders(outcome) {
+                } else if DepartureTurn.isTooLongForReminders(planned.outcome) {
                     note = DepartureLines.tooLongForReminders
                 }
             }
-            Self.add(answer, place: place, target: arrival.target, note: note, clock: clock, to: &reply)
+            Self.add(answer, place: place, target: target, note: note, clock: clock, to: &reply)
             return saved
 
         case let .arriveBy(destination, at):
             let early = DepartureTurn.arriveEarlyMinutes(said: state.args.arriveEarlyMinutes, kept: nil)
-            let arrival = DepartureTurn.arrival(start: at, arriveEarlyMinutes: early, now: now)
-            let answer = await planTrip(to: destination, arrival: arrival,
+            let target = DepartureTurn.target(start: at, arriveEarlyMinutes: early)
+            let answer = await planTrip(to: destination, by: target,
                                         choice: DepartureTurn.mode(said: state.args.mode, kept: nil),
                                         startingPoint: state.args.startingPoint, forEvent: false, services: state.services,
                                         availability: state.availability, now: now, clock: clock)
-            Self.add(answer, place: destination, target: arrival.target, note: nil, clock: clock, to: &reply)
+            Self.add(answer, place: destination, target: target, note: Self.noEventNote(state), clock: clock, to: &reply)
             return .notSet
 
         case let .howLong(destination):
-            let answer = await planTrip(to: destination, arrival: nil,
+            let answer = await planTrip(to: destination, by: nil,
                                         choice: DepartureTurn.mode(said: state.args.mode, kept: nil),
                                         startingPoint: state.args.startingPoint, forEvent: false, services: state.services,
                                         availability: state.availability, now: now, clock: clock)
-            Self.add(answer, place: destination, target: nil, note: nil, clock: clock, to: &reply)
+            Self.add(answer, place: destination, target: nil, note: Self.noEventNote(state), clock: clock, to: &reply)
             return .notSet
         }
     }
 
+    /// A plan_departure meant for a new event (create_event) that matched none of the turn's new events (Gemini's
+    /// arrive_at_local isn't any event's start) is answered as an arrival: say that the new event got no reminders.
+    private static func noEventNote(_ state: DeparturePlanState) -> String? {
+        state.args.createEvent == true && state.createsEvents ? DepartureLines.notSet : nil
+    }
+
     /// Asks the server for the trip (once, or twice with the one driving retry). Never throws. A request once sent is
     /// never cancelled, even when the turn is: the server counts a plan it answered.
-    /// - Parameter arrival: nil for "how long" (leaving now).
-    private func planTrip(to destination: String, arrival: DepartureTurn.Arrival?, choice: DepartureTurn.ModeChoice,
+    /// - Parameter target: when to be there; nil for "how long" (leaving now).
+    private func planTrip(to destination: String, by target: Date?, choice: DepartureTurn.ModeChoice,
                           startingPoint: String?, forEvent: Bool, services: DepartureServices,
-                          availability: DepartureAvailability, now: Date, clock: WallClock) async -> DepartureAnswer {
+                          availability: DepartureAvailability, now requested: Date,
+                          clock: WallClock) async -> DepartureAnswer {
+        var now = requested
+        var arrival = target.map { DepartureTurn.arrival(by: $0, now: now) }
         if arrival == .passed { return .refused(.passed) }
         let start = DepartureTurn.start(startingPoint: startingPoint, availability: availability)
         if start == .needsTypedStart { return .refused(.needsTypedStart) }
         // Nothing goes to Google, and the location isn't read, before Allow (docs/SETTINGS.md §7.11).
+        let firstTime = services.consent.read() == .notAsked
+        let asked = services.currentTime()
         guard await Self.hasConsent(services) else { return .refused(.declined) }
+        if firstTime {
+            // The question waited for the user: check the time to be there again before anything is sent.
+            now = requested.addingTimeInterval(max(0, services.currentTime().timeIntervalSince(asked)))
+            arrival = target.map { DepartureTurn.arrival(by: $0, now: now) }
+            if arrival == .passed { return .refused(.passed) }
+        }
         let origin: TravelOrigin
         switch start {
         case let .typed(text):
@@ -1139,9 +1183,10 @@ extension ScheduleAssistant {
             let result = await Task { try await routing.route(request) }.result
             switch result {
             case let .success(.route(route)):
-                return .planned(outcome: DepartureTurn.outcome(route, target: arrival?.target, now: now),
-                                mode: TravelMode(route.mode), fellBack: fellBack, plansLeft: route.plansLeft,
-                                planToken: route.plan)
+                return .planned(DeparturePlanned(outcome: DepartureTurn.outcome(route, target: arrival?.target, now: now),
+                                                 mode: TravelMode(route.mode), keptMode: fellBack ? choice.mode : mode,
+                                                 fellBack: fellBack, plansLeft: route.plansLeft, planToken: route.plan,
+                                                 now: now))
             case .success(.noRoute):
                 if !fellBack, let next = DepartureTurn.fallback(after: choice) {
                     mode = next
@@ -1180,18 +1225,19 @@ extension ScheduleAssistant {
         var mode: TravelMode?
         var token: String?
         switch answer {
-        case let .planned(outcome, used, fellBack, plansLeft, planToken):
-            shown = [DepartureLines.shown(outcome, place: place, target: target, fellBack: fellBack, clock: clock)]
-            kept = [DepartureLines.kept(outcome, place: place, target: target, clock: clock)]
+        case let .planned(planned):
+            shown = [DepartureLines.shown(planned.outcome, place: place, target: target, fellBack: planned.fellBack,
+                                          clock: clock)]
+            kept = [DepartureLines.kept(planned.outcome, place: place, target: target, clock: clock)]
             if let note {
                 shown.append(note)
                 kept.append(note)
             }
-            let left = DepartureLines.plansLeft(plansLeft)
+            let left = DepartureLines.plansLeft(planned.plansLeft)
             shown.append(left)
             kept.append(left)
-            mode = used
-            token = planToken
+            mode = planned.mode
+            token = planned.planToken
         case let .refused(reason):
             shown = [DepartureLines.failure(reason)]
             kept = shown
