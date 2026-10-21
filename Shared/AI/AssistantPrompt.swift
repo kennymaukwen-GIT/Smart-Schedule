@@ -22,6 +22,27 @@ enum AssistantPrompt {
                        calendars: [CalendarInfo] = [],
                        defaultTarget: CalendarRef? = nil,
                        pendingEvents: PendingEventBatch? = nil) -> String {
+        system(now: now, clock: clock, locale: locale, upcoming: upcoming, focus: focus, policy: policy, draft: draft,
+               preferences: preferences, calendars: calendars, defaultTarget: defaultTarget,
+               pendingEvents: pendingEvents, departures: false)
+    }
+
+    /// The same, with departure reminders 「該出發了」 (docs/SETTINGS.md §7.11) on or off. Off gives exactly the text
+    /// above, as the app has it without the feature (owner decision 3A, proven by AssistantPromptTests against a
+    /// frozen copy). On adds rule 13 and the two sentences that point to it; the pending-events rule becomes 14.
+    /// No defaults, so no call can match both functions.
+    static func system(now: Date,
+                       clock: WallClock,
+                       locale: Locale,
+                       upcoming: [ScheduleEvent],
+                       focus: ScheduleEvent?,
+                       policy: ReminderPolicy,
+                       draft: PlanDraft?,
+                       preferences: AppPreferences,
+                       calendars: [CalendarInfo],
+                       defaultTarget: CalendarRef?,
+                       pendingEvents: PendingEventBatch?,
+                       departures: Bool) -> String {
         let aliases = CalendarAliases(calendars: calendars)
         let shownUpcoming = upcoming.sorted { $0.start < $1.start }.prefix(40).map { aliases.scrubbed($0) }
         let shownFocus = focus.map { aliases.scrubbed($0) }
@@ -43,7 +64,7 @@ enum AssistantPrompt {
         }
         let pendingRule = pendingEvents == nil ? "" : """
 
-        14. PENDING EVENTS are waiting for the user's approval and are NOT in the calendar. Approval ('add them', \
+        \(departures ? 14 : 13). PENDING EVENTS are waiting for the user's approval and are NOT in the calendar. Approval ('add them', \
         'OK', '好', '加入') → confirm_plan decision 'add'; abandonment → 'discard'; changes → call create_events \
         again with the complete corrected list (it replaces the batch). If a DRAFT PLAN is also shown, confirm_plan \
         applies to the newer of the two.
@@ -57,8 +78,8 @@ enum AssistantPrompt {
 
         # Scope
         Help only with the user's calendar and time: adding, moving, changing, deleting and finding events and free \
-        time; what is on their schedule; reminders and Smart Schedules' own settings; how long a trip takes and when to \
-        leave (plan_departure works it out; you know no travel times); dates, times, time zones and how long \
+        time; what is on their schedule; reminders and Smart Schedules' own settings; \
+        \(departures ? departureScope : travelScope) dates, times, time zones and how long \
         until or between them ("how many days until …", "what time is it in Tokyo"); plans for goals that become \
         calendar events (exercise, study, habits) and questions about them; and how to use Smart Schedules (never \
         invent menu names). A greeting or thanks on its own, or an "ok" with nothing waiting for approval, gets a \
@@ -77,7 +98,7 @@ enum AssistantPrompt {
         or dose, what to invest in, the answer to the homework, code, an essay) is not, not even inside a title or \
         notes.
         - A message with both: do the calendar part and decline the rest in one short sentence, without the example. \
-        If you must ask a question for the calendar part (rules 5, 7 and 13), put that sentence first in the same \
+        If you must ask a question for the calendar part (\(departures ? "rules 5, 7 and 13" : "rules 5 and 7")), put that sentence first in the same \
         reply_to_user, keeping needs_clarification=true and its suggested_replies. Call reply_to_user at most once \
         per turn.
         - If the user may hurt themselves or others, call no other function and, instead of the decline, kindly urge \
@@ -153,23 +174,7 @@ enum AssistantPrompt {
         second account from now on' → its 'My calendar | Account 2' line; an address of theirs, which you see as \
         '[Account 2 email]', may be the value as it is). When the user names an account or calendar some other way \
         ('my school account'), put their words in the value: the app matches them on the iPhone. Never guess an \
-        Account number.
-        13. Travel times and departures → plan_departure. Never estimate a travel time or a time to leave yourself, \
-        not even in reply_to_user, and never ask for a starting point. Call it when the user asks how long it takes \
-        to get somewhere or when to leave ('去台北 101 要多久？', '明天看牙醫幾點要出門？'), or says they need to be at a \
-        place by a time ('今天下午 5 點要到台北 101 開會', 'I need to be at Dishoom by 19:30, I'm driving'). An event \
-        in UPCOMING or FOCUS: pass its event_id, without destination or arrive_at_local (the app reads its place and \
-        start). A new event there (a meeting, class, meal or appointment): call create_events with it (its location \
-        the place as written; the message's other new events go in the same call) and plan_departure with \
-        create_event=true and arrive_at_local = its start, in the same turn. No new event \
-        ('8 點要到台北車站，幾點出門？'): plan_departure alone, with destination and arrive_at_local. If something is \
-        missing, call only reply_to_user (needs_clarification=true), one question at a time: the time (rule 7) first, \
-        then the place ('要去哪裡？'), then, for a new event with neither an end nor a length, how long it lasts \
-        (suggested_replies such as '30 分鐘', '1 小時', '2 小時'; no default length here). The answer completes the \
-        same request: ask the next missing thing, or make the calls, keeping the place, minutes early, travel mode \
-        and starting point the user said. '提早 30 分鐘到' or '30 minutes early' = arrive_early_minutes 30, when to \
-        arrive, not reminder_minutes ('提前 30 分鐘提醒'). A plain new event with a place and a time \
-        ('明天下午 3 點看牙醫', 'lunch at Borough Market at 12:30') is create_events only: no plan_departure.\(pendingRule)
+        Account number.\(departures ? departureRule : "")\(pendingRule)
 
         # Writing style (summary_for_user, reply_to_user.message and every other text the user reads)
         - \(replyRule) Use 24-hour times such as 18:30.
@@ -341,4 +346,31 @@ enum AssistantPrompt {
 
     /// Characters of an event's notes in UPCOMING and FOCUS: enough for "bring passport", short enough for 40 rows.
     static let notesLimit = 300
+
+    /// The Scope phrase about travel without the feature: the model asks how long the trip takes.
+    private static let travelScope = "when to leave for an event (you know no travel times: ask how long the trip " +
+        "takes, then set a reminder);"
+    /// The Scope phrase with departure reminders on.
+    private static let departureScope = "how long a trip takes and when to leave (plan_departure works it out; you " +
+        "know no travel times);"
+    /// Rule 13, with departure reminders on only (owner decision 3A), right after rule 12.
+    private static let departureRule = """
+
+        13. Travel times and departures → plan_departure. Never estimate a travel time or a time to leave yourself, \
+        not even in reply_to_user, and never ask for a starting point. Call it when the user asks how long it takes \
+        to get somewhere or when to leave ('去台北 101 要多久？', '明天看牙醫幾點要出門？'), or says they need to be at a \
+        place by a time ('今天下午 5 點要到台北 101 開會', 'I need to be at Dishoom by 19:30, I'm driving'). An event \
+        in UPCOMING or FOCUS: pass its event_id, without destination or arrive_at_local (the app reads its place and \
+        start). A new event there (a meeting, class, meal or appointment): call create_events with it (its location \
+        the place as written; the message's other new events go in the same call) and plan_departure with \
+        create_event=true and arrive_at_local = its start, in the same turn. No new event \
+        ('8 點要到台北車站，幾點出門？'): plan_departure alone, with destination and arrive_at_local. If something is \
+        missing, call only reply_to_user (needs_clarification=true), one question at a time: the time (rule 7) first, \
+        then the place ('要去哪裡？'), then, for a new event with neither an end nor a length, how long it lasts \
+        (suggested_replies such as '30 分鐘', '1 小時', '2 小時'; no default length here). The answer completes the \
+        same request: ask the next missing thing, or make the calls, keeping the place, minutes early, travel mode \
+        and starting point the user said. '提早 30 分鐘到' or '30 minutes early' = arrive_early_minutes 30, when to \
+        arrive, not reminder_minutes ('提前 30 分鐘提醒'). A plain new event with a place and a time \
+        ('明天下午 3 點看牙醫', 'lunch at Borough Market at 12:30') is create_events only: no plan_departure.
+        """
 }

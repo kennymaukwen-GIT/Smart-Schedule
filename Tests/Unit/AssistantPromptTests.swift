@@ -13,11 +13,12 @@ final class AssistantPromptTests: XCTestCase {
                         preferences: AppPreferences = AppPreferences(),
                         calendars: [CalendarInfo] = [],
                         defaultTarget: CalendarRef? = nil,
-                        pendingEvents: PendingEventBatch? = nil) -> String {
+                        pendingEvents: PendingEventBatch? = nil,
+                        departures: Bool = false) -> String {
         AssistantPrompt.system(now: now ?? self.now, clock: clock, locale: locale,
                                upcoming: upcoming, focus: focus, policy: ReminderPolicy(), draft: draft,
                                preferences: preferences, calendars: calendars, defaultTarget: defaultTarget,
-                               pendingEvents: pendingEvents)
+                               pendingEvents: pendingEvents, departures: departures)
     }
 
     /// The block that starts with `header`, up to the next "# " heading.
@@ -148,10 +149,9 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertTrue(topics.hasPrefix("Help only with the user's calendar and time: adding, moving, changing, deleting "
                                        + "and finding events and free time; what is on their schedule; reminders and Smart "
                                        + "Schedules' own settings;"), topics)
-        // The model knows no travel times: plan_departure works them out (rule 13).
-        XCTAssertTrue(topics.contains("how long a trip takes and when to leave (plan_departure works it out; you know no "
-                                      + "travel times);"), topics)
-        XCTAssertFalse(topics.contains("ask how long the trip takes"), topics)
+        // The model knows no travel times: it asks how long the trip takes instead of guessing when to leave.
+        XCTAssertTrue(topics.contains("when to leave for an event (you know no travel times: ask how long the trip takes, "
+                                      + "then set a reminder);"), topics)
         XCTAssertTrue(topics.contains(#"dates, times, time zones and how long until or between them ("how many days "#
                                       + #"until …", "what time is it in Tokyo")"#), topics)
         // Questions about such a plan ("how long should each session be?") are in scope too.
@@ -205,8 +205,8 @@ final class AssistantPromptTests: XCTestCase {
         // that reply, and needs_clarification and the one-tap answers stay.
         let mixed = try XCTUnwrap(scope.first { $0.hasPrefix("- A message with both: ") }, joined)
         XCTAssertEqual(mixed, "- A message with both: do the calendar part and decline the rest in one short sentence, "
-                       + "without the example. If you must ask a question for the calendar part (rules 5, 7 and 13), "
-                       + "put that sentence first in the same reply_to_user, keeping needs_clarification=true and its "
+                       + "without the example. If you must ask a question for the calendar part (rules 5 and 7), put "
+                       + "that sentence first in the same reply_to_user, keeping needs_clarification=true and its "
                        + "suggested_replies. "
                        + "Call reply_to_user at most once per turn.")
         XCTAssertTrue(mixed.contains("put that sentence first"), mixed)
@@ -225,7 +225,7 @@ final class AssistantPromptTests: XCTestCase {
     func testScopeCitesTheRulesThatAskAQuestion() throws {
         let text = prompt()
         let scope = try block("# Scope", in: text)
-        XCTAssertTrue(scope.contains { $0.contains("If you must ask a question for the calendar part (rules 5, 7 and 13)") },
+        XCTAssertTrue(scope.contains { $0.contains("If you must ask a question for the calendar part (rules 5 and 7)") },
                       scope.joined(separator: "\n"))
         let lines = text.components(separatedBy: "\n")
         let rule5 = try XCTUnwrap(lines.first { $0.hasPrefix("5. ") }, text)
@@ -514,7 +514,7 @@ final class AssistantPromptTests: XCTestCase {
     func testPendingEventsBlockAndRuleOnlyWhileEventsWait() throws {
         let without = prompt()
         XCTAssertFalse(without.contains("# PENDING EVENTS"))
-        XCTAssertFalse(without.contains("14. PENDING EVENTS"))
+        XCTAssertFalse(without.contains("13. PENDING EVENTS"))
 
         let preview = TestEvents.make(id: "draft-ev-abc12345-0", title: "Lunch | with Andrew",
                                       start: TestClock.local(2026, 10, 14, 13), end: TestClock.local(2026, 10, 14, 14))
@@ -523,10 +523,16 @@ final class AssistantPromptTests: XCTestCase {
         let text = prompt(pendingEvents: batch)
         XCTAssertEqual(try block("# PENDING EVENTS (waiting for approval, NOT in the calendar; batch batch-abc12345)", in: text),
                        ["Lunch / with Andrew | 2026-10-14T13:00 | 2026-10-14T14:00 | event"])
-        XCTAssertTrue(text.contains("14. PENDING EVENTS are waiting for the user's approval"), text)
-        let departures = try XCTUnwrap(text.range(of: "\n13. Travel times and departures")).lowerBound
-        XCTAssertLessThan(departures, try XCTUnwrap(text.range(of: "\n14. PENDING EVENTS")).lowerBound)
+        XCTAssertTrue(text.contains("13. PENDING EVENTS are waiting for the user's approval"), text)
         XCTAssertTrue(text.contains("confirm_plan decision 'add'"), text)
+
+        // With departure reminders on, rule 13 is theirs and the pending rule comes after it as 14.
+        let on = prompt(pendingEvents: batch, departures: true)
+        XCTAssertTrue(on.contains("14. PENDING EVENTS are waiting for the user's approval"), on)
+        XCTAssertFalse(on.contains("13. PENDING EVENTS"), on)
+        let departures = try XCTUnwrap(on.range(of: "\n13. Travel times and departures")).lowerBound
+        XCTAssertLessThan(departures, try XCTUnwrap(on.range(of: "\n14. PENDING EVENTS")).lowerBound)
+        XCTAssertFalse(prompt(departures: true).contains("14. PENDING EVENTS"))
     }
 
     func testSettingsBlocksSitBetweenTheDraftAndUpcoming() throws {
@@ -558,7 +564,7 @@ final class AssistantPromptTests: XCTestCase {
     // MARK: Departures (rule 13)
 
     func testDepartureRule() throws {
-        let text = prompt()
+        let text = prompt(departures: true)
         let lines = text.components(separatedBy: "\n")
         let rule = try XCTUnwrap(lines.first { $0.hasPrefix("13. Travel times and departures → plan_departure.") }, text)
         for phrase in ["Never estimate a travel time or a time to leave yourself, not even in reply_to_user, and never "
@@ -587,7 +593,7 @@ final class AssistantPromptTests: XCTestCase {
                         "('8 點要到台北車站，幾點出門？')"] {
             XCTAssertTrue(rule.contains(example), example)
         }
-        // Every request has it, and it comes right after rule 12.
+        // Every request with departures on has it, and it comes right after rule 12.
         let twelve = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("12. Lasting preferences") })
         let thirteen = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("13. Travel times") })
         XCTAssertEqual(thirteen, twelve + 1)
@@ -600,12 +606,15 @@ final class AssistantPromptTests: XCTestCase {
                                     end: TestClock.local(2026, 10, 13, 18))
         event.location = "台北101 信義路五段7號"
         event.departure = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit)
-        let text = prompt(upcoming: [event], focus: event)
-        // The same row in FOCUS and UPCOMING, with no column for the place or the departure.
-        let rows = text.components(separatedBy: "\n").filter { $0.hasPrefix("ss101 |") }
-        XCTAssertEqual(rows, Array(repeating: "ss101 | 開會 | 2026-10-13T17:00 | 2026-10-13T18:00 | event", count: 2), text)
-        XCTAssertFalse(text.contains("台北101"), text)
-        XCTAssertFalse(text.contains("信義路"), text)
+        for departures in [false, true] {
+            let text = prompt(upcoming: [event], focus: event, departures: departures)
+            // The same row in FOCUS and UPCOMING, with no column for the place or the departure.
+            let rows = text.components(separatedBy: "\n").filter { $0.hasPrefix("ss101 |") }
+            XCTAssertEqual(rows, Array(repeating: "ss101 | 開會 | 2026-10-13T17:00 | 2026-10-13T18:00 | event", count: 2),
+                           text)
+            XCTAssertFalse(text.contains("台北101"), text)
+            XCTAssertFalse(text.contains("信義路"), text)
+        }
 
         // An "Ask me first" event waiting for approval: its row has no place or departure either.
         let batch = PendingEventBatch(id: "batch-abc12345", createdAt: now, utterance: "開會", seed: "s",
@@ -621,6 +630,84 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertTrue(suggestions.contains("信義路"), suggestions)
         XCTAssertFalse(suggestions.contains("walking"), suggestions)
         XCTAssertFalse(suggestions.contains("137"), suggestions)
+    }
+
+    // MARK: Departures off: main's prompt exactly (owner decision 3A)
+
+    /// With departure reminders off (Siri, a notification reply, demo mode, Not now, or where the feature isn't
+    /// offered), the prompt is byte for byte main's (the frozen copy in Tests/Unit/PromptWithoutDepartures.swift),
+    /// through either overload, whatever the blocks hold.
+    func testWithDeparturesOffThePromptIsMainsExactly() throws {
+        let preview = TestEvents.make(id: "draft-ev-abc12345-0", title: "Lunch", start: TestClock.local(2026, 10, 14, 13),
+                                      end: TestClock.local(2026, 10, 14, 14))
+        let batch = PendingEventBatch(id: "batch-abc12345", createdAt: now, utterance: "lunch", seed: "s",
+                                      argsJSON: Data("{}".utf8), previewEvents: [preview])
+        var located = focusEvent
+        located.location = "Dishoom"
+        located.notes = "bring the slides"
+        located.departure = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit)
+        var askFirst = AppPreferences()
+        askFirst.autonomy = .askFirst
+        let draft = try revisionDraft()
+
+        func check(locale: Locale, at time: Date, upcoming: [ScheduleEvent], focus: ScheduleEvent?, draft: PlanDraft?,
+                   preferences: AppPreferences, calendars: [CalendarInfo], target: CalendarRef?,
+                   pending: PendingEventBatch?, line: UInt = #line) {
+            let main = PromptWithoutDepartures.system(now: time, clock: clock, locale: locale, upcoming: upcoming,
+                                                       focus: focus, policy: ReminderPolicy(), draft: draft,
+                                                       preferences: preferences, calendars: calendars,
+                                                       defaultTarget: target, pendingEvents: pending)
+            let off = AssistantPrompt.system(now: time, clock: clock, locale: locale, upcoming: upcoming, focus: focus,
+                                             policy: ReminderPolicy(), draft: draft, preferences: preferences,
+                                             calendars: calendars, defaultTarget: target, pendingEvents: pending,
+                                             departures: false)
+            let unchanged = AssistantPrompt.system(now: time, clock: clock, locale: locale, upcoming: upcoming,
+                                                   focus: focus, policy: ReminderPolicy(), draft: draft,
+                                                   preferences: preferences, calendars: calendars,
+                                                   defaultTarget: target, pendingEvents: pending)
+            XCTAssertEqual(off, main, line: line)
+            XCTAssertEqual(unchanged, main, line: line)
+            XCTAssertFalse(off.contains("plan_departure"), line: line)
+        }
+
+        check(locale: Locale(identifier: "en_GB"), at: now, upcoming: [], focus: nil, draft: nil,
+              preferences: AppPreferences(), calendars: [], target: nil, pending: nil)
+        check(locale: Locale(identifier: "zh-Hant-TW"), at: now, upcoming: [located, focusEvent], focus: located,
+              draft: draft, preferences: askFirst, calendars: calendars, target: gym.id, pending: batch)
+        check(locale: Locale(identifier: "en_GB"), at: TestClock.local(2026, 11, 10, 9, 0), upcoming: [located],
+              focus: nil, draft: nil, preferences: askFirst, calendars: calendars, target: nil, pending: batch)
+        check(locale: Locale(identifier: "zh-Hant-TW"), at: TestClock.local(2026, 10, 13, 22, 50), upcoming: [],
+              focus: focusEvent, draft: draft, preferences: AppPreferences(), calendars: [personal], target: personal.id,
+              pending: nil)
+    }
+
+    /// With departure reminders on, rule 13 and the three places that point to it are the only changes.
+    func testWithDeparturesOnOnlyRule13AndWhatPointsToItChange() throws {
+        let preview = TestEvents.make(id: "draft-ev-abc12345-0", title: "Lunch", start: TestClock.local(2026, 10, 14, 13),
+                                      end: TestClock.local(2026, 10, 14, 14))
+        let batch = PendingEventBatch(id: "batch-abc12345", createdAt: now, utterance: "lunch", seed: "s",
+                                      argsJSON: Data("{}".utf8), previewEvents: [preview])
+        for pending in [nil, batch] {
+            let off = prompt(calendars: calendars, pendingEvents: pending)
+            let on = prompt(calendars: calendars, pendingEvents: pending, departures: true)
+            XCTAssertNotEqual(on, off)
+            let rule = try XCTUnwrap(on.components(separatedBy: "\n").first { $0.hasPrefix("13. Travel times and departures") })
+            let pieces = [("\n" + rule, ""),
+                          ("how long a trip takes and when to leave (plan_departure works it out; you know no travel "
+                           + "times);",
+                           "when to leave for an event (you know no travel times: ask how long the trip takes, then "
+                           + "set a reminder);"),
+                          ("(rules 5, 7 and 13)", "(rules 5 and 7)"),
+                          ("\n14. PENDING EVENTS", "\n13. PENDING EVENTS")]
+            var back = on
+            for (index, (onText, offText)) in pieces.enumerated() {
+                // Each piece is there once (the pending rule only while events wait).
+                let expected = index == 3 && pending == nil ? 0 : 1
+                XCTAssertEqual(on.components(separatedBy: onText).count - 1, expected, onText)
+                back = back.replacingOccurrences(of: onText, with: offText)
+            }
+            XCTAssertEqual(back, off)
+        }
     }
 
     // MARK: A time counted from now

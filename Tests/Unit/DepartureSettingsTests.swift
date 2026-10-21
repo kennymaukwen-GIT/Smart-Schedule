@@ -170,4 +170,33 @@ final class DepartureSettingsTests: XCTestCase {
         let data = try JSONEncoder().encode(event)
         XCTAssertEqual(try JSONDecoder().decode(ScheduleEvent.self, from: data), event)
     }
+
+    // MARK: Waiting to sync
+
+    /// A departure saved while offline waits in the outbox; the event shows it at once (`OutboxOverlay`), merged the
+    /// way Google merges private properties.
+    func testAQueuedDepartureShowsOnTheEventAtOnce() throws {
+        var event = try XCTUnwrap(mapper.scheduleEvent(from: googleEvent(nil)))
+        let settings = DepartureSettings(arriveEarlyMinutes: 15, travelMode: .scooter)
+        let shown = OutboxOverlay.applying(mapper.departurePatch(settings), to: event, clock: TestClock.clock)
+        XCTAssertEqual(shown.departure, settings)
+        XCTAssertEqual(shown.title, event.title)
+        XCTAssertEqual(shown.start, event.start)
+        XCTAssertEqual(shown.reminderMinutes, event.reminderMinutes)
+
+        // One of the two values changes only that one.
+        event.departure = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit)
+        var travel = GCalEvent()
+        travel.extendedProperties = GCalExtendedProperties(private: ["ssTravelMode": "driving"])
+        XCTAssertEqual(OutboxOverlay.applying(travel, to: event, clock: TestClock.clock).departure,
+                       DepartureSettings(arriveEarlyMinutes: 30, travelMode: .driving))
+        // Other private properties, or other fields, leave it as it was.
+        var other = GCalEvent()
+        other.summary = "Lunch"
+        other.extendedProperties = GCalExtendedProperties(private: ["ssKind": "event"])
+        XCTAssertEqual(OutboxOverlay.applying(other, to: event, clock: TestClock.clock).departure, event.departure)
+        // Without a value already on the event, one of the two alone is not enough to read.
+        event.departure = nil
+        XCTAssertNil(OutboxOverlay.applying(travel, to: event, clock: TestClock.clock).departure)
+    }
 }

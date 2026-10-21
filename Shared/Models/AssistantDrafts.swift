@@ -20,9 +20,14 @@ enum AssistantFunction: String, CaseIterable, Sendable {
     /// Only in its own request (`ScheduleAssistant.suggestNotes`), never in conversation.
     case suggestEventNotes = "suggest_event_notes"
 
-    /// What a chat turn may call: every function but `suggest_event_notes`.
+    /// What a chat turn may call: every function but `suggest_event_notes` and `plan_departure`.
     static var conversational: [AssistantFunction] {
-        allCases.filter { $0 != .suggestEventNotes }
+        conversational(departures: false)
+    }
+
+    /// The same, with `plan_departure` when departure reminders are on for the request (owner decision 3A).
+    static func conversational(departures: Bool) -> [AssistantFunction] {
+        allCases.filter { $0 != .suggestEventNotes && (departures || $0 != .planDeparture) }
     }
 }
 

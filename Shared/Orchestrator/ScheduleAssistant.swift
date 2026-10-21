@@ -71,6 +71,9 @@ actor ScheduleAssistant {
         var savedToHiddenCalendarName: String? = nil
         /// Some change could not reach Google and waits in the outbox (shown at once, marked waiting to sync).
         var waitingToSync = false
+        /// A departure answer 「該出發了」: `text` holds its kept version (no time from Google); the chat shows `shown`.
+        /// In memory only.
+        var departure: DepartureReply? = nil
 
         mutating func append(_ line: String?) {
             guard let line, !line.isEmpty else { return }
@@ -99,6 +102,8 @@ actor ScheduleAssistant {
     private let preferences: PreferencesStore
     private let fixedClock: WallClock?
     private let rescheduleReminders: @Sendable (SharedStore) async -> Void
+    /// Departure reminders 「該出發了」: what `handleFromChat` may use (owner decision 3A: never `handle`).
+    private let departureSource: DepartureSource
     /// Each exchange = [user text, model turn, function responses]. Trimmed by whole exchanges so a
     /// functionCall is never separated from its functionResponse (Gemini rejects that).
     private var exchanges: [[GeminiTurn]] = []
@@ -127,12 +132,25 @@ actor ScheduleAssistant {
          preferences: PreferencesStore,
          clock: WallClock?,
          rescheduleReminders: @escaping @Sendable (SharedStore) async -> Void) {
+        self.init(gemini: gemini, router: router, store: store, preferences: preferences, clock: clock,
+                  rescheduleReminders: rescheduleReminders, departures: .installed)
+    }
+
+    /// The same, with the departure services given (unit tests pass fakes; the others use what the app installed).
+    init(gemini: GeminiClient,
+         router: CalendarRouter,
+         store: SharedStore,
+         preferences: PreferencesStore,
+         clock: WallClock?,
+         rescheduleReminders: @escaping @Sendable (SharedStore) async -> Void,
+         departures: DepartureSource) {
         self.gemini = gemini
         self.router = router
         self.store = store
         self.preferences = preferences
         self.fixedClock = clock
         self.rescheduleReminders = rescheduleReminders
+        self.departureSource = departures
     }
 
     func resetConversation() {
@@ -163,6 +181,19 @@ actor ScheduleAssistant {
     ///   resolves to that event without the user naming it.
     /// - Throws: `GeminiError.consentRequired` when AI data sharing is not allowed; nothing was sent.
     func handle(_ utterance: String, focusEventID: String? = nil, now: Date = Date()) async throws -> Reply {
+        try await respond(utterance, focusEventID: focusEventID, now: now, offered: nil)
+    }
+
+    /// The in-app chat and Quick Capture: the only requests that may plan departures 「該出發了」 (owner decision 3A).
+    /// Siri, replies typed on a notification and the long-press card call `handle`, which never does.
+    func handleFromChat(_ utterance: String, now: Date = Date()) async throws -> Reply {
+        try await respond(utterance, focusEventID: nil, now: now, offered: departureSource.services)
+    }
+
+    /// - Parameter offered: the departure services the caller may use; nil = the request behaves exactly as without
+    ///   the feature.
+    private func respond(_ utterance: String, focusEventID: String?, now: Date,
+                         offered: DepartureServices?) async throws -> Reply {
         let ctx = context()
         let window = DateInterval(start: ctx.clock.calendar.startOfDay(for: now), duration: 14 * 86_400)
         let upcoming = await store.events(in: window)
@@ -175,30 +206,53 @@ actor ScheduleAssistant {
         // The same names the prompt uses: function results name calendars this way too, and hold no account address.
         let aliases = CalendarAliases(calendars: calendars)
         let onDevice = await writesOnDevice(ctx)
+        // Off (no services, demo mode, or not available here): Gemini gets exactly what it gets without the feature.
+        let departures = await activeDepartures(offered, onDevice: onDevice)
 
         let system = AssistantPrompt.system(now: now, clock: ctx.clock, locale: .current,
                                             upcoming: upcoming, focus: focus, policy: ctx.mapper.policy, draft: draft,
                                             preferences: ctx.preferences, calendars: calendars,
-                                            defaultTarget: defaultTarget, pendingEvents: pendingEvents)
+                                            defaultTarget: defaultTarget, pendingEvents: pendingEvents,
+                                            departures: departures != nil)
             + (onDevice ? "\n\n" + AssistantPrompt.demoModeBlock : "")
         // The user's own words, without their Google accounts' addresses ("use example@yourmail.com from now on" →
         // "[Account 2 email]"). The request kept for the events' notes and the reply keeps what they typed.
         var exchange = [GeminiTurn.user(aliases.scrubbingAccountEmails(utterance))]
         // suggest_event_notes has its own request (`suggestNotes`); a chat turn never calls it.
-        let response = try await gemini.generate(system: system, history: exchanges.flatMap { $0 } + exchange,
-                                                 allowedFunctions: AssistantFunction.conversational.map(\.rawValue))
+        let earlier = exchanges.flatMap { $0 }
+        let response = try await gemini.generate(
+            system: system,
+            history: (departures == nil ? DepartureTurn.withoutDepartureCalls(earlier) : earlier) + exchange,
+            mode: "ANY",
+            allowedFunctions: AssistantFunction.conversational(departures: departures != nil).map(\.rawValue),
+            including: departures == nil ? [] : GeminiClient.optInFunctions)
         exchange.append(response.modelTurn)
 
         var reply = Reply()
         var results: [GeminiTurn.FunctionResult] = []
         let requestSeed = UUID().uuidString
         let request = clarifiedRequest.map { "\($0) → \(utterance)" } ?? utterance
+        let known = upcoming + [focus].compactMap { $0 }
+        // 「該出發了」: a new event's departure is worked out before create_events writes it.
+        var plan = departures.map { DeparturePlanState(services: $0.services, availability: $0.availability) }
+        if var state = plan {
+            await prepareDeparture(&state, calls: response.functionCalls, requestSeed: requestSeed, request: request,
+                                   now: now, ctx: ctx, aliases: aliases)
+            plan = state
+        }
         for (index, call) in response.functionCalls.enumerated() {
+            if let state = plan, state.answers, call.name == AssistantFunction.replyToUser.rawValue {
+                // The app answers about the departure itself: Gemini's own words could state a travel time.
+                results.append(.init(name: call.name, id: call.id, responseJSON: Data(#"{"ok":true}"#.utf8)))
+                continue
+            }
             let outcome: [String: Any]
             do {
                 outcome = try await execute(call, seed: "\(requestSeed)|\(index)", utterance: utterance, request: request,
-                                            upcoming: upcoming + [focus].compactMap { $0 }, now: now, aliases: aliases,
-                                            ctx: ctx, reply: &reply)
+                                            upcoming: known, now: now, aliases: aliases, ctx: ctx,
+                                            newEventDepartures: index == plan?.createCallIndex
+                                                ? plan?.newEventSettings ?? [:] : [:],
+                                            reply: &reply)
             } catch {
                 // Gemini reads the error on the next turn: no address in it ("Google sign-in for … expired" names
                 // the account). The reply on this iPhone keeps the full text.
@@ -207,6 +261,12 @@ actor ScheduleAssistant {
             }
             let json = (try? JSONSerialization.data(withJSONObject: outcome)) ?? Data("{}".utf8)
             results.append(.init(name: call.name, id: call.id, responseJSON: json))
+        }
+        if let state = plan, let index = state.callIndex, results.indices.contains(index) {
+            // Only a fixed value goes back to Gemini: never a place, a time, a route or a reason.
+            let saved = await finishDeparture(state, known: known, now: now, ctx: ctx, reply: &reply)
+            let json = (try? JSONSerialization.data(withJSONObject: DepartureTurn.functionResult(saved))) ?? Data("{}".utf8)
+            results[index] = .init(name: results[index].name, id: results[index].id, responseJSON: json)
         }
         if !results.isEmpty { exchange.append(.functionResponses(results)) }
         remember(exchange)
@@ -352,9 +412,12 @@ actor ScheduleAssistant {
 
     private func writeBatch(_ batch: PendingEventBatch, ctx: Context, now: Date) async throws -> (events: [ScheduleEvent], target: CalendarInfo) {
         let args = try Self.decodeCreateArgs(batch.argsJSON)
-        let mapped = try args.events.prefix(20).enumerated().map { index, draft in
+        let mapped = try args.events.prefix(20).enumerated().map { index, draft -> MappedEvent in
             // Created now, at Add: an item for later today gets the same-day reminders.
-            try ctx.mapper.event(from: draft, seed: "\(batch.seed)|\(index)", utterance: batch.utterance, createdAt: now)
+            let item = try ctx.mapper.event(from: draft, seed: "\(batch.seed)|\(index)", utterance: batch.utterance,
+                                            createdAt: now)
+            // A departure planned with the proposal ("Ask me first") is written with the event.
+            return Self.withPreviewDeparture(item, batch: batch, index: index)
         }
         let target: CalendarInfo
         if let ref = batch.target, let calendar = await ctx.router.accounts.calendar(ref), calendar.isWritable {
@@ -422,6 +485,7 @@ actor ScheduleAssistant {
                          now: Date,
                          aliases: CalendarAliases,
                          ctx: Context,
+                         newEventDepartures: [Int: DepartureSettings],
                          reply: inout Reply) async throws -> [String: Any] {
         let clock = ctx.clock
         switch AssistantFunction(rawValue: call.name) {
@@ -429,8 +493,10 @@ actor ScheduleAssistant {
             // "[Account N email]" back to the address before anything is written, kept or shown.
             let restored = Self.restoringAccountEmails(in: call, aliases: aliases)
             let args = try restored.decode(CreateEventsArgs.self)
-            let mapped = try args.events.prefix(20).enumerated().map { index, draft in
-                try ctx.mapper.event(from: draft, seed: "\(seed)|\(index)", utterance: request, createdAt: now)
+            let mapped = try args.events.prefix(20).enumerated().map { index, draft -> MappedEvent in
+                let item = try ctx.mapper.event(from: draft, seed: "\(seed)|\(index)", utterance: request, createdAt: now)
+                // 「該出發了」: the departure worked out for this new event goes into the same insert.
+                return newEventDepartures[index].map { CalendarEventMapper.addingDeparture($0, to: item) } ?? item
             }
             // suggested_notes stay on this iPhone: chips on the card and the event page, never in Google.
             let suggested = Self.suggestedNotes(args, mapped: mapped)
@@ -673,10 +739,10 @@ actor ScheduleAssistant {
             return ["ok": rejected.isEmpty, "applied": applied, "rejected": refused]
 
         case .planDeparture:
-            // Departure reminders 「該出發了」 (docs/SETTINGS.md §7.11) are wired in build step 6. Until then nothing is
-            // worked out or written, and Gemini gets one fixed answer whatever was asked: nothing location-derived and
-            // no reason, so this must never throw (an error's text would go to Gemini).
-            return ["ok": true, "departure_reminders": "not_set"]
+            // Departure reminders 「該出發了」 (docs/SETTINGS.md §7.11): handle() works the plan out around the calls
+            // and replaces this answer with a fixed value. Off, or a second call in one turn: not_set. Never throws
+            // (an error's text would go to Gemini).
+            return DepartureTurn.functionResult(.notSet)
 
         case .suggestEventNotes:
             // Only allowed in suggestNotes' own request; a chat turn that calls it changes nothing.
@@ -842,5 +908,309 @@ actor ScheduleAssistant {
         if receipt != nil || rejected.isEmpty { reply.append(summary) }
         if let receipt { reply.append(ReplyFormatter.preferencesUpdated(receipt)) }
         reply.append(ReplyFormatter.preferencesRejected(rejected))
+    }
+}
+
+// MARK: - Departures 「該出發了」 (docs/SETTINGS.md §7.11, build step G4d)
+
+extension ScheduleAssistant {
+    /// One turn's departure plan. Kept per request (a local value, never on the actor), so a request that arrives while
+    /// another waits for Google can't change it.
+    private struct DeparturePlanState {
+        let services: DepartureServices
+        let availability: DepartureAvailability
+        /// The turn's first plan_departure call: the one planned for. Any other gets not_set.
+        var callIndex: Int?
+        var args = PlanDepartureArgs()
+        var target: DepartureTurn.Target = .none
+        /// A clarifying question in the same turn: nothing is planned until it is answered.
+        var asksFirst = false
+        /// A new event's departure, worked out before its create_events call runs.
+        var createCallIndex: Int?
+        var newEventSettings: [Int: DepartureSettings] = [:]
+        var newEventAnswer: DepartureAnswer?
+        var newEventPlace = ""
+        var newEventTarget: Date?
+
+        /// The app answers about the departure this turn. A call with nothing to plan (no event and no place) leaves
+        /// the answer to Gemini's reply_to_user.
+        var answers: Bool { callIndex != nil && !asksFirst && target != .none }
+    }
+
+    /// What one plan gave.
+    private enum DepartureAnswer {
+        case planned(outcome: DepartureTurn.Outcome, mode: TravelMode, fellBack: Bool, plansLeft: Int, planToken: String?)
+        case refused(DepartureLines.Reason)
+    }
+
+    /// The departure services for this request, or nil: only what the chat offered, never in demo mode, and only
+    /// where the feature is available and not turned off (owner decision 3A).
+    private func activeDepartures(_ offered: DepartureServices?,
+                                  onDevice: Bool) async -> (services: DepartureServices, availability: DepartureAvailability)? {
+        guard let offered, !onDevice else { return nil }
+        let availability = await offered.availability()
+        return availability == .off ? nil : (offered, availability)
+    }
+
+    /// Finds the turn's plan_departure and, for a new event, plans it now so create_events writes its departure.
+    private func prepareDeparture(_ state: inout DeparturePlanState, calls: [GeminiFunctionCall], requestSeed: String,
+                                  request: String, now: Date, ctx: Context, aliases: CalendarAliases) async {
+        guard let index = calls.firstIndex(where: { $0.name == AssistantFunction.planDeparture.rawValue }) else { return }
+        state.callIndex = index
+        state.asksFirst = calls.contains { call in
+            call.name == AssistantFunction.replyToUser.rawValue
+                && (try? call.decode(ReplyToUserArgs.self))?.needsClarification == true
+        }
+        guard !state.asksFirst else { return }
+        state.args = (try? calls[index].decode(PlanDepartureArgs.self)) ?? PlanDepartureArgs()
+
+        let createIndex = calls.firstIndex { $0.name == AssistantFunction.createEvents.rawValue }
+        let drafts: [EventDraft] = createIndex.flatMap { createIndex in
+            (try? Self.restoringAccountEmails(in: calls[createIndex], aliases: aliases).decode(CreateEventsArgs.self))
+                .map { Array($0.events.prefix(20)) }
+        } ?? []
+        let starts: [Date?] = drafts.map { $0.allDay == true ? nil : ctx.clock.dateTime($0.start) }
+        state.target = DepartureTurn.target(state.args, newEventStarts: starts, clock: ctx.clock)
+        guard case let .newEvent(eventIndex) = state.target, let createIndex else { return }
+        state.createCallIndex = createIndex
+
+        // The event as create_events will write it (a weekly series starts on its first day).
+        let draft = drafts[eventIndex]
+        let mapped = try? ctx.mapper.event(from: draft, seed: "\(requestSeed)|\(createIndex)|\(eventIndex)",
+                                           utterance: request, createdAt: now)
+        let place = Self.nonBlank(state.args.destination) ?? Self.nonBlank(draft.location)
+        guard let start = mapped.flatMap({ ctx.mapper.scheduleEvent(from: $0.body) })?.start else {
+            state.newEventAnswer = .refused(.allDay)
+            return
+        }
+        guard let place else {
+            state.newEventAnswer = .refused(.noPlace)
+            return
+        }
+        let early = DepartureTurn.arriveEarlyMinutes(said: state.args.arriveEarlyMinutes, kept: nil)
+        let arrival = DepartureTurn.arrival(start: start, arriveEarlyMinutes: early, now: now)
+        let answer = await planTrip(to: place, arrival: arrival, choice: DepartureTurn.mode(said: state.args.mode, kept: nil),
+                                    startingPoint: state.args.startingPoint, forEvent: false, services: state.services,
+                                    availability: state.availability, now: now, clock: ctx.clock)
+        if case let .planned(outcome, mode, _, _, _) = answer, DepartureTurn.setsReminders(outcome, now: now) {
+            state.newEventSettings[eventIndex] = DepartureSettings(arriveEarlyMinutes: early, travelMode: mode)
+        }
+        state.newEventAnswer = answer
+        state.newEventPlace = place
+        state.newEventTarget = arrival.target
+    }
+
+    /// Plans what the turn's plan_departure was for (an event in the calendar, an arrival or a trip), or reports the
+    /// new event's plan, and puts the answer in the reply. Returns what Gemini may be told. Never throws.
+    private func finishDeparture(_ state: DeparturePlanState, known: [ScheduleEvent], now: Date, ctx: Context,
+                                 reply: inout Reply) async -> DepartureTurn.Saved {
+        guard state.answers else { return .notSet }
+        let clock = ctx.clock
+        switch state.target {
+        case .none:
+            return .notSet
+
+        case .newEvent:
+            guard let answer = state.newEventAnswer else { return .notSet }
+            let wanted = !state.newEventSettings.isEmpty
+            let saved: DepartureTurn.Saved
+            var note: String?
+            if wanted, reply.pendingEvents != nil {
+                saved = .awaitingApproval
+                note = DepartureLines.whenAdded
+            } else if wanted, reply.created.contains(where: { $0.departure != nil }) {
+                saved = .set
+            } else {
+                saved = .notSet
+                if wanted { note = DepartureLines.notSet }
+            }
+            if note == nil, case let .planned(outcome, _, _, _, _) = answer, DepartureTurn.isTooLongForReminders(outcome) {
+                note = DepartureLines.tooLongForReminders
+            }
+            Self.add(answer, place: state.newEventPlace, target: state.newEventTarget, note: note, clock: clock, to: &reply)
+            return saved
+
+        case let .existingEvent(id):
+            guard known.contains(where: { $0.id == id }), let event = await store.event(id: id) else {
+                reply.append(AssistantError.unknownEvent(id).localizedDescription)
+                return .notSet
+            }
+            guard !event.isAllDay else {
+                Self.add(.refused(.allDay), place: "", target: nil, note: nil, clock: clock, to: &reply)
+                return .notSet
+            }
+            guard let place = Self.nonBlank(event.location) else {
+                Self.add(.refused(.noPlace), place: "", target: nil, note: nil, clock: clock, to: &reply)
+                return .notSet
+            }
+            let early = DepartureTurn.arriveEarlyMinutes(said: state.args.arriveEarlyMinutes,
+                                                         kept: event.departure?.arriveEarlyMinutes)
+            let arrival = DepartureTurn.arrival(start: event.start, arriveEarlyMinutes: early, now: now)
+            let answer = await planTrip(to: place, arrival: arrival,
+                                        choice: DepartureTurn.mode(said: state.args.mode, kept: event.departure?.travelMode),
+                                        startingPoint: state.args.startingPoint, forEvent: true, services: state.services,
+                                        availability: state.availability, now: now, clock: clock)
+            var saved = DepartureTurn.Saved.notSet
+            var note: String?
+            if case let .planned(outcome, mode, _, _, _) = answer {
+                if DepartureTurn.setsReminders(outcome, now: now) {
+                    let settings = DepartureSettings(arriveEarlyMinutes: early, travelMode: mode)
+                    do {
+                        // A repeating event: the whole series (owner decision 2026-10-20).
+                        if event.seriesID != nil {
+                            let queued = try await ctx.router.patchSeries(of: event, body: ctx.mapper.departurePatch(settings),
+                                                                          mapper: ctx.mapper, now: now)
+                            if queued { reply.waitingToSync = true }
+                        } else {
+                            let updated = try await ctx.router.patch(event, body: ctx.mapper.departurePatch(settings),
+                                                                     mapper: ctx.mapper, now: now)
+                            if updated?.isWaitingToSync == true { reply.waitingToSync = true }
+                        }
+                        reply.changed = true
+                        saved = .set
+                    } catch {
+                        // To the user only; Gemini gets not_set.
+                        note = DepartureLines.notSet + "\n" + error.localizedDescription
+                    }
+                } else if DepartureTurn.isTooLongForReminders(outcome) {
+                    note = DepartureLines.tooLongForReminders
+                }
+            }
+            Self.add(answer, place: place, target: arrival.target, note: note, clock: clock, to: &reply)
+            return saved
+
+        case let .arriveBy(destination, at):
+            let early = DepartureTurn.arriveEarlyMinutes(said: state.args.arriveEarlyMinutes, kept: nil)
+            let arrival = DepartureTurn.arrival(start: at, arriveEarlyMinutes: early, now: now)
+            let answer = await planTrip(to: destination, arrival: arrival,
+                                        choice: DepartureTurn.mode(said: state.args.mode, kept: nil),
+                                        startingPoint: state.args.startingPoint, forEvent: false, services: state.services,
+                                        availability: state.availability, now: now, clock: clock)
+            Self.add(answer, place: destination, target: arrival.target, note: nil, clock: clock, to: &reply)
+            return .notSet
+
+        case let .howLong(destination):
+            let answer = await planTrip(to: destination, arrival: nil,
+                                        choice: DepartureTurn.mode(said: state.args.mode, kept: nil),
+                                        startingPoint: state.args.startingPoint, forEvent: false, services: state.services,
+                                        availability: state.availability, now: now, clock: clock)
+            Self.add(answer, place: destination, target: nil, note: nil, clock: clock, to: &reply)
+            return .notSet
+        }
+    }
+
+    /// Asks the server for the trip (once, or twice with the one driving retry). Never throws. A request once sent is
+    /// never cancelled, even when the turn is: the server counts a plan it answered.
+    /// - Parameter arrival: nil for "how long" (leaving now).
+    private func planTrip(to destination: String, arrival: DepartureTurn.Arrival?, choice: DepartureTurn.ModeChoice,
+                          startingPoint: String?, forEvent: Bool, services: DepartureServices,
+                          availability: DepartureAvailability, now: Date, clock: WallClock) async -> DepartureAnswer {
+        if arrival == .passed { return .refused(.passed) }
+        let start = DepartureTurn.start(startingPoint: startingPoint, availability: availability)
+        if start == .needsTypedStart { return .refused(.needsTypedStart) }
+        // Nothing goes to Google, and the location isn't read, before Allow (docs/SETTINGS.md §7.11).
+        guard await Self.hasConsent(services) else { return .refused(.declined) }
+        let origin: TravelOrigin
+        switch start {
+        case let .typed(text):
+            origin = .typed(text)
+        case .needsTypedStart:
+            return .refused(.needsTypedStart)
+        case .currentLocation:
+            do {
+                origin = .current(try await services.location.currentLocation())
+            } catch let error as TravelTimeError {
+                return .refused(DepartureLines.reason(error))
+            } catch {
+                return .refused(.noLocation)
+            }
+        }
+        var mode = choice.mode
+        var fellBack = false
+        while true {
+            guard !Task.isCancelled else { return .refused(.unavailable) }
+            let request = DepartureTurn.request(mode: mode, origin: origin, destination: destination,
+                                                arrival: arrival ?? .leaveNow(target: now), now: now,
+                                                timeZone: clock.timeZone, appLanguage: services.appLanguage,
+                                                isoRegion: services.isoRegion, debugBuild: services.debugBuild)
+            let routing = services.routing
+            // An unstructured task: cancelling this turn doesn't cancel a request already on its way.
+            let result = await Task { try await routing.route(request) }.result
+            switch result {
+            case let .success(.route(route)):
+                return .planned(outcome: DepartureTurn.outcome(route, target: arrival?.target, now: now),
+                                mode: TravelMode(route.mode), fellBack: fellBack, plansLeft: route.plansLeft,
+                                planToken: route.plan)
+            case .success(.noRoute):
+                if !fellBack, let next = DepartureTurn.fallback(after: choice) {
+                    mode = next
+                    fellBack = true
+                    continue
+                }
+                return .refused(.noRoute(mode))
+            case let .success(.placeNotFound(place, _)):
+                return .refused(place == .start ? .startNotFound : .destinationNotFound(forEvent: forEvent))
+            case let .failure(error as DepartureRouteError):
+                return .refused(DepartureLines.reason(error))
+            case .failure:
+                return .refused(.unavailable)
+            }
+        }
+    }
+
+    /// The user's answer to 「使用 Google 地圖規劃出發時間？」, asked the first time and kept. Not now turns the feature off.
+    private static func hasConsent(_ services: DepartureServices) async -> Bool {
+        switch services.consent.read() {
+        case .allowed: return true
+        case .declined: return false
+        case .notAsked:
+            let allowed = await services.askConsent()
+            services.consent.write(allowed ? .allowed : .declined)
+            return allowed
+        }
+    }
+
+    /// Puts a departure answer in the reply: its kept version in `text` (what history and the Live Activity keep: no
+    /// time from Google), the shown version in `departure` for the chat.
+    private static func add(_ answer: DepartureAnswer, place: String, target: Date?, note: String?, clock: WallClock,
+                            to reply: inout Reply) {
+        var shown: [String]
+        var kept: [String]
+        var mode: TravelMode?
+        var token: String?
+        switch answer {
+        case let .planned(outcome, used, fellBack, plansLeft, planToken):
+            shown = [DepartureLines.shown(outcome, place: place, target: target, fellBack: fellBack, clock: clock)]
+            kept = [DepartureLines.kept(outcome, place: place, target: target, clock: clock)]
+            if let note {
+                shown.append(note)
+                kept.append(note)
+            }
+            let left = DepartureLines.plansLeft(plansLeft)
+            shown.append(left)
+            kept.append(left)
+            mode = used
+            token = planToken
+        case let .refused(reason):
+            shown = [DepartureLines.failure(reason)]
+            kept = shown
+        }
+        let keptText = kept.joined(separator: "\n")
+        reply.append(keptText)
+        reply.departure = DepartureReply(shown: shown.joined(separator: "\n"), kept: keptText,
+                                         destination: place.isEmpty ? nil : place, mode: mode, planToken: token)
+    }
+
+    /// `item` with the departure its preview carried (`PendingEventBatch.previewEvents`, matched by the preview's id).
+    /// Unchanged when there is none, which is every batch made without the feature.
+    static func withPreviewDeparture(_ item: MappedEvent, batch: PendingEventBatch, index: Int) -> MappedEvent {
+        let id = PendingEventBatch.previewID(batchID: batch.id, index: index)
+        guard let settings = batch.previewEvents.first(where: { $0.id == id })?.departure else { return item }
+        return CalendarEventMapper.addingDeparture(settings, to: item)
+    }
+
+    private static func nonBlank(_ text: String?) -> String? {
+        guard let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 }

@@ -25,7 +25,7 @@
               },
               "duration_minutes": {
                 "type": "integer",
-                "description": "Used only when end is omitted. Defaults: meeting 60, call 30, lunch 60, task 30. For an event the user must leave for (plan_departure), ask how long it lasts instead (rule 13).",
+                "description": "Used only when end is omitted. Defaults: meeting 60, call 30, lunch 60, task 30.",
                 "minimum": 5,
                 "maximum": 1440
               },
@@ -356,7 +356,7 @@
   },
   {
     "name": "plan_departure",
-    "description": "Work out when to leave or how long a trip takes, with Google's travel times for that time of day, from the iPhone's location or a starting point the user gave; the app answers the user itself. Call it when the user asks how long it takes to get somewhere or when to leave ('去台北 101 要多久？', 'when should I leave for the dentist?'), or says they need to be at a place at a time ('今天下午 5 點要到台北 101 開會'). Never estimate a travel time or a time to leave yourself (rule 13). Not for a plain new event with a place and a time ('明天下午 3 點看牙醫'): that is create_events only.",
+    "description": "Work out when to leave or how long a trip takes, with Google's travel times for that time of day, from the iPhone's location or a starting point the user gave; the app answers the user itself. Call it when the user asks how long it takes to get somewhere or when to leave ('去台北 101 要多久？', 'when should I leave for the dentist?'), or says they need to be at a place at a time ('今天下午 5 點要到台北 101 開會'). Never estimate a travel time or a time to leave yourself (rule 13). A new event to leave for whose length the user didn't give: ask how long it lasts before creating it (no default length). Not for a plain new event with a place and a time ('明天下午 3 點看牙醫'): that is create_events only.",
     "parameters": {
       "type": "object",
       "properties": {

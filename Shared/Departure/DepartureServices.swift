@@ -14,6 +14,10 @@ struct DepartureServices: Sendable {
     var isoRegion: String?
     /// True only in Debug builds (`#if DEBUG`).
     var debugBuild: Bool
+    /// Asks 「使用 Google 地圖規劃出發時間？」 and waits for the answer: true for Allow, false for Not now. Called only
+    /// while `consent` is not asked yet, right before the first plan would get the location or ask Google (build step
+    /// G4e shows the dialog). Unset, nothing is ever allowed.
+    var askConsent: @Sendable () async -> Bool = { false }
 }
 
 /// Where ScheduleAssistant gets its departure services.

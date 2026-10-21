@@ -8,6 +8,9 @@ import Foundation
 /// with `ScheduleAssistant.handle`'s own defaulted parameters.
 protocol ScheduleAssisting: Sendable {
     func handle(_ utterance: String, focusEventID: String?, now: Date) async throws -> ScheduleAssistant.Reply
+    /// The in-app chat and Quick Capture: like `handle`, and the only request that may plan departures 「該出發了」
+    /// (owner decision 3A). Assistants without the feature answer it with `handle`.
+    func handleFromChat(_ utterance: String, now: Date) async throws -> ScheduleAssistant.Reply
     func confirm(_ pending: ScheduleAssistant.PendingDeletion) async throws -> ScheduleAssistant.Reply
     /// "Add" on a draft plan card: writes the reviewed draft (`Reply.planDraft`) and clears the pending plan.
     func commitPlan(_ draft: PlanDraft) async throws -> ScheduleAssistant.Reply
@@ -26,6 +29,11 @@ protocol ScheduleAssisting: Sendable {
 }
 
 extension ScheduleAssisting {
+    /// No departure planning: the same as `handle` with no focused event (demo mode, the offline rules).
+    func handleFromChat(_ utterance: String, now: Date) async throws -> ScheduleAssistant.Reply {
+        try await handle(utterance, focusEventID: nil, now: now)
+    }
+
     /// Smart Schedule's own rules, for an assistant without AI.
     func suggestNotes(for event: ScheduleEvent) async throws -> [NoteSuggestion] {
         NoteSuggester.ruleSuggestions(for: event, existingNotes: event.notes, limit: NoteSuggester.requestLimit)

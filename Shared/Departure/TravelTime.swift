@@ -4,8 +4,9 @@ import Foundation
 // hides Core Location. The iPhone implementation is App/Departure/DeviceLocation.swift; tests use a fake, so nothing
 // here needs a device. Travel times come from Google through the Smart Schedules server (DepartureRoutes.swift).
 //
-// This folder is compiled into the app and the tests only, never the widget or notification extensions
-// (project.yml), and imports neither MapKit nor Core Location (scripts/validate_schema.py check 14).
+// This folder is compiled into the app, the tests and the notification extension (ScheduleAssistant's departure flow,
+// which nothing installs there, so it stays off), never the widget (project.yml); it imports neither MapKit nor Core
+// Location (scripts/validate_schema.py check 14).
 //
 // Nothing here is stored or sent to Gemini: the location and the starting point stay in memory for the one request.
 

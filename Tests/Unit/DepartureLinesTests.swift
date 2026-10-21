@@ -79,7 +79,8 @@ final class DepartureLinesTests: XCTestCase {
     func testEveryReasonSaysSomethingDifferent() {
         let reasons: [DepartureLines.Reason] = [
             .passed, .allDay, .noPlace, .destinationNotFound(forEvent: true), .destinationNotFound(forEvent: false),
-            .startNotFound, .noRoute(.transit), .noRoute(.scooter), .noPermission, .noLocation, .needsTypedStart, .region,
+            .startNotFound, .noRoute(.transit), .noRoute(.scooter), .noPermission, .noLocation, .needsTypedStart, .declined,
+            .region,
             .weeklyLimit, .dailyCapacity, .userDailyLimit, .busy, .unavailable,
         ]
         let lines = reasons.map(DepartureLines.failure)
@@ -88,6 +89,8 @@ final class DepartureLinesTests: XCTestCase {
         XCTAssertEqual(DepartureLines.failure(.noRoute(.scooter)), "No route there by scooter.")
         XCTAssertEqual(DepartureLines.failure(.passed), "That time has already passed, so there's no departure to plan.")
         XCTAssertEqual(DepartureLines.failure(.noPlace), "This event has no place yet. Add one to the event first.")
+        XCTAssertEqual(DepartureLines.failure(.declined),
+                       "OK. Departure planning stays off. You can turn it on in Settings › Assistant.")
     }
 
     // MARK: Pieces

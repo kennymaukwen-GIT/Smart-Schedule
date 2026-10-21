@@ -204,6 +204,7 @@ targets:
       - Shared/Auth
       - Shared/Security   # App Attest: the extension calls Smart Schedule's server itself
       - Shared/Orchestrator
+      - Shared/Departure  # ScheduleAssistant's departure flow; nothing installs it here, so it stays off
       - Shared/Notifications
       - Shared/DesignSystem
       - Shared/Localization

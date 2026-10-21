@@ -162,6 +162,20 @@ final class GeminiClient: Sendable {
                   history: [GeminiTurn],
                   mode: String = "ANY",
                   allowedFunctions: [String]? = nil) async throws -> GeminiResponse {
+        try await generate(system: system, history: history, mode: mode, allowedFunctions: allowedFunctions,
+                           including: [])
+    }
+
+    /// Declarations only some requests carry: `plan_departure` goes out only when departure reminders 「該出發了」 are
+    /// on for this request (owner decision 3A: off, the request declares exactly what it did without the feature).
+    static let optInFunctions: Set<String> = [AssistantFunction.planDeparture.rawValue]
+
+    /// The same, declaring the opt-in functions named in `including` too. No defaults, so no call can match both.
+    func generate(system: String,
+                  history: [GeminiTurn],
+                  mode: String,
+                  allowedFunctions: [String]?,
+                  including: Set<String>) async throws -> GeminiResponse {
         guard consentCheck() else { throw GeminiError.consentRequired }
         var functionCallingConfig: [String: Any] = ["mode": mode]
         if let allowedFunctions { functionCallingConfig["allowedFunctionNames"] = allowedFunctions }
@@ -169,7 +183,7 @@ final class GeminiClient: Sendable {
         var body: [String: Any] = [
             "systemInstruction": ["parts": [["text": system]]],
             "contents": try history.map { try JSONSerialization.jsonObject(with: $0.json) },
-            "tools": [["functionDeclarations": try JSONSerialization.jsonObject(with: declarationsJSON)]],
+            "tools": [["functionDeclarations": try Self.declarations(declarationsJSON, including: including)]],
             "toolConfig": ["functionCallingConfig": functionCallingConfig],
             "safetySettings": Self.safetySettings
         ]
@@ -266,6 +280,16 @@ final class GeminiClient: Sendable {
             functionCalls: calls,
             text: text.isEmpty ? nil : text
         )
+    }
+
+    /// The declarations file as a JSON array, in its own order, without the opt-in functions `including` doesn't name.
+    static func declarations(_ json: Data, including: Set<String>) throws -> Any {
+        let all = try JSONSerialization.jsonObject(with: json)
+        guard let list = all as? [[String: Any]] else { return all }
+        return list.filter { declaration in
+            guard let name = declaration["name"] as? String, optInFunctions.contains(name) else { return true }
+            return including.contains(name)
+        }
     }
 
     private static func loadDeclarations() -> Data {

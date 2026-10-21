@@ -130,6 +130,8 @@ final class LocalizationCatalogTests: XCTestCase {
                        "這個行程還沒有地點，請先在行程加上地點。")
         XCTAssertEqual(zh("Today's route planning is used up. Try again tomorrow.", in: table), "今天的規劃額度已用完，明天再試。")
         XCTAssertEqual(zh("Departure reminders are set when you tap Add.", in: table), "按「加入」後會設定出發提醒。")
+        XCTAssertEqual(zh("OK. Departure planning stays off. You can turn it on in Settings › Assistant.", in: table),
+                       "好的，不會規劃出發時間。可以到「設定 › 助理」開啟。")
     }
 
     /// The list a tapped date in the month grid opens.

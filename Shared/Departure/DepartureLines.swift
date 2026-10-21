@@ -78,6 +78,8 @@ enum DepartureLines {
         case noLocation
         /// Debug builds where the feature is otherwise off, with no starting point in the sentence.
         case needsTypedStart
+        /// Not now on 「使用 Google 地圖規劃出發時間？」: nothing was sent, and the feature is off until Settings turns it on.
+        case declined
         case region
         case weeklyLimit
         case dailyCapacity
@@ -120,6 +122,7 @@ enum DepartureLines {
         case .noLocation:
             String(localized: "Couldn't get your location. Try again, or say where you're leaving from.")
         case .needsTypedStart: String(localized: "Test mode: say where you're leaving from.")
+        case .declined: String(localized: "OK. Departure planning stays off. You can turn it on in Settings › Assistant.")
         case .region: String(localized: "Departure planning isn't available here.")
         case .weeklyLimit: String(localized: "This week's departure plans are used up. They come back on Monday.")
         case .dailyCapacity: String(localized: "Today's route planning is used up. Try again tomorrow.")

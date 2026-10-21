@@ -148,10 +148,16 @@ final class GeminiClientParseTests: XCTestCase {
         let names = declarations.compactMap { $0["name"] as? String }
         XCTAssertEqual(names.count, 10)
         XCTAssertEqual(Set(names), Set(AssistantFunction.allCases.map(\.rawValue)))
-        // A chat turn may call every function but suggest_event_notes, which has its own request.
-        XCTAssertEqual(AssistantFunction.conversational.count, 9)
-        XCTAssertTrue(AssistantFunction.conversational.contains(.planDeparture))
+        // A chat turn may call every function but suggest_event_notes, which has its own request, and plan_departure,
+        // which only a chat request with departure reminders on may call (owner decision 3A).
+        XCTAssertEqual(AssistantFunction.conversational.count, 8)
+        XCTAssertFalse(AssistantFunction.conversational.contains(.planDeparture))
         XCTAssertFalse(AssistantFunction.conversational.contains(.suggestEventNotes))
+        XCTAssertEqual(AssistantFunction.conversational(departures: false), AssistantFunction.conversational)
+        let withDepartures = AssistantFunction.conversational(departures: true)
+        XCTAssertEqual(withDepartures.count, 9)
+        XCTAssertEqual(withDepartures.filter { $0 != .planDeparture }, AssistantFunction.conversational, "same order")
+        XCTAssertFalse(withDepartures.contains(.suggestEventNotes))
         for declaration in declarations {
             XCTAssertNotNil(declaration["parameters"] as? [String: Any], "\(declaration["name"] ?? "?")")
         }
@@ -173,6 +179,28 @@ final class GeminiClientParseTests: XCTestCase {
         XCTAssertEqual(properties["travel_mode"]?["enum"] as? [String], TravelMode.allCases.map(\.rawValue))
         XCTAssertEqual(properties["arrive_early_minutes"]?["minimum"] as? Int, DeparturePlanner.arriveEarlyRange.lowerBound)
         XCTAssertEqual(properties["arrive_early_minutes"]?["maximum"] as? Int, DeparturePlanner.arriveEarlyRange.upperBound)
+    }
+
+    /// Off (owner decision 3A), a request declares exactly what main's app declares (the frozen copy in
+    /// Tests/fixtures/main/FunctionDeclarations.json), in the same order; on, it adds plan_departure.
+    func testWithoutDeparturesTheDeclarationsAreMains() throws {
+        let url = try XCTUnwrap(Bundle(for: GeminiClient.self).url(forResource: "FunctionDeclarations", withExtension: "json"))
+        let file = try Data(contentsOf: url)
+        let main = try JSONSerialization.jsonObject(with: Data(contentsOf: Fixtures.directory()
+            .appendingPathComponent("main/FunctionDeclarations.json")))
+        XCTAssertEqual(GeminiClient.optInFunctions, [AssistantFunction.planDeparture.rawValue])
+
+        let off = try XCTUnwrap(GeminiClient.declarations(file, including: []) as? NSArray)
+        XCTAssertEqual(off, main as? NSArray)
+        XCTAssertEqual(off.count, 9)
+        XCTAssertFalse(String(decoding: try JSONSerialization.data(withJSONObject: off), as: UTF8.self)
+            .contains("plan_departure"))
+
+        let on = try XCTUnwrap(GeminiClient.declarations(file, including: GeminiClient.optInFunctions) as? NSArray)
+        XCTAssertEqual(on, try JSONSerialization.jsonObject(with: file) as? NSArray, "the whole file, in its order")
+        XCTAssertEqual(on.count, 10)
+        // A name that isn't opt-in changes nothing.
+        XCTAssertEqual(try GeminiClient.declarations(file, including: ["create_events"]) as? NSArray, off)
     }
 
     func testPlanDepartureCallDecodesAndNeverFails() throws {

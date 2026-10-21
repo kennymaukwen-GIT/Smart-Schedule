@@ -112,6 +112,13 @@ enum OutboxOverlay {
             reminders.extendedProperties = patch.extendedProperties
             event.reminderMinutes = CalendarEventMapper.reminderMinutes(of: reminders)
         }
+        // A queued departure patch (「該出發了」) shows at once; Google merges private properties the same way.
+        let departureKeys = [SSProperty.arriveEarly, SSProperty.travelMode]
+        if let properties = patch.extendedProperties?.private, departureKeys.contains(where: { properties[$0] != nil }) {
+            let kept = event.departure.map(CalendarEventMapper.departureProperties) ?? [:]
+            let merged = kept.merging(properties.filter { departureKeys.contains($0.key) }) { _, new in new }
+            event.departure = CalendarEventMapper.departure(from: merged)
+        }
         return event
     }
 

@@ -190,6 +190,29 @@ enum DepartureTurn {
         ["ok": true, "departure_reminders": saved.rawValue]
     }
 
+    /// Earlier turns for a request that doesn't declare `plan_departure` (Siri after the chat, or after Not now):
+    /// without that function's calls and answers, so Gemini sees no call to a function it wasn't given. A turn
+    /// without one is passed on byte for byte; a model turn left empty says "OK."; an answer turn left empty is dropped.
+    static func withoutDepartureCalls(_ turns: [GeminiTurn]) -> [GeminiTurn] {
+        let name = AssistantFunction.planDeparture.rawValue
+        func isDeparture(_ part: [String: Any]) -> Bool {
+            (part["functionCall"] as? [String: Any])?["name"] as? String == name
+                || (part["functionResponse"] as? [String: Any])?["name"] as? String == name
+        }
+        return turns.compactMap { turn in
+            guard var content = (try? JSONSerialization.jsonObject(with: turn.json)) as? [String: Any],
+                  let parts = content["parts"] as? [[String: Any]], parts.contains(where: isDeparture) else { return turn }
+            let kept = parts.filter { !isDeparture($0) }
+            if kept.isEmpty {
+                guard content["role"] as? String == "model" else { return nil }
+                content["parts"] = [["text": "OK."]]
+            } else {
+                content["parts"] = kept
+            }
+            return (try? JSONSerialization.data(withJSONObject: content)).map(GeminiTurn.init(json:))
+        }
+    }
+
     // MARK: Helpers
 
     /// Minutes between the two clock times as a reply shows them ("16:00" to "16:25" is 25); never negative.

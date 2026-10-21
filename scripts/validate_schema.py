@@ -67,8 +67,9 @@
     the one event of the turn's create_events call that starts at arrive_at_local, with the length the user said and the
     place as written, and no reminder for the minutes early; a question that must not plan names no minutes or time. At
     least 3 "how long / when to leave" turns, 3 with a new event and 3 ordinary events without plan_departure; no
-    minItems/maxItems. The prompt builders never read an event's place (AssistantPrompt) or its departure (either
-    builder), interpolations included.
+    minItems/maxItems; no other declaration names plan_departure or rule 13 (with departures off they go out without
+    them). The prompt builders never read an event's place (AssistantPrompt) or its departure (either builder),
+    interpolations included.
 
 Usage: python3 -I scripts/validate_schema.py [--print-payloads]
 """
@@ -1055,6 +1056,10 @@ def departure_declaration_checks(by_name: dict) -> None:
         errors.append(f"plan_departure: arrive_early_minutes must be an integer {bounds} (DeparturePlanner.arriveEarlyRange)")
     if re.search(r'"(minItems|maxItems)"', json.dumps(decl)):
         errors.append("plan_departure: no minItems/maxItems (Gemini 3.8 Flash rejects them under mode ANY)")
+    # Off (owner decision 3A), every other declaration still goes out, so none may lean on plan_departure.
+    for name, other in by_name.items():
+        if name != "plan_departure" and re.search(r"plan_departure|\brule 13\b", json.dumps(other, ensure_ascii=False)):
+            errors.append(f"{name}: names plan_departure or rule 13, but goes out without them when departures are off")
 
 
 def turn_calls(root: dict) -> list[dict]:

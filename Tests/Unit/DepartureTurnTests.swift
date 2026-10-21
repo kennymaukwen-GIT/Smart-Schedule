@@ -259,6 +259,78 @@ final class DepartureTurnTests: XCTestCase {
         XCTAssertEqual(DepartureTurn.Saved.allCases.map(\.rawValue), ["set", "awaiting_user_approval", "not_set"])
     }
 
+    // MARK: Earlier turns, for a request without the feature
+
+    /// Siri after a chat that planned, or the chat after Not now: the history Gemini gets has no call to, or answer
+    /// from, a function the request doesn't declare. Everything else passes byte for byte.
+    func testEarlierDepartureCallsLeaveTheHistoryOfARequestWithoutTheFeature() throws {
+        let user = GeminiTurn.user("明天 3 點去台北 101 開會")
+        let model = GeminiTurn(json: Data(#"""
+        {"role":"model","parts":[{"functionCall":{"name":"create_events","args":{}},"thoughtSignature":"sig"},
+        {"functionCall":{"name":"plan_departure","args":{"create_event":true}}}]}
+        """#.utf8))
+        let answers = GeminiTurn.functionResponses([
+            .init(name: "create_events", id: nil, responseJSON: Data(#"{"ok":true}"#.utf8)),
+            .init(name: "plan_departure", id: nil, responseJSON: Data(#"{"ok":true,"departure_reminders":"set"}"#.utf8)),
+        ])
+        let onlyDeparture = GeminiTurn(json: Data(#"""
+        {"role":"model","parts":[{"functionCall":{"name":"plan_departure","args":{"destination":"台北 101"}}}]}
+        """#.utf8))
+        let onlyAnswer = GeminiTurn.functionResponses([
+            .init(name: "plan_departure", id: "c1", responseJSON: Data(#"{"ok":true,"departure_reminders":"not_set"}"#.utf8)),
+        ])
+        let other = GeminiTurn(json: Data(#"""
+        {"role":"model","parts":[{"functionCall":{"name":"reply_to_user","args":{"message":"plan_departure"}}}]}
+        """#.utf8))
+
+        let kept = DepartureTurn.withoutDepartureCalls([user, model, answers, onlyDeparture, onlyAnswer, other])
+        XCTAssertEqual(kept.count, 5, "an answer turn left empty is dropped")
+        XCTAssertEqual(kept[0].json, user.json)
+        XCTAssertEqual(kept[4].json, other.json, "the word in a message is not a call")
+
+        let modelParts = try XCTUnwrap(TestJSON.object(kept[1].json)["parts"] as? [[String: Any]])
+        XCTAssertEqual(modelParts.count, 1)
+        XCTAssertEqual((modelParts[0]["functionCall"] as? [String: Any])?["name"] as? String, "create_events")
+        XCTAssertEqual(modelParts[0]["thoughtSignature"] as? String, "sig", "the other call keeps its signature")
+        let answerParts = try XCTUnwrap(TestJSON.object(kept[2].json)["parts"] as? [[String: Any]])
+        XCTAssertEqual(answerParts.count, 1)
+        XCTAssertEqual((answerParts[0]["functionResponse"] as? [String: Any])?["name"] as? String, "create_events")
+        XCTAssertEqual(try TestJSON.object(kept[2].json)["role"] as? String, "user")
+
+        // A model turn left with nothing says "OK.", so the turns still alternate.
+        let emptied = try TestJSON.object(kept[3].json)
+        XCTAssertEqual(emptied["role"] as? String, "model")
+        let emptiedParts = try XCTUnwrap(emptied["parts"] as? [[String: Any]])
+        XCTAssertEqual(emptiedParts.count, 1)
+        XCTAssertEqual(emptiedParts[0]["text"] as? String, "OK.")
+
+        for turn in kept {
+            for part in try XCTUnwrap(TestJSON.object(turn.json)["parts"] as? [[String: Any]]) {
+                XCTAssertNotEqual((part["functionCall"] as? [String: Any])?["name"] as? String, "plan_departure")
+                XCTAssertNotEqual((part["functionResponse"] as? [String: Any])?["name"] as? String, "plan_departure")
+            }
+        }
+        XCTAssertTrue(DepartureTurn.withoutDepartureCalls([]).isEmpty)
+        let untouched = DepartureTurn.withoutDepartureCalls([user, other])
+        XCTAssertEqual(untouched.map(\.json), [user.json, other.json])
+    }
+
+    // MARK: Who may plan
+
+    /// Only the chat and Quick Capture may plan (owner decision 3A). An assistant without the feature (demo mode, the
+    /// offline rules) answers the chat's request as it answers any other.
+    func testAnAssistantWithoutTheFeatureAnswersTheChatAsBefore() async throws {
+        let assistant = HandleOnlyAssistant()
+        let now = TestClock.local(2026, 10, 20, 9, 0)
+        let reply = try await assistant.handleFromChat("去台北 101 要多久？", now: now)
+        XCTAssertEqual(reply.text, "handled")
+        let calls = await assistant.calls
+        XCTAssertEqual(calls.count, 1)
+        XCTAssertEqual(calls.first?.utterance, "去台北 101 要多久？")
+        XCTAssertNil(calls.first?.focusEventID)
+        XCTAssertEqual(calls.first?.now, now)
+    }
+
     func testClockMinutes() {
         let start = TestClock.local(2026, 10, 20, 16, 0)
         XCTAssertEqual(DepartureTurn.clockMinutes(from: start, to: TestClock.local(2026, 10, 20, 16, 25)), 25)
@@ -266,4 +338,28 @@ final class DepartureTurnTests: XCTestCase {
         XCTAssertEqual(DepartureTurn.clockMinutes(from: start, to: start.addingTimeInterval(59)), 0)
         XCTAssertEqual(DepartureTurn.clockMinutes(from: start, to: start.addingTimeInterval(-600)), 0, "never negative")
     }
+}
+
+/// An assistant with only `handle`, as demo mode's and the offline rules' are for the chat.
+private actor HandleOnlyAssistant: ScheduleAssisting {
+    struct Call: Sendable {
+        let utterance: String
+        let focusEventID: String?
+        let now: Date
+    }
+
+    private(set) var calls: [Call] = []
+
+    func handle(_ utterance: String, focusEventID: String?, now: Date) async throws -> ScheduleAssistant.Reply {
+        calls.append(Call(utterance: utterance, focusEventID: focusEventID, now: now))
+        var reply = ScheduleAssistant.Reply()
+        reply.text = "handled"
+        return reply
+    }
+
+    func confirm(_ pending: ScheduleAssistant.PendingDeletion) async throws -> ScheduleAssistant.Reply { .init() }
+    func commitPlan(_ draft: PlanDraft) async throws -> ScheduleAssistant.Reply { .init() }
+    func discardPlan(_ draft: PlanDraft) async -> ScheduleAssistant.Reply { .init() }
+    func commitPendingEvents(_ batch: PendingEventBatch) async throws -> ScheduleAssistant.Reply { .init() }
+    func discardPendingEvents(_ batch: PendingEventBatch) async -> ScheduleAssistant.Reply { .init() }
 }

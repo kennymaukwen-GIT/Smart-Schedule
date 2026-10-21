@@ -3488,6 +3488,17 @@
         }
       }
     },
+    "OK. Departure planning stays off. You can turn it on in Settings › Assistant." : {
+      "comment" : "Departure reminders: the user tapped Not now on 「使用 Google 地圖規劃出發時間？」",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好的，不會規劃出發時間。可以到「設定 › 助理」開啟。"
+          }
+        }
+      }
+    },
     "OK. The assistant stays off until you allow AI data sharing in Settings › AI & privacy." : {
       "localizations" : {
         "zh-Hant" : {
