@@ -100,6 +100,46 @@ final class DepartureSettingsTests: XCTestCase {
         XCTAssertEqual(DepartureSettings(arriveEarlyMinutes: -5, travelMode: .walking).arriveEarlyMinutes, 0)
     }
 
+    // MARK: A new event's insert body
+
+    private func mapped(_ draft: EventDraft) throws -> MappedEvent {
+        try mapper.event(from: draft, seed: "s|0", utterance: "今天 5 點要到台北 101 開會")
+    }
+
+    func testANewTimedEventGetsTheTwoValuesInItsInsertBody() throws {
+        let plain = try mapped(EventDraft(title: "開會", start: "2026-10-20T17:00", durationMinutes: 60,
+                                          location: "台北 101"))
+        let with = CalendarEventMapper.addingDeparture(DepartureSettings(arriveEarlyMinutes: 30, travelMode: .scooter),
+                                                       to: plain)
+        let before = try XCTUnwrap(plain.body.extendedProperties?.private)
+        let after = try XCTUnwrap(with.body.extendedProperties?.private)
+        XCTAssertEqual(after["ssArriveEarly"], "30")
+        XCTAssertEqual(after["ssTravelMode"], "two-wheeler")
+        XCTAssertEqual(after.filter { !["ssArriveEarly", "ssTravelMode"].contains($0.key) }, before,
+                       "ssSource, ssKind, ssSchema and ssReminders stay as they were")
+        XCTAssertEqual(Set(after.keys).subtracting(before.keys), ["ssArriveEarly", "ssTravelMode"])
+        var unchanged = with.body
+        unchanged.extendedProperties = plain.body.extendedProperties
+        XCTAssertEqual(unchanged, plain.body, "nothing else in the body changes")
+        XCTAssertEqual(with.wantsConference, plain.wantsConference)
+    }
+
+    func testAnAllDayEventGetsNoDeparture() throws {
+        let allDay = try mapped(EventDraft(title: "露營", start: "2026-10-20", allDay: true, location: "露營地"))
+        let with = CalendarEventMapper.addingDeparture(DepartureSettings(arriveEarlyMinutes: 30, travelMode: .driving),
+                                                       to: allDay)
+        XCTAssertEqual(with.body, allDay.body)
+    }
+
+    func testANewDepartureReplacesAnOlderOne() throws {
+        let first = CalendarEventMapper.addingDeparture(DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit),
+                                                        to: try mapped(EventDraft(title: "開會", start: "2026-10-20T17:00")))
+        let second = CalendarEventMapper.addingDeparture(DepartureSettings(arriveEarlyMinutes: 10, travelMode: .walking),
+                                                         to: first)
+        XCTAssertEqual(second.body.extendedProperties?.private?["ssArriveEarly"], "10")
+        XCTAssertEqual(second.body.extendedProperties?.private?["ssTravelMode"], "walking")
+    }
+
     // MARK: From a plan, and back
 
     /// The owner's example: 17:00, 30 minutes early → be there by 16:30. Only the minutes early and the way of

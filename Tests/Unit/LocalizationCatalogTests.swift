@@ -106,6 +106,33 @@ final class LocalizationCatalogTests: XCTestCase {
     }
 
     /// The list a tapped date in the month grid opens.
+    /// 「該出發了」 (Shared/Departure/DepartureLines.swift): the owner's format 「根據你…的需求，建議…出門。」 and the
+    /// owner's own wording for an event without a place (1A) and for today's used-up routes.
+    func testDepartureTexts() throws {
+        let table = try chineseTable()
+        XCTAssertEqual(String(format: zh("Based on being at %@ by %@, leave at %@ (%@).", in: table),
+                              "台北 101 ", "16:30", "15:48", zh("by public transport", in: table)),
+                       "根據你 16:30 到台北 101 的需求，建議 15:48 出門（大眾運輸）。")
+        XCTAssertEqual(String(format: zh("Based on being at %@ by %@, leave now (%@): you'll arrive at %@, about %lld min late.", in: table),
+                              "台北 101 ", "16:30", zh("by scooter", in: table), "16:42", 12),
+                       "根據你 16:30 到台北 101 的需求，建議現在就出門（騎機車），預計 16:42 到，晚約 12 分鐘。")
+        XCTAssertEqual(String(format: zh("Leaving now for %@ takes about %@ (%@): you'll arrive at %@.", in: table),
+                              "台北 101 ", "25 分鐘", zh("on foot", in: table), "16:25"),
+                       "根據你去台北 101 的需求，現在出門約 25 分鐘（走路），16:25 到。")
+        XCTAssertEqual(String(format: zh("Planned when to leave for %@ (be there by %@).", in: table), "台北 101 ", "16:30"),
+                       "已規劃到台北 101 的出發時間（16:30 到）。")
+        XCTAssertEqual(String(format: zh("You can plan %lld more this week.", in: table), 1), "本週還可以規劃 1 次。")
+        XCTAssertEqual(String(format: zh("%lld hr %lld min", in: table), 1, 35), "1 小時 35 分鐘")
+        XCTAssertEqual(zh("by car", in: table), "開車")
+        XCTAssertEqual(zh("This is an estimate.", in: table), "（估算）")
+        XCTAssertEqual(zh("That time has already passed, so there's no departure to plan.", in: table),
+                       "時間已經過了，無法規劃出發時間。")
+        XCTAssertEqual(zh("This event has no place yet. Add one to the event first.", in: table),
+                       "這個行程還沒有地點，請先在行程加上地點。")
+        XCTAssertEqual(zh("Today's route planning is used up. Try again tomorrow.", in: table), "今天的規劃額度已用完，明天再試。")
+        XCTAssertEqual(zh("Departure reminders are set when you tap Add.", in: table), "按「加入」後會設定出發提醒。")
+    }
+
     func testDayListLabels() throws {
         let table = try chineseTable()
         XCTAssertEqual(zh("No events on this day", in: table), "這天沒有行程")
