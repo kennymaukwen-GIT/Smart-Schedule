@@ -36,11 +36,15 @@ struct DeparturePlan: Equatable, Sendable {
 enum DeparturePlanner {
     /// Minutes early: up to 3 hours (owner decision, 2026-10-19).
     static let arriveEarlyRange = 0...180
+    /// Minutes early when the user didn't say: 10 (owner decision 2026-10-20). They replace the old 10-minute margin,
+    /// so Google is asked to arrive 10 minutes before the start and the time to leave matches its route.
+    static let defaultArriveEarlyMinutes = 10
     /// Travel time: up to 24 hours (owner decision, 2026-10-19).
     static let travelMinutesRange = 0...1_440
-    /// The safety margin before leaving. Phase 1 always uses `defaultBufferMinutes`.
+    /// A margin before leaving on top of the travel time. None by default (owner decision 2026-10-20): Google's time
+    /// to leave already arrives in time, and the minutes early give the slack.
     static let bufferRange = 0...180
-    static let defaultBufferMinutes = 10
+    static let defaultBufferMinutes = 0
     /// 「準備出門」 comes this many minutes before departure.
     static let readyLeadRange = 0...180
     static let defaultReadyLeadMinutes = 10

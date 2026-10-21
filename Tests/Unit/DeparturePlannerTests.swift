@@ -30,13 +30,16 @@ final class DeparturePlannerTests: XCTestCase {
         XCTAssertFalse(plan.isEstimate)
     }
 
-    func testTheMarginIsTenMinutesUnlessGiven() {
+    /// Owner decision 2026-10-20: no margin on top of Google's time; 10 minutes early when the user didn't say.
+    func testThereIsNoMarginUnlessGivenAndTenMinutesEarlyByDefault() {
         let start = time(taipei, 2026, 10, 19, 17, 0)
-        let plan = DeparturePlanner.plan(start: start, arriveEarlyMinutes: 30, travelMinutes: 22,
-                                         travelMode: .transit, isEstimate: false)
-        XCTAssertEqual(DeparturePlanner.defaultBufferMinutes, 10)
+        let plan = DeparturePlanner.plan(start: start, arriveEarlyMinutes: DeparturePlanner.defaultArriveEarlyMinutes,
+                                         travelMinutes: 22, travelMode: .transit, isEstimate: false)
+        XCTAssertEqual(DeparturePlanner.defaultBufferMinutes, 0)
+        XCTAssertEqual(DeparturePlanner.defaultArriveEarlyMinutes, 10)
         XCTAssertEqual(DeparturePlanner.defaultReadyLeadMinutes, 10)
-        XCTAssertEqual(plan.departAt, time(taipei, 2026, 10, 19, 15, 58))
+        XCTAssertEqual(plan.arriveBy, time(taipei, 2026, 10, 19, 16, 50))
+        XCTAssertEqual(plan.departAt, time(taipei, 2026, 10, 19, 16, 28))
     }
 
     func testNoMinutesEarlyArrivesAtTheStart() {

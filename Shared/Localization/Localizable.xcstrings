@@ -221,6 +221,28 @@
         }
       }
     },
+    "%lld hr" : {
+      "comment" : "Trip length in whole hours",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 小時"
+          }
+        }
+      }
+    },
+    "%lld hr %lld min" : {
+      "comment" : "Trip length in hours and minutes",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld 小時 %2$lld 分鐘"
+          }
+        }
+      }
+    },
     "%lld items" : {
       "localizations" : {
         "en" : {
@@ -908,12 +930,34 @@
         }
       }
     },
+    "Allow Location for Smart Schedules in Settings, or say where you're leaving from." : {
+      "comment" : "No location permission for a departure",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請到「設定」允許 Smart Schedules 使用位置，或在句子裡說出發地。"
+          }
+        }
+      }
+    },
     "Allowed" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "已允許"
+          }
+        }
+      }
+    },
+    "An all-day event has no start time to plan a departure for." : {
+      "comment" : "Departure for an all-day event",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整天的行程沒有開始時間，無法規劃出發時間。"
           }
         }
       }
@@ -1010,6 +1054,28 @@
         }
       }
     },
+    "Based on being at %@ by %@, leave at %@ (%@)." : {
+      "comment" : "Departure reply (shown in the chat only): place, time to be there, Google's time to leave, way of travelling",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根據你 %2$@ 到%1$@的需求，建議 %3$@ 出門（%4$@）。"
+          }
+        }
+      }
+    },
+    "Based on being at %@ by %@, leave now (%@): you'll arrive at %@, about %lld min late." : {
+      "comment" : "Departure reply when even leaving now is late: place, time to be there, way of travelling, arrival, minutes late",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根據你 %2$@ 到%1$@的需求，建議現在就出門（%3$@），預計 %4$@ 到，晚約 %5$lld 分鐘。"
+          }
+        }
+      }
+    },
     "Both" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1076,6 +1142,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "可編輯"
+          }
+        }
+      }
+    },
+    "Can't plan the departure right now. Try again later." : {
+      "comment" : "Route server unavailable or not set up",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前無法規劃出發時間，請稍後再試。"
           }
         }
       }
@@ -1192,6 +1269,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "檢查 %lld 次"
+          }
+        }
+      }
+    },
+    "Checked the travel time to %@." : {
+      "comment" : "How-long reply as kept in chat history (no time from Google)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已查詢到%@的交通時間。"
           }
         }
       }
@@ -1453,6 +1541,39 @@
         }
       }
     },
+    "Couldn't find that place. Try its full name or address." : {
+      "comment" : "Google could not find the destination",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到這個地點，請改用完整名稱或地址。"
+          }
+        }
+      }
+    },
+    "Couldn't find this event's place. Change it to a name or address in the event." : {
+      "comment" : "Google could not find the event's place",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到這個行程的地點，請在行程裡改成名稱或地址。"
+          }
+        }
+      }
+    },
+    "Couldn't find where you're leaving from. Try its full name or address." : {
+      "comment" : "Google could not find the starting point",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到出發的地點，請改用完整名稱或地址。"
+          }
+        }
+      }
+    },
     "Couldn't get AI suggestions." : {
       "comment" : "Event page: the AI suggestions request failed",
       "localizations" : {
@@ -1460,6 +1581,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法取得 AI 建議。"
+          }
+        }
+      }
+    },
+    "Couldn't get your location. Try again, or say where you're leaving from." : {
+      "comment" : "No location fix for a departure",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前無法取得你的位置，請再試一次，或在句子裡說出發地。"
           }
         }
       }
@@ -1888,6 +2020,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "示範 · 不同步"
+          }
+        }
+      }
+    },
+    "Departure planning is busy. Try again in a moment." : {
+      "comment" : "Route server busy",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "出發規劃忙碌中，請稍後再試。"
+          }
+        }
+      }
+    },
+    "Departure planning isn't available here." : {
+      "comment" : "Departure planning is not offered in this region",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個地區無法使用出發規劃。"
+          }
+        }
+      }
+    },
+    "Departure reminders are set when you tap Add." : {
+      "comment" : "Ask me first: the departure is saved with the event",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按「加入」後會設定出發提醒。"
           }
         }
       }
@@ -2778,6 +2943,17 @@
         }
       }
     },
+    "Leaving now for %@ takes about %@ (%@): you'll arrive at %@." : {
+      "comment" : "How long a trip takes: place, duration, way of travelling, arrival",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根據你去%1$@的需求，現在出門約 %2$@（%3$@），%4$@ 到。"
+          }
+        }
+      }
+    },
     "Limit reminders per day" : {
       "localizations" : {
         "zh-Hant" : {
@@ -3040,6 +3216,17 @@
         }
       }
     },
+    "No departure reminders were set." : {
+      "comment" : "The departure could not be saved on the event",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有設定出發提醒。"
+          }
+        }
+      }
+    },
     "No events on this day" : {
       "comment" : "Day list (a date tapped in the month grid) with nothing on it",
       "localizations" : {
@@ -3062,12 +3249,34 @@
         }
       }
     },
+    "No public transport route was found, so this is by car." : {
+      "comment" : "Departure reply: fell back to driving",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到大眾運輸路線，改用開車計算。"
+          }
+        }
+      }
+    },
     "No purchases to restore." : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "沒有可回復的購買項目。"
+          }
+        }
+      }
+    },
+    "No route there %@." : {
+      "comment" : "No route by this way of travelling (\"by car\")",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到%@的路線。"
           }
         }
       }
@@ -3568,6 +3777,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "計畫"
+          }
+        }
+      }
+    },
+    "Planned when to leave for %@ (be there by %@)." : {
+      "comment" : "Departure reply as kept in chat history: place and the user's time to be there (no time from Google)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已規劃到%1$@的出發時間（%2$@ 到）。"
+          }
+        }
+      }
+    },
+    "Planned when to leave for %@." : {
+      "comment" : "Departure reply as kept in chat history (no time from Google)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已規劃到%@的出發時間。"
           }
         }
       }
@@ -4696,6 +4927,39 @@
         }
       }
     },
+    "Test mode: say where you're leaving from." : {
+      "comment" : "Debug builds only: the UK test switch needs a starting point in the sentence",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "測試模式：請在句子裡說出發地。"
+          }
+        }
+      }
+    },
+    "That time has already passed, so there's no departure to plan." : {
+      "comment" : "The time to be there has passed",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "時間已經過了，無法規劃出發時間。"
+          }
+        }
+      }
+    },
+    "That was this week's last plan." : {
+      "comment" : "No departure plans left this week",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這是本週最後一次規劃。"
+          }
+        }
+      }
+    },
     "The AI isn't available right now, so demo mode answered with its offline rules." : {
       "localizations" : {
         "zh-Hant" : {
@@ -4869,6 +5133,17 @@
         }
       }
     },
+    "This event has no place yet. Add one to the event first." : {
+      "comment" : "Departure for an event without a place (owner wording 1A)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這個行程還沒有地點，請先在行程加上地點。"
+          }
+        }
+      }
+    },
     "This iPhone can't recognise this language on the device yet, so the mic is hidden. The keyboard's dictation still works." : {
       "comment" : "Settings › Assistant › Voice input footer when on-device recognition isn't available",
       "localizations" : {
@@ -4897,6 +5172,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這是重複行程。"
+          }
+        }
+      }
+    },
+    "This is an estimate." : {
+      "comment" : "Departure reply: Google's time is an estimate",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "（估算）"
           }
         }
       }
@@ -4951,12 +5237,34 @@
         }
       }
     },
+    "This trip is too long to set departure reminders." : {
+      "comment" : "Trip of more than 24 hours",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "路程太長，不會設定出發提醒。"
+          }
+        }
+      }
+    },
     "This week" : {
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "這週"
+          }
+        }
+      }
+    },
+    "This week's departure plans are used up. They come back on Monday." : {
+      "comment" : "Weekly departure plans used up",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這週的出發規劃已用完，星期一會再恢復。"
           }
         }
       }
@@ -5124,6 +5432,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天的使用次數已用完，請明天再試。"
+          }
+        }
+      }
+    },
+    "Today's route planning is used up. Try again tomorrow." : {
+      "comment" : "Everyone's daily route planning used up (owner wording)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天的規劃額度已用完，明天再試。"
           }
         }
       }
@@ -5587,6 +5906,17 @@
         }
       }
     },
+    "You can plan %lld more this week." : {
+      "comment" : "Departure plans left this week",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本週還可以規劃 %lld 次。"
+          }
+        }
+      }
+    },
     "You can't add events to this calendar." : {
       "localizations" : {
         "zh-Hant" : {
@@ -5679,6 +6009,17 @@
         }
       }
     },
+    "You've planned a lot today. Try again tomorrow." : {
+      "comment" : "This user's daily route planning used up",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天的規劃次數已用完，明天再試。"
+          }
+        }
+      }
+    },
     "Your calendar names and assistant settings, but not your Google account email addresses" : {
       "localizations" : {
         "zh-Hant" : {
@@ -5726,6 +6067,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開始時"
+          }
+        }
+      }
+    },
+    "by car" : {
+      "comment" : "Way of travelling in a departure reply",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開車"
+          }
+        }
+      }
+    },
+    "by public transport" : {
+      "comment" : "Way of travelling in a departure reply",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大眾運輸"
+          }
+        }
+      }
+    },
+    "by scooter" : {
+      "comment" : "Way of travelling in a departure reply (scooter or motorbike)",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "騎機車"
           }
         }
       }
@@ -5786,6 +6160,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "現在"
+          }
+        }
+      }
+    },
+    "on foot" : {
+      "comment" : "Way of travelling in a departure reply",
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "走路"
           }
         }
       }

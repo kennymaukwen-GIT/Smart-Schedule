@@ -344,6 +344,18 @@ struct CalendarEventMapper: Sendable {
         return body
     }
 
+    /// A new event's insert body with its departure settings added to its private properties, for a timed event only
+    /// (an all-day event has no start time to leave for). Every other property stays as `event(from:)` made it, so
+    /// one insert writes the event and its departure.
+    static func addingDeparture(_ settings: DepartureSettings, to mapped: MappedEvent) -> MappedEvent {
+        guard mapped.body.start?.dateTime != nil else { return mapped }
+        var result = mapped
+        var properties = result.body.extendedProperties ?? GCalExtendedProperties()
+        properties.private = (properties.private ?? [:]).merging(departureProperties(settings)) { _, new in new }
+        result.body.extendedProperties = properties
+        return result
+    }
+
     // MARK: - Helpers
 
     func timed(_ date: Date) -> GCalDateTime {
