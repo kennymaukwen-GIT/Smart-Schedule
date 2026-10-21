@@ -18,8 +18,8 @@ struct DepartureServices: Sendable {
     /// while `consent` is not asked yet, right before the first plan would get the location or ask Google (build step
     /// G4e shows the dialog). Unset, nothing is ever allowed.
     var askConsent: @Sendable () async -> Bool = { false }
-    /// The time, read only to measure how long that first question waited for the user: the plan is then checked
-    /// against the later time (the time to be there may have passed meanwhile).
+    /// The time, read only to measure how long that question and iOS's location prompt waited for the user: the plan
+    /// is then checked against the later time (the time to be there may have passed meanwhile).
     var currentTime: @Sendable () -> Date = { Date() }
 }
 

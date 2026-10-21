@@ -276,6 +276,41 @@ final class DepartureTurnTests: XCTestCase {
         }
     }
 
+    /// "Ask me first" revised: a new event takes the departure of the earlier preview with its title or its place, each
+    /// earlier one at most once; all-day events and previews without a departure take and give none.
+    func testARevisedProposalKeepsDeparturesForTheSameEvents() {
+        func draft(_ title: String, _ start: String, place: String? = nil) -> EventDraft {
+            EventDraft(title: title, start: start, location: place)
+        }
+        func preview(_ id: String, _ title: String, place: String?, departure: DepartureSettings?,
+                     allDay: Bool = false) -> ScheduleEvent {
+            var event = TestEvents.make(id: id, title: title, start: TestClock.local(2026, 10, 20, 16, 40),
+                                        end: TestClock.local(2026, 10, 20, 17, 40), allDay: allDay)
+            event.location = place
+            event.departure = departure
+            return event
+        }
+        let transit = DepartureSettings(arriveEarlyMinutes: 10, travelMode: .transit)
+        let scooter = DepartureSettings(arriveEarlyMinutes: 20, travelMode: .scooter)
+        let previews = [preview("p0", "Meeting", place: "Taipei 101", departure: transit),
+                        preview("p1", "Dinner", place: "Din Tai Fung", departure: nil),
+                        preview("p2", "Class", place: "NTU", departure: scooter)]
+
+        let carried = ScheduleAssistant.carriedDepartures([
+            draft("meeting", "2026-10-20T17:00", place: "Taipei 101"),     // same title, another time
+            draft("Dinner", "2026-10-20T19:00", place: "Din Tai Fung"),    // its preview had none
+            draft("Seminar", "2026-10-21T09:00", place: " ntu "),          // same place, new title
+            draft("Class", "2026-10-22T09:00", place: "NTU"),              // NTU's departure already taken
+            draft("Meeting", "2026-10-23", place: "Taipei 101"),           // all day
+        ], from: previews)
+        XCTAssertEqual(carried, [0: transit, 2: scooter])
+        XCTAssertTrue(ScheduleAssistant.carriedDepartures([draft("Lunch", "2026-10-21T12:30", place: "Borough Market")],
+                                                          from: previews).isEmpty)
+        XCTAssertTrue(ScheduleAssistant.carriedDepartures([draft("Meeting", "2026-10-20T17:00")],
+                                                          from: [preview("p", "Meeting", place: nil, departure: transit,
+                                                                         allDay: true)]).isEmpty)
+    }
+
     // MARK: Earlier turns, for a request without the feature
 
     /// Siri after a chat that planned, or the chat after Not now: the history Gemini gets has no call to, or answer

@@ -797,6 +797,21 @@ final class DepartureAssistantTests: XCTestCase {
         XCTAssertTrue(routes.isEmpty)
     }
 
+    /// iOS's location prompt waits for the user too: when the time to be there passes meanwhile, nothing is sent.
+    func testATimeThatPassesWhileTheLocationIsAskedForIsNotPlanned() async throws {
+        let ticks = DepartureAssistantTicks([at(14, 0), at(14, 0), at(16, 45)])
+        let rig = await makeRig(events: [meeting()], currentTime: { ticks.next() })
+        await rig.routes.answer([route(leave: at(15, 48), arrive: at(16, 28))])
+        answer(call("plan_departure", #"{"event_id": "meeting1"}"#))
+        let reply = try await rig.assistant.handleFromChat("When should I leave for the meeting?", now: now)
+
+        let steps = await rig.trail.steps
+        XCTAssertEqual(steps, ["location"], "the location was read, then nothing sent")
+        XCTAssertEqual(reply.text, "That time has already passed, so there's no departure to plan.")
+        let writes = await rig.google.writes
+        XCTAssertTrue(writes.isEmpty)
+    }
+
     /// Allowed within two minutes of the time to be there: Google plans leaving now (no arrival is sent).
     func testAllowedJustBeforeTheTimeItPlansLeavingNow() async throws {
         let ticks = DepartureAssistantTicks([at(14, 0), at(16, 29)])
@@ -817,26 +832,49 @@ final class DepartureAssistantTests: XCTestCase {
 
     // MARK: "Ask me first", revised
 
-    /// A revised proposal without a new plan: the earlier proposal's departure isn't carried over, and the reply says
-    /// no departure reminders were set.
-    func testARevisedProposalWithoutANewPlanSaysNoRemindersWereSet() async throws {
+    /// A revised proposal without a new plan ("make it 17:00"): the same event keeps the departure the user chose, with
+    /// nothing sent to Google, and Add writes it.
+    func testARevisedProposalKeepsTheDepartureWithoutANewPlan() async throws {
         let rig = await makeRig(askFirst: true)
         await rig.routes.answer([route(leave: at(15, 48), arrive: at(16, 28))])
         answer(turn([("create_events", createMeeting), ("plan_departure", planNewMeeting)]),
                call("create_events", createMeeting.replacingOccurrences(of: "16:40", with: "17:00")))
         let first = try await rig.assistant.handleFromChat(newMeetingUtterance, now: now)
-        XCTAssertNotNil(first.pendingEvents?.previewEvents.first?.departure)
+        let settings = DepartureSettings(arriveEarlyMinutes: 10, travelMode: .transit)
+        XCTAssertEqual(first.pendingEvents?.previewEvents.first?.departure, settings)
 
         let revised = try await rig.assistant.handleFromChat("Make it 17:00", now: now)
         let batch = try XCTUnwrap(revised.pendingEvents)
-        XCTAssertNil(batch.previewEvents.first?.departure)
-        XCTAssertTrue(revised.text.hasSuffix("No departure reminders were set."), revised.text)
+        XCTAssertEqual(batch.previewEvents.first?.start, at(17, 0))
+        XCTAssertEqual(batch.previewEvents.first?.departure, settings)
+        XCTAssertNil(revised.departure)
+        XCTAssertFalse(revised.text.contains("No departure reminders were set."), revised.text)
+        let sent = await rig.routes.requests
+        XCTAssertEqual(sent.count, 1, "no new plan")
 
         _ = try await rig.assistant.commitPendingEvents(batch, now: now)
         let writes = await rig.google.writes
         let properties = try privateProperties(writes.last?.body)
-        XCTAssertNil(properties[SSProperty.arriveEarly])
-        XCTAssertNil(properties[SSProperty.travelMode])
+        XCTAssertEqual(properties[SSProperty.arriveEarly], "10")
+        XCTAssertEqual(properties[SSProperty.travelMode], "transit")
+    }
+
+    /// Something else proposed while a planned proposal waits: it replaces the proposal but gets no departure, and the
+    /// reply says nothing about one.
+    func testAnotherProposalDoesNotTakeTheDeparture() async throws {
+        let rig = await makeRig(askFirst: true)
+        await rig.routes.answer([route(leave: at(15, 48), arrive: at(16, 28))])
+        answer(turn([("create_events", createMeeting), ("plan_departure", planNewMeeting)]),
+               call("create_events", #"""
+                   {"events": [{"title": "Lunch", "start": "2026-10-21T12:30", "duration_minutes": 60, "kind": "event",
+                                "location": "Borough Market"}]}
+                   """#))
+        _ = try await rig.assistant.handleFromChat(newMeetingUtterance, now: now)
+        let lunch = try await rig.assistant.handleFromChat("Lunch at Borough Market tomorrow at 12:30", now: now)
+
+        XCTAssertNil(lunch.pendingEvents?.previewEvents.first?.departure)
+        XCTAssertNil(lunch.departure)
+        XCTAssertFalse(lunch.text.contains("departure"), lunch.text)
     }
 
     /// Revised with plan_departure again (rule 13): planned again for the new start, kept on the new preview.
