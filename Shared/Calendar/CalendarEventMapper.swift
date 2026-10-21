@@ -320,23 +320,20 @@ struct CalendarEventMapper: Sendable {
 
     // MARK: - Departure reminders
 
-    /// An event's departure settings from its private properties: all three values, each valid, or nil. Events
-    /// without them (every event made before departure reminders, or by other apps) read as before.
+    /// An event's departure settings from its private properties: both values, each valid, or nil. Events without
+    /// them (every event made before departure reminders, or by other apps) read as before.
     static func departure(from properties: [String: String]) -> DepartureSettings? {
         guard let early = properties[SSProperty.arriveEarly].flatMap(Int.init),
               DeparturePlanner.arriveEarlyRange.contains(early),
-              let mode = properties[SSProperty.travelMode].flatMap(TravelMode.init(rawValue:)),
-              let leave = properties[SSProperty.leaveBefore].flatMap(Int.init),
-              DepartureSettings.leaveRange.contains(leave), leave >= early
+              let mode = properties[SSProperty.travelMode].flatMap(TravelMode.init(rawValue:))
         else { return nil }
-        return DepartureSettings(arriveEarlyMinutes: early, travelMode: mode, leaveMinutesBeforeStart: leave)
+        return DepartureSettings(arriveEarlyMinutes: early, travelMode: mode)
     }
 
-    /// The three private properties for `settings`, as Google Calendar keeps them (strings).
+    /// The two private properties for `settings`, as Google Calendar keeps them (strings).
     static func departureProperties(_ settings: DepartureSettings) -> [String: String] {
         [SSProperty.arriveEarly: String(settings.arriveEarlyMinutes),
-         SSProperty.travelMode: settings.travelMode.rawValue,
-         SSProperty.leaveBefore: String(settings.leaveMinutesBeforeStart)]
+         SSProperty.travelMode: settings.travelMode.rawValue]
     }
 
     /// PATCH body that adds or replaces an event's departure settings and nothing else; Google keeps the event's other

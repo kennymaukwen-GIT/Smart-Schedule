@@ -5,7 +5,7 @@ import UIKit
 /// permission only, asked the first time the user asks for a departure or a travel time, in the app in the foreground.
 /// One fix per request (`requestLocation`), never continuous updates, never in the background (no Always permission,
 /// no location background mode: scripts/validate_schema.py check 14). The location is handed to the caller and not
-/// kept here.
+/// kept here; it goes only to Google through the Smart Schedules server, as the trip's starting point.
 @MainActor
 final class DeviceLocation: NSObject, LocationProviding {
     static let shared = DeviceLocation()
@@ -116,9 +116,5 @@ extension DeviceLocation: CLLocationManagerDelegate {
 extension GeoPoint {
     init(_ coordinate: CLLocationCoordinate2D) {
         self.init(latitude: coordinate.latitude, longitude: coordinate.longitude)
-    }
-
-    var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 }

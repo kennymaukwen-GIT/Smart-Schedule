@@ -124,7 +124,12 @@ final class DepartureRoutesTests: XCTestCase {
 
     func testModesAsTheServerKnowsThem() {
         XCTAssertEqual(RouteMode.allCases.map(\.rawValue), ["transit", "drive", "walk", "two_wheeler"])
-        XCTAssertEqual(TravelMode.allCases.map(RouteMode.init), [.transit, .drive, .walk])
+        XCTAssertEqual(TravelMode.allCases.map(RouteMode.init), [.transit, .drive, .walk, .twoWheeler])
+        // And back: a route from the server keeps the app's way of travelling.
+        XCTAssertEqual(RouteMode.allCases.map(TravelMode.init), [.transit, .driving, .walking, .scooter])
+        for mode in TravelMode.allCases {
+            XCTAssertEqual(TravelMode(RouteMode(mode)), mode)
+        }
     }
 
     // MARK: Answer

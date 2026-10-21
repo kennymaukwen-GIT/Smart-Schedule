@@ -197,14 +197,14 @@ struct UpdatePreferencesArgs: Decodable, Sendable {
 struct PlanDepartureArgs: Decodable, Sendable {
     /// Where the user is going, as they wrote it. Absent for an event from UPCOMING or FOCUS: the app reads its place.
     var destination: String?
-    /// Where the user said they leave from, as written. Absent: the user picks on the reply card.
+    /// Where the user said they leave from, as written. Absent: the iPhone's location.
     var startingPoint: String?
     /// "YYYY-MM-DDTHH:mm": when the user must be there (the new event's start). Absent for "how long" and for an event
     /// from UPCOMING or FOCUS.
     var arriveAtLocal: String?
     /// Minutes before the start the user wants to arrive ("提早 30 分鐘到" = 30).
     var arriveEarlyMinutes: Int?
-    /// "transit", "driving" or "walking" when the user said how they travel (`mode`).
+    /// "transit", "driving", "walking" or "two-wheeler" when the user said how they travel (`mode`).
     var travelMode: String?
     var eventId: String?
     /// The event to leave for is the one this turn's create_events call creates.

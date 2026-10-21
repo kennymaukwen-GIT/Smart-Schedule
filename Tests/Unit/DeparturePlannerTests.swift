@@ -260,6 +260,12 @@ final class DeparturePlannerTests: XCTestCase {
     }
 
     func testTravelModeRawValuesMatchGoogleMaps() {
-        XCTAssertEqual(TravelMode.allCases.map(\.rawValue), ["transit", "driving", "walking"])
+        XCTAssertEqual(TravelMode.allCases.map(\.rawValue), ["transit", "driving", "walking", "two-wheeler"])
+    }
+
+    func testAScooterOpensGoogleMapsTwoWheelerDirections() {
+        let url = DeparturePlanner.googleMapsURL(destination: "台北101", mode: .scooter)
+        XCTAssertEqual(queryItems(url)["travelmode"], "two-wheeler")
+        XCTAssertTrue(url.absoluteString.hasSuffix("&travelmode=two-wheeler&dir_action=navigate"))
     }
 }

@@ -599,7 +599,7 @@ final class AssistantPromptTests: XCTestCase {
         var event = TestEvents.make(id: "ss101", title: "開會", start: TestClock.local(2026, 10, 13, 17),
                                     end: TestClock.local(2026, 10, 13, 18))
         event.location = "台北101 信義路五段7號"
-        event.departure = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit, leaveMinutesBeforeStart: 62)
+        event.departure = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit)
         let text = prompt(upcoming: [event], focus: event)
         // The same row in FOCUS and UPCOMING, with no column for the place or the departure.
         let rows = text.components(separatedBy: "\n").filter { $0.hasPrefix("ss101 |") }
@@ -616,7 +616,7 @@ final class AssistantPromptTests: XCTestCase {
         XCTAssertFalse(pending.contains("信義路"), pending)
 
         // The AI-suggestions request sends the place (consent item 3) but never the departure.
-        event.departure = DepartureSettings(arriveEarlyMinutes: 15, travelMode: .walking, leaveMinutesBeforeStart: 137)
+        event.departure = DepartureSettings(arriveEarlyMinutes: 137, travelMode: .walking)
         let suggestions = NoteSuggestionPrompt.request(for: event, clock: clock, now: now, chinese: true, alreadySuggested: [])
         XCTAssertTrue(suggestions.contains("信義路"), suggestions)
         XCTAssertFalse(suggestions.contains("walking"), suggestions)

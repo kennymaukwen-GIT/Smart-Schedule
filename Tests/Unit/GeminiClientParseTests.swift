@@ -204,6 +204,9 @@ final class GeminiClientParseTests: XCTestCase {
         XCTAssertNil(odd.createEvent)
         XCTAssertNil(try TestJSON.decode(PlanDepartureArgs.self, json: "{}").destination)
         XCTAssertEqual(try TestJSON.decode(PlanDepartureArgs.self, json: #"{"travel_mode": " Driving "}"#).mode, .driving)
+        // 騎機車 / scooter: Google's two-wheeler; the server's spelling is not the app's.
+        XCTAssertEqual(try TestJSON.decode(PlanDepartureArgs.self, json: #"{"travel_mode": "two-wheeler"}"#).mode, .scooter)
+        XCTAssertNil(try TestJSON.decode(PlanDepartureArgs.self, json: #"{"travel_mode": "two_wheeler"}"#).mode)
     }
 
     func testConfirmPlanCallDecodes() throws {

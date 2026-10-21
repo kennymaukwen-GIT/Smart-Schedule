@@ -23,6 +23,19 @@ enum RouteMode: String, CaseIterable, Equatable, Sendable {
         case .transit: self = .transit
         case .driving: self = .drive
         case .walking: self = .walk
+        case .scooter: self = .twoWheeler
+        }
+    }
+}
+
+extension TravelMode {
+    /// The way of travelling a route from the server is for, as the app keeps it.
+    init(_ mode: RouteMode) {
+        switch mode {
+        case .transit: self = .transit
+        case .drive: self = .driving
+        case .walk: self = .walking
+        case .twoWheeler: self = .scooter
         }
     }
 }

@@ -17,7 +17,7 @@
 | `confirm_plan` | 使用者對畫面上的草稿計畫或「等你確認的行程」說「好」「looks good」或「不要了」 | `decision`：`add` 或 `discard`。只有 prompt 裡有 DRAFT PLAN 或 PENDING EVENTS 區塊時才能呼叫；兩個都有時，套用在比較新的那個 |
 | `reply_to_user` | 缺資訊時追問，或婉拒（行程和時間以外的要求一律用它婉拒，不帶 `needs_clarification` 和 `suggested_replies`；也可以和其他呼叫一起婉拒離題的部分，每一輪最多一次，見第 13.1 節） | `suggested_replies` 讓使用者一鍵回答 |
 | `update_preferences` | 「以後」「從現在開始」「別再」「always」這類**長期**指示：「8 點前不要提醒我」「健身提前 2 小時提醒」「以後用學校帳號」 | `changes[]`（`key` 是 18 個固定值之一，`value` 依 key 編碼）+ `summary_for_user`。只改設定，不碰行事曆；App 顯示「設定已更新」卡片並提供復原（見第 10 節） |
-| `plan_departure` | 「去台北 101 要多久？」「明天看牙醫幾點要出門？」「今天下午 5 點要到台北 101 開會」（出發提醒「該出發了」，**建置中**） | 全部選填：`destination`、`starting_point` 是使用者自己說的字；行事曆裡的行程只傳 `event_id`（Gemini 看不到行程地點）；新行程同一輪再呼叫 `create_events`，`create_event=true`。交通時間和出發時間由 App 用 Apple 地圖算，Gemini 不估算（見第 14 節） |
+| `plan_departure` | 「去台北 101 要多久？」「明天看牙醫幾點要出門？」「今天下午 5 點要到台北 101 開會」（出發提醒「該出發了」，**建置中**） | 全部選填：`destination`、`starting_point` 是使用者自己說的字；行事曆裡的行程只傳 `event_id`（Gemini 看不到行程地點）；新行程同一輪再呼叫 `create_events`，`create_event=true`。交通時間和出發時間由 App 經由伺服器問 Google 路線（Routes API），Gemini 不估算（見第 14 節） |
 | `suggest_event_notes` | 行程頁按「✨ AI 建議」：這個行程可能需要帶什麼、準備什麼 | **只在自己的 request 裡用**（mode ANY、`allowedFunctionNames` 只有它），聊天的每一輪都不允許呼叫。`items[]`（2–4 個）+ 選填的 `reason`。不寫入任何東西（見第 12 節） |
 
 不做成一個大函式加 `oneOf` 的理由：
@@ -521,22 +521,22 @@ App Review Guidelines 1.2 和 4.7.1 要求產生內容的 App 能過濾不當內
 | 參數 | 意思 |
 |---|---|
 | `destination` | 要去的地方，照使用者在這個要求裡寫的字（「台北 101」）。行事曆裡的行程不傳：App 自己讀行程的地點 |
-| `starting_point` | 只有使用者在這個要求裡說了從哪裡出發才填（「我從台北車站出發」），照原字。模型不問出發地 |
+| `starting_point` | 只有使用者在這個要求裡說了從哪裡出發才填（「我從台北車站出發」），照原字。模型不問出發地；沒有時 App 用 iPhone 的位置 |
 | `arrive_at_local` | 要到的時間，就是新行程的開始時間（`YYYY-MM-DDTHH:mm`），不減掉提早的分鐘。只問多久、或是行事曆裡的行程時不傳 |
 | `arrive_early_minutes` | 「提早 30 分鐘到」= 30，是幾點到，不是提醒（「提前 30 分鐘提醒」是 `reminder_minutes`）。0–180 |
-| `travel_mode` | 使用者說了才填：`transit`（捷運、公車、火車、大眾運輸）、`driving`（開車）、`walking`（走路）。沒說時 App 選 |
+| `travel_mode` | 使用者說了才填：`transit`（捷運、公車、火車、大眾運輸）、`driving`（開車）、`walking`（走路）、`two-wheeler`（騎機車、機車、摩托車、scooter、motorbike、moped）。沒說時 App 選 |
 | `event_id` | UPCOMING 或 FOCUS 裡的 id |
 | `create_event` | 這一輪的 `create_events` 裡從 `arrive_at_local` 開始的那個行程，就是要出發去的行程 |
 
 **為什麼沒有必填。** Gemini 只看得到行程的標題、時間、備註和 id，看不到地點（AI 同意第 7 版、隱私權政策第 4 節）。問行事曆裡的行程時，模型給不出目的地，所以 `destination` 不能必填；Gemini 的 schema 也沒有「沒有 `event_id` 時才必填」這種條件。App 自己檢查兩個至少有一個（第 6 步）。
 
 **擁有者的決定（2026-10-19）。**
-- 行事曆裡的行程只傳 `event_id`，App 讀行程上的地點去問 Apple 地圖，Gemini 從頭到尾不知道地點；行程沒有地點時，App 回覆「這個行程還沒有地點，請先在行程加上地點。」（1A）。
-- 出發地：回覆卡片一律讓使用者選「現在的位置」或「想要出發的位置」（自己輸入，只給 Apple 地圖）。使用者在句子裡說了出發地時，卡片預先選好那個地點，可以改成現在的位置；所以宣告裡有 `starting_point`（2A）。
+- 行事曆裡的行程只傳 `event_id`，App 讀行程上的地點去問 Google（原本是 Apple 地圖，2026-10-20 改成 Google），Gemini 從頭到尾不知道地點；行程沒有地點時，App 回覆「這個行程還沒有地點，請先在行程加上地點。」（1A）。
+- 出發地：回覆卡片一律讓使用者選「現在的位置」或「想要出發的位置」（自己輸入，經由 Smart Schedules 的伺服器只給 Google）。使用者在句子裡說了出發地時，卡片預先選好那個地點，可以改成現在的位置；所以宣告裡有 `starting_point`（2A）。
 - 加入這個函式需要在 `ScheduleAssistant` 和 `FixtureDecodingTests` 的 `switch` 各加一個 `case`（只新增，原本的行為不變）：擁有者同意。
 
-**Gemini 拿到什麼。** 只有固定的值：第 5 步是 `not_set`；第 6 步也只會是「已設定」「未設定」「需要出發地」這類固定值，沒有座標、地名、交通時間、出發時間，也沒有算不出來的原因（「太遠」「沒有路線」會透露距離）。`TravelTimeError` 每一種都變成同一個 `NSError`（固定 domain、code 0），就算錯誤走到 `ScheduleAssistant` 的通用錯誤處理，Gemini 也看不出原因。UPCOMING、FOCUS 和 PENDING 區塊不加地點或出發設定的欄位（`AssistantPromptTests.testThePromptNeverCarriesAnEventsPlaceOrDeparture`、validator 第 15 項）。
+**Gemini 拿到什麼。** 只有固定的值：第 5 步是 `not_set`；第 6 步也只會是「已設定」「未設定」「需要出發地」這類固定值，沒有座標、地名、交通時間、出發時間，也沒有算不出來的原因（「太遠」「沒有路線」會透露距離）。`TravelTimeError`（位置）和 `DepartureRouteError`（路線）每一種都變成同一個 `NSError`（各自固定 domain、code 0），就算錯誤走到 `ScheduleAssistant` 的通用錯誤處理，Gemini 也看不出原因。UPCOMING、FOCUS 和 PENDING 區塊不加地點或出發設定的欄位（`AssistantPromptTests.testThePromptNeverCarriesAnEventsPlaceOrDeparture`、validator 第 15 項）。
 
 **示範模式。** 一樣允許呼叫（不然模型會改用 `reply_to_user` 自己估時間）；第 6 步 App 回覆示範模式不規劃出發時間。
 
-**Fixture。** `plan_departure.*.json`（4 個問多久或幾點出發；5 個有新行程：其中一個帶 `starting_point`，一個是回答「會議大概多久？」的那一輪（`earlier_utterances`），一個同一句話還有另一個一般行程）、`create_events.no_departure_*.json`（4 個一般行程，包括只說「我開車去」的，`must_not_call: ["plan_departure"]`）、`reply_to_user.departure_length.json`（先問多長）和 `reply_to_user.departure_where.json`（先問去哪裡）。有新行程的 fixture 把 `create_events` 放在 `also_calls`。
+**Fixture。** `plan_departure.*.json`（5 個問多久或幾點出發，包括「騎機車去台北 101 要多久？」→ `two-wheeler`；5 個有新行程：其中一個帶 `starting_point`，一個是回答「會議大概多久？」的那一輪（`earlier_utterances`），一個同一句話還有另一個一般行程）、`create_events.no_departure_*.json`（4 個一般行程，包括只說「我開車去」的，`must_not_call: ["plan_departure"]`）、`reply_to_user.departure_length.json`（先問多長）和 `reply_to_user.departure_where.json`（先問去哪裡）。有新行程的 fixture 把 `create_events` 放在 `also_calls`。

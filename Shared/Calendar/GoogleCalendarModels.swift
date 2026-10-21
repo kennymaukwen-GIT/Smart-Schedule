@@ -180,11 +180,10 @@ enum SSProperty {
     /// The reminders Smart Schedule itself sends: "default" (the kind's defaults) or minutes like "60,10".
     /// Google's own pop-ups may differ (none at all in "Smart Schedules only" mode).
     static let localReminders = "ssReminders"
-    /// Departure reminders (`DepartureSettings`): minutes early to arrive ("30"), the travel mode ("transit") and the
-    /// minutes before the start to leave ("62"). All three or none; no location, starting point or travel time.
+    /// Departure reminders (`DepartureSettings`): minutes early to arrive ("30") and the travel mode ("transit").
+    /// Both or none; no location, starting point, travel time or time to leave (those come from Google).
     static let arriveEarly = "ssArriveEarly"
     static let travelMode = "ssTravelMode"
-    static let leaveBefore = "ssLeaveBefore"
 }
 
 /// Google Calendar's fixed event colorIds → the colour Google Calendar shows for each, so an event keeps the colour

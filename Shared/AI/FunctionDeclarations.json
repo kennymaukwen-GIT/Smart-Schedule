@@ -356,7 +356,7 @@
   },
   {
     "name": "plan_departure",
-    "description": "Work out how long a trip takes or when to leave, with the iPhone's location and Apple Maps; the app answers the user itself. Call it when the user asks how long it takes to get somewhere or when to leave ('去台北 101 要多久？', 'when should I leave for the dentist?'), or says they need to be at a place at a time ('今天下午 5 點要到台北 101 開會'). Never estimate a travel time or a time to leave yourself (rule 13). Not for a plain new event with a place and a time ('明天下午 3 點看牙醫'): that is create_events only.",
+    "description": "Work out when to leave or how long a trip takes, with Google's travel times for that time of day, from the iPhone's location or a starting point the user gave; the app answers the user itself. Call it when the user asks how long it takes to get somewhere or when to leave ('去台北 101 要多久？', 'when should I leave for the dentist?'), or says they need to be at a place at a time ('今天下午 5 點要到台北 101 開會'). Never estimate a travel time or a time to leave yourself (rule 13). Not for a plain new event with a place and a time ('明天下午 3 點看牙醫'): that is create_events only.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -366,7 +366,7 @@
         },
         "starting_point": {
           "type": "string",
-          "description": "Only when the user said where they leave from in this request (this message, or the earlier one your question was about), exactly as written: '台北車站'. Never ask for it: the app lets the user pick the current location or another place."
+          "description": "Only when the user said where they leave from in this request (this message, or the earlier one your question was about), exactly as written: '台北車站'. Never ask for it: without one the app uses the iPhone's location."
         },
         "arrive_at_local": {
           "type": "string",
@@ -380,8 +380,8 @@
         },
         "travel_mode": {
           "type": "string",
-          "enum": ["transit", "driving", "walking"],
-          "description": "Only when the user said how they travel: transit for 捷運, 公車, 火車, 大眾運輸, bus, train, tube or public transport; driving for 開車 or drive; walking for 走路 or walk. Omit otherwise: the app chooses."
+          "enum": ["transit", "driving", "walking", "two-wheeler"],
+          "description": "Only when the user said how they travel: transit for 捷運, 公車, 火車, 大眾運輸, bus, train, tube or public transport; driving for 開車 or drive; walking for 走路 or walk; two-wheeler for 騎機車, 機車, 摩托車, scooter, motorbike or moped. Omit otherwise: the app chooses."
         },
         "event_id": { "type": "string", "description": "Exact id from UPCOMING or FOCUS when the user asks about an event already in the calendar. Never invent ids." },
         "create_event": {

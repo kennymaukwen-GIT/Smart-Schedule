@@ -48,14 +48,16 @@
     NotificationActionsTests checks the notification reply action's .authenticationRequired.
 14. Departure reminders 「該出發了」 (docs/SETTINGS.md §7.11) use the location only when the user asks, in the app in the
     foreground: NSLocationWhenInUseUsageDescription is declared for the app target (English in project.yml, saying
-    Apple Maps and not saved; zh-Hant in Shared/Localization/zh-Hant.lproj/InfoPlist.strings, saying Apple 地圖 and
-    不會被保存), with no Always key, no location background mode (flow or block list) and no location key in either
-    extension (NSLocation*, NSWidgetWantsLocation); Core Location and MapKit are imported only under App/ (every import
-    spelling), CLLocationManager appears only in App/Departure, and no Swift file uses continuous or background location
-    (startUpdatingLocation, requestAlwaysAuthorization, CLBackgroundActivitySession, CLMonitor, liveUpdates, …).
+    Google Maps and "does not save"; zh-Hant in Shared/Localization/zh-Hant.lproj/InfoPlist.strings, saying Google 地圖
+    and 不會保存; neither names Apple), with no Always key, no location background mode (flow or block list) and no
+    location key in either extension (NSLocation*, NSWidgetWantsLocation); Core Location is imported only under App/
+    (every import spelling) and MapKit nowhere (routes come from Google, whose terms forbid showing them with a
+    non-Google map), CLLocationManager appears only in App/Departure, and no Swift file uses continuous or background
+    location (startUpdatingLocation, requestAlwaysAuthorization, CLBackgroundActivitySession, CLMonitor, liveUpdates, …).
 15. plan_departure (departure reminders, prompt rule 13, docs/SETTINGS.md §7.11): nothing required (Gemini never sees an
-    event's place, so an event from UPCOMING or FOCUS passes only its id), travel_mode is exactly the app's TravelMode and
-    arrive_early_minutes the app's range (Shared/Core/DeparturePlanner.swift). A fixture's turn may hold several calls
+    event's place, so an event from UPCOMING or FOCUS passes only its id), travel_mode is exactly the raw values of the
+    app's TravelMode ("two-wheeler" for a scooter), each with the words that name it, arrive_early_minutes the app's
+    range (Shared/Core/DeparturePlanner.swift), and the declaration never names Apple Maps (travel times are Google's). A fixture's turn may hold several calls
     (`also_calls`, with plan_departure in expected_call), name functions it must not call (`must_not_call`) and give the
     message an answer completes (`earlier_utterances`). One plan_departure per turn, with a destination or an event_id;
     an event from UPCOMING or FOCUS (its id shown there) passes only its id (owner decision 1A); destination and
@@ -857,9 +859,10 @@ LOCATION_KEY = "NSLocationWhenInUseUsageDescription"
 ALWAYS_LOCATION_KEYS = ("NSLocationAlwaysAndWhenInUseUsageDescription", "NSLocationAlwaysUsageDescription")
 # Every import spelling: attributes (@preconcurrency, @_exported, @_implementationOnly), access levels (SE-0409) and
 # scoped imports (`import class CoreLocation.CLLocationManager`).
-LOCATION_IMPORT = re.compile(r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|package|internal|fileprivate|private)\s+)?"
-                             r"import\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?"
-                             r"(?:CoreLocation|CoreLocationUI|MapKit|_MapKit_SwiftUI)\b", re.M)
+IMPORT_PREFIX = (r"^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|package|internal|fileprivate|private)\s+)?"
+                 r"import\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?")
+LOCATION_IMPORT = re.compile(IMPORT_PREFIX + r"(?:CoreLocation|CoreLocationUI)\b", re.M)
+MAPKIT_IMPORT = re.compile(IMPORT_PREFIX + r"(?:MapKit|_MapKit_SwiftUI)\b", re.M)
 LOCATION_MANAGER = re.compile(r"\bCLLocationManager\b")
 EXTENSION_LOCATION_KEY = re.compile(r"\bNSLocation\w*|\bNSWidgetWantsLocation\b")
 ZH_INFOPLIST = ROOT / "Shared/Localization/zh-Hant.lproj/InfoPlist.strings"
@@ -871,17 +874,21 @@ BACKGROUND_LOCATION = re.compile(r"\b(?:requestAlwaysAuthorization|allowsBackgro
 
 def location_checks() -> None:
     """Check 14: departure reminders 「該出發了」 (docs/SETTINGS.md §7.11) use the location only when the user asks, in
-    the app in the foreground: When In Use permission, one fix at a time, nothing in the background. Core Location and
-    MapKit stay in the app target (App/), so the extensions and the pure rules in Shared/Departure never get them, and
-    only App/Departure creates a location manager. Comments are ignored."""
+    the app in the foreground: When In Use permission, one fix at a time, nothing in the background. Core Location
+    stays in the app target (App/), so the extensions and the pure rules in Shared/Departure never get it, and only
+    App/Departure creates a location manager. MapKit is not used at all: travel times and routes come from Google, and
+    Google's terms forbid using them with or near a non-Google map. Comments are ignored."""
     before = len(errors)
     for directory in SWIFT_DIRS:
         for path in sorted((ROOT / directory).rglob("*.swift")):
             relative = path.relative_to(ROOT)
             code = re.sub(r"//.*", "", path.read_text(encoding="utf-8"))
             if LOCATION_IMPORT.search(code) and relative.parts[0] != "App":
-                errors.append(f"{relative}: imports Core Location or MapKit outside App/ (the extensions have no "
-                              "location; Shared/Departure keeps the rules pure behind protocols)")
+                errors.append(f"{relative}: imports Core Location outside App/ (the extensions have no location; "
+                              "Shared/Departure keeps the rules pure behind protocols)")
+            if MAPKIT_IMPORT.search(code):
+                errors.append(f"{relative}: imports MapKit (departure routes come from Google, whose terms forbid "
+                              "showing them with or near a non-Google map)")
             if LOCATION_MANAGER.search(code) and relative.parts[:2] != tuple(LOCATION_DIR.split("/")):
                 errors.append(f"{relative}: uses CLLocationManager outside {LOCATION_DIR} (DeviceLocation is the only "
                               "place that asks for the location)")
@@ -895,8 +902,9 @@ def location_checks() -> None:
     if not match:
         errors.append(f"project.yml: target {APP_TARGET} needs {LOCATION_KEY} (asked the first time the user asks "
                       "when to leave)")
-    elif "Apple Maps" not in match.group(1) or "not saved" not in match.group(1):
-        errors.append(f"project.yml: {LOCATION_KEY} must say the location goes only to Apple Maps and is not saved")
+    elif "Google Maps" not in match.group(1) or "does not save" not in match.group(1) or "Apple" in match.group(1):
+        errors.append(f"project.yml: {LOCATION_KEY} must say the location goes to Google Maps and that Smart Schedules "
+                      "does not save it, and must not name Apple")
     for key in ALWAYS_LOCATION_KEYS:
         if key in project:
             errors.append(f"project.yml: {key} declared; departure reminders use When In Use only")
@@ -919,12 +927,13 @@ def location_checks() -> None:
         found = re.search(rf'^"{LOCATION_KEY}"\s*=\s*"(.+)";$', text, re.M)
         if not found:
             errors.append(f"{path.relative_to(ROOT)}: {LOCATION_KEY} is missing (project.yml declares it in English)")
-        elif "Apple 地圖" not in found.group(1) or "不會被保存" not in found.group(1):
-            errors.append(f"{path.relative_to(ROOT)}: {LOCATION_KEY} must say the location goes only to Apple 地圖 "
-                          "and 不會被保存")
+        elif "Google 地圖" not in found.group(1) or "不會保存" not in found.group(1) or "Apple" in found.group(1):
+            errors.append(f"{path.relative_to(ROOT)}: {LOCATION_KEY} must say the location goes to Google 地圖 and "
+                          "Smart Schedules 不會保存 it, and must not name Apple")
     if len(errors) == before:
-        print(f"✓ Location for departure reminders: {LOCATION_KEY} only (en + zh-Hant), app target only, no Always key "
-              f"or background location; Core Location and MapKit only in App/, the location manager in {LOCATION_DIR}")
+        print(f"✓ Location for departure reminders: {LOCATION_KEY} only (en + zh-Hant, Google Maps), app target only, "
+              f"no Always key or background location; Core Location only in App/, no MapKit, the location manager in "
+              f"{LOCATION_DIR}")
 
 
 
@@ -940,6 +949,7 @@ MODE_WORDS = {
     "transit": re.compile(r"捷運|公車|火車|高鐵|大眾運輸|\b(?:bus|train|tube|metro|subway|public transport)\b", re.I),
     "driving": re.compile(r"開車|\b(?:drive|driving)\b", re.I),
     "walking": re.compile(r"走路|步行|\b(?:walk|walking)\b", re.I),
+    "two-wheeler": re.compile(r"機車|摩托車|\b(?:scooter|motorbike|moped)\b", re.I),
 }
 ZH_NUMBER = r"\d{1,3}|[零〇一二兩两三四五六七八九十]{1,4}"
 # "提早 30 分鐘到", "提早半小時到", "提前十分鐘抵達", "30 minutes early", "half an hour early". Arriving early only: '提前 30
@@ -1000,8 +1010,21 @@ def said_length(text: str) -> int | None:
 
 
 def swift_travel_modes() -> list[str]:
+    """TravelMode's raw values in order: `case transit` is "transit", `case scooter = "two-wheeler"` is "two-wheeler".
+    Comment lines are skipped; any other line starting with `case` that isn't one of these two forms fails the check."""
     body = re.search(r"enum TravelMode\b[^{]*\{(.*?)\n\}", DEPARTURE_PLANNER.read_text(encoding="utf-8"), re.S)
-    return re.findall(r"^\s*case (\w+)\s*$", body.group(1), re.M) if body else []
+    if not body:
+        return []
+    modes = []
+    for line in body.group(1).splitlines():
+        line = line.split("//", 1)[0].strip()
+        if not line.startswith("case"):
+            continue
+        match = re.fullmatch(r'case (\w+)(?:\s*=\s*"([^"]+)")?', line)
+        if not match:
+            return []
+        modes.append(match.group(2) or match.group(1))
+    return modes
 
 
 def swift_arrive_early_range() -> tuple[int, int] | None:
@@ -1022,7 +1045,11 @@ def departure_declaration_checks(by_name: dict) -> None:
         errors.append(f"plan_departure: parameters must be exactly {sorted(DEPARTURE_PROPERTIES)}, got {sorted(props)}")
     modes = swift_travel_modes()
     if not modes or props.get("travel_mode", {}).get("enum") != modes:
-        errors.append(f"plan_departure: travel_mode enum must be TravelMode's cases {modes}")
+        errors.append(f"plan_departure: travel_mode enum must be TravelMode's raw values {modes}")
+    if set(MODE_WORDS) != set(modes):
+        errors.append(f"check 15: MODE_WORDS must name every TravelMode raw value {modes}, got {sorted(MODE_WORDS)}")
+    if re.search(r"\bApple\b|MapKit", json.dumps(decl, ensure_ascii=False)):
+        errors.append("plan_departure: travel times come from Google, not Apple Maps")
     early, bounds = props.get("arrive_early_minutes", {}), swift_arrive_early_range()
     if early.get("type") != "integer" or not bounds or (early.get("minimum"), early.get("maximum")) != bounds:
         errors.append(f"plan_departure: arrive_early_minutes must be an integer {bounds} (DeparturePlanner.arriveEarlyRange)")
@@ -1131,7 +1158,7 @@ def departure_prompt_checks() -> None:
     for relative, pattern in DEPARTURE_PROMPT_READS.items():
         for number, line in enumerate((ROOT / relative).read_text(encoding="utf-8").splitlines(), 1):
             code = line.split("//", 1)[0]
-            if pattern.search(code) or re.search(r"\bSSProperty\.(?:arriveEarly|travelMode|leaveBefore)\b", code):
+            if pattern.search(code) or re.search(r"\bSSProperty\.(?:arriveEarly|travelMode)\b", code):
                 errors.append(f"{relative}:{number}: a prompt builder reads an event's place or departure (§7.11)")
 
 

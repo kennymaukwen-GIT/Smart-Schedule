@@ -1,34 +1,23 @@
 import Foundation
 
-/// What an event keeps of its departure reminders 「該出發了」 (docs/SETTINGS.md §7.11): exactly the three values the
-/// privacy policy names, in the event's private properties on Google Calendar (`SSProperty.arriveEarly`, `travelMode`,
-/// `leaveBefore`). Never a location, starting point, route or separate travel time.
-///
-/// The departure is kept relative to the start, so when the event moves, its reminders move with it.
+/// What an event keeps of its departure reminders 「該出發了」 (docs/SETTINGS.md §7.11): only the user's own two choices,
+/// in the event's private properties on Google Calendar (`SSProperty.arriveEarly`, `travelMode`). Never a location,
+/// starting point, route, travel time or the time to leave: those come from Google, whose terms allow no storing of
+/// them (owner decision 2026-10-20), so the time to leave stays on the iPhone only, for that event's reminders.
 struct DepartureSettings: Codable, Hashable, Sendable {
     /// Minutes before the start the user wants to be there.
     var arriveEarlyMinutes: Int
     var travelMode: TravelMode
-    /// Minutes before the start to leave: minutes early + travel + margin.
-    var leaveMinutesBeforeStart: Int
 
-    /// The longest a departure can be before the start: the most minutes early, travel and margin together.
-    static let leaveRange = 0...(DeparturePlanner.arriveEarlyRange.upperBound
-                                 + DeparturePlanner.travelMinutesRange.upperBound
-                                 + DeparturePlanner.bufferRange.upperBound)
-
-    /// Values are kept in range: minutes early within `DeparturePlanner.arriveEarlyRange`, and leaving no later than
-    /// arriving (`leaveMinutesBeforeStart` at least `arriveEarlyMinutes`) and within `leaveRange`.
-    init(arriveEarlyMinutes: Int, travelMode: TravelMode, leaveMinutesBeforeStart: Int) {
-        let early = min(max(arriveEarlyMinutes, DeparturePlanner.arriveEarlyRange.lowerBound),
-                        DeparturePlanner.arriveEarlyRange.upperBound)
-        self.arriveEarlyMinutes = early
+    /// The minutes early are kept within `DeparturePlanner.arriveEarlyRange`.
+    init(arriveEarlyMinutes: Int, travelMode: TravelMode) {
+        self.arriveEarlyMinutes = min(max(arriveEarlyMinutes, DeparturePlanner.arriveEarlyRange.lowerBound),
+                                      DeparturePlanner.arriveEarlyRange.upperBound)
         self.travelMode = travelMode
-        self.leaveMinutesBeforeStart = min(max(leaveMinutesBeforeStart, early), Self.leaveRange.upperBound)
     }
 
-    /// When to leave for an event starting at `start`.
-    func departAt(start: Date) -> Date {
-        start.addingTimeInterval(-TimeInterval(leaveMinutesBeforeStart) * 60)
+    /// When the user wants to be there for an event starting at `start`.
+    func arriveBy(start: Date) -> Date {
+        start.addingTimeInterval(-TimeInterval(arriveEarlyMinutes) * 60)
     }
 }

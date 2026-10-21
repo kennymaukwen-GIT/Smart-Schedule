@@ -1,7 +1,8 @@
 import XCTest
 
-/// Departure reminders on the event (step 3): the three values in its private properties on Google Calendar, read and
-/// written by the mapper. Events without them read exactly as before.
+/// Departure reminders on the event: the user's two choices (minutes early, way of travelling) in its private
+/// properties on Google Calendar, read and written by the mapper. Never the time to leave, which comes from Google
+/// (owner decision 2026-10-20). Events without them read exactly as before.
 final class DepartureSettingsTests: XCTestCase {
     private let mapper = CalendarEventMapper(clock: TestClock.clock, policy: ReminderPolicy())
 
@@ -16,14 +17,13 @@ final class DepartureSettingsTests: XCTestCase {
         return event
     }
 
-    private let saved = ["ssArriveEarly": "30", "ssTravelMode": "transit", "ssLeaveBefore": "62"]
+    private let saved = ["ssArriveEarly": "30", "ssTravelMode": "transit"]
 
     // MARK: Reading
 
     func testAnEventWithDepartureSettingsReadsThem() throws {
         let event = try XCTUnwrap(mapper.scheduleEvent(from: googleEvent(saved)))
-        XCTAssertEqual(event.departure, DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit,
-                                                         leaveMinutesBeforeStart: 62))
+        XCTAssertEqual(event.departure, DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit))
     }
 
     func testAnOlderEventReadsAsBefore() throws {
@@ -40,28 +40,36 @@ final class DepartureSettingsTests: XCTestCase {
 
     func testBadOrMissingValuesAreIgnored() {
         let cases: [[String: String]] = [
-            ["ssArriveEarly": "30", "ssTravelMode": "transit"],                         // one missing
-            ["ssArriveEarly": "thirty", "ssTravelMode": "transit", "ssLeaveBefore": "62"],
-            ["ssArriveEarly": "30", "ssTravelMode": "bicycling", "ssLeaveBefore": "62"], // not a mode the app uses
-            ["ssArriveEarly": "30", "ssTravelMode": "transit", "ssLeaveBefore": ""],
-            ["ssArriveEarly": "-5", "ssTravelMode": "transit", "ssLeaveBefore": "62"],
-            ["ssArriveEarly": "181", "ssTravelMode": "transit", "ssLeaveBefore": "200"],
-            ["ssArriveEarly": "30", "ssTravelMode": "transit", "ssLeaveBefore": "1801"],
-            ["ssArriveEarly": "30", "ssTravelMode": "transit", "ssLeaveBefore": "20"],   // leaving after arriving
-            ["ssArriveEarly": " 30", "ssTravelMode": "transit", "ssLeaveBefore": "62"],
+            ["ssArriveEarly": "30"],                                       // one missing
+            ["ssTravelMode": "transit"],
+            ["ssArriveEarly": "thirty", "ssTravelMode": "transit"],
+            ["ssArriveEarly": "30", "ssTravelMode": "bicycling"],          // not a mode the app uses
+            ["ssArriveEarly": "30", "ssTravelMode": "two_wheeler"],        // the server's spelling, not the app's
+            ["ssArriveEarly": "30", "ssTravelMode": ""],
+            ["ssArriveEarly": "-5", "ssTravelMode": "transit"],
+            ["ssArriveEarly": "181", "ssTravelMode": "transit"],
+            ["ssArriveEarly": " 30", "ssTravelMode": "transit"],
         ]
         for properties in cases {
             XCTAssertNil(CalendarEventMapper.departure(from: properties), "\(properties)")
         }
     }
 
+    /// An event written while the time to leave was still kept on it (development builds only) reads its two choices.
+    func testAnOlderThirdValueIsIgnored() {
+        XCTAssertEqual(CalendarEventMapper.departure(from: ["ssArriveEarly": "30", "ssTravelMode": "driving",
+                                                            "ssLeaveBefore": "62"]),
+                       DepartureSettings(arriveEarlyMinutes: 30, travelMode: .driving))
+    }
+
     // MARK: Writing
 
-    func testItWritesExactlyTheThreeValues() {
-        let settings = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit, leaveMinutesBeforeStart: 62)
+    func testItWritesExactlyTheTwoValues() {
+        let settings = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit)
         XCTAssertEqual(CalendarEventMapper.departureProperties(settings), saved)
         let patch = mapper.departurePatch(settings)
-        XCTAssertEqual(patch.extendedProperties?.private, saved, "no location, starting point or travel time")
+        XCTAssertEqual(patch.extendedProperties?.private, saved,
+                       "no location, starting point, travel time or time to leave")
         XCTAssertNil(patch.extendedProperties?.shared)
         XCTAssertNil(patch.summary)
         XCTAssertNil(patch.location)
@@ -71,43 +79,43 @@ final class DepartureSettingsTests: XCTestCase {
         XCTAssertNil(patch.description)
     }
 
+    func testAScooterIsKeptAsTwoWheeler() {
+        let settings = DepartureSettings(arriveEarlyMinutes: 10, travelMode: .scooter)
+        XCTAssertEqual(CalendarEventMapper.departureProperties(settings),
+                       ["ssArriveEarly": "10", "ssTravelMode": "two-wheeler"])
+    }
+
     func testWritingThenReadingGivesTheSameSettings() {
         for mode in TravelMode.allCases {
-            for (early, leave) in [(0, 0), (0, 32), (30, 62), (180, 1_800)] {
-                let settings = DepartureSettings(arriveEarlyMinutes: early, travelMode: mode, leaveMinutesBeforeStart: leave)
+            for early in [0, 10, 30, 180] {
+                let settings = DepartureSettings(arriveEarlyMinutes: early, travelMode: mode)
                 XCTAssertEqual(CalendarEventMapper.departure(from: CalendarEventMapper.departureProperties(settings)),
-                               settings, "\(mode) \(early) \(leave)")
+                               settings, "\(mode) \(early)")
             }
         }
     }
 
     func testValuesAreKeptInRange() {
-        let tooBig = DepartureSettings(arriveEarlyMinutes: 999, travelMode: .driving, leaveMinutesBeforeStart: 99_999)
-        XCTAssertEqual(tooBig.arriveEarlyMinutes, 180)
-        XCTAssertEqual(tooBig.leaveMinutesBeforeStart, 1_800)
-        let backwards = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .walking, leaveMinutesBeforeStart: 10)
-        XCTAssertEqual(backwards.leaveMinutesBeforeStart, 30, "never leave after the time to arrive")
-        let negative = DepartureSettings(arriveEarlyMinutes: -5, travelMode: .walking, leaveMinutesBeforeStart: -5)
-        XCTAssertEqual([negative.arriveEarlyMinutes, negative.leaveMinutesBeforeStart], [0, 0])
-        XCTAssertEqual(DepartureSettings.leaveRange, 0...1_800)
+        XCTAssertEqual(DepartureSettings(arriveEarlyMinutes: 999, travelMode: .driving).arriveEarlyMinutes, 180)
+        XCTAssertEqual(DepartureSettings(arriveEarlyMinutes: -5, travelMode: .walking).arriveEarlyMinutes, 0)
     }
 
     // MARK: From a plan, and back
 
-    /// The owner's example: 17:00, 30 minutes early, 22 minutes by transit, 10 minutes' margin → leave 62 minutes
-    /// before the start (15:58). The travel time itself is not kept.
-    func testAPlanBecomesTheThreeValues() {
+    /// The owner's example: 17:00, 30 minutes early → be there by 16:30. Only the minutes early and the way of
+    /// travelling are kept; the travel time and the time to leave are not.
+    func testAPlanKeepsOnlyTheUsersChoices() {
         let start = TestClock.local(2026, 10, 20, 17, 0)
         let plan = DeparturePlanner.plan(start: start, arriveEarlyMinutes: 30, travelMinutes: 22,
                                          travelMode: .transit, isEstimate: false)
         let settings = DeparturePlanner.settings(for: plan, start: start)
-        XCTAssertEqual(settings, DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit, leaveMinutesBeforeStart: 62))
-        XCTAssertEqual(settings.departAt(start: start), plan.departAt)
+        XCTAssertEqual(settings, DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit))
+        XCTAssertEqual(settings.arriveBy(start: start), TestClock.local(2026, 10, 20, 16, 30))
     }
 
-    func testMovingTheEventMovesTheDeparture() {
-        let settings = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit, leaveMinutesBeforeStart: 62)
-        XCTAssertEqual(settings.departAt(start: TestClock.local(2026, 10, 20, 18, 0)), TestClock.local(2026, 10, 20, 16, 58))
+    func testMovingTheEventMovesTheArrival() {
+        let settings = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .transit)
+        XCTAssertEqual(settings.arriveBy(start: TestClock.local(2026, 10, 20, 18, 0)), TestClock.local(2026, 10, 20, 17, 30))
     }
 
     // MARK: The cache
@@ -118,7 +126,7 @@ final class DepartureSettingsTests: XCTestCase {
         XCTAssertFalse(String(decoding: legacy, as: UTF8.self).contains("departure"), "nothing written when there is none")
         XCTAssertNil(try JSONDecoder().decode(ScheduleEvent.self, from: legacy).departure)
 
-        event.departure = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .driving, leaveMinutesBeforeStart: 100)
+        event.departure = DepartureSettings(arriveEarlyMinutes: 30, travelMode: .scooter)
         let data = try JSONEncoder().encode(event)
         XCTAssertEqual(try JSONDecoder().decode(ScheduleEvent.self, from: data), event)
     }

@@ -27,7 +27,7 @@
 | `recurrence` | `recurrence: ["RRULE:..."]` | 見第 4 節 |
 | `reminder_minutes` 或預設值 | `reminders.useDefault=false` 加 `overrides[]` | 見第 5 節 |
 | `kind` | `colorId` 加 `extendedProperties.private.ssKind` | routine 用 10（Basil 綠，對應 Gym）、deadline 用 6（Tangerine 橘）、task 用 5、event 沿用行事曆預設色 |
-| — | `extendedProperties.private` | `ssSource`、`ssKind`、`ssPlanId`、`ssSchema`、`ssReminders`（見第 5 節），可以用 `privateExtendedProperty=ssPlanId=<id>` 查回整個計畫；有出發提醒的行程另有 `ssArriveEarly`（想提早幾分鐘到）、`ssTravelMode`（`transit`／`driving`／`walking`）、`ssLeaveBefore`（開始前幾分鐘出發），三個一起，少一個或值不對就當作沒有（`DepartureSettings`、`CalendarEventMapper.departure(from:)`）。不存地點、出發地點、路線或交通時間。 |
+| — | `extendedProperties.private` | `ssSource`、`ssKind`、`ssPlanId`、`ssSchema`、`ssReminders`（見第 5 節），可以用 `privateExtendedProperty=ssPlanId=<id>` 查回整個計畫；有出發提醒的行程另有 `ssArriveEarly`（想提早幾分鐘到）、`ssTravelMode`（`transit`／`driving`／`walking`／`two-wheeler`），兩個一起，少一個或值不對就當作沒有（`DepartureSettings`、`CalendarEventMapper.departure(from:)`）。不存地點、出發地點、路線、交通時間或出發時間（Google 的條款不允許保存它算出的時間，出發時間只留在 iPhone 上給那個行程的提醒用）。 |
 | `add_video_conference` | `conferenceData.createRequest`（`hangoutsMeet`） | request 要帶 `conferenceDataVersion=1`，Meet 連結才會產生 |
 | `attendees`（只接受 email） | `attendees[]` | 有受邀者時設 `sendUpdates=all`，沒有就是 `none` |
 

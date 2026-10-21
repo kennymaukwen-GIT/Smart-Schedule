@@ -73,6 +73,14 @@ final class FixtureDecodingTests: XCTestCase {
         XCTAssertTrue(try Fixtures.alsoCalls("plan_departure.how_long.json").isEmpty)
     }
 
+    func testAScooterRideIsGooglesTwoWheeler() throws {
+        let args = try Fixtures.args(PlanDepartureArgs.self, from: "plan_departure.scooter.json")
+        XCTAssertEqual(args.destination, "台北 101")
+        XCTAssertEqual(args.travelMode, "two-wheeler")
+        XCTAssertEqual(args.mode, .scooter)
+        XCTAssertNil(args.arriveAtLocal, "only how long: no time to arrive")
+    }
+
     func testAnExistingEventPassesItsIdOnly() throws {
         // Gemini never sees an event's place (consent v7, docs/SETTINGS.md §7.11): the app reads it (owner, 2026-10-19).
         let name = "plan_departure.existing_event.json"

@@ -6,6 +6,8 @@ enum TravelMode: String, CaseIterable, Codable, Sendable {
     case transit
     case driving
     case walking
+    /// A scooter or motorbike: Google's two-wheeler routes (TWO_WHEELER), "two-wheeler" in a Google Maps link.
+    case scooter = "two-wheeler"
 }
 
 /// One worked-out departure for 「該出發了」: when to be there, when to leave and how long the trip takes.
@@ -58,12 +60,11 @@ enum DeparturePlanner {
                              travelMode: travelMode, isEstimate: isEstimate)
     }
 
-    /// What the event keeps of `plan` for an event starting at `start` (the plan's minutes early and its departure,
-    /// both counted back from the start). Never the travel time itself.
+    /// What the event keeps of `plan` for an event starting at `start`: the minutes early (counted back from the
+    /// start) and the way of travelling. Never the travel time or the time to leave, which come from Google.
     static func settings(for plan: DeparturePlan, start: Date) -> DepartureSettings {
         DepartureSettings(arriveEarlyMinutes: wholeMinutes(start.timeIntervalSince(plan.arriveBy)),
-                          travelMode: plan.travelMode,
-                          leaveMinutesBeforeStart: wholeMinutes(start.timeIntervalSince(plan.departAt)))
+                          travelMode: plan.travelMode)
     }
 
     /// When 「準備出門」 fires: `leadMinutes` before departure.

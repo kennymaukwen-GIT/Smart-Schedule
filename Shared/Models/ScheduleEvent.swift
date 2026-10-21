@@ -42,7 +42,7 @@ struct ScheduleEvent: Codable, Hashable, Identifiable, Sendable {
     /// never part of a Google write (the mapper and `EventEdit` ignore it) and kept across listings by
     /// `ScheduleEvent.keepingLocalFields`. nil = none; [] = cleared.
     var suggestedNotes: [String]? = nil
-    /// Departure reminders 「該出發了」 set for this event: the three values kept in its private properties on Google
+    /// Departure reminders 「該出發了」 set for this event: the two values kept in its private properties on Google
     /// Calendar (`DepartureSettings`). nil = none.
     var departure: DepartureSettings? = nil
 
