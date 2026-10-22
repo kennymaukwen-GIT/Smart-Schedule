@@ -2,7 +2,7 @@
 
 Smart Schedules 的靜態網站：首頁、隱私權政策和支援頁，網址是 **https://www.smart-schedules.com**。Google OAuth 驗證、App Store Connect 和 App 裡的連結都指向這裡。
 
-**實際上線方式（2026-10-17 起）：Vercel。** 網站放在 GitHub repo `Smart-Schedules-WEB`（Vercel 專案 `smartschedules-supportwebsite`，正式網域 www.smart-schedules.com），push 到 `main` 就自動部署。repo 的**最上層**放 `public/` 裡的檔案（`index.html`、`privacy.html`、`support.html`、`404.html`、`logo.png`、`home-bg.webp`、`home-bg-1200.webp`、`robots.txt`、`vercel.json`），不要放在子資料夾裡，也不要改檔名：Vercel 找不到最上層的 `index.html` 時整個網站都是 404（2026-10-17 就是只上傳了一個改名成 `SSWEB.html` 的政策頁）。`vercel.json` 讓 `/privacy`、`/support` 不用加 `.html`（`cleanUrls`，App 的隱私權政策連結就是 `/privacy`），並加上和 `_headers` 相同的安全標頭；`_headers` 和 `wrangler.toml` 只給 Cloudflare 用，Vercel 不需要。Vercel 專案設定：Framework Preset「Other」，Build Command 和 Output Directory 留空，Root Directory 是 repo 最上層。政策第 10、12、17 節寫網站由 Vercel 託管（Vercel DPA）。下面的 Cloudflare Pages 步驟是原本的方案，現在沒有使用。
+**實際上線方式（2026-10-17 起）：Vercel。** 網站放在 GitHub repo `Smart-Schedules-WEB`（Vercel 專案 `smartschedules-supportwebsite`，正式網域 www.smart-schedules.com），push 到 `main` 就自動部署。repo 的**最上層**放 `public/` 裡的檔案（`index.html`、`privacy.html`、`terms.html`、`support.html`、`404.html`、`logo.png`、`home-bg.webp`、`home-bg-1200.webp`、`robots.txt`、`vercel.json`），不要放在子資料夾裡，也不要改檔名：Vercel 找不到最上層的 `index.html` 時整個網站都是 404（2026-10-17 就是只上傳了一個改名成 `SSWEB.html` 的政策頁）。`vercel.json` 讓 `/privacy`、`/support` 不用加 `.html`（`cleanUrls`，App 的隱私權政策連結就是 `/privacy`），並加上和 `_headers` 相同的安全標頭；`_headers` 和 `wrangler.toml` 只給 Cloudflare 用，Vercel 不需要。Vercel 專案設定：Framework Preset「Other」，Build Command 和 Output Directory 留空，Root Directory 是 repo 最上層。政策第 10、12、17 節寫網站由 Vercel 託管（Vercel DPA）。下面的 Cloudflare Pages 步驟是原本的方案，現在沒有使用。
 
 部署方式（1.0）：**Cloudflare Pages 專案**（Direct Upload，只有靜態檔案，沒有 Functions），用 `server/worker` 已經裝好的 wrangler（4.151.1）從終端機上傳，和 `server/worker` 用同一個 Cloudflare 帳號。**DNS 留在 Squarespace，不搬到 Cloudflare**：nameserver 仍然是 `nsa1`～`nsa4.squarespacedns.com`，DNSSEC 照舊開著，Google Workspace 的郵件紀錄一筆都不動；唯一和網站有關的 DNS 變更是在 Squarespace 加**一筆 CNAME**（`www` → 專案的 `pages.dev` 主機名稱）。根網域 smart-schedules.com 不提供網站，可以選擇用 Squarespace 的網域轉址轉到 www（[§3.5](#35選做根網域-smart-schedulescom-轉到-www)）。步驟在 [§3](#3-網站上線wwwsmart-schedulescomcloudflare-pages--squarespace-一筆-cname不搬-dns)；之後如果要把 DNS 搬到 Cloudflare，見[附錄](#附錄之後若要把-dns-搬到-cloudflare10-不需要)（1.0 不需要）。
 
@@ -78,7 +78,7 @@ grep -rn 'https://smart-schedules\.com' site/public      # 網址都要是 https
    - **DNS 留在 Squarespace，Google 的郵件紀錄一筆都不要動**（MX、SPF、`google-site-verification`，以及已經有的 DKIM、DMARC）。照 [§3.6](#36-google-workspace-郵件dkim-和-dmarc加在-squarespace) 在 Squarespace 的 DNS 完成 DKIM 和 DMARC（Google Admin console 的「Complete email setup」），並做那裡的收發測試。
    - 確認 CDPA 已經生效：用超級管理員（super admin）登入 Google Admin console（https://admin.google.com）› 帳戶（Account）› 帳戶設定（Account settings）› 法律與法規遵循（Legal and compliance）› 安全性與隱私權附加條款（Security and Privacy Additional Terms）› 雲端資料處理附錄（Cloud Data Processing Addendum）› 檢查並接受（Review and Accept）。Google 說 Workspace 合約已經納入 CDPA 時不必再接受，不確定就接受，沒有副作用（請在畫面上確認）。
    - 之後如果改用別的收信方式（例如取消 Workspace），政策第 9、12、13、17 節要一起改。
-6. **1.0 沒有 App 內購買**（2026-10-18 決定：AI 訂閱、免費試用、每月 AI 額度和照片／PDF 附件都延到 1.1）。政策第 7 節「購買」寫 1.0 沒有任何 App 內購買或訂閱、App 不查詢購買記錄，第 12 節 Apple 那一項沒有「App 內購買」；第 6 節的「速率限制」寫每個安裝每分鐘 30 個請求，以及長按提醒通知回覆時每個安裝每天 200 個 AI 請求（防濫用，不是賣的東西，沒有每月額度）；支援頁的常見問題只留一題「有 App 內購買或訂閱嗎？」（`#zh-purchases`、`#en-purchases`），回答「沒有」。網站只寫 1.0 做的事，不提 1.1 的計畫。這要和 `AppConstants.subscriptionsEnabled = false`、App Store Connect 不附加任何購買項目一致。1.1 開始賣 AI 訂閱、加入附件時，在 1.1 送審前的同一次發佈改回（為 1.0 寫過的文字在 commit `6ce6551`）：政策摘要、第 4 節的照片和 PDF（加上同意說明第 8 版的附件那一項）、第 6 節（免費額度的次數存在 App Attest 金鑰記錄裡）、第 7 節「購買」（Apple 處理付款；App 用 StoreKit 在 iPhone 上確認；伺服器驗證 Apple 簽署的購買紀錄，只保留原始交易 ID、到期日和請求次數，在收到的最晚到期日過後 30 天刪除；不分享、不用於廣告或追蹤）、第 8 節的相機、照片和「檔案」、第 12 節 Apple 那一項的「App 內購買（訂閱）」、第 13 節的附件、免費額度和訂閱記錄、第 15 節的取消訂閱和法律依據（訂閱是契約，免費額度是正當利益）；支援頁的「有 App 內購買或訂閱嗎？」和「怎麼刪除我的資料？」裡訂閱的那一句；首頁的功能列表。政策依賴的 1.1 建置條件見 `docs/SETTINGS.md` §16（附件以 `inlineData` 放在同一個請求裡、不用 Gemini Files API；購買紀錄不放進轉給 Gemini 的 body，Worker 也不記錄購買紀錄或交易 ID）。這一版（語音輸入、出發提醒）上線時，中英文兩處的生效日期要改成上線日，並保留開頭的「本版更新」那一行（第 18 節承諾重大變更會明顯標示）。
+6. **1.0 沒有 App 內購買**（2026-10-18 決定：AI 訂閱、免費試用、每月 AI 額度和照片／PDF 附件都延到 1.1）。政策第 7 節「購買」寫 1.0 沒有任何 App 內購買或訂閱、App 不查詢購買記錄，第 12 節 Apple 那一項沒有「App 內購買」；第 6 節的「速率限制」寫每個安裝每分鐘 30 個請求，以及長按提醒通知回覆時每個安裝每天 200 個 AI 請求（防濫用，不是賣的東西，沒有每月額度）；支援頁的常見問題只留一題「有 App 內購買或訂閱嗎？」（`#zh-purchases`、`#en-purchases`），回答「沒有」。網站只寫 1.0 做的事，不提 1.1 的計畫。這要和 `AppConstants.subscriptionsEnabled = false`、App Store Connect 不附加任何購買項目一致。1.1 開始賣 AI 訂閱、加入附件時，在 1.1 送審前的同一次發佈改回（為 1.0 寫過的文字在 commit `6ce6551`）：政策摘要、第 4 節的照片和 PDF（加上同意說明第 8 版的附件那一項）、第 6 節（免費額度的次數存在 App Attest 金鑰記錄裡）、第 7 節「購買」（Apple 處理付款；App 用 StoreKit 在 iPhone 上確認；伺服器驗證 Apple 簽署的購買紀錄，只保留原始交易 ID、到期日和請求次數，在收到的最晚到期日過後 30 天刪除；不分享、不用於廣告或追蹤）、第 8 節的相機、照片和「檔案」、第 12 節 Apple 那一項的「App 內購買（訂閱）」、第 13 節的附件、免費額度和訂閱記錄、第 15 節的取消訂閱和法律依據（訂閱是契約，免費額度是正當利益）；支援頁的「有 App 內購買或訂閱嗎？」和「怎麼刪除我的資料？」裡訂閱的那一句；首頁的功能列表。政策依賴的 1.1 建置條件見 `docs/SETTINGS.md` §16（附件以 `inlineData` 放在同一個請求裡、不用 Gemini Files API；購買紀錄不放進轉給 Gemini 的 body，Worker 也不記錄購買紀錄或交易 ID）。這一版（語音輸入；出發提醒延到 1.1，2026-10-22 已從政策和條款拿掉）上線時，中英文兩處的生效日期要改成上線日，並保留開頭的「本版更新」那一行（第 18 節承諾重大變更會明顯標示）。
 7. **上架地區：1.0 不在歐洲經濟區、瑞士、香港、澳門和中國大陸上架**（App Store Connect › 價格與供應狀況（Pricing and Availability）取消 27 個歐盟會員國，加上挪威、冰島、列支敦斯登、瑞士，以及香港、澳門（清單上可能寫 Macao，請在畫面上確認）、中國大陸（Gemini API 不在那裡提供）；**英國**和其他地區照常上架，見 `docs/app-store-metadata.md` §4.3）。政策照仍在上架範圍內的地區寫：第 1 節用「英國 GDPR 等個資法」的用語，第 15 節的地區舉例是英國、美國加州和台灣，申訴機關舉英國的 ICO，法律依據的標題是「適用英國 GDPR 或類似法律時」，第 17 節寫英國使用者適用的 DPF 英國延伸。權利（查詢、更正、刪除、限制、反對、可攜、撤回同意）和法律依據的內容不變，英國 GDPR 一樣適用。
    - **歐洲經濟區和瑞士的代表（GDPR 第 27 條、瑞士 FADP 第 14 條）：排除期間不需要。** 之後的版本加入這些 storefront 前，要指定代表、把名稱和郵寄地址寫進政策第 1、19 節（中英文），並把第 1、15 節的法規、地區舉例和申訴機關（挪威 Datatilsynet、冰島 Persónuvernd、瑞士 FDPIC 等）加回去。
    - **英國代表（英國 GDPR 第 27 條）：不需要。** 開發者在英國（網域 WHOIS 的註冊人國家是 GB），第 27 條只要求英國境外的控管者指定代表。要確認的是 ICO 的資料保護費（data protection fee）：上架前到 ico.org.uk 的「Do I need to pay the fee?」自我評估，依結果繳費或記下不用繳的理由，金額以 ICO 網站為準（`docs/app-store-metadata.md` §4.4 第 4 點）；政策第 1、19 節的控管者名稱要和繳費登記的名稱一致。
@@ -275,9 +275,15 @@ Google OAuth 的品牌驗證要求首頁和隱私權政策所在的網域已經�
 
 **要多久：** 已經驗證或自動方式幾分鐘。手動方式 DNS 生效可能要幾分鐘到幾小時，失敗就過幾分鐘再按驗證，**不要改紀錄**。
 
-### 3.8 之後更新網站
+### 3.8 之後更新網站（Vercel）
 
-改了 `public/` 裡的檔案後，只要重新執行 [§3.1](#31-建立-pages-專案並部署在終端機) 的最後一行（在 `site/` 裡，一樣加 `--branch main`）。不用再建立專案，Squarespace 的 DNS 也不用動。Pages 每次部署都會更新快取，通常馬上看得到新版。
+網站現在放在 Vercel（見最上面），**不用**再跑 `wrangler pages deploy`；下面 3.1–3.4 的 Cloudflare Pages 步驟是 2026-10-17 以前的做法，留作紀錄。
+
+1. 在 GitHub 打開 repo `Smart-Schedules-WEB` › **Add file** › **Upload files**。
+2. 把這個 repo `site/public/` 裡改過的檔案拖進去（檔名不變，放在最上層，不要放進資料夾）。
+3. 下面寫一句說明，選 **Commit directly to the `main` branch**，按 **Commit changes**。
+4. 到 Vercel 的專案頁，等最新的部署顯示 **Ready**（通常一分鐘內）。
+5. 打開 https://www.smart-schedules.com/privacy 和 /terms，確認日期是新的。
 
 ### 3.9 疑難排解
 
